@@ -13,8 +13,8 @@ namespace kickcat
 
         Error open(std::string const& interface) override;
         Error close() override;
-        Error read(std::vector<uint8_t>& datagram) override;
-        Error write(std::vector<uint8_t> const& datagram) override;
+        Error read(uint8_t* frame, int32_t frame_size) override;
+        Error write(uint8_t const* frame, int32_t frame_size) override;
 
     private:
         int fd_;

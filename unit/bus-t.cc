@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "Protocol.h"
+#include "protocol.h"
 
 #include <cstdio>
 

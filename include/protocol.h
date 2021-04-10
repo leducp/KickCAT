@@ -5,9 +5,15 @@
 
 namespace kickcat
 {
-    constexpr int32_t  ETH_HEADER_SIZE = 18;
+    constexpr int32_t  ETH_HEADER_SIZE = 14;
     constexpr int32_t  ETH_MTU_SIZE = 1500;
+    constexpr int32_t  ETH_FCS_SIZE = 4;
+    constexpr int32_t  ETH_MAX_SIZE = ETH_HEADER_SIZE + ETH_MTU_SIZE + ETH_FCS_SIZE;
     constexpr uint16_t ETH_ETHERCAT_TYPE = 0x88A4;
+
+    // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
+    constexpr uint8_t PRIMARY_IF_MAC[6]   = { 0x02, 0xCA, 0xCA, 0x0F, 0xFF, 0xFF };
+    constexpr uint8_t SECONDARY_IF_MAC[6] = { 0x02, 0xC0, 0xFF, 0xEE, 0x00, 0xFF };
 
     constexpr int32_t MAX_ETHERCAT_DATAGRAMS = 15; // max EtherCAT datagrams per Ethernet frame
 
@@ -26,8 +32,8 @@ namespace kickcat
     struct EthercatHeader
     {
         int16_t len : 11;
-        int8_t reserved : 1;
-        int8_t type : 4;
+        int16_t reserved : 1;
+        int16_t type : 4;
     } __attribute__((__packed__));
 
     // Ethercat command types

@@ -9,7 +9,7 @@
 #include <cstring>
 
 #include "LinuxSocket.h"
-#include "Protocol.h"
+#include "protocol.h"
 
 namespace kickcat
 {
@@ -23,7 +23,7 @@ namespace kickcat
         }
 
         // Non-blocking mode
-        struct timeval timeout{0, 0};
+        struct timeval timeout{0, 1};
 
         int rc = setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
         if (rc < 0)
@@ -93,23 +93,33 @@ namespace kickcat
         return ESUCCESS;
     }
 
-    Error LinuxSocket::read(std::vector<uint8_t>& frame)
+    Error LinuxSocket::read(uint8_t* frame, int32_t frame_size)
     {
-        int rc = ::recv(fd_, frame.data(), frame.size(), 0);
+        ssize_t rc = ::recv(fd_, frame, frame_size, 0);
         if (rc < 0)
         {
             return EERROR(std::strerror(errno));
+        }
+        if (frame_size != rc)
+        {
+            return EERROR("Wrong number of bytes read");
         }
 
         return ESUCCESS;
     }
 
-    Error LinuxSocket::write(std::vector<uint8_t> const& frame)
+    Error LinuxSocket::write(uint8_t const* frame, int32_t frame_size)
     {
-        int rc = ::send(fd_, frame.data(), frame.size(), 0);
+        printf("frame size is %d and fd is %d\n", frame_size, fd_);
+        ssize_t rc = ::send(fd_, frame, frame_size, 0);
         if (rc < 0)
         {
+            printf("wtf %d\n", rc);
             return EERROR(std::strerror(errno));
+        }
+        if (frame_size != rc)
+        {
+            return EERROR("Wrong number of bytes written");
         }
 
         return ESUCCESS;
