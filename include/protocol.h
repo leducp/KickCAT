@@ -8,6 +8,7 @@ namespace kickcat
     constexpr int32_t  ETH_HEADER_SIZE = 14;
     constexpr int32_t  ETH_MTU_SIZE = 1500;
     constexpr int32_t  ETH_FCS_SIZE = 4;
+    constexpr int32_t  ETH_MIN_SIZE = 60;
     constexpr int32_t  ETH_MAX_SIZE = ETH_HEADER_SIZE + ETH_MTU_SIZE + ETH_FCS_SIZE;
     constexpr uint16_t ETH_ETHERCAT_TYPE = 0x88A4;
 

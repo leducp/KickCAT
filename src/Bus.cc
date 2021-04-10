@@ -33,41 +33,66 @@ namespace kickcat
 
         // set the EtherCAT payload pointer at the right position
         ethercat_payload_ = frame_.data() + ETH_HEADER_SIZE + sizeof(EthercatHeader);
+        current_pos_ = ethercat_payload_;
+    }
+
+
+    void Bus::addDatagram(uint8_t index, enum Command command, uint16_t ADP, uint16_t ADO, void* data, uint16_t data_size)
+    {
+        DatagramHeader* header = reinterpret_cast<DatagramHeader*>(current_pos_);
+        header->index = index;
+        header->command = command;
+        header->address[0] = (ADP & 0x00FF) >> 0;
+        header->address[1] = (ADP & 0xFF00) >> 8;
+        header->address[2] = (ADO & 0x00FF) >> 0;
+        header->address[3] = (ADO & 0xFF00) >> 8;
+        header->len = data_size;
+
+        current_pos_ += sizeof(DatagramHeader);
+
+        if (data_size > 0)
+        {
+            switch (command)
+            {
+                case Command::NOP:
+                case Command::BRD:
+                case Command::APRD:
+                case Command::FPRD:
+                case Command::LRD:
+                {
+                    // no-op or read only command: clear the area
+                    std::memset(current_pos_, 0, data_size);
+                    break;
+                }
+                default:
+                {
+                    // commands that require to write something: copy data
+                    std::memcpy(current_pos_, data, data_size);
+                    current_pos_ += data_size;
+                }
+            }
+        }
+
+        // clear working counter
+        std::memset(current_pos_, 0, 2);
+        current_pos_ += 2;
+
+        header_->len += sizeof(DatagramHeader) + data_size + 2; // +2 for wkc
     }
 
 
     int32_t Bus::getSlavesOnNetwork()
     {
-        std::memset(ethercat_payload_, 0, 60);
+        uint8_t data = 0;
+        addDatagram(1, Command::BWR, 0xF, 0x0101, &data, 1);
 
-        DatagramHeader* header = reinterpret_cast<DatagramHeader*>(ethercat_payload_);
-        header->command = Command::BWR;
-        header->index = 0x80;
-        header->address[0] = 0x0F;
-        header->address[1] = 0x00;
-        header->address[2] = 0x01;
-        header->address[3] = 0x01;
-        header->len = 1;
-
-        uint8_t* payload = ethercat_payload_ + sizeof(DatagramHeader);
-        payload[0] = 0;
         uint16_t* wkc = reinterpret_cast<uint16_t*>(ethercat_payload_ + sizeof(DatagramHeader) + 1);
-        *wkc = 0;
-
-        int32_t length = sizeof(DatagramHeader) + 1 + 2; //+2 working counter
-        header_->len = length;
 
         Error err = socket_->write(frame_.data(), 60);
         if (err) { err.what(); }
 
-        for (int32_t i = 0; i < 10; ++i)
-        {
-            usleep(1000);
-
-            err = socket_->read(frame_.data(), 60);
-            if (err) { err.what(); }
-            else break;
-        }
+        err = socket_->read(frame_.data(), 60);
+        if (err) { err.what(); }
 
         printf("----> There is %d slaves on the bus\n", *wkc);
 
