@@ -16,6 +16,7 @@ namespace kickcat
     constexpr uint8_t PRIMARY_IF_MAC[6]   = { 0x02, 0xCA, 0xCA, 0x0F, 0xFF, 0xFF };
     constexpr uint8_t SECONDARY_IF_MAC[6] = { 0x02, 0xC0, 0xFF, 0xEE, 0x00, 0xFF };
 
+    constexpr int32_t ETHERCAT_WKC_SIZE = 2;
     constexpr int32_t MAX_ETHERCAT_DATAGRAMS = 15; // max EtherCAT datagrams per Ethernet frame
 
     // EtherCAT state machine states

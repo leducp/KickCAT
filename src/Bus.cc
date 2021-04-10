@@ -34,6 +34,16 @@ namespace kickcat
         // set the EtherCAT payload pointer at the right position
         ethercat_payload_ = frame_.data() + ETH_HEADER_SIZE + sizeof(EthercatHeader);
         current_pos_ = ethercat_payload_;
+
+        header_recv_ = reinterpret_cast<EthercatHeader*>(frame_received_.data() + ETH_HEADER_SIZE);
+        ethercat_payload_recv_ = frame_received_.data() + ETH_HEADER_SIZE + sizeof(EthercatHeader);
+        current_pos_recv_ = ethercat_payload_recv_;
+    }
+
+
+    int32_t Bus::freeSpace() const
+    {
+        return ETH_MTU_SIZE - sizeof(EthercatHeader) - (current_pos_ - ethercat_payload_);
     }
 
 
@@ -47,6 +57,7 @@ namespace kickcat
         header->address[2] = (ADO & 0x00FF) >> 0;
         header->address[3] = (ADO & 0xFF00) >> 8;
         header->len = data_size;
+        header->multiple = 1; // by default, consider that more datagrams will follow
 
         current_pos_ += sizeof(DatagramHeader);
 
@@ -78,23 +89,52 @@ namespace kickcat
         current_pos_ += 2;
 
         header_->len += sizeof(DatagramHeader) + data_size + 2; // +2 for wkc
+        last_datagram_ = header;    // save last datagram header to finalize frame when ready
+        ++datagram_counter_;        // one more datagram in the frame to be sent
     }
 
 
+    int32_t Bus::finalizeFrame()
+    {
+        last_datagram_->multiple = 0; // no more datagram in this frame -> ready to be sent!
+        uint8_t* saved_current_pos = current_pos_; // save current position before resetting context (needed to handle padding)
+
+        // reset context
+        current_pos_ = ethercat_payload_;
+
+        if (header_->len < ETH_MIN_SIZE)
+        {
+            // reset padding
+            std::memset(saved_current_pos, 0, ETH_MIN_SIZE - header_->len);
+            return ETH_MIN_SIZE;
+        }
+        return header_->len;
+    }
+
+
+    std::tuple<DatagramHeader const*, uint8_t const*, uint16_t> Bus::readNextDatagram()
+    {
+        DatagramHeader const* header = reinterpret_cast<DatagramHeader*>(current_pos_recv_);
+        uint8_t const* data = current_pos_recv_ + sizeof(DatagramHeader);
+        uint16_t const* wkc = reinterpret_cast<uint16_t const*>(data + header->len);
+        return std::make_tuple(header, data, *wkc);
+    }
+
     int32_t Bus::getSlavesOnNetwork()
     {
-        uint8_t data = 0;
-        addDatagram(1, Command::BWR, 0xF, 0x0101, &data, 1);
+        uint8_t param = 0;
+        addDatagram(1, Command::BWR, 0, 0x0101, &param, 1);
+        int32_t toWrite = finalizeFrame();
 
-        uint16_t* wkc = reinterpret_cast<uint16_t*>(ethercat_payload_ + sizeof(DatagramHeader) + 1);
-
-        Error err = socket_->write(frame_.data(), 60);
+        Error err = socket_->write(frame_.data(), toWrite);
         if (err) { err.what(); }
 
-        err = socket_->read(frame_.data(), 60);
+        err = socket_->read(frame_received_.data(), toWrite);
         if (err) { err.what(); }
 
-        printf("----> There is %d slaves on the bus\n", *wkc);
+        auto [header, data, wkc] = readNextDatagram();
+
+        printf("----> There is %d slaves on the bus %02x%02x %02x%02x\n", wkc, header->address[0], header->address[1], header->address[2], header->address[3]);
 
         return 0;
     }

@@ -6,6 +6,12 @@ add_library(kickcat src/Bus.cc
                     src/LinuxSocket.cc)
 target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_compile_options(-Wall -Wextra -pedantic)# -Werror)
+set_target_properties(kickcat PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED YES
+    CXX_EXTENSIONS NO
+    POSITION_INDEPENDENT_CODE ON
+)
 
 include(FetchContent)
 FetchContent_Declare(
