@@ -13,8 +13,8 @@ namespace kickcat
 
         virtual Error open(std::string const& interface) = 0;
         virtual Error close() = 0;
-        virtual Error read(uint8_t* frame, int32_t frame_size) = 0;
-        virtual Error write(uint8_t const* frame, int32_t frame_size) = 0;
+        virtual int32_t read(uint8_t* frame, int32_t frame_size) = 0;
+        virtual int32_t write(uint8_t const* frame, int32_t frame_size) = 0;
     };
 }
 

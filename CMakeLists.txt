@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 project(KickCAT)
 
 add_library(kickcat src/Bus.cc
+                    src/Frame.cc
                     src/Error.cc
                     src/LinuxSocket.cc)
 target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

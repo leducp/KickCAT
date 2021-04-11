@@ -5,7 +5,7 @@ using namespace kickcat;
 
 int main()
 {
-    auto socket = std::make_unique<LinuxSocket>();
+    auto socket = std::make_shared<LinuxSocket>();
     Error err = socket->open("enp0s31f6");
     if (err)
     {
@@ -13,7 +13,7 @@ int main()
         return 1;
     }
 
-    Bus bus(std::move(socket));
+    Bus bus(socket);
     bus.getSlavesOnNetwork();
     return 0;
 }

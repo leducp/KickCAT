@@ -3,7 +3,6 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <net/if.h>
-#include <arpa/inet.h>
 #include <linux/if_packet.h>
 
 #include <cstring>
@@ -16,7 +15,7 @@ namespace kickcat
     Error LinuxSocket::open(std::string const& interface)
     {
         // RAW socket with EtherCAT type
-        fd_ = socket(PF_PACKET, SOCK_RAW, htons(ETH_ETHERCAT_TYPE));
+        fd_ = socket(PF_PACKET, SOCK_RAW, ETH_ETHERCAT_TYPE);
         if (fd_ < 0)
         {
             return EERROR(std::strerror(errno));
@@ -47,7 +46,7 @@ namespace kickcat
 
         // Connect socket to interface and configure interface for EtherCAT use (promiscious, broadcast)
         struct ifreq ifr;
-        std::strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ-1);
+        std::strncpy(ifr.ifr_name, interface.c_str(), sizeof(ifr.ifr_name)-1);
         rc = ioctl(fd_, SIOCGIFINDEX, &ifr);
         if (rc < 0)
         {
@@ -72,7 +71,7 @@ namespace kickcat
         struct sockaddr_ll link_layer;
         link_layer.sll_family = AF_PACKET;
         link_layer.sll_ifindex = interface_index;
-        link_layer.sll_protocol = htons(ETH_ETHERCAT_TYPE);
+        link_layer.sll_protocol = ETH_ETHERCAT_TYPE;
         rc = bind(fd_, (struct sockaddr *)&link_layer, sizeof(link_layer));
         if (rc < 0)
         {
@@ -93,35 +92,13 @@ namespace kickcat
         return ESUCCESS;
     }
 
-    Error LinuxSocket::read(uint8_t* frame, int32_t frame_size)
+    int32_t LinuxSocket::read(uint8_t* frame, int32_t frame_size)
     {
-        ssize_t rc = ::recv(fd_, frame, frame_size, 0);
-        if (rc < 0)
-        {
-            return EERROR(std::strerror(errno));
-        }
-        if (frame_size != rc)
-        {
-            return EERROR("Wrong number of bytes read");
-        }
-
-        return ESUCCESS;
+        return ::read(fd_, frame, frame_size);
     }
 
-    Error LinuxSocket::write(uint8_t const* frame, int32_t frame_size)
+    int32_t LinuxSocket::write(uint8_t const* frame, int32_t frame_size)
     {
-        printf("frame size is %d and fd is %d\n", frame_size, fd_);
-        ssize_t rc = ::send(fd_, frame, frame_size, 0);
-        if (rc < 0)
-        {
-            printf("wtf %d\n", rc);
-            return EERROR(std::strerror(errno));
-        }
-        if (frame_size != rc)
-        {
-            return EERROR("Wrong number of bytes written");
-        }
-
-        return ESUCCESS;
+        return ::write(fd_, frame, frame_size);
     }
 }
