@@ -117,14 +117,54 @@ namespace kickcat
     // EtherCAT standard registers
     namespace registers
     {
-        constexpr uint16_t ESC_DL_FWRD  = 0x100;
-        constexpr uint16_t ESC_DL_PORT  = 0x101;
-        constexpr uint16_t ESC_DL_ALIAS = 0x103;
+        constexpr uint16_t TYPE          = 0x0000;
+        constexpr uint16_t REVISION      = 0x0001;
+        constexpr uint16_t BUILD         = 0x0002; // 2 bytes
+        constexpr uint16_t FMMU_SUP      = 0x0004;
+        constexpr uint16_t SYNC_MNGR_SUP = 0x0005;
+        constexpr uint16_t RAM_SIZE      = 0x0006;
+        constexpr uint16_t PORT_DESC     = 0x0007;
+        constexpr uint16_t ESC_FEATURES  = 0x0008; // 2 bytes
 
-        constexpr uint16_t SYNC_MANAGER_0 = 0x800;
-        constexpr uint16_t SYNC_MANAGER_1 = SYNC_MANAGER_0 + 0x8;
-        constexpr uint16_t SYNC_MANAGER_2 = SYNC_MANAGER_1 + 0x8;
-        constexpr uint16_t SYNC_MANAGER_3 = SYNC_MANAGER_2 + 0x8;
+        constexpr uint16_t STATION_ADDR  = 0x0010; // 2 bytes
+        constexpr uint16_t STATION_ALIAS = 0x0012; // 2 bytes
+
+        constexpr uint16_t REG_WRITE_EN  = 0x0020;
+        constexpr uint16_t REG_WRITE_PRO = 0x0021;
+
+        constexpr uint16_t ESC_WRITE_EN  = 0x0030;
+        constexpr uint16_t ESC_WRITE_PRO = 0x0031;
+
+        constexpr uint16_t ESC_DL_FWRD   = 0x100;
+        constexpr uint16_t ESC_DL_PORT   = 0x101;
+        constexpr uint16_t ESC_DL_ALIAS  = 0x103;
+        constexpr uint16_t ESC_DL_STATUS = 0x110;
+
+        constexpr uint16_t AL_CONTROL    = 0x120;
+        constexpr uint16_t AL_STATUS     = 0x130;
+
+        constexpr uint16_t PDI_CONTROL   = 0x140;
+        constexpr uint16_t ESC_CONFIG    = 0x141;
+
+        constexpr uint16_t ECAT_EVENT_MASK = 0x200;
+        constexpr uint16_t RX_ERROR        = 0x300;
+
+        constexpr uint16_t EEPROM_CONFIG  = 0x500;
+        constexpr uint16_t EEPROM_PDI     = 0x501;
+        constexpr uint16_t EEPROM_CONTROL = 0x502; // 2 bytes
+        constexpr uint16_t EEPROM_ADDRESS = 0x504; // 4 bytes
+        constexpr uint16_t EEPROM_DATA    = 0x508; // 8 bytes
+
+        constexpr uint16_t FMMU            = 0x600; // each FFMU entry is described in 16 bytes (6x0 to 6xF), up to 16 FMMU (max adress is 6FF)
+
+        constexpr uint16_t SYNC_MANAGER    = 0x800; // each SyncManager is described in 8 bytes, up to 15 Sync Manager (max address is 87F)
+
+        constexpr uint16_t DC_TIME            = 0x900;
+        constexpr uint16_t DC_SYSTEM_TIME     = 0x910;
+        constexpr uint16_t DC_SPEED_CNT_START = 0x930;
+        constexpr uint16_t DC_TIME_FILTER     = 0x934;
+        constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
+        constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
     }
 
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
