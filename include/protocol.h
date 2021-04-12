@@ -64,7 +64,7 @@ namespace kickcat
 
 
     // EtherCAT state machine states
-    enum class SM_STATE : int16_t
+    enum SM_STATE : uint8_t
     {
         INVALID     = 0x00,
         INIT        = 0x01,
@@ -72,7 +72,7 @@ namespace kickcat
         BOOT        = 0x03,
         SAFE_OP     = 0x04,
         OPERATIONAL = 0x08,
-        ERROR       = 0x10
+        ACK         = 0x10  // Acknowledge flag request - check AL_STATUS
     };
 
 
@@ -115,7 +115,7 @@ namespace kickcat
     //TODO need unit test on bitfield to check position !
 
     // EtherCAT standard registers
-    namespace registers
+    namespace reg
     {
         constexpr uint16_t TYPE          = 0x0000;
         constexpr uint16_t REVISION      = 0x0001;
@@ -155,9 +155,9 @@ namespace kickcat
         constexpr uint16_t EEPROM_ADDRESS = 0x504; // 4 bytes
         constexpr uint16_t EEPROM_DATA    = 0x508; // 8 bytes
 
-        constexpr uint16_t FMMU            = 0x600; // each FFMU entry is described in 16 bytes (6x0 to 6xF), up to 16 FMMU (max adress is 6FF)
+        constexpr uint16_t FMMU            = 0x600; // each FFMU entry is described in 16 bytes (6x0 to 6xF), up to 16 FMMU
 
-        constexpr uint16_t SYNC_MANAGER    = 0x800; // each SyncManager is described in 8 bytes, up to 15 Sync Manager (max address is 87F)
+        constexpr uint16_t SYNC_MANAGER    = 0x800; // each SyncManager is described in 8 bytes, up to 8 Sync Manager
 
         constexpr uint16_t DC_TIME            = 0x900;
         constexpr uint16_t DC_SYSTEM_TIME     = 0x910;

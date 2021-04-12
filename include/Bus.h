@@ -18,8 +18,9 @@ namespace kickcat
         ~Bus() = default;
 
         Error init();
+        Error requestState(SM_STATE request);
 
-        int32_t getSlavesOnNetwork();
+        uint16_t getSlavesOnNetwork();
 
     private:
         Error resetSlaves();

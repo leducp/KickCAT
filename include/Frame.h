@@ -18,12 +18,15 @@ namespace kickcat
         Frame(uint8_t const src_mac[6]);
         ~Frame() = default;
 
-        /// \return free space in bytes of the current frame
-        int32_t freeSpace() const;
-
         /// \brief Add a datagram in the frame
         /// \warning Doesn't check anything - max datagram nor max size!
-        void addDatagram(uint8_t index, enum Command command, uint32_t address, void* data, uint16_t data_size);
+        void addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size);
+
+        template<typename T>
+        void addDatagram(uint8_t index, enum Command command, uint32_t address, T const& data)
+        {
+            addDatagram(index, command, address, &data, sizeof(data));
+        }
 
         /// \brief finalize the frame to sent it on the network - handle padding and multiple datagram flag
         /// \return the number of bytes to write on the network
@@ -35,8 +38,19 @@ namespace kickcat
 
         EthernetFrame const& frame() const { return frame_; }
 
+        /// \return number of datagram already written in the frame
+        int32_t datagramCounter() const { return datagram_counter_; }
+
+        /// \return free space in bytes of the current frame
+        int32_t freeSpace() const;
+
+        /// \return true if the frame is full (no more datagram can be added: either there is not sufficient space or max datagram was reached)
+        bool isFull() const;
+
+        // handle bus access
         Error read(std::shared_ptr<AbstractSocket> socket);
         Error write(std::shared_ptr<AbstractSocket> socket);
+        Error writeThenRead(std::shared_ptr<AbstractSocket> socket);
 
     private:
         EthernetFrame frame_;

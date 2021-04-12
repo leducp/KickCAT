@@ -1,5 +1,6 @@
 #include "Frame.h"
 #include <cstring>
+#include <unistd.h>
 
 namespace kickcat
 {
@@ -29,7 +30,23 @@ namespace kickcat
     }
 
 
-    void Frame::addDatagram(uint8_t index, enum Command command, uint32_t address, void* data, uint16_t data_size)
+    bool Frame::isFull() const
+    {
+        if (datagram_counter_ >= MAX_ETHERCAT_DATAGRAMS)
+        {
+            return true;
+        }
+
+        if (freeSpace() <= (sizeof(DatagramHeader) + sizeof(uint16_t)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    void Frame::addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
     {
         DatagramHeader* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
         uint8_t* pos = next_datagram_;
@@ -88,13 +105,14 @@ namespace kickcat
         last_datagram_ = first_datagram_;
         datagram_counter_ = 0;
 
-        if (header_->len < ETH_MIN_SIZE)
+        int32_t to_write = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        if (to_write < ETH_MIN_SIZE)
         {
             // reset padding
-            std::memset(pos, 0, ETH_MIN_SIZE - header_->len);
+            std::memset(pos, 0, ETH_MIN_SIZE - to_write);
             return ETH_MIN_SIZE;
         }
-        return header_->len;
+        return to_write;
     }
 
 
@@ -109,9 +127,7 @@ namespace kickcat
 
     Error Frame::read(std::shared_ptr<AbstractSocket> socket)
     {
-        next_datagram_ = first_datagram_;
         int32_t read = socket->read(frame_.data(), frame_.size());
-        printf("read %d\n", read);
         if (read < 0)
         {
             return EERROR(std::strerror(errno));
@@ -123,8 +139,8 @@ namespace kickcat
             return EERROR("Wrong frame type");
         }
 
-
         int32_t expected = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        header_->len = 0; // reset len for future usage
         if (expected < ETH_MIN_SIZE)
         {
             expected = ETH_MIN_SIZE;
@@ -142,6 +158,8 @@ namespace kickcat
     {
         int32_t toWrite = finalize();
         int32_t written = socket->write(frame_.data(), toWrite);
+        //printf("written: %d\n", written);
+
         if (written < 0)
         {
             return EERROR(std::strerror(errno));
@@ -152,7 +170,17 @@ namespace kickcat
             return EERROR("wrong number of written bytes: expected " + std::to_string(toWrite) + ", written  " + std::to_string(written));
         }
 
-        printf("written %d\n", written);
+        return ESUCCESS;
+    }
+
+
+    Error Frame::writeThenRead(std::shared_ptr<AbstractSocket> socket)
+    {
+        Error err = write(socket);
+        if (err) { err += EERROR(""); return err; }
+
+        err = read(socket);
+        if (err) { err += EERROR(""); return err; }
 
         return ESUCCESS;
     }

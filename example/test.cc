@@ -1,6 +1,8 @@
 #include "Bus.h"
 #include "LinuxSocket.h"
 
+#include <unistd.h>
+
 using namespace kickcat;
 
 int main()
@@ -14,6 +16,9 @@ int main()
     }
 
     Bus bus(socket);
-    bus.getSlavesOnNetwork();
+    printf("%u slaves detected\n", bus.getSlavesOnNetwork());
+
+    err = bus.init();
+    err.what();
     return 0;
 }
