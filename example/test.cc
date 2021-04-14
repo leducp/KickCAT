@@ -16,7 +16,6 @@ int main()
     }
 
     Bus bus(socket);
-    printf("%u slaves detected\n", bus.getSlavesOnNetwork());
 
     err = bus.init();
     err.what();

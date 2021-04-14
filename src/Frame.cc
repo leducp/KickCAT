@@ -2,6 +2,8 @@
 #include <cstring>
 #include <unistd.h>
 
+#include <fstream>
+
 namespace kickcat
 {
     Frame::Frame(uint8_t const src_mac[6])
@@ -78,19 +80,30 @@ namespace kickcat
                 {
                     // commands that require to write something: copy data
                     std::memcpy(pos, data, data_size);
-                    pos += data_size;
                 }
             }
         }
 
         // clear working counter
+        pos += data_size;
         std::memset(pos, 0, 2);
+
+        // next datagram position
         pos += 2;
 
         header_->len += sizeof(DatagramHeader) + data_size + 2; // +2 for wkc
         last_datagram_ = reinterpret_cast<uint8_t*>(header);    // save last datagram header to finalize frame when ready
-        next_datagram_ = pos;    // save current
-        ++datagram_counter_;     // one more datagram in the frame to be sent
+        next_datagram_ = pos;                                   // set next datagram
+        ++datagram_counter_;                                    // one more datagram in the frame to be sent
+    }
+
+
+    void Frame::clear()
+    {
+        // reset context
+        next_datagram_ = first_datagram_;
+        last_datagram_ = first_datagram_;
+        datagram_counter_ = 0;
     }
 
 
@@ -100,10 +113,7 @@ namespace kickcat
         header->multiple = 0;           // no more datagram in this frame -> ready to be sent!
         uint8_t* pos = next_datagram_;  // save current position before resetting context (needed to handle padding)
 
-        // reset context
-        next_datagram_ = first_datagram_;
-        last_datagram_ = first_datagram_;
-        datagram_counter_ = 0;
+        clear();
 
         int32_t to_write = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
         if (to_write < ETH_MIN_SIZE)
@@ -119,8 +129,16 @@ namespace kickcat
     std::tuple<DatagramHeader const*, uint8_t const*, uint16_t> Frame::nextDatagram()
     {
         DatagramHeader const* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
-        uint8_t const* data = next_datagram_ + sizeof(DatagramHeader);
-        uint16_t const* wkc = reinterpret_cast<uint16_t const*>(data + header->len);
+        uint8_t* data = next_datagram_ + sizeof(DatagramHeader);
+        uint16_t* wkc = reinterpret_cast<uint16_t*>(data + header->len);
+        next_datagram_ = reinterpret_cast<uint8_t*>(wkc) + sizeof(uint16_t);
+
+        if (header->multiple == 0)
+        {
+            // This was the last datagram of this frame: clear context for future usage
+            clear();
+        }
+
         return std::make_tuple(header, data, *wkc);
     }
 
@@ -158,8 +176,11 @@ namespace kickcat
     {
         int32_t toWrite = finalize();
         int32_t written = socket->write(frame_.data(), toWrite);
-        //printf("written: %d\n", written);
-
+/*
+        std::ofstream myfile;
+        myfile.open ("yolo.bin", std::ios::out | std::ios::binary | std::ios::trunc);
+        myfile.write((char const*)frame_.data(), frame_.size());
+*/
         if (written < 0)
         {
             return EERROR(std::strerror(errno));

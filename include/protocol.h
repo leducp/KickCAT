@@ -64,7 +64,7 @@ namespace kickcat
 
 
     // EtherCAT state machine states
-    enum SM_STATE : uint8_t
+    enum State : uint8_t
     {
         INVALID     = 0x00,
         INIT        = 0x01,
@@ -74,13 +74,27 @@ namespace kickcat
         OPERATIONAL = 0x08,
         ACK         = 0x10  // Acknowledge flag request - check AL_STATUS
     };
+    constexpr char const* toString(State state)
+    {
+        uint8_t raw_state = state & 0xF;
+        switch (raw_state)
+        {
+            case INVALID:     { return "invalid";     }
+            case INIT:        { return "init";        }
+            case PRE_OP:      { return "pre-op";      }
+            case BOOT:        { return "boot";        }
+            case SAFE_OP:     { return "safe-op";     }
+            case OPERATIONAL: { return "operational"; }
+            default:          { return "unknown";     }
+        }
+    }
 
 
-    enum class MailboxType
+    enum MailboxProtocol
     {
         AoE = 0x01,
         EoE = 0x02,
-        CoE = 0x03,
+        CoE = 0x04,
         FoE = 0x08,
         SoE = 0x10
     };
@@ -140,8 +154,9 @@ namespace kickcat
         constexpr uint16_t ESC_DL_ALIAS  = 0x103;
         constexpr uint16_t ESC_DL_STATUS = 0x110;
 
-        constexpr uint16_t AL_CONTROL    = 0x120;
-        constexpr uint16_t AL_STATUS     = 0x130;
+        constexpr uint16_t AL_CONTROL     = 0x120;
+        constexpr uint16_t AL_STATUS      = 0x130;
+        constexpr uint16_t AL_STATUS_CODE = 0x134;
 
         constexpr uint16_t PDI_CONTROL   = 0x140;
         constexpr uint16_t ESC_CONFIG    = 0x141;
@@ -166,6 +181,44 @@ namespace kickcat
         constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
         constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
     }
+
+    namespace eeprom
+    {
+        constexpr uint16_t ESC_INFO            = 0x00;
+        constexpr uint16_t ESC_PDI_CONTROL     = 0;
+        constexpr uint16_t ESC_PDI_CONFIG      = 1;
+        constexpr uint16_t ESC_SYNC_IMPULSE    = 2;
+        constexpr uint16_t ESC_PDI_CONFIG_2    = 3;
+
+        constexpr uint16_t ESC_STATION_ALIAS   = 0x04;
+        constexpr uint16_t ESC_CRC             = 0x07;
+
+        constexpr uint16_t VENDOR_ID           = 0x8;
+        constexpr uint16_t PRODUCT_CODE        = 0xA;
+        constexpr uint16_t REVISION_NUMBER     = 0xC;
+        constexpr uint16_t SERIAL_NUMBER       = 0xE;
+
+        constexpr uint16_t BOOTSTRAP_MAILBOX   = 0x14;
+        constexpr uint16_t STANDARD_MAILBOX    = 0x18;
+        constexpr uint16_t RECV_MBO_OFFSET     = 0;
+        constexpr uint16_t RECV_MBO_SIZE       = 1;
+        constexpr uint16_t SEND_MBO_OFFSET     = 2;
+        constexpr uint16_t SEND_MBO_SIZE       = 3;
+        constexpr uint16_t MAILBOX_PROTOCOL    = 0x1C;
+
+        constexpr uint16_t EEPROM_SIZE         = 0x3E;
+        constexpr uint16_t EEPROM_VERSION      = 0x3F;
+
+        constexpr uint16_t START_CATEGORY      = 0x40;
+    }
+
+    enum EepromCommand : uint16_t
+    {
+        NOP    = 0x0000,  // clear error bits
+        READ   = 0x0100,
+        WRITE  = 0x0201,
+        RELOAD = 0x0300
+    };
 
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
     constexpr uint8_t PRIMARY_IF_MAC[6]   = { 0x02, 0x00, 0xCA, 0xCA, 0x00, 0xFF };

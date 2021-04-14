@@ -28,6 +28,8 @@ namespace kickcat
             addDatagram(index, command, address, &data, sizeof(data));
         }
 
+        void clear(); // reset frame context
+
         /// \brief finalize the frame to sent it on the network - handle padding and multiple datagram flag
         /// \return the number of bytes to write on the network
         int32_t finalize();
