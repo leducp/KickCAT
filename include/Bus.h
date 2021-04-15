@@ -45,15 +45,18 @@ namespace kickcat
 
         Error init();
         Error requestState(State request);
-        State getCurrentState(uint16_t slave);
+        State getCurrentState(Slave const& slave);
 
         uint16_t getSlavesOnNetwork();
 
         void printSlavesInfo();
 
     private:
+
+        // INIT state methods
         Error detectSlaves();
         Error resetSlaves();
+        Error configureMailboxes();
 
         Error fetchEeprom();
         bool areEepromReady();

@@ -63,7 +63,14 @@ namespace kickcat
         {
             return err;
         }
-/*
+
+        err = configureMailboxes();
+        if (err)
+        {
+            return err;
+        }
+
+
         //requestState(SM_STATE::INIT);
         //usleep(5000);
         requestState(State::PRE_OP);
@@ -71,20 +78,11 @@ namespace kickcat
         //requestState(SM_STATE::SAFE_OP);
         //requestState(SM_STATE::OPERATIONAL);
 
-        for (uint16_t slave = 0; slave < 3; ++slave)
+        for (auto& slave : slaves_)
         {
             State state = getCurrentState(slave);
-            printf("Slave %d state is %s - %x\n", slave, toString(state), state);
+            printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
         }
-
-        requestState(State::INIT);
-        usleep(5000);
-        for (uint16_t slave = 0; slave < 3; ++slave)
-        {
-            State state = getCurrentState(slave);
-            printf("Slave %d state is %s - %x\n", slave, toString(state), state);
-        }
-        */
 
         err += EERROR("Not implemented");
         return err;
@@ -106,9 +104,9 @@ namespace kickcat
     }
 
 
-    State Bus::getCurrentState(uint16_t slave)
+    State Bus::getCurrentState(Slave const& slave)
     {
-        frame_.addDatagram(0x55, Command::APRD, createAddress(0 - slave, reg::AL_STATUS), nullptr, 2);
+        frame_.addDatagram(0x55, Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2);
         Error err = frame_.writeThenRead(socket_);
         if (err)
         {
@@ -219,6 +217,39 @@ namespace kickcat
         return ESUCCESS;
     }
 
+
+    Error Bus::configureMailboxes()
+    {
+        for (auto& slave : slaves_)
+        {
+            if (slave.supported_mailbox)
+            {
+                // 0 is mailbox out, 1 is mailbox in - cf. default EtherCAT configuration if slave support a mailbox
+                // NOTE: mailbox out -> master to slave - mailbox in -> slave to master
+                SyncManager SM[2];
+                SM[0].start_address = slave.mailbox_standard.recv_offset;
+                SM[0].length        = slave.mailbox_standard.recv_size;
+                SM[0].control       = 0x26; // 1 buffer - write access - PDI IRQ ON
+                SM[0].status        = 0x00; // RO register
+                SM[0].activate      = 0x01; // Sync Manger enable
+                SM[0].pdi_control   = 0x00; // RO register
+                SM[1].start_address = slave.mailbox_standard.send_offset;
+                SM[1].length        = slave.mailbox_standard.send_size;
+                SM[1].control       = 0x22; // 1 buffer - read access - PDI IRQ ON
+                SM[1].status        = 0x00; // RO register
+                SM[1].activate      = 0x01; // Sync Manger enable
+                SM[1].pdi_control   = 0x00; // RO register
+
+                frame_.addDatagram(1, Command::FPRW, createAddress(slave.address, reg::SYNC_MANAGER), SM);
+            }
+        }
+
+        if (frame_.datagramCounter() > 0)
+        {
+            return frame_.writeThenRead(socket_);
+        }
+        return ESUCCESS; // No mailbox to configure
+    }
 
     bool Bus::areEepromReady()
     {
@@ -355,7 +386,7 @@ namespace kickcat
     {
         for (auto const& slave : slaves_)
         {
-            printf("-*-*-*-*- slave 0x%04x -*-*-*-*-n", slave.address);
+            printf("-*-*-*-*- slave 0x%04x -*-*-*-*-\n", slave.address);
             printf("Vendor ID:       0x%08x\n", slave.vendor_id);
             printf("Product code:    0x%08x\n", slave.product_code);
             printf("Revision number: 0x%08x\n", slave.revision_number);

@@ -182,6 +182,16 @@ namespace kickcat
         constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
     }
 
+    struct SyncManager
+    {
+        uint16_t start_address;
+        uint16_t length;
+        uint8_t  control;
+        uint8_t  status;
+        uint8_t  activate;
+        uint8_t  pdi_control;
+    } __attribute__((__packed__));
+
     namespace eeprom
     {
         constexpr uint16_t ESC_INFO            = 0x00;
