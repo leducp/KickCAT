@@ -2,7 +2,7 @@
 #include <cstring>
 #include <unistd.h>
 
-#include <fstream>
+#include <fstream> // debug
 
 namespace kickcat
 {
@@ -13,6 +13,7 @@ namespace kickcat
         , next_datagram_{first_datagram_}
         , last_datagram_{next_datagram_}
         , datagram_counter_{0}
+        , isDatagramAvailable_{false}
     {
         // prepare Ethernet header once for the all future communication
         std::memset(ethernet_->dst_mac, 0xFF, sizeof(ethernet_->dst_mac));      // broadcast
@@ -25,6 +26,21 @@ namespace kickcat
         header_->type = 1;
         header_->len  = 0;
     }
+
+
+    Frame::Frame(Frame&& other)
+        : frame_{std::move(other.frame_)}
+        , ethernet_{reinterpret_cast<EthernetHeader*>(frame_.data())}
+        , header_  {reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader))}
+        , first_datagram_{frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader)}
+        , next_datagram_{first_datagram_}
+        , last_datagram_{next_datagram_}
+        , datagram_counter_{0}
+        , isDatagramAvailable_{false}
+    {
+
+    }
+
 
     int32_t Frame::freeSpace() const
     {
@@ -104,6 +120,7 @@ namespace kickcat
         next_datagram_ = first_datagram_;
         last_datagram_ = first_datagram_;
         datagram_counter_ = 0;
+        isDatagramAvailable_ = false;
     }
 
 
@@ -168,6 +185,7 @@ namespace kickcat
             return EERROR("wrong number of read bytes: expected " + std::to_string(expected) + " got " + std::to_string(read));
         }
 
+        isDatagramAvailable_ = true;
         return ESUCCESS;
     }
 

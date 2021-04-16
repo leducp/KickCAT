@@ -16,17 +16,12 @@ namespace kickcat
     {
     public:
         Frame(uint8_t const src_mac[6]);
+        Frame(Frame&& other);
         ~Frame() = default;
 
         /// \brief Add a datagram in the frame
         /// \warning Doesn't check anything - max datagram nor max size!
         void addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size);
-
-        template<typename T>
-        void addDatagram(uint8_t index, enum Command command, uint32_t address, T const& data)
-        {
-            addDatagram(index, command, address, &data, sizeof(data));
-        }
 
         void clear(); // reset frame context
 
@@ -49,6 +44,9 @@ namespace kickcat
         /// \return true if the frame is full (no more datagram can be added: either there is not sufficient space or max datagram was reached)
         bool isFull() const;
 
+        /// \return true if datagram can be extracted, false otherwise
+        bool isDatagramAvailable() const { return isDatagramAvailable_; }
+
         // handle bus access
         Error read(std::shared_ptr<AbstractSocket> socket);
         Error write(std::shared_ptr<AbstractSocket> socket);
@@ -62,6 +60,7 @@ namespace kickcat
         uint8_t* last_datagram_;        // Last **written** datagram
         uint8_t* next_datagram_;        // Next datagram **to write** or **to read**
         int32_t datagram_counter_;      // number of datagram already written
+        bool isDatagramAvailable_{false};
     };
 }
 

@@ -1,16 +1,18 @@
+#include <unistd.h>
+#include <cstring>
+
 #include "Bus.h"
 #include "AbstractSocket.h"
-#include <unistd.h>
 
-#include <cstring>
+#include <fstream> // debug
 
 namespace kickcat
 {
     Bus::Bus(std::shared_ptr<AbstractSocket> socket)
         : socket_{socket}
-        , frame_{PRIMARY_IF_MAC}
+        , frames_{}
     {
-
+        frames_.emplace_back(PRIMARY_IF_MAC);
     }
 
 
@@ -20,18 +22,90 @@ namespace kickcat
     }
 
 
-    Error Bus::detectSlaves()
+    uint16_t Bus::broadcastRead(uint16_t ADO, uint16_t data_size)
     {
-         // we dont really care about the type, we just want a working counter to detect the number of slaves
-        frame_.addDatagram(1, Command::BRD, createAddress(0, reg::TYPE), nullptr, 1);
-        Error err = frame_.writeThenRead(socket_);
+        frames_[0].addDatagram(idx_, Command::BRD, createAddress(0, ADO), nullptr, data_size);
+        Error err = frames_[0].writeThenRead(socket_);
         if (err)
         {
-            return err;
+            err.what();
+            return 0;
         }
 
-        auto [header, data, wkc] = frame_.nextDatagram();
+        auto [header, _, wkc] = frames_[0].nextDatagram();
+        ++idx_; // one more frame sent
+        return wkc;
+    }
+
+
+    uint16_t Bus::broadcastWrite(uint16_t ADO, void const* data, uint16_t data_size)
+    {
+        frames_[0].addDatagram(idx_, Command::BWR, createAddress(0, ADO), data, data_size);
+        Error err = frames_[0].writeThenRead(socket_);
+        if (err)
+        {
+            err.what();
+            return 0;
+        }
+
+        auto [header, _, wkc] = frames_[0].nextDatagram();
+        ++idx_; // one more frame sent
+        return wkc;
+    }
+
+
+    void Bus::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size)
+    {
+        auto* frame = &frames_[current_frame_];
+        if ((frame->datagramCounter() == MAX_ETHERCAT_DATAGRAMS) or (frame->freeSpace() < data_size))
+        {
+            ++current_frame_;
+            frame = &frames_[current_frame_];
+        }
+        frame->addDatagram(idx_, command, address, data, data_size);
+    }
+
+
+    Error Bus::processFrames()
+    {
+        current_frame_ = 0; // reset frame position
+
+        for (auto& frame : frames_)
+        {
+            if (frame.datagramCounter() == 0)
+            {
+                break;
+            }
+            Error err = frame.writeThenRead(socket_);
+            if (err)
+            {
+                return err;
+            }
+        }
+
+        return ESUCCESS;
+    }
+
+
+    Error Bus::detectSlaves()
+    {
+        // we dont really care about the type, we just want a working counter to detect the number of slaves
+        uint16_t wkc = broadcastRead(reg::TYPE, 1);
+        if (wkc == 0)
+        {
+            return EERROR("No slaves on the bus");
+        }
+
         slaves_.resize(wkc);
+
+        // Allocate frames
+        int32_t needed_frames = (wkc * 2 / MAX_ETHERCAT_DATAGRAMS + 1) * 2; // at one frame is required. We need to be able to send two datagram per slave in a row (mailboxes check)
+        frames_.reserve(needed_frames);
+        for (int i = 1; i < needed_frames; ++i)
+        {
+            frames_.emplace_back(PRIMARY_IF_MAC);
+        }
+
         printf("-*-*-*- %d slave detected on the network -*-*-*-\n", slaves_.size());
         return ESUCCESS;
     }
@@ -49,14 +123,13 @@ namespace kickcat
         for (int i = 0; i < slaves_.size(); ++i)
         {
             slaves_[i].address = 0x1000 + i;
-            frame_.addDatagram(0x55, Command::APRW, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
+            addDatagram(Command::APRW, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
         }
-        err = frame_.writeThenRead(socket_);
+        err = processFrames();
         if (err)
         {
             return err;
         }
-
 
         err = fetchEeprom();
         if (err)
@@ -70,19 +143,17 @@ namespace kickcat
             return err;
         }
 
-
-        //requestState(SM_STATE::INIT);
-        //usleep(5000);
         requestState(State::PRE_OP);
-        usleep(5000);
-        //requestState(SM_STATE::SAFE_OP);
-        //requestState(SM_STATE::OPERATIONAL);
+        usleep(10000); //TODO: wait for state
 
+        checkMailboxes(slaves_);
         for (auto& slave : slaves_)
         {
             State state = getCurrentState(slave);
             printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
+            printf("   - in ready %d | out ready %d\n", slave.mailbox.read_available, slave.mailbox.write_available);
         }
+
 
         err += EERROR("Not implemented");
         return err;
@@ -92,12 +163,11 @@ namespace kickcat
     Error Bus::requestState(State request)
     {
         uint16_t param = request | State::ACK;
-        frame_.addDatagram(2, Command::BWR, createAddress(0, reg::AL_CONTROL), param);
-        Error err = frame_.writeThenRead(socket_);
-        if (err)
+        uint16_t wkc = broadcastWrite(reg::AL_CONTROL, &param, sizeof(param));
+        if (wkc != slaves_.size())
         {
-            err += EERROR("");
-            return err;
+            printf("aie %d %d\n", wkc, slaves_.size());
+            return EERROR("failed to request state");
         }
 
         return ESUCCESS;
@@ -106,15 +176,15 @@ namespace kickcat
 
     State Bus::getCurrentState(Slave const& slave)
     {
-        frame_.addDatagram(0x55, Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2);
-        Error err = frame_.writeThenRead(socket_);
+        frames_[0].addDatagram(0x55, Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2);
+        Error err = frames_[0].writeThenRead(socket_);
         if (err)
         {
             err.what();
             return State::INVALID;
         }
 
-        auto [header, data, wkc] = frame_.nextDatagram();
+        auto [header, data, wkc] = frames_[0].nextDatagram();
         printf("--> data %x\n", data[0]);
         return State(data[0] & 0xF);
     }
@@ -127,78 +197,23 @@ namespace kickcat
         std::memset(param, 0, sizeof(param));
 
         // Set port to auto mode
-        frame_.addDatagram(1, Command::BWR, createAddress(0, reg::ESC_DL_PORT), param, 1);
-        Error err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
+        broadcastWrite(reg::ESC_DL_PORT,        param, 1);
 
-        // reset RX error counters
-        frame_.addDatagram(2, Command::BWR, createAddress(0, reg::RX_ERROR), param, 8);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
-
-        // reset FMMU
-        frame_.addDatagram(3, Command::BWR, createAddress(0, reg::FMMU), param, 256);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
-
-        // reset Sync Managers
-        frame_.addDatagram(4, Command::BWR, createAddress(0, reg::SYNC_MANAGER), param, 128);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
-
-        // reset DC config
-        frame_.addDatagram(5, Command::BWR, createAddress(0, reg::DC_SYSTEM_TIME), param, 8);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
-
-        frame_.addDatagram(6, Command::BWR, createAddress(0, reg::DC_SYNC_ACTIVATION), param, 1);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
+        // Reset slaves registers
+        broadcastWrite(reg::RX_ERROR,           param, 8);
+        broadcastWrite(reg::FMMU,               param, 256);
+        broadcastWrite(reg::SYNC_MANAGER,       param, 128);
+        broadcastWrite(reg::DC_SYSTEM_TIME,     param, 8);
+        broadcastWrite(reg::DC_SYNC_ACTIVATION, param, 1);
 
         uint16_t dc_param = 0x1000; // reset value
-        frame_.addDatagram(7, Command::BWR, createAddress(0, reg::DC_SPEED_CNT_START), dc_param);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
+        broadcastWrite(reg::DC_SPEED_CNT_START, &dc_param, sizeof(dc_param));
 
-        dc_param = 0x0c00; // reset value
-        frame_.addDatagram(8, Command::BWR, createAddress(0, reg::DC_TIME_FILTER), dc_param);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
+        dc_param = 0x0c00;          // reset value
+        broadcastWrite(reg::DC_TIME_FILTER, &dc_param, sizeof(dc_param));
 
         // Request INIT state
-        err = requestState(State::INIT);
+        Error err = requestState(State::INIT);
         if (err)
         {
             err += EERROR("");
@@ -206,13 +221,7 @@ namespace kickcat
         }
 
         // eeprom to master
-        frame_.addDatagram(10, Command::BWR, createAddress(0, reg::EEPROM_CONFIG), param, 2);
-        err = frame_.writeThenRead(socket_);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
+        broadcastWrite(reg::EEPROM_CONFIG, param, 2);
 
         return ESUCCESS;
     }
@@ -227,29 +236,26 @@ namespace kickcat
                 // 0 is mailbox out, 1 is mailbox in - cf. default EtherCAT configuration if slave support a mailbox
                 // NOTE: mailbox out -> master to slave - mailbox in -> slave to master
                 SyncManager SM[2];
-                SM[0].start_address = slave.mailbox_standard.recv_offset;
-                SM[0].length        = slave.mailbox_standard.recv_size;
+                SM[0].start_address = slave.mailbox.recv_offset;
+                SM[0].length        = slave.mailbox.recv_size;
                 SM[0].control       = 0x26; // 1 buffer - write access - PDI IRQ ON
                 SM[0].status        = 0x00; // RO register
                 SM[0].activate      = 0x01; // Sync Manger enable
                 SM[0].pdi_control   = 0x00; // RO register
-                SM[1].start_address = slave.mailbox_standard.send_offset;
-                SM[1].length        = slave.mailbox_standard.send_size;
+                SM[1].start_address = slave.mailbox.send_offset;
+                SM[1].length        = slave.mailbox.send_size;
                 SM[1].control       = 0x22; // 1 buffer - read access - PDI IRQ ON
                 SM[1].status        = 0x00; // RO register
                 SM[1].activate      = 0x01; // Sync Manger enable
                 SM[1].pdi_control   = 0x00; // RO register
 
-                frame_.addDatagram(1, Command::FPRW, createAddress(slave.address, reg::SYNC_MANAGER), SM);
+                addDatagram(Command::FPRW, createAddress(slave.address, reg::SYNC_MANAGER), SM);
             }
         }
 
-        if (frame_.datagramCounter() > 0)
-        {
-            return frame_.writeThenRead(socket_);
-        }
-        return ESUCCESS; // No mailbox to configure
+        return processFrames();
     }
+
 
     bool Bus::areEepromReady()
     {
@@ -259,9 +265,9 @@ namespace kickcat
             usleep(200);
             for (auto& slave : slaves_)
             {
-                frame_.addDatagram(1, Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2);
+                addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2);
             }
-            Error err = frame_.writeThenRead(socket_);
+            Error err = processFrames();
             if (err)
             {
                 err.what();
@@ -272,21 +278,23 @@ namespace kickcat
             bool ready = true;
             do
             {
-                auto [h, data, wkc] = frame_.nextDatagram();
+                auto [h, answer, wkc] = nextDatagram<uint16_t>();
                 header = h;
-                uint16_t const* answer = reinterpret_cast<uint16_t const*>(data);
                 if (wkc != 1)
                 {
                     Error err = EERROR("no answer!");
                     err.what();
                 }
-                if(*answer & 0x8000)
+                if (*answer & 0x8000)
                 {
-                    frame_.clear();
                     ready = false;
+                    for (auto& frame : frames_)
+                    {
+                        frame.clear();
+                    }
                     break;
                 }
-            } while(header->multiple);
+            } while (header->multiple);
 
             if (ready)
             {
@@ -296,6 +304,7 @@ namespace kickcat
 
         return false;
     }
+
 
     Error Bus::readEeprom(uint16_t address, std::function<void(Slave&, uint32_t word)> apply)
     {
@@ -311,12 +320,10 @@ namespace kickcat
 
         // Request specific address
         req = { EepromCommand::READ, address, 0 };
-        frame_.addDatagram(1, Command::BWR, createAddress(0, reg::EEPROM_CONTROL), req);
-        Error err = frame_.writeThenRead(socket_);
-        if (err)
+        uint16_t wkc = broadcastWrite(reg::EEPROM_CONTROL, &req, sizeof(req));
+        if (wkc != slaves_.size())
         {
-            err += EERROR("");
-            return err;
+            return EERROR("wrong slave number");
         }
 
         // wait for all eeprom to be ready
@@ -328,9 +335,9 @@ namespace kickcat
         // Read result
         for (auto& slave : slaves_)
         {
-            frame_.addDatagram(1, Command::FPRD, createAddress(slave.address, reg::EEPROM_DATA), nullptr, 4);
+            addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_DATA), nullptr, 4);
         }
-        err = frame_.writeThenRead(socket_);
+        Error err = processFrames();
         if (err)
         {
             return err;
@@ -339,13 +346,12 @@ namespace kickcat
         // Extract result and store it
         for (auto& slave : slaves_)
         {
-            auto [header, data, wkc] = frame_.nextDatagram();
+            auto [header, answer, wkc] = nextDatagram<uint32_t>();
             if (wkc != 1)
             {
                 Error err = EERROR("no answer!");
                 err.what();
             }
-            uint32_t const* answer = reinterpret_cast<uint32_t const*>(data);
             apply(slave, *answer);
         }
 
@@ -362,9 +368,9 @@ namespace kickcat
 
         // Mailbox info
         readEeprom(eeprom::STANDARD_MAILBOX + eeprom::RECV_MBO_OFFSET,
-        [](Slave& s, uint32_t word) { s.mailbox_standard.recv_offset = word; s.mailbox_standard.recv_size = word >> 16; } );
+        [](Slave& s, uint32_t word) { s.mailbox.recv_offset = word; s.mailbox.recv_size = word >> 16; } );
         readEeprom(eeprom::STANDARD_MAILBOX + eeprom::SEND_MBO_OFFSET,
-        [](Slave& s, uint32_t word) { s.mailbox_standard.send_offset = word; s.mailbox_standard.send_size = word >> 16; } );
+        [](Slave& s, uint32_t word) { s.mailbox.send_offset = word; s.mailbox.send_size = word >> 16; } );
 
         readEeprom(eeprom::MAILBOX_PROTOCOL, [](Slave& s, uint32_t word) { s.supported_mailbox = static_cast<MailboxProtocol>(word); });
 
@@ -391,11 +397,44 @@ namespace kickcat
             printf("Product code:    0x%08x\n", slave.product_code);
             printf("Revision number: 0x%08x\n", slave.revision_number);
             printf("Serial number:   0x%08x\n", slave.serial_number);
-            printf("mailbox in:  size %d - offset 0x%04x\n", slave.mailbox_standard.recv_size, slave.mailbox_standard.recv_offset);
-            printf("mailbox out: size %d - offset 0x%04x\n", slave.mailbox_standard.send_size, slave.mailbox_standard.send_offset);
+            printf("mailbox in:  size %d - offset 0x%04x\n", slave.mailbox.recv_size, slave.mailbox.recv_offset);
+            printf("mailbox out: size %d - offset 0x%04x\n", slave.mailbox.send_size, slave.mailbox.send_offset);
             printf("supported mailbox protocol: 0x%02x\n", slave.supported_mailbox);
             printf("EEPROM: size: %d - version 0x%02x\n",  slave.eeprom_size, slave.eeprom_version);
             printf("\n");
+        }
+    }
+
+
+    void Bus::checkMailboxes(std::vector<Slave>& slaves)
+    {
+        for (auto& slave : slaves)
+        {
+            addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1);
+            addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1);
+        }
+
+        Error err = processFrames();
+        if (err)
+        {
+            err.what();
+            return;
+        }
+
+        for (auto& slave : slaves)
+        {
+            auto isFull = [this](bool stable_value)
+            {
+                auto [header, state, wkc] = nextDatagram<uint8_t>();
+                if (wkc != 1)
+                {
+                    EERROR("error while reading mailboxes state").what();
+                    return stable_value;
+                }
+                return ((*state & 0x08) == 0x08);
+            };
+            slave.mailbox.read_available  = isFull(false);
+            slave.mailbox.write_available = isFull(true);
         }
     }
 }

@@ -173,6 +173,11 @@ namespace kickcat
         constexpr uint16_t FMMU            = 0x600; // each FFMU entry is described in 16 bytes (6x0 to 6xF), up to 16 FMMU
 
         constexpr uint16_t SYNC_MANAGER    = 0x800; // each SyncManager is described in 8 bytes, up to 8 Sync Manager
+        constexpr uint16_t SYNC_MANAGER_0  = SYNC_MANAGER + 8 * 0;
+        constexpr uint16_t SYNC_MANAGER_1  = SYNC_MANAGER + 8 * 1;
+        constexpr uint16_t SYNC_MANAGER_2  = SYNC_MANAGER + 8 * 2;
+        constexpr uint16_t SYNC_MANAGER_3  = SYNC_MANAGER + 8 * 3;
+        constexpr uint16_t SM_STATS = 5;
 
         constexpr uint16_t DC_TIME            = 0x900;
         constexpr uint16_t DC_SYSTEM_TIME     = 0x910;
@@ -192,7 +197,7 @@ namespace kickcat
         uint8_t  pdi_control;
     } __attribute__((__packed__));
 
-    namespace eeprom
+    namespace eeprom // addresses are in words!
     {
         constexpr uint16_t ESC_INFO            = 0x00;
         constexpr uint16_t ESC_PDI_CONTROL     = 0;
