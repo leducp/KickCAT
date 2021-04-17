@@ -123,37 +123,44 @@ namespace kickcat
         for (int i = 0; i < slaves_.size(); ++i)
         {
             slaves_[i].address = 0x1000 + i;
-            addDatagram(Command::APRW, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
+            addDatagram(Command::APWR, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
         }
         err = processFrames();
         if (err)
         {
+            err.what();
             return err;
         }
 
         err = fetchEeprom();
         if (err)
         {
+            err.what();
             return err;
         }
 
         err = configureMailboxes();
         if (err)
         {
+            err.what();
             return err;
         }
 
         requestState(State::PRE_OP);
         usleep(10000); //TODO: wait for state
 
-        checkMailboxes(slaves_);
         for (auto& slave : slaves_)
         {
             State state = getCurrentState(slave);
             printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
-            printf("   - in ready %d | out ready %d\n", slave.mailbox.read_available, slave.mailbox.write_available);
         }
 
+        printf("\n\n try to read a SDO on one slave\n");
+        uint32_t yolo = 0xCAFE;
+        int32_t size = sizeof(yolo);
+        //readSDO(1, 0x2F00, 5, false, &yolo, &size);
+        readSDO(1, 0x1018, 4, false, &yolo, &size);
+        printf("YOLO %x\n", yolo);
 
         err += EERROR("Not implemented");
         return err;
@@ -240,20 +247,40 @@ namespace kickcat
                 SM[0].length        = slave.mailbox.recv_size;
                 SM[0].control       = 0x26; // 1 buffer - write access - PDI IRQ ON
                 SM[0].status        = 0x00; // RO register
-                SM[0].activate      = 0x01; // Sync Manger enable
+                SM[0].activate      = 0x01; // Sync Manager enable
                 SM[0].pdi_control   = 0x00; // RO register
                 SM[1].start_address = slave.mailbox.send_offset;
                 SM[1].length        = slave.mailbox.send_size;
                 SM[1].control       = 0x22; // 1 buffer - read access - PDI IRQ ON
                 SM[1].status        = 0x00; // RO register
-                SM[1].activate      = 0x01; // Sync Manger enable
+                SM[1].activate      = 0x01; // Sync Manager enable
                 SM[1].pdi_control   = 0x00; // RO register
 
-                addDatagram(Command::FPRW, createAddress(slave.address, reg::SYNC_MANAGER), SM);
+                addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER), SM);
             }
         }
 
-        return processFrames();
+        Error err = processFrames();
+        if (err)
+        {
+            return err;
+        }
+
+        for (auto& slave : slaves_)
+        {
+            if (not slave.supported_mailbox)
+            {
+                continue;
+            }
+
+            auto [header, _, wkc] = nextDatagram<uint8_t>();
+            if (wkc != 1)
+            {
+                err += EERROR("one slave didn't answer");
+            }
+        }
+
+        return err;
     }
 
 
@@ -319,7 +346,7 @@ namespace kickcat
         Request req;
 
         // Request specific address
-        req = { EepromCommand::READ, address, 0 };
+        req = { eeprom::Command::READ, address, 0 };
         uint16_t wkc = broadcastWrite(reg::EEPROM_CONTROL, &req, sizeof(req));
         if (wkc != slaves_.size())
         {
@@ -372,7 +399,7 @@ namespace kickcat
         readEeprom(eeprom::STANDARD_MAILBOX + eeprom::SEND_MBO_OFFSET,
         [](Slave& s, uint32_t word) { s.mailbox.send_offset = word; s.mailbox.send_size = word >> 16; } );
 
-        readEeprom(eeprom::MAILBOX_PROTOCOL, [](Slave& s, uint32_t word) { s.supported_mailbox = static_cast<MailboxProtocol>(word); });
+        readEeprom(eeprom::MAILBOX_PROTOCOL, [](Slave& s, uint32_t word) { s.supported_mailbox = static_cast<eeprom::MailboxProtocol>(word); });
 
         readEeprom(eeprom::EEPROM_SIZE,
         [](Slave& s, uint32_t word)
@@ -406,10 +433,14 @@ namespace kickcat
     }
 
 
-    void Bus::checkMailboxes(std::vector<Slave>& slaves)
+    void Bus::checkMailboxes()
     {
-        for (auto& slave : slaves)
+        for (auto& slave : slaves_)
         {
+            if (slave.supported_mailbox == 0)
+            {
+                continue;
+            }
             addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1);
             addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1);
         }
@@ -421,8 +452,13 @@ namespace kickcat
             return;
         }
 
-        for (auto& slave : slaves)
+        for (auto& slave : slaves_)
         {
+            if (slave.supported_mailbox == 0)
+            {
+                continue;
+            }
+
             auto isFull = [this](bool stable_value)
             {
                 auto [header, state, wkc] = nextDatagram<uint8_t>();
@@ -433,8 +469,142 @@ namespace kickcat
                 }
                 return ((*state & 0x08) == 0x08);
             };
-            slave.mailbox.read_available  = isFull(false);
-            slave.mailbox.write_available = isFull(true);
+            slave.mailbox.can_write = not isFull(true);
+            slave.mailbox.can_read  = isFull(false);
+        }
+    }
+
+
+    void Bus::readSDO(uint16_t id, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size)
+    {
+        auto& mailbox = slaves_[id].mailbox;
+
+        {
+            uint8_t buffer[256]; // taille au pif
+            mailbox::Header* header = reinterpret_cast<mailbox::Header*>(buffer);
+            mailbox::ServiceData* coe = reinterpret_cast<mailbox::ServiceData*>(buffer + sizeof(mailbox::Header));
+
+            header->len = 10;
+            header->address = 0;  // master
+            header->priority = 0; // unused
+            header->channel  = 0;
+            header->type     = mailbox::Type::CoE;
+
+            // compute new counter - used as session handle
+            uint8_t counter = slaves_[id].mailbox.counter++;
+            if (counter > 7)
+            {
+                counter = 1;
+            }
+            slaves_[id].mailbox.counter = 1;
+
+            coe->number  = counter;
+            coe->service = CoE::Service::SDO_REQUEST;
+            coe->complete_access = CA;
+            coe->command = CoE::SDO::request::UPLOAD;
+            coe->block_size     = 0;
+            coe->transfer_type  = 0;
+            coe->size_indicator = 0;
+            coe->index = index;
+            coe->subindex = subindex;
+
+            addDatagram(Command::FPWR, createAddress(slaves_[id].address, mailbox.recv_offset), buffer, mailbox.recv_size);
+            Error err = processFrames();
+            if (err)
+            {
+                err.what();
+                return;
+            }
+            auto [h, d, wkc] = nextDatagram<uint8_t>();
+            if (wkc != 1)
+            {
+                printf("No answer from slave\n");
+                return;
+            }
+        }
+
+        for (int i = 0; i < 10; ++i)
+        {
+            checkMailboxes();
+            printf("   - can read %d | can write %d\n", slaves_[1].mailbox.can_read, slaves_[1].mailbox.can_write);
+            if (slaves_[id].mailbox.can_read)
+            {
+                break;
+            }
+            usleep(200);
+        }
+
+        if (not slaves_[id].mailbox.can_read)
+        {
+            printf("TIMEOUT !\n");
+            return;
+        }
+
+        {
+            addDatagram(Command::FPRD, createAddress(slaves_[id].address, mailbox.send_offset), nullptr, mailbox.send_size);
+            Error err = processFrames();
+            if (err)
+            {
+                err.what();
+                return;
+            }
+
+            auto [h, buffer, wkc] = nextDatagram<uint8_t>();
+            if (wkc != 1)
+            {
+                printf("No answer from slave again\n");
+                return;
+            }
+            mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(buffer);
+            mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(buffer + sizeof(mailbox::Header));
+
+            if (header->type == mailbox::Type::ERROR)
+            {
+                //TODO handle error properly
+                printf("An error happened !");
+                return;
+            }
+
+            if (header->type != mailbox::Type::CoE)
+            {
+                printf("Header type unexpected %d\n", header->type);
+                return;
+            }
+
+            if (coe->service == CoE::Service::EMERGENCY)
+            {
+                printf("Houston, we've got a situation here\n");
+                return;
+            }
+
+            if (coe->command == CoE::SDO::request::ABORT)
+            {
+                printf("Abort requested!\n");
+                return;
+            }
+
+            if (coe->service != CoE::Service::SDO_RESPONSE)
+            {
+                printf("OK guy, this one answer, but miss the point\n");
+                return;
+            }
+
+            if (coe->transfer_type == 1)
+            {
+                // expedited transfer
+                int32_t size = 4 - coe->size_indicator;
+                if(*data_size < coe->size_indicator)
+                {
+                    printf("Really? Not enough size in client buffer?\n");
+                    return;
+                }
+                uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
+                std::memcpy(data, payload, size);
+                *data_size = size;
+                return;
+            }
+
+            printf("OK so this one is not an expedited one... sorry I don't know how to handle  it yet!");
         }
     }
 }

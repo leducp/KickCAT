@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <tuple>
+#include <list>
 #include <vector>
 #include <functional>
 
@@ -12,6 +13,12 @@
 namespace kickcat
 {
     class AbstractSocket;
+
+    struct RawMessage
+    {
+        uint16_t id;
+        std::vector<uint8_t> payload;
+    };
 
     struct Slave
     {
@@ -29,12 +36,13 @@ namespace kickcat
             uint16_t send_offset;
             uint16_t send_size;
 
-            bool read_available;
-            bool write_available;
+            bool can_read;  // data available on the slave
+            bool can_write; // free space for a new message on the slave
+            uint8_t counter; // sessionhandle, from 1 to 7
         };
         Mailbox mailbox;
         Mailbox mailbox_bootstrap;
-        MailboxProtocol supported_mailbox;
+        eeprom::MailboxProtocol supported_mailbox;
 
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;
@@ -84,8 +92,9 @@ namespace kickcat
         Error readEeprom(uint16_t address, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
-        // Update designated slaves mailboxes
-        void checkMailboxes(std::vector<Slave>& slaves);
+        // Update slaves mailboxes state
+        void checkMailboxes();
+        void readSDO(uint16_t id, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size);
 
         std::shared_ptr<AbstractSocket> socket_;
         std::vector<Frame> frames_;

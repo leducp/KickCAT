@@ -89,43 +89,6 @@ namespace kickcat
         }
     }
 
-
-    enum MailboxProtocol
-    {
-        AoE = 0x01,
-        EoE = 0x02,
-        CoE = 0x04,
-        FoE = 0x08,
-        SoE = 0x10
-    };
-
-    struct MailboxHeader
-    {
-        uint16_t len;
-        uint16_t address;
-        uint8_t  channel : 6,
-                 priority : 2;
-        uint8_t  type : 4, // type of the mailbox, i.e. CoE
-                 count: 3,
-                 reserved : 1;
-    } __attribute__((__packed__));
-
-    struct MailboxServiceData // CoE type -> SDO
-    {
-        uint16_t number : 9,
-                 reserved : 3,
-                 service : 4; // i.e. request, response
-        uint8_t size_indicator : 1,
-                transfer_type : 1,
-                block_size : 2,
-                complete_access : 1,
-                command : 3; // i.e. upload
-        uint16_t index;
-        uint8_t subindex;
-        uint32_t size;
-    } __attribute__((__packed__));
-
-
     //TODO need unit test on bitfield to check position !
 
     // EtherCAT standard registers
@@ -225,15 +188,110 @@ namespace kickcat
         constexpr uint16_t EEPROM_VERSION      = 0x3F;
 
         constexpr uint16_t START_CATEGORY      = 0x40;
+
+        enum MailboxProtocol // get from EEPROM
+        {
+            AoE = 0x01,
+            EoE = 0x02,
+            CoE = 0x04,
+            FoE = 0x08,
+            SoE = 0x10
+        };
+
+        enum Command : uint16_t
+        {
+            NOP    = 0x0000,  // clear error bits
+            READ   = 0x0100,
+            WRITE  = 0x0201,
+            RELOAD = 0x0300
+        };
     }
 
-    enum EepromCommand : uint16_t
+    namespace mailbox
     {
-        NOP    = 0x0000,  // clear error bits
-        READ   = 0x0100,
-        WRITE  = 0x0201,
-        RELOAD = 0x0300
-    };
+        enum Type // to put in Mailbox header type entry
+        {
+            ERROR = 0x00,
+            AoE   = 0x01,  // ADS over EtherCAT
+            EoE   = 0x02,  // Ethernet over EthercAT
+            CoE   = 0x03,  // CANopen over EtherCAT
+            FoE   = 0x04,  // File over EtherCAT
+            SoE   = 0x05,  // Servo over EtherCAT
+            VoE   = 0x0F   // Vendor specific o er EtherCAT
+        };
+
+        struct Header
+        {
+            uint16_t len;
+            uint16_t address;
+            uint8_t  channel : 6,
+                    priority : 2;
+            uint8_t  type : 4, // type of the mailbox, i.e. CoE
+                    count: 3,
+                    reserved : 1;
+        } __attribute__((__packed__));
+
+        struct ServiceData // CoE type
+        {
+            uint16_t number : 9,
+                    reserved : 3,
+                    service : 4; // i.e. request, response
+            uint8_t size_indicator : 1,
+                    transfer_type : 1, // expedited or not
+                    block_size : 2,
+                    complete_access : 1,
+                    command : 3; // i.e. upload
+            uint16_t index;
+            uint8_t subindex;
+        } __attribute__((__packed__));
+    }
+
+    namespace CoE
+    {
+        enum Service
+        {
+            EMERGENCY            = 0x01,
+            SDO_REQUEST          = 0x02,
+            SDO_RESPONSE         = 0x03,
+            TxPDO                = 0x04,
+            RxPDO                = 0x05,
+            TxPDO_REMOTE_REQUEST = 0x06,
+            RxPDO_REMOTE_REQUEST = 0x07,
+            SDO_INFORMATION      = 0x08
+        };
+
+        namespace SDO
+        {
+            // Command specifiers depending on SDO request type
+            namespace request
+            {
+                constexpr uint8_t DOWNLOAD_SEGMENTED = 0x00;
+                constexpr uint8_t DOWNLOAD           = 0x01;
+                constexpr uint8_t UPLOAD             = 0x02;
+                constexpr uint8_t UPLOAD_SEGMENTED   = 0x03;
+                constexpr uint8_t ABORT              = 0x04;
+            }
+
+            namespace response
+            {
+                constexpr uint8_t UPLOAD_SEGMENTED    = 0x00;
+                constexpr uint8_t DOWNLOAD_SEGMENTED  = 0x01;
+                constexpr uint8_t UPLOAD              = 0x02;
+                constexpr uint8_t DOWNLOAD            = 0x03;
+            }
+
+            namespace information
+            {
+                constexpr uint8_t GET_OD_LIST_REQ    = 0x01;
+                constexpr uint8_t GET_OD_LIST_RESP   = 0x02;
+                constexpr uint8_t GET_OD_REQ         = 0x03;
+                constexpr uint8_t GET_OD_RESP        = 0x04;
+                constexpr uint8_t GET_ED_LIST_REQ    = 0x05;
+                constexpr uint8_t GET_ED_LIST_RESP   = 0x06;
+                constexpr uint8_t SDO_INFO_ERROR_REQ = 0x07;
+            }
+        }
+    }
 
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
     constexpr uint8_t PRIMARY_IF_MAC[6]   = { 0x02, 0x00, 0xCA, 0xCA, 0x00, 0xFF };
