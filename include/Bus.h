@@ -46,6 +46,7 @@ namespace kickcat
 
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;
+        std::vector<uint32_t> sii_;
     };
 
     class Bus
@@ -89,12 +90,14 @@ namespace kickcat
 
         Error fetchEeprom();
         bool areEepromReady();
-        Error readEeprom(uint16_t address, std::function<void(Slave&, uint32_t word)> apply);
+        Error readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
         // Update slaves mailboxes state
         void checkMailboxes();
         void readSDO(uint16_t id, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size);
+
+        void configureMapping(Slave& slave, int32_t size_in, int32_t size_out);
 
         std::shared_ptr<AbstractSocket> socket_;
         std::vector<Frame> frames_;

@@ -155,12 +155,17 @@ namespace kickcat
             printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
         }
 
+/*
         printf("\n\n try to read a SDO on one slave\n");
         uint32_t yolo = 0xCAFE;
         int32_t size = sizeof(yolo);
         //readSDO(1, 0x2F00, 5, false, &yolo, &size);
         readSDO(1, 0x1018, 4, false, &yolo, &size);
         printf("YOLO %x\n", yolo);
+
+        readSDO(2, 0x1018, 4, false, &yolo, &size);
+        printf("YOLO %x\n", yolo);
+        */
 
         err += EERROR("Not implemented");
         return err;
@@ -284,6 +289,12 @@ namespace kickcat
     }
 
 
+    void Bus::configureMapping(Slave& slave, int32_t size_in, int32_t size_out)
+    {
+
+    }
+
+
     bool Bus::areEepromReady()
     {
         bool ready = false;
@@ -333,7 +344,7 @@ namespace kickcat
     }
 
 
-    Error Bus::readEeprom(uint16_t address, std::function<void(Slave&, uint32_t word)> apply)
+    Error Bus::readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply)
     {
         // eeprom request
         struct Request
@@ -351,6 +362,7 @@ namespace kickcat
         if (wkc != slaves_.size())
         {
             return EERROR("wrong slave number");
+
         }
 
         // wait for all eeprom to be ready
@@ -360,9 +372,9 @@ namespace kickcat
         }
 
         // Read result
-        for (auto& slave : slaves_)
+        for (auto& slave : slaves)
         {
-            addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_DATA), nullptr, 4);
+            addDatagram(Command::FPRD, createAddress(slave->address, reg::EEPROM_DATA), nullptr, 4);
         }
         Error err = processFrames();
         if (err)
@@ -371,7 +383,7 @@ namespace kickcat
         }
 
         // Extract result and store it
-        for (auto& slave : slaves_)
+        for (auto& slave : slaves)
         {
             auto [header, answer, wkc] = nextDatagram<uint32_t>();
             if (wkc != 1)
@@ -379,7 +391,7 @@ namespace kickcat
                 Error err = EERROR("no answer!");
                 err.what();
             }
-            apply(slave, *answer);
+            apply(*slave, *answer);
         }
 
         return ESUCCESS;
@@ -387,27 +399,54 @@ namespace kickcat
 
     Error Bus::fetchEeprom()
     {
+        std::vector<Slave*> slaves;
+        for (auto& slave : slaves_)
+        {
+            slaves.push_back(&slave);
+        }
+
         // General slave info
-        readEeprom(eeprom::VENDOR_ID,       [](Slave& s, uint32_t word) { s.vendor_id       = word; } );
-        readEeprom(eeprom::PRODUCT_CODE,    [](Slave& s, uint32_t word) { s.product_code    = word; } );
-        readEeprom(eeprom::REVISION_NUMBER, [](Slave& s, uint32_t word) { s.revision_number = word; } );
-        readEeprom(eeprom::SERIAL_NUMBER,   [](Slave& s, uint32_t word) { s.serial_number   = word; } );
+        readEeprom(eeprom::VENDOR_ID,       slaves, [](Slave& s, uint32_t word) { s.vendor_id       = word; } );
+        readEeprom(eeprom::PRODUCT_CODE,    slaves, [](Slave& s, uint32_t word) { s.product_code    = word; } );
+        readEeprom(eeprom::REVISION_NUMBER, slaves, [](Slave& s, uint32_t word) { s.revision_number = word; } );
+        readEeprom(eeprom::SERIAL_NUMBER,   slaves, [](Slave& s, uint32_t word) { s.serial_number   = word; } );
 
         // Mailbox info
-        readEeprom(eeprom::STANDARD_MAILBOX + eeprom::RECV_MBO_OFFSET,
+        readEeprom(eeprom::STANDARD_MAILBOX + eeprom::RECV_MBO_OFFSET, slaves,
         [](Slave& s, uint32_t word) { s.mailbox.recv_offset = word; s.mailbox.recv_size = word >> 16; } );
-        readEeprom(eeprom::STANDARD_MAILBOX + eeprom::SEND_MBO_OFFSET,
+        readEeprom(eeprom::STANDARD_MAILBOX + eeprom::SEND_MBO_OFFSET, slaves,
         [](Slave& s, uint32_t word) { s.mailbox.send_offset = word; s.mailbox.send_size = word >> 16; } );
 
-        readEeprom(eeprom::MAILBOX_PROTOCOL, [](Slave& s, uint32_t word) { s.supported_mailbox = static_cast<eeprom::MailboxProtocol>(word); });
+        readEeprom(eeprom::MAILBOX_PROTOCOL, slaves,
+        [](Slave& s, uint32_t word) { s.supported_mailbox = static_cast<eeprom::MailboxProtocol>(word); });
 
-        readEeprom(eeprom::EEPROM_SIZE,
+        readEeprom(eeprom::EEPROM_SIZE, slaves,
         [](Slave& s, uint32_t word)
         {
-            s.eeprom_size = (word & 0xFF) + 1; // 0 means 1024 bits
-            s.eeprom_size *= 128;              // Kibit to bytes
+            s.eeprom_size = (word & 0xFF) + 1;  // 0 means 1024 bits
+            s.eeprom_size *= 128;               // Kibit to bytes
             s.eeprom_version = word >> 16;
         });
+
+        // Get SII section
+        int32_t pos = 0;
+        while (not slaves.empty())
+        {
+            readEeprom(eeprom::START_CATEGORY + pos, slaves,
+            [](Slave& s, uint32_t word)
+            {
+                s.sii_.push_back(word);
+            });
+
+            pos += 2;
+
+            slaves.erase(std::remove_if(slaves.begin(), slaves.end(),
+            [](Slave* s)
+            {
+                return ((s->sii_.back() >> 16) == 0xFFFF);
+            }),
+            slaves.end());
+        }
 
         printSlavesInfo();
 
@@ -428,6 +467,7 @@ namespace kickcat
             printf("mailbox out: size %d - offset 0x%04x\n", slave.mailbox.send_size, slave.mailbox.send_offset);
             printf("supported mailbox protocol: 0x%02x\n", slave.supported_mailbox);
             printf("EEPROM: size: %d - version 0x%02x\n",  slave.eeprom_size, slave.eeprom_version);
+            printf("SII size: %d\n",                       slave.sii_.size() * sizeof(uint32_t));
             printf("\n");
         }
     }
