@@ -1,8 +1,9 @@
 #ifndef KICKCAT_PROTOCOL_H
-#define KICKCATPROTOCOL_H
+#define KICKCAT_PROTOCOL_H
 
 #include <cstdint>
 #include <cstdio>
+
 namespace kickcat
 {
     // Ethernet description
@@ -205,6 +206,69 @@ namespace kickcat
             WRITE  = 0x0201,
             RELOAD = 0x0300
         };
+
+        enum Category : uint16_t
+        {
+            Strings   = 10,
+            DataTypes = 20,
+            General   = 30,
+            FMMU      = 40,
+            SyncM     = 41,
+            TxPDO     = 50,
+            RxPDO     = 51,
+            DC        = 60,
+            End       = 0xFFFF
+        };
+
+        struct GeneralEntry
+        {
+            uint8_t group_info_id;
+            uint8_t image_name_id;
+            uint8_t device_order_id;
+            uint8_t device_name_id;
+            uint8_t reserved_A;
+            uint8_t CoE_details;
+            uint8_t FoE_details;
+            uint8_t EoE_details;
+            uint8_t SoE_channels;
+            uint8_t DS402_channels;
+            uint8_t SysmanClass;
+            uint8_t flags;
+            int16_t current_on_ebus;
+            uint8_t group_info_id_dup;
+            uint8_t reserved_B;
+            uint16_t physical_port;
+            uint16_t physical_memory_address;
+            uint8_t reserved_C[12];
+        } __attribute__((__packed__));
+
+        enum FMMU : uint8_t
+        {
+            NOT_USED     = 0,
+            OUTPUT       = 1,
+            INPUT        = 2,
+            SYNCM_STATUS = 3
+        };
+
+        struct SyncManagerEntry
+        {
+            uint16_t start_adress;
+            uint16_t length;
+            uint8_t  control_register;
+            uint8_t  status_register;
+            uint8_t  enable;
+            uint8_t  type;
+        } __attribute__((__packed__));
+
+        struct PDOEntry
+        {
+            uint16_t index;
+            uint8_t  subindex;
+            uint8_t  name;
+            uint8_t  data_type;
+            uint8_t  bitlen;
+            uint16_t flags;
+        } __attribute__((__packed__));
     }
 
     namespace mailbox
@@ -248,6 +312,9 @@ namespace kickcat
 
     namespace CoE
     {
+        constexpr uint16_t SM_COM_TYPE = 0x1C00; // each sub-entry described SM[x] com type (mailbox in/out, PDO in/out, not used)
+        constexpr uint16_t SM_CHANNEL  = 0x1C10; // each entry is associated with the mapped PDOs (if in used)
+
         enum Service
         {
             EMERGENCY            = 0x01,

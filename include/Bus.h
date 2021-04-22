@@ -9,6 +9,7 @@
 
 #include "Error.h"
 #include "Frame.h"
+#include "Slave.h"
 
 namespace kickcat
 {
@@ -20,34 +21,6 @@ namespace kickcat
         std::vector<uint8_t> payload;
     };
 
-    struct Slave
-    {
-        uint16_t address;
-
-        uint32_t vendor_id;
-        uint32_t product_code;
-        uint32_t revision_number;
-        uint32_t serial_number;
-
-        struct Mailbox
-        {
-            uint16_t recv_offset;
-            uint16_t recv_size;
-            uint16_t send_offset;
-            uint16_t send_size;
-
-            bool can_read;  // data available on the slave
-            bool can_write; // free space for a new message on the slave
-            uint8_t counter; // sessionhandle, from 1 to 7
-        };
-        Mailbox mailbox;
-        Mailbox mailbox_bootstrap;
-        eeprom::MailboxProtocol supported_mailbox;
-
-        uint32_t eeprom_size; // in bytes
-        uint16_t eeprom_version;
-        std::vector<uint32_t> sii_;
-    };
 
     class Bus
     {
@@ -88,6 +61,10 @@ namespace kickcat
         Error resetSlaves();
         Error configureMailboxes();
 
+        // mapping helpers
+        Error createMapping(uint8_t* iomap);
+        Error readMappedPDO(Slave& slave, uint16_t index);
+
         Error fetchEeprom();
         bool areEepromReady();
         Error readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
@@ -95,9 +72,8 @@ namespace kickcat
         // mailbox helpers
         // Update slaves mailboxes state
         void checkMailboxes();
-        void readSDO(uint16_t id, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size);
+        void readSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size);
 
-        void configureMapping(Slave& slave, int32_t size_in, int32_t size_out);
 
         std::shared_ptr<AbstractSocket> socket_;
         std::vector<Frame> frames_;

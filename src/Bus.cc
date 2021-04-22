@@ -157,15 +157,12 @@ namespace kickcat
 
 /*
         printf("\n\n try to read a SDO on one slave\n");
-        uint32_t yolo = 0xCAFE;
-        int32_t size = sizeof(yolo);
-        //readSDO(1, 0x2F00, 5, false, &yolo, &size);
-        readSDO(1, 0x1018, 4, false, &yolo, &size);
-        printf("YOLO %x\n", yolo);
-
-        readSDO(2, 0x1018, 4, false, &yolo, &size);
-        printf("YOLO %x\n", yolo);
-        */
+        char buffer[512];
+        int32_t size = 512;
+        readSDO(1, 0x1600, 0, true, buffer, &size);
+        printf("read %d\n", size);
+*/
+        createMapping(nullptr);
 
         err += EERROR("Not implemented");
         return err;
@@ -289,9 +286,71 @@ namespace kickcat
     }
 
 
-    void Bus::configureMapping(Slave& slave, int32_t size_in, int32_t size_out)
+    Error Bus::createMapping(uint8_t* iomap)
     {
+        // Determines PI sizes for each slave
+        for (auto& slave : slaves_)
+        {
+            if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
+            {
+                uint8_t sm[64];
+                int32_t sm_size = sizeof(sm);
+                readSDO(slave, CoE::SM_COM_TYPE, 1, true, sm, &sm_size);
 
+                for (int i = 0; i < sm_size; ++i)
+                {
+                    if (sm[i] > 2)
+                    {
+                        Slave::PIMapping mapping;
+                        mapping.sync_manager = i;
+                        mapping.type = sm[i];
+                        mapping.size = 0;
+
+                        uint16_t mapped_index[64];
+                        int32_t map_size = sizeof(mapped_index);
+                        readSDO(slave, CoE::SM_CHANNEL + i, 1, true, mapped_index, &map_size);
+
+                        for (int32_t j = 0; j < (map_size / 2); ++j)
+                        {
+                            uint8_t object[64];
+                            int32_t object_size = sizeof(object);
+                            readSDO(slave, mapped_index[j], 1, true, object, &object_size);
+
+                            for (int32_t k = 0; k < object_size; k += 4)
+                            {
+                                mapping.size += object[k];
+                            }
+                        }
+                        printf("mapped size %d bits\n", mapping.size);
+                    }
+                }
+            }
+            else
+            {
+                // unsupported mailbox: use SII
+                Slave::PIMapping mapping;
+
+                mapping.sync_manager = 0;
+                mapping.size = 0;
+                mapping.type = 3;
+                for (auto const& pdo : slave.sii.TxPDO)
+                {
+                    mapping.size += pdo->bitlen;
+                }
+                slave.mapping.push_back(mapping);
+
+                mapping.sync_manager = 1;
+                mapping.size = 0;
+                mapping.type = 4;
+                for (auto const& pdo : slave.sii.RxPDO)
+                {
+                    mapping.size += pdo->bitlen;
+                }
+                slave.mapping.push_back(mapping);
+            }
+        }
+
+        return ESUCCESS;
     }
 
 
@@ -435,7 +494,7 @@ namespace kickcat
             readEeprom(eeprom::START_CATEGORY + pos, slaves,
             [](Slave& s, uint32_t word)
             {
-                s.sii_.push_back(word);
+                s.sii.buffer.push_back(word);
             });
 
             pos += 2;
@@ -443,9 +502,15 @@ namespace kickcat
             slaves.erase(std::remove_if(slaves.begin(), slaves.end(),
             [](Slave* s)
             {
-                return ((s->sii_.back() >> 16) == 0xFFFF);
+                return ((s->sii.buffer.back() >> 16) == eeprom::Category::End);
             }),
             slaves.end());
+        }
+
+        // Parse SII
+        for (auto& slave : slaves_)
+        {
+            slave.parseSII();
         }
 
         printSlavesInfo();
@@ -458,16 +523,7 @@ namespace kickcat
     {
         for (auto const& slave : slaves_)
         {
-            printf("-*-*-*-*- slave 0x%04x -*-*-*-*-\n", slave.address);
-            printf("Vendor ID:       0x%08x\n", slave.vendor_id);
-            printf("Product code:    0x%08x\n", slave.product_code);
-            printf("Revision number: 0x%08x\n", slave.revision_number);
-            printf("Serial number:   0x%08x\n", slave.serial_number);
-            printf("mailbox in:  size %d - offset 0x%04x\n", slave.mailbox.recv_size, slave.mailbox.recv_offset);
-            printf("mailbox out: size %d - offset 0x%04x\n", slave.mailbox.send_size, slave.mailbox.send_offset);
-            printf("supported mailbox protocol: 0x%02x\n", slave.supported_mailbox);
-            printf("EEPROM: size: %d - version 0x%02x\n",  slave.eeprom_size, slave.eeprom_version);
-            printf("SII size: %d\n",                       slave.sii_.size() * sizeof(uint32_t));
+            slave.printInfo();
             printf("\n");
         }
     }
@@ -515,9 +571,9 @@ namespace kickcat
     }
 
 
-    void Bus::readSDO(uint16_t id, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size)
+    void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size)
     {
-        auto& mailbox = slaves_[id].mailbox;
+        auto& mailbox = slave.mailbox;
 
         {
             uint8_t buffer[256]; // taille au pif
@@ -531,12 +587,12 @@ namespace kickcat
             header->type     = mailbox::Type::CoE;
 
             // compute new counter - used as session handle
-            uint8_t counter = slaves_[id].mailbox.counter++;
+            uint8_t counter = slave.mailbox.counter++;
             if (counter > 7)
             {
                 counter = 1;
             }
-            slaves_[id].mailbox.counter = 1;
+            slave.mailbox.counter = 1;
 
             coe->number  = counter;
             coe->service = CoE::Service::SDO_REQUEST;
@@ -548,7 +604,7 @@ namespace kickcat
             coe->index = index;
             coe->subindex = subindex;
 
-            addDatagram(Command::FPWR, createAddress(slaves_[id].address, mailbox.recv_offset), buffer, mailbox.recv_size);
+            addDatagram(Command::FPWR, createAddress(slave.address, mailbox.recv_offset), buffer, mailbox.recv_size);
             Error err = processFrames();
             if (err)
             {
@@ -567,21 +623,21 @@ namespace kickcat
         {
             checkMailboxes();
             printf("   - can read %d | can write %d\n", slaves_[1].mailbox.can_read, slaves_[1].mailbox.can_write);
-            if (slaves_[id].mailbox.can_read)
+            if (slave.mailbox.can_read)
             {
                 break;
             }
             usleep(200);
         }
 
-        if (not slaves_[id].mailbox.can_read)
+        if (not slave.mailbox.can_read)
         {
             printf("TIMEOUT !\n");
             return;
         }
 
         {
-            addDatagram(Command::FPRD, createAddress(slaves_[id].address, mailbox.send_offset), nullptr, mailbox.send_size);
+            addDatagram(Command::FPRD, createAddress(slave.address, mailbox.send_offset), nullptr, mailbox.send_size);
             Error err = processFrames();
             if (err)
             {
@@ -629,22 +685,38 @@ namespace kickcat
                 return;
             }
 
+            uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
             if (coe->transfer_type == 1)
             {
                 // expedited transfer
-                int32_t size = 4 - coe->size_indicator;
-                if(*data_size < coe->size_indicator)
+                int32_t size = 4 - coe->block_size;
+                if(*data_size < size)
                 {
                     printf("Really? Not enough size in client buffer?\n");
                     return;
                 }
-                uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
                 std::memcpy(data, payload, size);
                 *data_size = size;
                 return;
             }
 
-            printf("OK so this one is not an expedited one... sorry I don't know how to handle  it yet!");
+            // standard transfer
+            uint32_t size = *reinterpret_cast<uint32_t const*>(payload);
+            payload += 4;
+
+            if ((header->len - 10 ) >= size)
+            {
+                if(*data_size < size)
+                {
+                    printf("Really? Not enough size in client buffer?\n");
+                    return;
+                }
+                std::memcpy(data, payload, size);
+                *data_size = size;
+                return;
+            }
+
+            printf("Segmented transfer - sorry I dunno how to do it\n");
         }
     }
 }
