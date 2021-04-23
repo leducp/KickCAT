@@ -164,6 +164,15 @@ namespace kickcat
 */
         err = createMapping(nullptr);
 
+        requestState(State::SAFE_OP);
+        usleep(10000); //TODO: wait for state
+
+        for (auto& slave : slaves_)
+        {
+            State state = getCurrentState(slave);
+            printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
+        }
+
         err += EERROR("Not implemented");
         return err;
     }
