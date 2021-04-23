@@ -63,6 +63,7 @@ namespace kickcat
 
         // mapping helpers
         Error createMapping(uint8_t* iomap);
+        Error detectMapping();
         Error readMappedPDO(Slave& slave, uint16_t index);
 
         Error fetchEeprom();

@@ -161,6 +161,28 @@ namespace kickcat
         uint8_t  pdi_control;
     } __attribute__((__packed__));
 
+    enum SyncManagerType
+    {
+        Unused     = 0,
+        MailboxOut = 1,
+        MailboxInt = 2,
+        Output     = 3,
+        Input      = 4  // slave to master
+    };
+
+    struct FMMU
+    {
+        uint32_t logical_address;
+        uint16_t length;
+        uint8_t  logical_start_bit;
+        uint8_t  logical_stop_bit;
+        uint16_t physical_address;
+        uint8_t  physical_start_bit;
+        uint8_t  type;
+        uint8_t  activate;
+        uint8_t  reserved[3];
+    } __attribute__((__packed__));
+
     namespace eeprom // addresses are in words!
     {
         constexpr uint16_t ESC_INFO            = 0x00;
@@ -241,14 +263,6 @@ namespace kickcat
             uint16_t physical_memory_address;
             uint8_t reserved_C[12];
         } __attribute__((__packed__));
-
-        enum FMMU : uint8_t
-        {
-            NOT_USED     = 0,
-            OUTPUT       = 1,
-            INPUT        = 2,
-            SYNCM_STATUS = 3
-        };
 
         struct SyncManagerEntry
         {

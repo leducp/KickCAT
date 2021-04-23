@@ -162,7 +162,7 @@ namespace kickcat
         readSDO(1, 0x1600, 0, true, buffer, &size);
         printf("read %d\n", size);
 */
-        createMapping(nullptr);
+        err = createMapping(nullptr);
 
         err += EERROR("Not implemented");
         return err;
@@ -286,20 +286,21 @@ namespace kickcat
     }
 
 
-    Error Bus::createMapping(uint8_t* iomap)
+    Error Bus::detectMapping()
     {
         // Determines PI sizes for each slave
         for (auto& slave : slaves_)
         {
             if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
             {
+                // Slave support CAN over EtherCAT -> use mailbox/SDO to get mapping size
                 uint8_t sm[64];
                 int32_t sm_size = sizeof(sm);
                 readSDO(slave, CoE::SM_COM_TYPE, 1, true, sm, &sm_size);
 
                 for (int i = 0; i < sm_size; ++i)
                 {
-                    if (sm[i] > 2)
+                    if (sm[i] > 2) // <=> SyncManagerType::Input or Output
                     {
                         Slave::PIMapping mapping;
                         mapping.sync_manager = i;
@@ -321,19 +322,20 @@ namespace kickcat
                                 mapping.size += object[k];
                             }
                         }
-                        printf("mapped size %d bits\n", mapping.size);
+
+                        slave.mapping.push_back(mapping);
                     }
                 }
             }
             else
             {
-                // unsupported mailbox: use SII
+                // unsupported mailbox: use SII to get the mapping size
                 Slave::PIMapping mapping;
 
                 mapping.sync_manager = 0;
                 mapping.size = 0;
-                mapping.type = 3;
-                for (auto const& pdo : slave.sii.TxPDO)
+                mapping.type = SyncManagerType::Output;
+                for (auto const& pdo : slave.sii.RxPDO)
                 {
                     mapping.size += pdo->bitlen;
                 }
@@ -341,8 +343,8 @@ namespace kickcat
 
                 mapping.sync_manager = 1;
                 mapping.size = 0;
-                mapping.type = 4;
-                for (auto const& pdo : slave.sii.RxPDO)
+                mapping.type = SyncManagerType::Input;
+                for (auto const& pdo : slave.sii.TxPDO)
                 {
                     mapping.size += pdo->bitlen;
                 }
@@ -350,8 +352,110 @@ namespace kickcat
             }
         }
 
+        // Compute offset - overlap input and output
+        // TODO: doesn't work if two SM are in used for the same direction
+        int32_t offset = 0;
+        for (auto& slave : slaves_)
+        {
+            for (auto& mapping : slave.mapping)
+            {
+                // compute byte size from bit size, round up
+                mapping.bsize = mapping.size / 8;
+                if (mapping.size % 8)
+                {
+                    mapping.bsize += 1;
+                }
+
+                mapping.offset = offset;
+            }
+
+            // get the biggest one.
+            auto biggest_mapping = std::max_element(slave.mapping.begin(), slave.mapping.end(),
+                [](Slave::PIMapping const& lhs, Slave::PIMapping const& rhs)
+                {
+                    return lhs.bsize < rhs.bsize;
+                });
+            int32_t size = biggest_mapping->bsize;
+
+            offset += size;
+        }
+
         return ESUCCESS;
     }
+
+
+    Error Bus::createMapping(uint8_t* iomap)
+    {
+        // First we need to know:
+        // - how many bits to map per slave
+        // - which SM to use
+        // - logical offset in the frame
+        detectMapping();
+
+        uint16_t frame_sent = 0;
+
+        // Program Sync Managers and FMMUs
+        for (auto& slave : slaves_)
+        {
+            for (auto& mapping : slave.mapping)
+            {
+                uint16_t physical_address = slave.sii.syncManagers_[mapping.sync_manager]->start_adress;
+
+                SyncManager sm;
+                FMMU fmmu;
+                std::memset(&sm,   0, sizeof(SyncManager));
+                std::memset(&fmmu, 0, sizeof(FMMU));
+
+                uint16_t targeted_fmmu = reg::FMMU; // FMMU0 - outputs
+                sm.control = 0x64;                  // 3 buffers - write access - PDI IRQ ON - wdg ON
+                fmmu.type  = 2;                     // write access
+                if (mapping.type == SyncManagerType::Input)
+                {
+                    sm.control = 0x20;              // 3 buffers - read acces - PDI IRQ ON
+                    fmmu.type  = 1;                 // read access
+                    targeted_fmmu += 0x10;          // FMMU1 - inputs (slave to master)
+                }
+                sm.start_address = physical_address;
+                sm.length        = mapping.bsize;
+                sm.status        = 0x00; // RO register
+                sm.activate      = 0x01; // Sync Manager enable
+                sm.pdi_control   = 0x00; // RO register
+
+                addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
+                frame_sent++;
+
+                fmmu.logical_address    = mapping.offset;
+                fmmu.length             = mapping.bsize;
+                fmmu.logical_start_bit  = 0;   // we map every bits
+                fmmu.logical_stop_bit   = 0x7; // we map every bits
+                fmmu.physical_address   = physical_address;
+                fmmu.physical_start_bit = 0;
+                fmmu.activate           = 1;
+
+                addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
+                frame_sent++;
+            }
+        }
+
+        Error err = processFrames();
+        if (err)
+        {
+            err.what();
+            return err;
+        }
+
+        for (int32_t i = 0; i < frame_sent; ++i)
+        {
+            auto [h, _, wkc] = nextDatagram<uint8_t>();
+            if (wkc != 1)
+            {
+                err += EERROR("wrong wkc!");
+            }
+        }
+
+        return EERROR("not implemented");
+    }
+
 
 
     bool Bus::areEepromReady()
@@ -622,7 +726,6 @@ namespace kickcat
         for (int i = 0; i < 10; ++i)
         {
             checkMailboxes();
-            printf("   - can read %d | can write %d\n", slaves_[1].mailbox.can_read, slaves_[1].mailbox.can_write);
             if (slave.mailbox.can_read)
             {
                 break;
