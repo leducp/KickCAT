@@ -54,7 +54,9 @@ namespace kickcat
 
         std::vector<Slave>& slaves() { return slaves_; }
 
-    private:
+        Error sendProcessData();
+
+    protected: // for unit testing
         uint8_t idx_{0};
 
         // Helpers for broadcast commands, mainly for init purpose
@@ -83,6 +85,7 @@ namespace kickcat
         // mapping helpers
         Error detectMapping();
         Error readMappedPDO(Slave& slave, uint16_t index);
+        Error configureFMMUs();
 
         Error fetchEeprom();
         bool areEepromReady();
@@ -98,6 +101,10 @@ namespace kickcat
         std::vector<Frame> frames_;
         int32_t current_frame_{0};
         std::vector<Slave> slaves_;
+
+        uint8_t* iomap_;
+        uint8_t pi_frames_;             // number of frames required for PI
+        uint16_t pi_expected_wkc_[8];   // max 8 frames in PI - arbitrary setup for now
     };
 }
 

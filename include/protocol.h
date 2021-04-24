@@ -22,11 +22,12 @@ namespace kickcat
     // EtherCAT description
     constexpr uint16_t ETH_ETHERCAT_TYPE = __builtin_bswap16(0x88A4); //TODO: implement constexpr htons
     constexpr int32_t ETHERCAT_WKC_SIZE = 2;
-    constexpr int32_t MAX_ETHERCAT_DATAGRAMS = 15; // max EtherCAT datagrams per Ethernet frame
+    constexpr int32_t MAX_ETHERCAT_DATAGRAMS = 15;       // max EtherCAT datagrams per Ethernet frame
+    constexpr uint16_t MAX_ETHERCAT_PAYLOAD_SIZE = 1480; // max EtherCAT payload size possible - aligned on 64bits (1486 truncated)
 
     struct EthercatHeader
     {
-        int16_t len : 11;
+        uint16_t len : 11;
         int16_t reserved : 1;
         int16_t type : 4;
     } __attribute__((__packed__));

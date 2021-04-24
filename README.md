@@ -14,6 +14,11 @@ https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/13
 various:
 https://sir.upc.edu/wikis/roblab/index.php/Development/Ethercat
 
+diag:
+https://www.automation.com/en-us/articles/2014-2/diagnostics-with-ethercat-part-4
+https://infosys.beckhoff.com/english.php?content=../content/1033/ethercatsystem/1072509067.html&id=
+https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z000000kHwESAU
+
 
 ### TODO
  *  Handle idx properly and check for incoherent received idx

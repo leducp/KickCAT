@@ -13,6 +13,8 @@ namespace kickcat
         , frames_{}
     {
         frames_.emplace_back(PRIMARY_IF_MAC);
+
+        std::memset(pi_expected_wkc_, 0, sizeof(pi_expected_wkc_));
     }
 
 
@@ -381,23 +383,27 @@ namespace kickcat
             }
         }
 
-        // Compute offset - overlap input and output
-        // TODO: doesn't work if two SM are in used for the same direction
-        int32_t offset = 0;
+
+        // compute byte size from bit size, round up
         for (auto& slave : slaves_)
         {
             for (auto& mapping : slave.mapping)
             {
-                // compute byte size from bit size, round up
                 mapping.bsize = mapping.size / 8;
                 if (mapping.size % 8)
                 {
                     mapping.bsize += 1;
                 }
-
-                mapping.offset = offset;
             }
+        }
 
+        // Compute offset - overlap input and output
+        // Note: a frame cannot handle more than 1486 bytes
+        // TODO: doesn't work if two SM are in used for the same direction
+        pi_frames_ = 1;
+        int32_t offset = 0;
+        for (auto& slave : slaves_)
+        {
             // get the biggest one.
             auto biggest_mapping = std::max_element(slave.mapping.begin(), slave.mapping.end(),
                 [](Slave::PIMapping const& lhs, Slave::PIMapping const& rhs)
@@ -406,6 +412,21 @@ namespace kickcat
                 });
             int32_t size = biggest_mapping->bsize;
 
+            if ((offset + size) > (pi_frames_ * MAX_ETHERCAT_PAYLOAD_SIZE))
+            {
+                // current size will overflow the frame at the current offset: set in on the next frame
+                pi_frames_ += 1;
+                offset = pi_frames_ * MAX_ETHERCAT_PAYLOAD_SIZE;
+            }
+
+            // save offset for this mapping
+            for (auto& mapping : slave.mapping)
+            {
+                mapping.offset = offset;
+                pi_expected_wkc_[pi_frames_ - 1] += 1;
+            }
+
+            // update offset
             offset += size;
         }
 
@@ -415,15 +436,61 @@ namespace kickcat
 
     Error Bus::createMapping(uint8_t* iomap)
     {
+        // save io mapping
+        iomap_ = iomap;
+
         // First we need to know:
         // - how many bits to map per slave
         // - which SM to use
         // - logical offset in the frame
         detectMapping();
 
-        uint16_t frame_sent = 0;
+        // Second step: program FMMUs and SyncManagers
+        Error err = configureFMMUs();
+        if (err) { return err; }
 
-        // Program Sync Managers and FMMUs
+        // Third step: set right address in slave context
+        uint8_t* pos = iomap;
+        for (auto& slave : slaves_)
+        {
+            for (auto& mapping : slave.mapping)
+            {
+                mapping.client = pos;
+                pos += mapping.bsize;
+            }
+        }
+
+        return ESUCCESS;
+    }
+
+
+    Error Bus::sendProcessData()
+    {
+        for (int32_t i = 0; i < pi_frames_; ++i)
+        {
+            //addDatagram(Command::BRW, i * MAX_ETHERCAT_PAYLOAD_SIZE, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
+            addDatagram(Command::LRD, i * MAX_ETHERCAT_PAYLOAD_SIZE, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
+        }
+
+        Error err = processFrames();
+        if (err) { return err; }
+
+        for (int32_t i = 0; i < pi_frames_; ++i)
+        {
+            auto [header, data, wkc] = nextDatagram<uint8_t>();
+            if (wkc != pi_expected_wkc_[i])
+            {
+                printf("Wrong wkc! expected %d - received: %d\n", pi_expected_wkc_[i], wkc);
+            }
+
+            std::memcpy(iomap_, data, 32);
+        }
+    }
+
+
+    Error Bus::configureFMMUs()
+    {
+        uint16_t frame_sent = 0;
         for (auto& slave : slaves_)
         {
             for (auto& mapping : slave.mapping)
@@ -482,7 +549,7 @@ namespace kickcat
             }
         }
 
-        return EERROR("not implemented");
+        return ESUCCESS;
     }
 
 
