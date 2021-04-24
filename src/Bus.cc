@@ -119,62 +119,21 @@ namespace kickcat
         err = resetSlaves();
         if (err) { return err; }
 
-        // set addresses
-        for (int i = 0; i < slaves_.size(); ++i)
-        {
-            slaves_[i].address = 0x1000 + i;
-            addDatagram(Command::APWR, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
-        }
-        err = processFrames();
-        if (err)
-        {
-            err.what();
-            return err;
-        }
+        err = setAddresses();
+        if (err) { return err; }
+
+        err = requestState(State::INIT);
+        if (err) { return err; }
+        waitForState(State::INIT, 5000ms);
 
         err = fetchEeprom();
-        if (err)
-        {
-            err.what();
-            return err;
-        }
+        if (err) { return err; }
 
         err = configureMailboxes();
-        if (err)
-        {
-            err.what();
-            return err;
-        }
+        if (err) {  return err; }
 
         requestState(State::PRE_OP);
-        usleep(10000); //TODO: wait for state
-
-        for (auto& slave : slaves_)
-        {
-            State state = getCurrentState(slave);
-            printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
-        }
-
-/*
-        printf("\n\n try to read a SDO on one slave\n");
-        char buffer[512];
-        int32_t size = 512;
-        readSDO(1, 0x1600, 0, true, buffer, &size);
-        printf("read %d\n", size);
-*/
-        err = createMapping(nullptr);
-
-        requestState(State::SAFE_OP);
-        usleep(10000); //TODO: wait for state
-
-        for (auto& slave : slaves_)
-        {
-            State state = getCurrentState(slave);
-            printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
-        }
-
-        err += EERROR("Not implemented");
-        return err;
+        return waitForState(State::PRE_OP, 3000ms);
     }
 
 
@@ -184,7 +143,6 @@ namespace kickcat
         uint16_t wkc = broadcastWrite(reg::AL_CONTROL, &param, sizeof(param));
         if (wkc != slaves_.size())
         {
-            printf("aie %d %d\n", wkc, slaves_.size());
             return EERROR("failed to request state");
         }
 
@@ -194,17 +152,68 @@ namespace kickcat
 
     State Bus::getCurrentState(Slave const& slave)
     {
-        frames_[0].addDatagram(0x55, Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2);
-        Error err = frames_[0].writeThenRead(socket_);
+        addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2);
+        Error err = processFrames();
         if (err)
         {
             err.what();
             return State::INVALID;
         }
 
-        auto [header, data, wkc] = frames_[0].nextDatagram();
-        printf("--> data %x\n", data[0]);
-        return State(data[0] & 0xF);
+        auto [header, data, wkc] = nextDatagram<uint8_t>();
+        uint8_t state = data[0];
+
+        // error indicator flag set: check status code
+        if (state & 0x10)
+        {
+            addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS_CODE), nullptr, 2);
+            err = processFrames();
+            if (err)
+            {
+                err.what();
+                return State::INVALID;
+            }
+            auto [h, error, w] = nextDatagram<uint16_t>();
+            if (*error == 0)
+            {
+                // no real error -> filter the flag
+                return State(state & 0xF);
+            }
+        }
+        return State(state);
+    }
+
+
+    Error Bus::waitForState(State request, nanoseconds timeout)
+    {
+        nanoseconds now = since_epoch();
+
+        while (true)
+        {
+            bool is_state_reached = true;
+            for (auto& slave : slaves_)
+            {
+                State state = getCurrentState(slave);
+                if (state != request)
+                {
+                    is_state_reached = false;
+                    break;
+                }
+            }
+
+            if (is_state_reached)
+            {
+                return ESUCCESS;
+            }
+
+            if (elapsed_time(now) > timeout)
+            {
+                printf("aie\n");
+                return EERROR("timeout");
+            }
+
+            sleep(1ms);
+        }
     }
 
 
@@ -230,16 +239,27 @@ namespace kickcat
         dc_param = 0x0c00;          // reset value
         broadcastWrite(reg::DC_TIME_FILTER, &dc_param, sizeof(dc_param));
 
-        // Request INIT state
-        Error err = requestState(State::INIT);
-        if (err)
-        {
-            err += EERROR("");
-            return err;
-        }
-
         // eeprom to master
         broadcastWrite(reg::EEPROM_CONFIG, param, 2);
+
+        return ESUCCESS;
+    }
+
+
+    Error Bus::setAddresses()
+    {
+        for (int i = 0; i < slaves_.size(); ++i)
+        {
+            slaves_[i].address = 0x1000 + i;
+            addDatagram(Command::APWR, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
+        }
+
+        Error err = processFrames();
+        if (err)
+        {
+            err.what();
+            return err;
+        }
 
         return ESUCCESS;
     }
@@ -466,7 +486,6 @@ namespace kickcat
     }
 
 
-
     bool Bus::areEepromReady()
     {
         bool ready = false;
@@ -569,6 +588,7 @@ namespace kickcat
         return ESUCCESS;
     }
 
+
     Error Bus::fetchEeprom()
     {
         std::vector<Slave*> slaves;
@@ -625,8 +645,6 @@ namespace kickcat
         {
             slave.parseSII();
         }
-
-        printSlavesInfo();
 
         return ESUCCESS;
     }

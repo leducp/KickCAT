@@ -7,9 +7,11 @@
 #include <vector>
 #include <functional>
 
+
 #include "Error.h"
 #include "Frame.h"
 #include "Slave.h"
+#include "Time.h"
 
 namespace kickcat
 {
@@ -28,13 +30,29 @@ namespace kickcat
         Bus(std::shared_ptr<AbstractSocket> socket);
         ~Bus() = default;
 
+        // set the bus from an unknown state to PREOP state
         Error init();
-        Error requestState(State request);
-        State getCurrentState(Slave const& slave);
 
+        // detect the number of slaves on the line
         uint16_t getSlavesOnNetwork();
 
+        // request a state for all slaves
+        Error requestState(State request);
+
+        // Get the state a specific slave
+        State getCurrentState(Slave const& slave);
+
+        // wait for all slaves to reached a state
+        Error waitForState(State request, nanoseconds timeout);
+
+        // create thje mapping between slaves PI and client buffer
+        // if OK, set the bus to SAFE_OP state
+        Error createMapping(uint8_t* iomap);
+
+        // Print various info about slaves, mainly from SII
         void printSlavesInfo();
+
+        std::vector<Slave>& slaves() { return slaves_; }
 
     private:
         uint8_t idx_{0};
@@ -59,10 +77,10 @@ namespace kickcat
         // INIT state methods
         Error detectSlaves();
         Error resetSlaves();
+        Error setAddresses();
         Error configureMailboxes();
 
         // mapping helpers
-        Error createMapping(uint8_t* iomap);
         Error detectMapping();
         Error readMappedPDO(Slave& slave, uint16_t index);
 
