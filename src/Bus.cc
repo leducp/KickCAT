@@ -13,8 +13,6 @@ namespace kickcat
         , frames_{}
     {
         frames_.emplace_back(PRIMARY_IF_MAC);
-
-        std::memset(pi_expected_wkc_, 0, sizeof(pi_expected_wkc_));
     }
 
 
@@ -319,6 +317,17 @@ namespace kickcat
 
     Error Bus::detectMapping()
     {
+        // helper: compute byte size from bit size, round up
+        auto bits_to_bytes = [](int32_t bits)
+        {
+            int32_t bytes = bits / 8;
+            if (bits % 8)
+            {
+                bytes += 1;
+            }
+            return  bytes;
+        };
+
         // Determines PI sizes for each slave
         for (auto& slave : slaves_)
         {
@@ -331,12 +340,16 @@ namespace kickcat
 
                 for (int i = 0; i < sm_size; ++i)
                 {
+                    //TODO we support only one input and one output per slave for now
                     if (sm[i] > 2) // <=> SyncManagerType::Input or Output
                     {
-                        Slave::PIMapping mapping;
-                        mapping.sync_manager = i;
-                        mapping.type = sm[i];
-                        mapping.size = 0;
+                        Slave::PIMapping* mapping = &slave.input;
+                        if (sm[i] == SyncManagerType::Output)
+                        {
+                            mapping = &slave.output;
+                        }
+                        mapping->sync_manager = i;
+                        mapping->size = 0;
 
                         uint16_t mapped_index[64];
                         int32_t map_size = sizeof(mapped_index);
@@ -350,84 +363,35 @@ namespace kickcat
 
                             for (int32_t k = 0; k < object_size; k += 4)
                             {
-                                mapping.size += object[k];
+                                mapping->size += object[k];
                             }
                         }
 
-                        slave.mapping.push_back(mapping);
+                        mapping->bsize = bits_to_bytes(mapping->size);
                     }
                 }
             }
             else
             {
                 // unsupported mailbox: use SII to get the mapping size
-                Slave::PIMapping mapping;
-
-                mapping.sync_manager = 0;
-                mapping.size = 0;
-                mapping.type = SyncManagerType::Output;
+                Slave::PIMapping* mapping = &slave.output;
+                mapping->sync_manager = 0;
+                mapping->size = 0;
                 for (auto const& pdo : slave.sii.RxPDO)
                 {
-                    mapping.size += pdo->bitlen;
+                    mapping->size += pdo->bitlen;
                 }
-                slave.mapping.push_back(mapping);
+                mapping->bsize = bits_to_bytes(mapping->size);
 
-                mapping.sync_manager = 1;
-                mapping.size = 0;
-                mapping.type = SyncManagerType::Input;
+                mapping = &slave.input;
+                mapping->sync_manager = 1;
+                mapping->size = 0;
                 for (auto const& pdo : slave.sii.TxPDO)
                 {
-                    mapping.size += pdo->bitlen;
+                    mapping->size += pdo->bitlen;
                 }
-                slave.mapping.push_back(mapping);
+                mapping->bsize = bits_to_bytes(mapping->size);
             }
-        }
-
-
-        // compute byte size from bit size, round up
-        for (auto& slave : slaves_)
-        {
-            for (auto& mapping : slave.mapping)
-            {
-                mapping.bsize = mapping.size / 8;
-                if (mapping.size % 8)
-                {
-                    mapping.bsize += 1;
-                }
-            }
-        }
-
-        // Compute offset - overlap input and output
-        // Note: a frame cannot handle more than 1486 bytes
-        // TODO: doesn't work if two SM are in used for the same direction
-        pi_frames_ = 1;
-        int32_t offset = 0;
-        for (auto& slave : slaves_)
-        {
-            // get the biggest one.
-            auto biggest_mapping = std::max_element(slave.mapping.begin(), slave.mapping.end(),
-                [](Slave::PIMapping const& lhs, Slave::PIMapping const& rhs)
-                {
-                    return lhs.bsize < rhs.bsize;
-                });
-            int32_t size = biggest_mapping->bsize;
-
-            if ((offset + size) > (pi_frames_ * MAX_ETHERCAT_PAYLOAD_SIZE))
-            {
-                // current size will overflow the frame at the current offset: set in on the next frame
-                pi_frames_ += 1;
-                offset = pi_frames_ * MAX_ETHERCAT_PAYLOAD_SIZE;
-            }
-
-            // save offset for this mapping
-            for (auto& mapping : slave.mapping)
-            {
-                mapping.offset = offset;
-                pi_expected_wkc_[pi_frames_ - 1] += 1;
-            }
-
-            // update offset
-            offset += size;
         }
 
         return ESUCCESS;
@@ -437,7 +401,7 @@ namespace kickcat
     Error Bus::createMapping(uint8_t* iomap)
     {
         // save io mapping
-        iomap_ = iomap;
+       // iomap_ = iomap;
 
         // First we need to know:
         // - how many bits to map per slave
@@ -449,23 +413,57 @@ namespace kickcat
         Error err = configureFMMUs();
         if (err) { return err; }
 
-        // Third step: set right address in slave context
-        uint8_t* pos = iomap;
+        // Third step: create 'block I/O' lists for read and write op
+        // Note A: offset computing will overlap input and output in the frame (better density and compatibility, more works for master)
+        // Note B: a frame cannot handle more than 1486 bytes
+        pi_frames_ = 0;
+        int32_t offset = 0;
         for (auto& slave : slaves_)
         {
-            for (auto& mapping : slave.mapping)
+            // get the biggest one.
+            int32_t size = std::max(slave.input.bsize, slave.output.bsize);
+            if ((offset + size) > ((pi_frames_ + 1) * MAX_ETHERCAT_PAYLOAD_SIZE))
             {
-                mapping.client = pos;
-                pos += mapping.bsize;
+                // current size will overflow the frame at the current offset: set in on the next frame
+                pi_frames_ += 1;
+                offset = pi_frames_ * MAX_ETHERCAT_PAYLOAD_SIZE;
             }
+
+            // create block IO entries
+            inputs_.push_back ({nullptr, offset, slave.input.bsize,  pi_frames_, &slave});
+            outputs_.push_back({nullptr, offset, slave.output.bsize, pi_frames_, &slave});
+
+            // save mapping offset (need to configure slave FMMU)
+            slave.input.offset  = offset;
+            slave.output.offset = offset;
+
+            // update offset
+            offset += size;
+        }
+
+        // Fourth step: associate client buffer address to block IO and slaves
+        // Note: inputs are mapped first, outputs second
+        uint8_t* pos = iomap;
+        for (auto& bio : inputs_)
+        {
+            bio.iomap = pos;
+            bio.slave->input.data = pos;
+            pos += bio.size;
+        }
+        for (auto& bio : outputs_)
+        {
+            bio.iomap = pos;
+            bio.slave->output.data = pos;
+            pos += bio.size;
         }
 
         return ESUCCESS;
     }
 
 
-    Error Bus::sendProcessData()
+    Error Bus::processDataRead()
     {
+        /*
         for (int32_t i = 0; i < pi_frames_; ++i)
         {
             //addDatagram(Command::BRW, i * MAX_ETHERCAT_PAYLOAD_SIZE, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
@@ -485,52 +483,62 @@ namespace kickcat
 
             std::memcpy(iomap_, data, 32);
         }
+        */
+
+       return ESUCCESS;
     }
 
 
     Error Bus::configureFMMUs()
     {
+        auto prepareDatagrams = [this](Slave& slave, Slave::PIMapping& mapping, SyncManagerType type)
+        {
+            if (mapping.bsize = 0)
+            {
+                // there is nothing to do for this mapping
+                return 0;
+            }
+
+            uint16_t physical_address = slave.sii.syncManagers_[mapping.sync_manager]->start_adress;
+
+            SyncManager sm;
+            FMMU fmmu;
+            std::memset(&sm,   0, sizeof(SyncManager));
+            std::memset(&fmmu, 0, sizeof(FMMU));
+
+            uint16_t targeted_fmmu = reg::FMMU; // FMMU0 - outputs
+            sm.control = 0x64;                  // 3 buffers - write access - PDI IRQ ON - wdg ON
+            fmmu.type  = 2;                     // write access
+            if (type == SyncManagerType::Input)
+            {
+                sm.control = 0x20;              // 3 buffers - read acces - PDI IRQ ON
+                fmmu.type  = 1;                 // read access
+                targeted_fmmu += 0x10;          // FMMU1 - inputs (slave to master)
+            }
+            sm.start_address = physical_address;
+            sm.length        = mapping.bsize;
+            sm.status        = 0x00; // RO register
+            sm.activate      = 0x01; // Sync Manager enable
+            sm.pdi_control   = 0x00; // RO register
+            addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
+
+            fmmu.logical_address    = mapping.offset;
+            fmmu.length             = mapping.bsize;
+            fmmu.logical_start_bit  = 0;   // we map every bits
+            fmmu.logical_stop_bit   = 0x7; // we map every bits
+            fmmu.physical_address   = physical_address;
+            fmmu.physical_start_bit = 0;
+            fmmu.activate           = 1;
+            addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
+
+            return 2; // number of datagrams
+        };
+
         uint16_t frame_sent = 0;
         for (auto& slave : slaves_)
         {
-            for (auto& mapping : slave.mapping)
-            {
-                uint16_t physical_address = slave.sii.syncManagers_[mapping.sync_manager]->start_adress;
-
-                SyncManager sm;
-                FMMU fmmu;
-                std::memset(&sm,   0, sizeof(SyncManager));
-                std::memset(&fmmu, 0, sizeof(FMMU));
-
-                uint16_t targeted_fmmu = reg::FMMU; // FMMU0 - outputs
-                sm.control = 0x64;                  // 3 buffers - write access - PDI IRQ ON - wdg ON
-                fmmu.type  = 2;                     // write access
-                if (mapping.type == SyncManagerType::Input)
-                {
-                    sm.control = 0x20;              // 3 buffers - read acces - PDI IRQ ON
-                    fmmu.type  = 1;                 // read access
-                    targeted_fmmu += 0x10;          // FMMU1 - inputs (slave to master)
-                }
-                sm.start_address = physical_address;
-                sm.length        = mapping.bsize;
-                sm.status        = 0x00; // RO register
-                sm.activate      = 0x01; // Sync Manager enable
-                sm.pdi_control   = 0x00; // RO register
-
-                addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
-                frame_sent++;
-
-                fmmu.logical_address    = mapping.offset;
-                fmmu.length             = mapping.bsize;
-                fmmu.logical_start_bit  = 0;   // we map every bits
-                fmmu.logical_stop_bit   = 0x7; // we map every bits
-                fmmu.physical_address   = physical_address;
-                fmmu.physical_start_bit = 0;
-                fmmu.activate           = 1;
-
-                addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
-                frame_sent++;
-            }
+            frame_sent += prepareDatagrams(slave, slave.input, SyncManagerType::Input);
+            frame_sent += prepareDatagrams(slave, slave.input, SyncManagerType::Output);
         }
 
         Error err = processFrames();
