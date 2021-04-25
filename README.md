@@ -1,4 +1,17 @@
-A C++ implementation of EtherCAT master stack (and currently so unfinished that you cannot do anything with it)
+A C++ implementation of EtherCAT master stack.
+
+Current state:
+ - Can go to OP state
+ - Can read and write PI (no read/write though)
+ - Can read SDO - blocking call
+
+TODO:
+ - CoE: write SDO - blocking call
+ - CoE: read and write SDO - async call
+ - read/write PI
+ - better error handling
+ - CoE: Emergency message
+ - bus diagnostic
 
 
 ### EtherCAT doc
