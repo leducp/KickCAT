@@ -60,7 +60,7 @@ int main()
     }
 
     auto& slave = bus.slaves().at(0);
-    for (int32_t i = 0; i < 1000; ++i)
+    for (int32_t i = 0; i < 500; ++i)
     {
         sleep(10ms);
         bus.processDataRead();
@@ -69,8 +69,9 @@ int main()
         {
             printf("%02x ", slave.input.data[j]);
         }
-        printf("\n");
+        printf("\r");
     }
+    printf("\n");
 
 
     return 0;

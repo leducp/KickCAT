@@ -208,7 +208,6 @@ namespace kickcat
 
             if (elapsed_time(now) > timeout)
             {
-                printf("aie\n");
                 return EERROR("timeout");
             }
 
@@ -318,14 +317,14 @@ namespace kickcat
     Error Bus::detectMapping()
     {
         // helper: compute byte size from bit size, round up
-        auto bits_to_bytes = [](int32_t bits)
+        auto bits_to_bytes = [](int32_t bits) -> int32_t
         {
             int32_t bytes = bits / 8;
             if (bits % 8)
             {
                 bytes += 1;
             }
-            return  bytes;
+            return bytes;
         };
 
         // Determines PI sizes for each slave
@@ -400,20 +399,13 @@ namespace kickcat
 
     Error Bus::createMapping(uint8_t* iomap)
     {
-        // save io mapping
-       // iomap_ = iomap;
-
         // First we need to know:
         // - how many bits to map per slave
         // - which SM to use
         // - logical offset in the frame
         detectMapping();
 
-        // Second step: program FMMUs and SyncManagers
-        Error err = configureFMMUs();
-        if (err) { return err; }
-
-        // Third step: create 'block I/O' lists for read and write op
+        // Second step: create 'block I/O' lists for read and write op
         // Note A: offset computing will overlap input and output in the frame (better density and compatibility, more works for master)
         // Note B: a frame cannot handle more than 1486 bytes
         pi_frames_ = 0;
@@ -441,7 +433,7 @@ namespace kickcat
             offset += size;
         }
 
-        // Fourth step: associate client buffer address to block IO and slaves
+        // Third step: associate client buffer address to block IO and slaves
         // Note: inputs are mapped first, outputs second
         uint8_t* pos = iomap;
         for (auto& bio : inputs_)
@@ -457,14 +449,17 @@ namespace kickcat
             pos += bio.size;
         }
 
+        // Fourth step: program FMMUs and SyncManagers
+        Error err = configureFMMUs();
+        if (err) { return err; }
+
         return ESUCCESS;
     }
 
 
     Error Bus::processDataRead()
     {
-        /*
-        for (int32_t i = 0; i < pi_frames_; ++i)
+        for (int32_t i = 0; i < (pi_frames_ + 1); ++i)
         {
             //addDatagram(Command::BRW, i * MAX_ETHERCAT_PAYLOAD_SIZE, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
             addDatagram(Command::LRD, i * MAX_ETHERCAT_PAYLOAD_SIZE, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
@@ -473,17 +468,17 @@ namespace kickcat
         Error err = processFrames();
         if (err) { return err; }
 
-        for (int32_t i = 0; i < pi_frames_; ++i)
+        for (int32_t i = 0; i < (pi_frames_ + 1); ++i)
         {
             auto [header, data, wkc] = nextDatagram<uint8_t>();
-            if (wkc != pi_expected_wkc_[i])
+
+            if (wkc != 3)
             {
-                printf("Wrong wkc! expected %d - received: %d\n", pi_expected_wkc_[i], wkc);
+                printf("Wrong wkc! expected %d - received: %d\n", 3, wkc);
             }
 
-            std::memcpy(iomap_, data, 32);
+            std::memcpy(slaves_[0].input.data, data, 32);
         }
-        */
 
        return ESUCCESS;
     }
@@ -493,7 +488,7 @@ namespace kickcat
     {
         auto prepareDatagrams = [this](Slave& slave, Slave::PIMapping& mapping, SyncManagerType type)
         {
-            if (mapping.bsize = 0)
+            if (mapping.bsize == 0)
             {
                 // there is nothing to do for this mapping
                 return 0;
@@ -530,6 +525,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
+            printf("slave %04x - size %d - offset %d - address %04x\n", slave.address, mapping.bsize, mapping.offset, physical_address);
 
             return 2; // number of datagrams
         };
@@ -537,8 +533,8 @@ namespace kickcat
         uint16_t frame_sent = 0;
         for (auto& slave : slaves_)
         {
-            frame_sent += prepareDatagrams(slave, slave.input, SyncManagerType::Input);
-            frame_sent += prepareDatagrams(slave, slave.input, SyncManagerType::Output);
+            frame_sent += prepareDatagrams(slave, slave.input,  SyncManagerType::Input);
+            frame_sent += prepareDatagrams(slave, slave.output, SyncManagerType::Output);
         }
 
         Error err = processFrames();
