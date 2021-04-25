@@ -59,14 +59,14 @@ namespace kickcat
 
         struct PIMapping
         {
-            uint8_t* client;        // buffer client to read or write back
+            uint8_t* data;          // buffer client to read or write back
             int32_t size;           // size fo the mapping (in bits)
             int32_t bsize;          // size of the mapping (in bytes)
             int32_t sync_manager;   // associated Sync manager
-            int32_t type;           // type of the mapping (either in or out)
-            int32_t offset;         // offset in the PI frame
+            uint32_t address;       // logical address
         };
-        std::vector<PIMapping> mapping;
+        PIMapping input;  // slave to master
+        PIMapping output;
     };
 }
 

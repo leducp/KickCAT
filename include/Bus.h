@@ -15,6 +15,9 @@
 
 namespace kickcat
 {
+    // max 8 frames for process data - arbitrary setup for now
+    constexpr int32_t MAX_PI_FRAMES = 8;
+
     class AbstractSocket;
 
     struct RawMessage
@@ -54,7 +57,9 @@ namespace kickcat
 
         std::vector<Slave>& slaves() { return slaves_; }
 
-        Error sendProcessData();
+        Error processDataRead();
+        Error processDataWrite();
+        Error processDataReadWrite();
 
     protected: // for unit testing
         uint8_t idx_{0};
@@ -102,9 +107,25 @@ namespace kickcat
         int32_t current_frame_{0};
         std::vector<Slave> slaves_;
 
-        uint8_t* iomap_;
-        uint8_t pi_frames_;             // number of frames required for PI
-        uint16_t pi_expected_wkc_[8];   // max 8 frames in PI - arbitrary setup for now
+        uint8_t* iomap_read_section_;   // pointer on read section (to write back inputs)
+        uint8_t* iomap_write_section_;  // pointer on write section (to send to the slaves)
+
+        struct blockIO
+        {
+            uint8_t* iomap;     // client buffer
+            uint32_t offset;    // frame offset
+            int32_t  size;      // block size
+            Slave*   slave;     // associated slave of this input
+        };
+
+        struct PIFrame
+        {
+            uint32_t address;               // logical address
+            int32_t size;                   // frame size
+            std::vector<blockIO> inputs;    // slave to master
+            std::vector<blockIO> outputs;
+        };
+        std::vector<PIFrame> pi_frames_; // PI frame description
     };
 }
 

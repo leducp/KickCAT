@@ -45,38 +45,41 @@ int main()
     for (auto& slave : bus.slaves())
     {
         State state = bus.getCurrentState(slave);
-        printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
+        printf("Slave %04x state is %s\n", slave.address, toString(state));
     }
-
-    // do a round trip to let the bus switch to OP
-    bus.sendProcessData();
 
     bus.requestState(State::OPERATIONAL);
     bus.waitForState(State::OPERATIONAL, 10ms);
     for (auto& slave : bus.slaves())
     {
         State state = bus.getCurrentState(slave);
-        printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
+        printf("Slave %04x state is %s\n", slave.address, toString(state));
     }
 
     auto& slave = bus.slaves().at(0);
-    uint8_t* slave0_in = slave.mapping.at(0).client;
-    if (slave.mapping.at(0).type == SyncManagerType::Output)
-    {
-        uint8_t* slave0_in = slave.mapping.at(1).client;
-    }
-    for (int32_t i = 0; i < 1000; ++i)
+    for (int32_t i = 0; i < 5000; ++i)
     {
         sleep(10ms);
-        bus.sendProcessData();
+        bus.processDataRead();
 
-        for (int32_t j = 0;  j < 32; ++j)
+        for (int32_t j = 0;  j < slave.input.bsize; ++j)
         {
-            printf("%02x ", slave0_in[j]);
+            printf("%02x ", slave.input.data[j]);
         }
-        printf("\n");
-    }
+        printf("\r");
 
+        // blink a led - EasyCAT example for Arduino
+        if ((i % 50) < 25)
+        {
+            slave.output.data[0] = 1;
+        }
+        else
+        {
+            slave.output.data[0] = 0;
+        }
+        bus.processDataWrite();
+    }
+    printf("\n");
 
     return 0;
 }
