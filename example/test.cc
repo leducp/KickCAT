@@ -45,22 +45,19 @@ int main()
     for (auto& slave : bus.slaves())
     {
         State state = bus.getCurrentState(slave);
-        printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
+        printf("Slave %04x state is %s\n", slave.address, toString(state));
     }
-
-    // do a round trip to let the bus switch to OP
-    bus.processDataRead();
 
     bus.requestState(State::OPERATIONAL);
     bus.waitForState(State::OPERATIONAL, 10ms);
     for (auto& slave : bus.slaves())
     {
         State state = bus.getCurrentState(slave);
-        printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
+        printf("Slave %04x state is %s\n", slave.address, toString(state));
     }
 
     auto& slave = bus.slaves().at(0);
-    for (int32_t i = 0; i < 500; ++i)
+    for (int32_t i = 0; i < 5000; ++i)
     {
         sleep(10ms);
         bus.processDataRead();
@@ -70,9 +67,19 @@ int main()
             printf("%02x ", slave.input.data[j]);
         }
         printf("\r");
+
+        // blink a led - EasyCAT example for Arduino
+        if ((i % 50) < 25)
+        {
+            slave.output.data[0] = 1;
+        }
+        else
+        {
+            slave.output.data[0] = 0;
+        }
+        bus.processDataWrite();
     }
     printf("\n");
-
 
     return 0;
 }

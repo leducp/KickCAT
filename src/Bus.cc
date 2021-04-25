@@ -340,34 +340,36 @@ namespace kickcat
                 for (int i = 0; i < sm_size; ++i)
                 {
                     //TODO we support only one input and one output per slave for now
-                    if (sm[i] > 2) // <=> SyncManagerType::Input or Output
+                    if (sm[i] <= 2) // mailboxes
                     {
-                        Slave::PIMapping* mapping = &slave.input;
-                        if (sm[i] == SyncManagerType::Output)
-                        {
-                            mapping = &slave.output;
-                        }
-                        mapping->sync_manager = i;
-                        mapping->size = 0;
-
-                        uint16_t mapped_index[64];
-                        int32_t map_size = sizeof(mapped_index);
-                        readSDO(slave, CoE::SM_CHANNEL + i, 1, true, mapped_index, &map_size);
-
-                        for (int32_t j = 0; j < (map_size / 2); ++j)
-                        {
-                            uint8_t object[64];
-                            int32_t object_size = sizeof(object);
-                            readSDO(slave, mapped_index[j], 1, true, object, &object_size);
-
-                            for (int32_t k = 0; k < object_size; k += 4)
-                            {
-                                mapping->size += object[k];
-                            }
-                        }
-
-                        mapping->bsize = bits_to_bytes(mapping->size);
+                        continue;
                     }
+
+                    Slave::PIMapping* mapping = &slave.input;
+                    if (sm[i] == SyncManagerType::Output)
+                    {
+                        mapping = &slave.output;
+                    }
+                    mapping->sync_manager = i;
+                    mapping->size = 0;
+
+                    uint16_t mapped_index[64];
+                    int32_t map_size = sizeof(mapped_index);
+                    readSDO(slave, CoE::SM_CHANNEL + i, 1, true, mapped_index, &map_size);
+
+                    for (int32_t j = 0; j < (map_size / 2); ++j)
+                    {
+                        uint8_t object[64];
+                        int32_t object_size = sizeof(object);
+                        readSDO(slave, mapped_index[j], 1, true, object, &object_size);
+
+                        for (int32_t k = 0; k < object_size; k += 4)
+                        {
+                            mapping->size += object[k];
+                        }
+                    }
+
+                    mapping->bsize = bits_to_bytes(mapping->size);
                 }
             }
             else
@@ -408,45 +410,57 @@ namespace kickcat
         // Second step: create 'block I/O' lists for read and write op
         // Note A: offset computing will overlap input and output in the frame (better density and compatibility, more works for master)
         // Note B: a frame cannot handle more than 1486 bytes
-        pi_frames_ = 0;
-        int32_t offset = 0;
+        pi_frames_.resize(1);
+        pi_frames_[0].address = 0;
+        uint32_t address = 0;
         for (auto& slave : slaves_)
         {
             // get the biggest one.
             int32_t size = std::max(slave.input.bsize, slave.output.bsize);
-            if ((offset + size) > ((pi_frames_ + 1) * MAX_ETHERCAT_PAYLOAD_SIZE))
+            if ((address + size) > (pi_frames_.size() * MAX_ETHERCAT_PAYLOAD_SIZE)) // do we overflow current frame ?
             {
+                pi_frames_.back().size = address - pi_frames_.back().address; // frame size = current address - frame address
+
                 // current size will overflow the frame at the current offset: set in on the next frame
-                pi_frames_ += 1;
-                offset = pi_frames_ * MAX_ETHERCAT_PAYLOAD_SIZE;
+                address = pi_frames_.size() * MAX_ETHERCAT_PAYLOAD_SIZE;
+                pi_frames_.push_back({address, 0});
             }
 
             // create block IO entries
-            inputs_.push_back ({nullptr, offset, slave.input.bsize,  pi_frames_, &slave});
-            outputs_.push_back({nullptr, offset, slave.output.bsize, pi_frames_, &slave});
+            pi_frames_.back().inputs.push_back ({nullptr, address - pi_frames_.back().address, slave.input.bsize,  &slave});
+            pi_frames_.back().outputs.push_back({nullptr, address - pi_frames_.back().address, slave.output.bsize, &slave});
 
             // save mapping offset (need to configure slave FMMU)
-            slave.input.offset  = offset;
-            slave.output.offset = offset;
+            slave.input.address  = address;
+            slave.output.address = address;
 
             // update offset
-            offset += size;
+            address += size;
         }
+
+        // update last frame size
+        pi_frames_.back().size = address - pi_frames_.back().address;
 
         // Third step: associate client buffer address to block IO and slaves
         // Note: inputs are mapped first, outputs second
         uint8_t* pos = iomap;
-        for (auto& bio : inputs_)
+        for (auto& frame : pi_frames_)
         {
-            bio.iomap = pos;
-            bio.slave->input.data = pos;
-            pos += bio.size;
+            for (auto& bio : frame.inputs)
+            {
+                bio.iomap = pos;
+                bio.slave->input.data = pos;
+                pos += bio.size;
+            }
         }
-        for (auto& bio : outputs_)
+        for (auto& frame : pi_frames_)
         {
-            bio.iomap = pos;
-            bio.slave->output.data = pos;
-            pos += bio.size;
+            for (auto& bio : frame.outputs)
+            {
+                bio.iomap = pos;
+                bio.slave->output.data = pos;
+                pos += bio.size;
+            }
         }
 
         // Fourth step: program FMMUs and SyncManagers
@@ -459,28 +473,62 @@ namespace kickcat
 
     Error Bus::processDataRead()
     {
-        for (int32_t i = 0; i < (pi_frames_ + 1); ++i)
+        for (auto const& frame : pi_frames_)
         {
-            //addDatagram(Command::BRW, i * MAX_ETHERCAT_PAYLOAD_SIZE, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
-            addDatagram(Command::LRD, i * MAX_ETHERCAT_PAYLOAD_SIZE, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
+            addDatagram(Command::LRD, frame.address, nullptr, frame.size);
         }
 
         Error err = processFrames();
         if (err) { return err; }
 
-        for (int32_t i = 0; i < (pi_frames_ + 1); ++i)
+        for (auto const& frame : pi_frames_)
         {
             auto [header, data, wkc] = nextDatagram<uint8_t>();
 
             if (wkc != 3)
             {
                 printf("Wrong wkc! expected %d - received: %d\n", 3, wkc);
+                //TODO: handle error
             }
 
-            std::memcpy(slaves_[0].input.data, data, 32);
+            for (auto& input : frame.inputs)
+            {
+                std::memcpy(input.iomap, data + input.offset, input.size);
+            }
         }
 
        return ESUCCESS;
+    }
+
+
+    Error Bus::processDataWrite()
+    {
+        for (auto const& frame : pi_frames_)
+        {
+            uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
+            for (auto const& output : frame.outputs)
+            {
+                std::memcpy(buffer + output.offset, output.iomap, output.size);
+            }
+
+            addDatagram(Command::LWR, frame.address, buffer, frame.size);
+        }
+
+        Error err = processFrames();
+        if (err) { return err; }
+
+        for (auto const& frame : pi_frames_)
+        {
+            auto [header, data, wkc] = nextDatagram<uint8_t>();
+
+            if (wkc != 3)
+            {
+                printf("Wrong wkc! expected %d - received: %d\n", 3, wkc);
+                //TODO: handle error
+            }
+        }
+
+        return ESUCCESS;
     }
 
 
@@ -517,7 +565,7 @@ namespace kickcat
             sm.pdi_control   = 0x00; // RO register
             addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
 
-            fmmu.logical_address    = mapping.offset;
+            fmmu.logical_address    = mapping.address;
             fmmu.length             = mapping.bsize;
             fmmu.logical_start_bit  = 0;   // we map every bits
             fmmu.logical_stop_bit   = 0x7; // we map every bits
@@ -525,7 +573,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
-            printf("slave %04x - size %d - offset %d - address %04x\n", slave.address, mapping.bsize, mapping.offset, physical_address);
+            printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, physical_address);
 
             return 2; // number of datagrams
         };

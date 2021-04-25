@@ -63,7 +63,7 @@ namespace kickcat
             int32_t size;           // size fo the mapping (in bits)
             int32_t bsize;          // size of the mapping (in bytes)
             int32_t sync_manager;   // associated Sync manager
-            int32_t offset;         // frame offset
+            uint32_t address;       // logical address
         };
         PIMapping input;  // slave to master
         PIMapping output;
