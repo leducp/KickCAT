@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 project(KickCAT)
 
 add_library(kickcat src/Bus.cc
+                    src/CoE.cc
                     src/Frame.cc
                     src/Slave.cc
                     src/Error.cc

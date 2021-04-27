@@ -2,6 +2,18 @@
 
 namespace kickcat
 {
+    uint8_t Slave::Mailbox::nextCounter()
+    {
+        // compute new counter - used as session handle
+        counter++;
+        if (counter > 7)
+        {
+            counter = 1;
+        }
+        return counter;
+    }
+
+
     void Slave::parseStrings(uint8_t const* section_start)
     {
         sii.strings.push_back(std::string_view()); // index 0 is an empty string

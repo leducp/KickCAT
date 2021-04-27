@@ -8,8 +8,9 @@ Current state:
 TODO:
  - CoE: write SDO - blocking call
  - CoE: read and write SDO - async call
+ - CoE: segmented transfer
  - read/write PI
- - better error handling
+ - rework error handling
  - CoE: Emergency message
  - bus diagnostic
 

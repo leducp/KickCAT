@@ -27,6 +27,8 @@ namespace kickcat
             bool can_read;  // data available on the slave
             bool can_write; // free space for a new message on the slave
             uint8_t counter; // sessionhandle, from 1 to 7
+
+            uint8_t nextCounter();
         };
         Mailbox mailbox;
         Mailbox mailbox_bootstrap;
