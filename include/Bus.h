@@ -61,6 +61,9 @@ namespace kickcat
         Error processDataWrite();
         Error processDataReadWrite();
 
+        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t* data_size);
+        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, uint32_t data_size);
+
     protected: // for unit testing
         uint8_t idx_{0};
 
@@ -92,6 +95,7 @@ namespace kickcat
         Error readMappedPDO(Slave& slave, uint16_t index);
         Error configureFMMUs();
 
+        // Slave SII eeprom helpers
         Error fetchEeprom();
         bool areEepromReady();
         Error readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
@@ -99,8 +103,9 @@ namespace kickcat
         // mailbox helpers
         // Update slaves mailboxes state
         void checkMailboxes();
-        void readSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size);
 
+        // CoE helpers
+        void SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void const* data = nullptr, uint32_t size = 0);
 
         std::shared_ptr<AbstractSocket> socket_;
         std::vector<Frame> frames_;
