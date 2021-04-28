@@ -3,10 +3,10 @@ A C++ implementation of EtherCAT master stack.
 Current state:
  - Can go to OP state
  - Can read and write PI (no read/write though)
- - Can read SDO - blocking call
+ - Can read SDO  - blocking call
+ - Can write SDO - blocking call
 
 TODO:
- - CoE: write SDO - blocking call
  - CoE: read and write SDO - async call
  - CoE: segmented transfer
  - read/write PI
