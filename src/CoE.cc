@@ -4,7 +4,7 @@
 
 namespace kickcat
 {
-    void Bus::SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t size)
+    void Bus::SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void const* data, uint32_t size)
     {
         uint8_t buffer[256]; // TODO: adapt to mailbox size
         mailbox::Header* header   = reinterpret_cast<mailbox::Header*>(buffer);
@@ -67,7 +67,7 @@ namespace kickcat
         }
     }
 
-    void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size)
+    void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t* data_size)
     {
         SDORequest(slave, index, subindex, CA, CoE::SDO::request::UPLOAD);
 
@@ -103,6 +103,7 @@ namespace kickcat
         }
         mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(buffer);
         mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(buffer + sizeof(mailbox::Header));
+        uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
 
         if (header->type == mailbox::Type::ERROR)
         {
@@ -123,15 +124,20 @@ namespace kickcat
             return;
         }
 
-        if (coe->service != CoE::Service::SDO_RESPONSE)
+        if (coe->service == CoE::Service::SDO_REQUEST)
         {
-            printf("OK guy, this one answer, but miss the point\n");
+            if (coe->command == CoE::SDO::request::ABORT)
+            {
+                printf("Abort requested!\n");
+                return;
+            }
+            printf("OK guy, this one answer, but miss the point: %x\n", coe->service);
             return;
         }
 
-        if (coe->command == CoE::SDO::request::ABORT)
+        if (coe->service != CoE::Service::SDO_RESPONSE)
         {
-            printf("Abort requested!\n");
+            printf("Not for us: maybe sopmeone else could use this one");
             return;
         }
 
@@ -147,7 +153,6 @@ namespace kickcat
             return;
         }
 
-        uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
         if (coe->transfer_type == 1)
         {
             // expedited transfer
@@ -182,9 +187,9 @@ namespace kickcat
     }
 
 
-    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, int32_t* data_size)
+    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, uint32_t data_size)
     {
-        SDORequest(slave, index, subindex, CA, CoE::SDO::request::DOWNLOAD, 0, 0);
+        SDORequest(slave, index, subindex, CA, CoE::SDO::request::DOWNLOAD, data, data_size);
 
         for (int i = 0; i < 10; ++i)
         {
@@ -218,6 +223,7 @@ namespace kickcat
         }
         mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(buffer);
         mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(buffer + sizeof(mailbox::Header));
+        uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
 
         if (header->type == mailbox::Type::ERROR)
         {
@@ -238,15 +244,22 @@ namespace kickcat
             return;
         }
 
-        if (coe->service != CoE::Service::SDO_RESPONSE)
+        if (coe->service == CoE::Service::SDO_REQUEST)
         {
-            printf("OK guy, this one answer, but miss the point\n");
+            if (coe->command == CoE::SDO::request::ABORT)
+            {
+                uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
+                std::string_view text = CoE::SDO::abort_to_str(code);
+                printf("Abort requested! code %08x - %.*s\n", code, text.size(), text.data());
+                return;
+            }
+            printf("OK guy, this one answer, but miss the point: %x\n", coe->service);
             return;
         }
 
-        if (coe->command == CoE::SDO::request::ABORT)
+        if (coe->service != CoE::Service::SDO_RESPONSE)
         {
-            printf("Abort requested!\n");
+            printf("Not for us: maybe sopmeone else could use this one");
             return;
         }
 

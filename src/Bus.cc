@@ -333,7 +333,7 @@ namespace kickcat
             {
                 // Slave support CAN over EtherCAT -> use mailbox/SDO to get mapping size
                 uint8_t sm[64];
-                int32_t sm_size = sizeof(sm);
+                uint32_t sm_size = sizeof(sm);
                 readSDO(slave, CoE::SM_COM_TYPE, 1, true, sm, &sm_size);
 
                 for (int i = 0; i < sm_size; ++i)
@@ -353,13 +353,13 @@ namespace kickcat
                     mapping->size = 0;
 
                     uint16_t mapped_index[64];
-                    int32_t map_size = sizeof(mapped_index);
+                    uint32_t map_size = sizeof(mapped_index);
                     readSDO(slave, CoE::SM_CHANNEL + i, 1, true, mapped_index, &map_size);
 
                     for (int32_t j = 0; j < (map_size / 2); ++j)
                     {
                         uint8_t object[64];
-                        int32_t object_size = sizeof(object);
+                        uint32_t object_size = sizeof(object);
                         readSDO(slave, mapped_index[j], 1, true, object, &object_size);
 
                         for (int32_t k = 0; k < object_size; k += 4)

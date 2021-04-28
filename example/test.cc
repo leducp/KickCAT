@@ -30,6 +30,22 @@ int main()
         printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
     }
 
+    auto& slave = bus.slaves().at(1);
+
+    uint32_t yolo = 0xCAFE;
+    bus.writeSDO(slave, 0x1018, 2, false, &yolo, sizeof(uint32_t));
+
+    uint32_t yala;
+    uint32_t size = sizeof(yala);
+    bus.readSDO(slave, 0x2F00, 2, false, &yala, &size);
+    printf("ouiiii %x\n", yala);
+
+    yolo = 0xDEAD;
+    bus.writeSDO(slave, 0x2F00, 2, false, &yolo, sizeof(uint32_t));
+    bus.readSDO(slave, 0x2F00, 2, false, &yala, &size);
+    printf("yolo %x\n", yala);
+
+/*
     bus.printSlavesInfo();
 
     uint8_t io_buffer[1024];
@@ -80,6 +96,6 @@ int main()
         bus.processDataWrite();
     }
     printf("\n");
-
+*/
     return 0;
 }

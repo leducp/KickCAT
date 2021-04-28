@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <string_view>
 
 namespace kickcat
 {
@@ -372,6 +373,8 @@ namespace kickcat
                 constexpr uint8_t GET_ED_LIST_RESP   = 0x06;
                 constexpr uint8_t SDO_INFO_ERROR_REQ = 0x07;
             }
+
+            std::string_view abort_to_str(uint32_t abort_code);
         }
     }
 
