@@ -64,6 +64,9 @@ namespace kickcat
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t* data_size);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, uint32_t data_size);
 
+        Error clearErrorCounters();
+        Error refreshErrorCounters();
+
     protected: // for unit testing
         uint8_t idx_{0};
 

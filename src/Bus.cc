@@ -225,7 +225,7 @@ namespace kickcat
         broadcastWrite(reg::ESC_DL_PORT,        param, 1);
 
         // Reset slaves registers
-        broadcastWrite(reg::RX_ERROR,           param, 8);
+        clearErrorCounters();
         broadcastWrite(reg::FMMU,               param, 256);
         broadcastWrite(reg::SYNC_MANAGER,       param, 128);
         broadcastWrite(reg::DC_SYSTEM_TIME,     param, 8);
@@ -484,9 +484,9 @@ namespace kickcat
         {
             auto [header, data, wkc] = nextDatagram<uint8_t>();
 
-            if (wkc != 3)
+            if (wkc != frame.inputs.size())
             {
-                err = EERROR("wrong wkc");
+                err = EERROR("wrong wkc -> expected " + std::to_string(frame.inputs.size()) + " got " + std::to_string(wkc));
             }
 
             for (auto& input : frame.inputs)
@@ -519,9 +519,9 @@ namespace kickcat
         {
             auto [header, data, wkc] = nextDatagram<uint8_t>();
 
-            if (wkc != 3)
+            if (wkc != frame.outputs.size())
             {
-                err = EERROR("wrong wkc");
+                err = EERROR("wrong wkc -> expected " + std::to_string(frame.outputs.size()) + " got " + std::to_string(wkc));
             }
         }
 
@@ -816,4 +816,46 @@ namespace kickcat
             slave.mailbox.can_read  = isFull(false);
         }
     }
+
+
+    Error Bus::clearErrorCounters()
+    {
+        uint16_t clear_param[20]; // Note: value is not taken into acocunt by the slave and result will always be zero
+        uint16_t wkc = broadcastWrite(reg::ERROR_COUNTERS, clear_param, 20);
+        if (wkc != slaves_.size())
+        {
+            return EERROR("invalid wkc");
+        }
+
+        return ESUCCESS;
+    }
+
+    Error Bus::refreshErrorCounters()
+    {
+        printf("size %d\n", sizeof(ErrorCounters));
+        for (auto& slave : slaves_)
+        {
+            addDatagram(Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), slave.error_counters);
+        }
+
+        Error err = processFrames();
+        if (err)
+        {
+            return err;
+        }
+
+        for (auto& slave : slaves_)
+        {
+            auto [h, answer, wkc] = nextDatagram<ErrorCounters>();
+            if (wkc != 1)
+            {
+                err += EERROR("Wrong wkc");
+            }
+
+            slave.error_counters = *answer;
+        }
+
+        return ESUCCESS;
+    }
+
 }

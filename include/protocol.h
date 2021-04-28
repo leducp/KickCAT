@@ -128,7 +128,7 @@ namespace kickcat
         constexpr uint16_t ESC_CONFIG    = 0x141;
 
         constexpr uint16_t ECAT_EVENT_MASK = 0x200;
-        constexpr uint16_t RX_ERROR        = 0x300;
+        constexpr uint16_t ERROR_COUNTERS  = 0x300;
 
         constexpr uint16_t EEPROM_CONFIG  = 0x500;
         constexpr uint16_t EEPROM_PDI     = 0x501;
@@ -152,6 +152,24 @@ namespace kickcat
         constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
         constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
     }
+
+    struct ErrorCounters
+    {
+        struct RX
+        {
+            uint8_t invalid_frame;
+            uint8_t physical_layer;
+        };
+        RX rx[4];
+        uint8_t forwarded[4];
+        uint8_t malformed_frame;
+        uint8_t pdi;
+        uint16_t spi_pdi;
+        uint16_t uc_pdi;
+        uint16_t avalon_pdi;
+        uint16_t axi_pdi;
+        uint8_t lost_link[4];
+    } __attribute__((__packed__));
 
     struct SyncManager
     {

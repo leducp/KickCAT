@@ -10,6 +10,12 @@ namespace kickcat
 {
     struct Slave
     {
+        void parseSII();
+
+        void printInfo() const;
+        void printPDOs() const;
+        void printErrorCounters() const;
+
         uint16_t address;
 
         uint32_t vendor_id;
@@ -50,15 +56,6 @@ namespace kickcat
         };
         SII sii;
 
-        void parseSII();
-        void parseStrings(uint8_t const* section_start);
-        void parseFMMU(uint8_t const* section_start, uint16_t section_size);
-        void parseSyncM(uint8_t const* section_start, uint16_t section_size);
-        void parsePDO(uint8_t const* section_start, std::vector<eeprom::PDOEntry const*>& pdo);
-
-        void printInfo() const;
-        void printPDOs() const;
-
         struct PIMapping
         {
             uint8_t* data;          // buffer client to read or write back
@@ -69,6 +66,14 @@ namespace kickcat
         };
         PIMapping input;  // slave to master
         PIMapping output;
+
+        ErrorCounters error_counters;
+
+    private:
+        void parseStrings(uint8_t const* section_start);
+        void parseFMMU(uint8_t const* section_start, uint16_t section_size);
+        void parseSyncM(uint8_t const* section_start, uint16_t section_size);
+        void parsePDO(uint8_t const* section_start, std::vector<eeprom::PDOEntry const*>& pdo);
     };
 }
 

@@ -201,4 +201,19 @@ namespace kickcat
             }
         }
     }
+
+
+    void Slave::printErrorCounters() const
+    {
+        printf("-*-*-*-*- slave 0x%04x -*-*-*-*-\n", address);
+        for (int32_t i = 0; i < 4; ++i)
+        {
+            printf("Port %d\n", i);
+            printf("  invalid frame:  %d\n", error_counters.rx[i].invalid_frame);
+            printf("  physical layer: %d\n", error_counters.rx[i].physical_layer);
+            printf("  forwarded:      %d\n", error_counters.forwarded[i]);
+            printf("  lost link:      %d\n", error_counters.lost_link[i]);
+        }
+        printf("\n");
+    }
 }

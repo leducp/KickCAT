@@ -76,7 +76,8 @@ int main()
     for (int32_t i = 0; i < 5000; ++i)
     {
         sleep(10ms);
-        bus.processDataRead();
+        err = bus.processDataRead();
+        if (err) { err.what(); }
 
         for (int32_t j = 0;  j < slave.input.bsize; ++j)
         {
@@ -93,7 +94,23 @@ int main()
         {
             slave.output.data[0] = 0;
         }
-        bus.processDataWrite();
+        err = bus.processDataWrite();
+        if (err)
+        {
+            err.what();
+            bus.requestState(State::OPERATIONAL); // auto recover for deco/reco
+        }
+
+        if ((i % 1000) == 0)
+        {
+            bus.refreshErrorCounters();
+            for (auto const& slave : bus.slaves())
+            {
+                slave.printErrorCounters();
+                State state = bus.getCurrentState(slave);
+                printf("Slave %04x state is %s\n", slave.address, toString(state));
+            }
+        }
     }
     printf("\n");
 */
