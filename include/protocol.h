@@ -306,7 +306,7 @@ namespace kickcat
             uint8_t  channel : 6,
                     priority : 2;
             uint8_t  type : 4, // type of the mailbox, i.e. CoE
-                    count: 3,
+                    count: 3,  // handle of the message
                     reserved : 1;
         } __attribute__((__packed__));
 

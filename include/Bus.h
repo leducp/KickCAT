@@ -105,7 +105,7 @@ namespace kickcat
         void checkMailboxes();
 
         // CoE helpers
-        void SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, uint32_t size, void* data);
+        void SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data = nullptr, uint32_t size = 0);
 
         std::shared_ptr<AbstractSocket> socket_;
         std::vector<Frame> frames_;

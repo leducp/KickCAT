@@ -13,6 +13,7 @@ TODO:
  - rework error handling
  - CoE: Emergency message
  - bus diagnostic
+ - better mailbox handling - timeout, answer queue (to avoid drop of unexpected messages that may be useful like CoE emergency)
 
 
 ### EtherCAT doc

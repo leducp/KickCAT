@@ -4,9 +4,9 @@
 
 namespace kickcat
 {
-    void Bus::SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, uint32_t size, void* data)
+    void Bus::SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t size)
     {
-        uint8_t buffer[256]; // adapt to mailbox size
+        uint8_t buffer[256]; // TODO: adapt to mailbox size
         mailbox::Header* header   = reinterpret_cast<mailbox::Header*>(buffer);
         mailbox::ServiceData* coe = reinterpret_cast<mailbox::ServiceData*>(buffer + sizeof(mailbox::Header));
         uint8_t* payload          = reinterpret_cast<uint8_t*>(buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData));
@@ -16,8 +16,9 @@ namespace kickcat
         header->priority = 0; // unused
         header->channel  = 0;
         header->type     = mailbox::Type::CoE;
+        header->count    = slave.mailbox.nextCounter();
 
-        coe->number  = slave.mailbox.nextCounter();
+        coe->number = 0;
         coe->service = CoE::Service::SDO_REQUEST;
         coe->complete_access = CA;
         coe->command         = request;
@@ -63,13 +64,127 @@ namespace kickcat
         if (wkc != 1)
         {
             printf("No answer from slave\n");
-            return;
         }
     }
 
     void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, int32_t* data_size)
     {
-        SDORequest(slave, index, subindex, CA, CoE::SDO::request::UPLOAD, 0, 0);
+        SDORequest(slave, index, subindex, CA, CoE::SDO::request::UPLOAD);
+
+        for (int i = 0; i < 25; ++i)
+        {
+            checkMailboxes();
+            if (slave.mailbox.can_read)
+            {
+                break;
+            }
+            sleep(2000us);
+        }
+
+        if (not slave.mailbox.can_read)
+        {
+            printf("TIMEOUT !\n");
+            return;
+        }
+
+        addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
+        Error err = processFrames();
+        if (err)
+        {
+            err.what();
+            return;
+        }
+
+        auto [h, buffer, wkc] = nextDatagram<uint8_t>();
+        if (wkc != 1)
+        {
+            printf("No answer from slave again\n");
+            return;
+        }
+        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(buffer);
+        mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(buffer + sizeof(mailbox::Header));
+
+        if (header->type == mailbox::Type::ERROR)
+        {
+            //TODO handle error properly
+            printf("An error happened !");
+            return;
+        }
+
+        if (header->type != mailbox::Type::CoE)
+        {
+            printf("Header type unexpected %d\n", header->type);
+            return;
+        }
+
+        if (coe->service == CoE::Service::EMERGENCY)
+        {
+            printf("Houston, we've got a situation here\n");
+            return;
+        }
+
+        if (coe->service != CoE::Service::SDO_RESPONSE)
+        {
+            printf("OK guy, this one answer, but miss the point\n");
+            return;
+        }
+
+        if (coe->command == CoE::SDO::request::ABORT)
+        {
+            printf("Abort requested!\n");
+            return;
+        }
+
+        if (coe->command != CoE::SDO::response::UPLOAD)
+        {
+            printf("Well, this one answer for another request than upload?\n");
+            return;
+        }
+
+        if ((coe->index != index) or (coe->subindex != subindex))
+        {
+            printf("wrong index or subindex!\n");
+            return;
+        }
+
+        uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
+        if (coe->transfer_type == 1)
+        {
+            // expedited transfer
+            int32_t size = 4 - coe->block_size;
+            if(*data_size < size)
+            {
+                printf("Really? Not enough size in client buffer?\n");
+                return;
+            }
+            std::memcpy(data, payload, size);
+            *data_size = size;
+            return;
+        }
+
+        // standard transfer
+        uint32_t size = *reinterpret_cast<uint32_t const*>(payload);
+        payload += 4;
+
+        if ((header->len - 10 ) >= size)
+        {
+            if(*data_size < size)
+            {
+                printf("Really? Not enough size in client buffer?\n");
+                return;
+            }
+            std::memcpy(data, payload, size);
+            *data_size = size;
+            return;
+        }
+
+        printf("Segmented transfer - sorry I dunno how to do it\n");
+    }
+
+
+    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, int32_t* data_size)
+    {
+        SDORequest(slave, index, subindex, CA, CoE::SDO::request::DOWNLOAD, 0, 0);
 
         for (int i = 0; i < 10; ++i)
         {
@@ -87,94 +202,67 @@ namespace kickcat
             return;
         }
 
+        addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
+        Error err = processFrames();
+        if (err)
         {
-            addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
-            Error err = processFrames();
-            if (err)
-            {
-                err.what();
-                return;
-            }
-
-            auto [h, buffer, wkc] = nextDatagram<uint8_t>();
-            if (wkc != 1)
-            {
-                printf("No answer from slave again\n");
-                return;
-            }
-            mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(buffer);
-            mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(buffer + sizeof(mailbox::Header));
-
-            if (header->type == mailbox::Type::ERROR)
-            {
-                //TODO handle error properly
-                printf("An error happened !");
-                return;
-            }
-
-            if (header->type != mailbox::Type::CoE)
-            {
-                printf("Header type unexpected %d\n", header->type);
-                return;
-            }
-
-            if (coe->service == CoE::Service::EMERGENCY)
-            {
-                printf("Houston, we've got a situation here\n");
-                return;
-            }
-
-            if (coe->command == CoE::SDO::request::ABORT)
-            {
-                printf("Abort requested!\n");
-                return;
-            }
-
-            if (coe->service != CoE::Service::SDO_RESPONSE)
-            {
-                printf("OK guy, this one answer, but miss the point\n");
-                return;
-            }
-
-            uint8_t const* payload = buffer + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
-            if (coe->transfer_type == 1)
-            {
-                // expedited transfer
-                int32_t size = 4 - coe->block_size;
-                if(*data_size < size)
-                {
-                    printf("Really? Not enough size in client buffer?\n");
-                    return;
-                }
-                std::memcpy(data, payload, size);
-                *data_size = size;
-                return;
-            }
-
-            // standard transfer
-            uint32_t size = *reinterpret_cast<uint32_t const*>(payload);
-            payload += 4;
-
-            if ((header->len - 10 ) >= size)
-            {
-                if(*data_size < size)
-                {
-                    printf("Really? Not enough size in client buffer?\n");
-                    return;
-                }
-                std::memcpy(data, payload, size);
-                *data_size = size;
-                return;
-            }
-
-            printf("Segmented transfer - sorry I dunno how to do it\n");
+            err.what();
+            return;
         }
-    }
 
+        auto [h, buffer, wkc] = nextDatagram<uint8_t>();
+        if (wkc != 1)
+        {
+            printf("No answer from slave again\n");
+            return;
+        }
+        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(buffer);
+        mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(buffer + sizeof(mailbox::Header));
 
-    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, int32_t* data_size)
-    {
+        if (header->type == mailbox::Type::ERROR)
+        {
+            //TODO handle error properly
+            printf("An error happened !");
+            return;
+        }
 
+        if (header->type != mailbox::Type::CoE)
+        {
+            printf("Header type unexpected %d\n", header->type);
+            return;
+        }
+
+        if (coe->service == CoE::Service::EMERGENCY)
+        {
+            printf("Houston, we've got a situation here\n");
+            return;
+        }
+
+        if (coe->service != CoE::Service::SDO_RESPONSE)
+        {
+            printf("OK guy, this one answer, but miss the point\n");
+            return;
+        }
+
+        if (coe->command == CoE::SDO::request::ABORT)
+        {
+            printf("Abort requested!\n");
+            return;
+        }
+
+        if (coe->command != CoE::SDO::response::DOWNLOAD)
+        {
+            printf("Well, this one answer for another request than download?\n");
+            return;
+        }
+
+        if ((coe->index != index) or (coe->subindex != subindex))
+        {
+            printf("wrong index or subindex!\n");
+            return;
+        }
+
+        // OK!
     }
 
 }
