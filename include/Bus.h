@@ -7,7 +7,7 @@
 #include <vector>
 #include <functional>
 
-
+#include "Error.h"
 #include "Frame.h"
 #include "Slave.h"
 #include "Time.h"

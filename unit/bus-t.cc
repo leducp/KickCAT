@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
+#include <cstdio>
 
 #include "protocol.h"
+#include "Error.h"
 
-#include <cstdio>
 
 using namespace kickcat;
 
@@ -22,4 +23,14 @@ TEST(yolo, yala)
         printf("0x%02x ", raw[i]);
     }
     printf("\n");
+
+    try
+    {
+        THROW_ERROR("yeah");
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+
 }

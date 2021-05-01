@@ -76,7 +76,7 @@ namespace kickcat
         uint16_t wkc = broadcastRead(reg::TYPE, 1);
         if (wkc == 0)
         {
-            throw "Invalid working counter: no slaves on the network";
+            THROW_ERROR("Invalid working counter");
         }
 
         slaves_.resize(wkc);
@@ -116,7 +116,7 @@ namespace kickcat
         uint16_t wkc = broadcastWrite(reg::AL_CONTROL, &param, sizeof(param));
         if (wkc != slaves_.size())
         {
-            throw "Invalid working counter";
+            THROW_ERROR("Invalid working counter");
         }
     }
 
@@ -184,7 +184,7 @@ namespace kickcat
 
             if (elapsed_time(now) > timeout)
             {
-                throw "Timeout";
+                THROW_ERROR("Timeout");
             }
 
             sleep(1ms);
@@ -268,7 +268,7 @@ namespace kickcat
             auto [header, _, wkc] = nextDatagram<uint8_t>();
             if (wkc != 1)
             {
-                throw "Invalid working counter";
+                THROW_ERROR("Invalid working counter");
             }
         }
     }
@@ -441,7 +441,7 @@ namespace kickcat
 
             if (wkc != frame.inputs.size())
             {
-                throw "Invalid working counter";
+                THROW_ERROR("Invalid working counter");
             }
 
             for (auto& input : frame.inputs)
@@ -473,7 +473,7 @@ namespace kickcat
 
             if (wkc != frame.outputs.size())
             {
-                throw "Invalid working counter";
+                THROW_ERROR("Invalid working counter");
             }
         }
     }
@@ -538,7 +538,7 @@ namespace kickcat
             auto [h, _, wkc] = nextDatagram<uint8_t>();
             if (wkc != 1)
             {
-                throw "Invalid working counter";
+                THROW_ERROR("Invalid working counter");
             }
         }
     }
@@ -612,13 +612,13 @@ namespace kickcat
         uint16_t wkc = broadcastWrite(reg::EEPROM_CONTROL, &req, sizeof(req));
         if (wkc != slaves_.size())
         {
-            throw "Invalid working counter";
+            THROW_ERROR("Invalid working counter");
         }
 
         // wait for all eeprom to be ready
         if (not areEepromReady())
         {
-            throw "Timeout";
+            THROW_ERROR("Timeout");
         }
 
         // Read result
@@ -634,7 +634,7 @@ namespace kickcat
             auto [header, answer, wkc] = nextDatagram<uint32_t>();
             if (wkc != 1)
             {
-                throw "invalid working counter";
+                THROW_ERROR("Invalid working counter");
             }
             apply(*slave, *answer);
         }
@@ -770,7 +770,7 @@ namespace kickcat
         uint16_t wkc = broadcastWrite(reg::ERROR_COUNTERS, clear_param, 20);
         if (wkc != slaves_.size())
         {
-            throw "Invalid working counter";
+            THROW_ERROR("Invalid working counter");
         }
     }
 
@@ -787,7 +787,7 @@ namespace kickcat
             auto [h, answer, wkc] = nextDatagram<ErrorCounters>();
             if (wkc != 1)
             {
-                throw "Invalid working counter";
+                THROW_ERROR("Invalid working counter");
             }
 
             slave.error_counters = *answer;

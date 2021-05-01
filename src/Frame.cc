@@ -1,8 +1,7 @@
-#include "Frame.h"
 #include <cstring>
 #include <unistd.h>
 
-#include <fstream> // debug
+#include "Frame.h"
 
 namespace kickcat
 {
@@ -165,13 +164,13 @@ namespace kickcat
         int32_t read = socket->read(frame_.data(), frame_.size());
         if (read < 0)
         {
-            throw std::system_error(errno, std::generic_category());
+            THROW_SYSTEM_ERROR("read()");
         }
 
         // check if the frame is an EtherCAT one. if not, drop it and try again
         if (ethernet_->type != ETH_ETHERCAT_TYPE)
         {
-            throw "Invalid frame type";
+            THROW_ERROR("Invalid frame type");
         }
 
         int32_t expected = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
@@ -182,7 +181,7 @@ namespace kickcat
         }
         if (read != expected)
         {
-            throw "Wrong number of bytes read";
+            THROW_ERROR("Wrong number of bytes read");
         }
 
         isDatagramAvailable_ = true;
@@ -196,12 +195,12 @@ namespace kickcat
 
         if (written < 0)
         {
-            throw std::system_error(errno, std::generic_category());
+            THROW_SYSTEM_ERROR("write()");
         }
 
         if (written != toWrite)
         {
-            throw "Wrong number of bytes written";
+            THROW_ERROR("Wrong number of bytes written");
         }
     }
 

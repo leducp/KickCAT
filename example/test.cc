@@ -18,7 +18,7 @@ int main()
     Bus bus(socket);
     try
     {
-        socket->open("enp0s31f6");
+        socket->open("enp0s31f6", 1us);
         bus.init();
 
         for (auto& slave : bus.slaves())
@@ -85,8 +85,9 @@ int main()
             }
             bus.processDataWrite();
         }
-        catch (...)
+        catch (std::exception const& e)
         {
+            std::cerr << e.what() << std::endl;
             try
             {
                 bus.refreshErrorCounters();
