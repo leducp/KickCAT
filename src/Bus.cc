@@ -818,6 +818,25 @@ namespace kickcat
     }
 
 
+    bool Bus::waitForMessage(Slave& slave, nanoseconds timeout)
+    {
+        nanoseconds now = since_epoch();
+        while (true)
+        {
+            checkMailboxes();
+            if (slave.mailbox.can_read)
+            {
+                return true;
+            }
+            sleep(200us);
+
+            if (elapsed_time(now) > timeout)
+            {
+                return false;
+            }
+        }
+    }
+
     Error Bus::clearErrorCounters()
     {
         uint16_t clear_param[20]; // Note: value is not taken into acocunt by the slave and result will always be zero

@@ -53,6 +53,11 @@ namespace kickcat
             }
         }
 
+        if (request == CoE::SDO::request::UPLOAD_SEGMENTED)
+        {
+            coe->complete_access = slave.mailbox.toggle; // CA bit is used for toggle bit in segmented transfer
+        }
+
         addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), buffer, slave.mailbox.recv_size);
         Error err = processFrames();
         if (err)
@@ -70,20 +75,8 @@ namespace kickcat
     void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t* data_size)
     {
         SDORequest(slave, index, subindex, CA, CoE::SDO::request::UPLOAD);
-
-        for (int i = 0; i < 25; ++i)
+        if (not waitForMessage(slave, 20ms))
         {
-            checkMailboxes();
-            if (slave.mailbox.can_read)
-            {
-                break;
-            }
-            sleep(2000us);
-        }
-
-        if (not slave.mailbox.can_read)
-        {
-            printf("TIMEOUT !\n");
             return;
         }
 
@@ -128,7 +121,9 @@ namespace kickcat
         {
             if (coe->command == CoE::SDO::request::ABORT)
             {
-                printf("Abort requested!\n");
+                uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
+                std::string_view text = CoE::SDO::abort_to_str(code);
+                printf("Abort requested! code %08x - %.*s\n", code, text.size(), text.data());
                 return;
             }
             printf("OK guy, this one answer, but miss the point: %x\n", coe->service);
@@ -137,7 +132,7 @@ namespace kickcat
 
         if (coe->service != CoE::Service::SDO_RESPONSE)
         {
-            printf("Not for us: maybe sopmeone else could use this one");
+            printf("Not for us: maybe someone else could use this one");
             return;
         }
 
@@ -162,18 +157,20 @@ namespace kickcat
                 printf("Really? Not enough size in client buffer?\n");
                 return;
             }
+            printf("size: %d - blk %d - client %d\n", size, coe->block_size, *data_size);
             std::memcpy(data, payload, size);
             *data_size = size;
             return;
         }
 
-        // standard transfer
+        // standard or segmented transfer
         uint32_t size = *reinterpret_cast<uint32_t const*>(payload);
         payload += 4;
 
-        if ((header->len - 10 ) >= size)
+        if ((header->len - 10) >= size)
         {
-            if(*data_size < size)
+            // standard
+            if (*data_size < size)
             {
                 printf("Really? Not enough size in client buffer?\n");
                 return;
@@ -183,7 +180,87 @@ namespace kickcat
             return;
         }
 
-        printf("Segmented transfer - sorry I dunno how to do it\n");
+        // segmented
+        uint8_t* pos = reinterpret_cast<uint8_t*>(data);
+        uint32_t complete_size = size;
+        uint32_t already_written = 0;
+        if (*data_size < complete_size)
+        {
+            printf("Really? Not enough size in client buffer?\n");
+            return;
+        }
+
+        size = *reinterpret_cast<uint32_t const*>(payload);
+        payload += 4;
+        std::memcpy(pos, payload, size);
+        pos += size;
+        already_written += size;
+
+        while (true)
+        {
+            if (not waitForMessage(slave, 20ms))
+            {
+                return;
+            }
+
+            SDORequest(slave, 0, 0, false, CoE::SDO::request::UPLOAD_SEGMENTED);
+            if (not waitForMessage(slave, 20ms))
+            {
+                return;
+            }
+
+            addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
+            err = processFrames();
+            if (err)
+            {
+                err.what();
+                return;
+            }
+
+            auto [h, segment, wkc] = nextDatagram<uint8_t>();
+            if (wkc != 1)
+            {
+                printf("No answer from slave again\n");
+                return;
+            }
+
+            header = reinterpret_cast<mailbox::Header const*>(segment);
+            coe = reinterpret_cast<mailbox::ServiceData const*>(segment + sizeof(mailbox::Header));
+            payload = segment + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
+
+            size = 0;
+            if (header->len == 10)
+            {
+                size = 7 - (coe->block_size | (coe->size_indicator << 2));
+            }
+            else
+            {
+                size = *reinterpret_cast<uint32_t const*>(payload);
+                payload += 4;
+            }
+            if (coe->complete_access != slave.mailbox.toggle)
+            {
+                printf("toggle bit is different!");
+            }
+            slave.mailbox.toggle = not slave.mailbox.toggle; // for next call
+
+            if ((complete_size - already_written) < size)
+            {
+                printf("something wrong here: we are going to overflow, but this should happened!");
+                return;
+            }
+            std::memcpy(pos, payload, size);
+            pos += size;
+            already_written += size;
+
+            bool more_follow = coe->size_indicator;
+            if (not more_follow)
+            {
+                slave.mailbox.toggle = false;
+                *data_size = already_written;
+                return; // finished!
+            }
+        }
     }
 
 
@@ -191,19 +268,8 @@ namespace kickcat
     {
         SDORequest(slave, index, subindex, CA, CoE::SDO::request::DOWNLOAD, data, data_size);
 
-        for (int i = 0; i < 10; ++i)
+        if (not waitForMessage(slave, 20ms))
         {
-            checkMailboxes();
-            if (slave.mailbox.can_read)
-            {
-                break;
-            }
-            sleep(200us);
-        }
-
-        if (not slave.mailbox.can_read)
-        {
-            printf("TIMEOUT !\n");
             return;
         }
 

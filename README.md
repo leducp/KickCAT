@@ -14,6 +14,9 @@ TODO:
  - CoE: Emergency message
  - bus diagnostic
  - better mailbox handling - timeout, answer queue (to avoid drop of unexpected messages that may be useful like CoE emergency)
+ - CoE: diagnosis message - 0x10F3
+ - FoE
+ - Distributed clock
 
 
 ### EtherCAT doc
@@ -33,8 +36,3 @@ diag:
 https://www.automation.com/en-us/articles/2014-2/diagnostics-with-ethercat-part-4
 https://infosys.beckhoff.com/english.php?content=../content/1033/ethercatsystem/1072509067.html&id=
 https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z000000kHwESAU
-
-
-### TODO
- *  Handle idx properly and check for incoherent received idx
- *  Check wkc

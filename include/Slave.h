@@ -30,9 +30,10 @@ namespace kickcat
             uint16_t send_offset;
             uint16_t send_size;
 
-            bool can_read;  // data available on the slave
-            bool can_write; // free space for a new message on the slave
+            bool can_read;   // data available on the slave
+            bool can_write;  // free space for a new message on the slave
             uint8_t counter; // sessionhandle, from 1 to 7
+            bool toggle;     // for SDO segmented transfer
 
             uint8_t nextCounter();
         };

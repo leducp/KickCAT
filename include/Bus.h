@@ -106,6 +106,7 @@ namespace kickcat
         // mailbox helpers
         // Update slaves mailboxes state
         void checkMailboxes();
+        bool waitForMessage(Slave& slave, nanoseconds timeout);
 
         // CoE helpers
         void SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void const* data = nullptr, uint32_t size = 0);
