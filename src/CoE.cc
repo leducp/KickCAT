@@ -59,12 +59,8 @@ namespace kickcat
         }
 
         addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), buffer, slave.mailbox.recv_size);
-        Error err = processFrames();
-        if (err)
-        {
-            err.what();
-            return;
-        }
+        processFrames();
+
         auto [h, d, wkc] = nextDatagram<uint8_t>();
         if (wkc != 1)
         {
@@ -81,12 +77,7 @@ namespace kickcat
         }
 
         addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
-        Error err = processFrames();
-        if (err)
-        {
-            err.what();
-            return;
-        }
+        processFrames();
 
         auto [h, buffer, wkc] = nextDatagram<uint8_t>();
         if (wkc != 1)
@@ -210,12 +201,7 @@ namespace kickcat
             }
 
             addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
-            err = processFrames();
-            if (err)
-            {
-                err.what();
-                return;
-            }
+            processFrames();
 
             auto [h, segment, wkc] = nextDatagram<uint8_t>();
             if (wkc != 1)
@@ -274,12 +260,7 @@ namespace kickcat
         }
 
         addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
-        Error err = processFrames();
-        if (err)
-        {
-            err.what();
-            return;
-        }
+        processFrames();
 
         auto [h, buffer, wkc] = nextDatagram<uint8_t>();
         if (wkc != 1)

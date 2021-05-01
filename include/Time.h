@@ -2,6 +2,7 @@
 #define KICKCAT_TIME_H
 
 #include <chrono>
+#include <system_error>
 
 namespace kickcat
 {

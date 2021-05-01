@@ -8,7 +8,6 @@
 #include <functional>
 
 
-#include "Error.h"
 #include "Frame.h"
 #include "Slave.h"
 #include "Time.h"
@@ -34,38 +33,38 @@ namespace kickcat
         ~Bus() = default;
 
         // set the bus from an unknown state to PREOP state
-        Error init();
+        void init();
 
         // detect the number of slaves on the line
         uint16_t getSlavesOnNetwork();
 
         // request a state for all slaves
-        Error requestState(State request);
+        void requestState(State request);
 
         // Get the state a specific slave
         State getCurrentState(Slave const& slave);
 
         // wait for all slaves to reached a state
-        Error waitForState(State request, nanoseconds timeout);
+        void waitForState(State request, nanoseconds timeout);
 
         // create thje mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state
-        Error createMapping(uint8_t* iomap);
+        void createMapping(uint8_t* iomap);
 
         // Print various info about slaves, mainly from SII
         void printSlavesInfo();
 
         std::vector<Slave>& slaves() { return slaves_; }
 
-        Error processDataRead();
-        Error processDataWrite();
-        Error processDataReadWrite();
+        void processDataRead();
+        void processDataWrite();
+        void processDataReadWrite();
 
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t* data_size);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, uint32_t data_size);
 
-        Error clearErrorCounters();
-        Error refreshErrorCounters();
+        void clearErrorCounters();
+        void refreshErrorCounters();
 
     protected: // for unit testing
         uint8_t idx_{0};
@@ -83,25 +82,25 @@ namespace kickcat
         {
             addDatagram(command, address, &data, sizeof(data));
         }
-        Error processFrames();
+        void processFrames();
         template<typename T>
         std::tuple<DatagramHeader const*, T const*, uint16_t> nextDatagram();
 
         // INIT state methods
-        Error detectSlaves();
-        Error resetSlaves();
-        Error setAddresses();
-        Error configureMailboxes();
+        void detectSlaves();
+        void resetSlaves();
+        void setAddresses();
+        void configureMailboxes();
 
         // mapping helpers
-        Error detectMapping();
-        Error readMappedPDO(Slave& slave, uint16_t index);
-        Error configureFMMUs();
+        void detectMapping();
+        void readMappedPDO(Slave& slave, uint16_t index);
+        void configureFMMUs();
 
         // Slave SII eeprom helpers
-        Error fetchEeprom();
+        void fetchEeprom();
         bool areEepromReady();
-        Error readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
+        void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
         // Update slaves mailboxes state

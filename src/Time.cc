@@ -31,8 +31,7 @@ namespace kickcat
             }
 
             // only possible if timespec is wrongly defined or wrong clock ID
-            perror("something wrong happened");
-            break;
+            throw std::system_error(errno, std::generic_category());
         }
     }
 

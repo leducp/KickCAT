@@ -12,13 +12,13 @@
 
 namespace kickcat
 {
-    Error LinuxSocket::open(std::string const& interface)
+    void LinuxSocket::open(std::string const& interface)
     {
         // RAW socket with EtherCAT type
         fd_ = socket(PF_PACKET, SOCK_RAW, ETH_ETHERCAT_TYPE);
         if (fd_ < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
 
         // Non-blocking mode
@@ -27,13 +27,13 @@ namespace kickcat
         int rc = setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
 
         rc = setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
 
         // EtherCAT frames shall not be routed to another network, but only on the dedicated interface
@@ -41,7 +41,7 @@ namespace kickcat
         rc = setsockopt(fd_, SOL_SOCKET, SO_DONTROUTE, &dont_route, sizeof(dont_route));
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
 
         // Connect socket to interface and configure interface for EtherCAT use (promiscious, broadcast)
@@ -50,7 +50,7 @@ namespace kickcat
         rc = ioctl(fd_, SIOCGIFINDEX, &ifr);
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
         int interface_index = ifr.ifr_ifindex;
 
@@ -58,14 +58,14 @@ namespace kickcat
         rc = ioctl(fd_, SIOCGIFFLAGS, &ifr);
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
 
         ifr.ifr_flags = ifr.ifr_flags | IFF_PROMISC | IFF_BROADCAST;
         rc = ioctl(fd_, SIOCSIFFLAGS, &ifr);
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
 
         struct sockaddr_ll link_layer;
@@ -75,21 +75,17 @@ namespace kickcat
         rc = bind(fd_, (struct sockaddr *)&link_layer, sizeof(link_layer));
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
-
-        return ESUCCESS;
     }
 
-    Error LinuxSocket::close()
+    void LinuxSocket::close()
     {
         int rc = ::close(fd_);
         if (rc < 0)
         {
-            return EERROR(std::strerror(errno));
+            throw std::system_error(errno, std::generic_category());
         }
-
-        return ESUCCESS;
     }
 
     int32_t LinuxSocket::read(uint8_t* frame, int32_t frame_size)

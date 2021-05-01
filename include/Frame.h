@@ -48,9 +48,9 @@ namespace kickcat
         bool isDatagramAvailable() const { return isDatagramAvailable_; }
 
         // handle bus access
-        Error read(std::shared_ptr<AbstractSocket> socket);
-        Error write(std::shared_ptr<AbstractSocket> socket);
-        Error writeThenRead(std::shared_ptr<AbstractSocket> socket);
+        void read(std::shared_ptr<AbstractSocket> socket);
+        void write(std::shared_ptr<AbstractSocket> socket);
+        void writeThenRead(std::shared_ptr<AbstractSocket> socket);
 
     private:
         EthernetFrame frame_;

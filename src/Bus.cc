@@ -24,12 +24,7 @@ namespace kickcat
     uint16_t Bus::broadcastRead(uint16_t ADO, uint16_t data_size)
     {
         frames_[0].addDatagram(idx_, Command::BRD, createAddress(0, ADO), nullptr, data_size);
-        Error err = frames_[0].writeThenRead(socket_);
-        if (err)
-        {
-            err.what();
-            return 0;
-        }
+        frames_[0].writeThenRead(socket_);
 
         auto [header, _, wkc] = frames_[0].nextDatagram();
         ++idx_; // one more frame sent
@@ -40,12 +35,7 @@ namespace kickcat
     uint16_t Bus::broadcastWrite(uint16_t ADO, void const* data, uint16_t data_size)
     {
         frames_[0].addDatagram(idx_, Command::BWR, createAddress(0, ADO), data, data_size);
-        Error err = frames_[0].writeThenRead(socket_);
-        if (err)
-        {
-            err.what();
-            return 0;
-        }
+        frames_[0].writeThenRead(socket_);
 
         auto [header, _, wkc] = frames_[0].nextDatagram();
         ++idx_; // one more frame sent
@@ -65,7 +55,7 @@ namespace kickcat
     }
 
 
-    Error Bus::processFrames()
+    void Bus::processFrames()
     {
         current_frame_ = 0; // reset frame position
 
@@ -75,24 +65,18 @@ namespace kickcat
             {
                 break;
             }
-            Error err = frame.writeThenRead(socket_);
-            if (err)
-            {
-                return err;
-            }
+            frame.writeThenRead(socket_);
         }
-
-        return ESUCCESS;
     }
 
 
-    Error Bus::detectSlaves()
+    void Bus::detectSlaves()
     {
         // we dont really care about the type, we just want a working counter to detect the number of slaves
         uint16_t wkc = broadcastRead(reg::TYPE, 1);
         if (wkc == 0)
         {
-            return EERROR("No slaves on the bus");
+            throw "Invalid working counter: no slaves on the network";
         }
 
         slaves_.resize(wkc);
@@ -106,84 +90,77 @@ namespace kickcat
         }
 
         printf("-*-*-*- %d slave detected on the network -*-*-*-\n", slaves_.size());
-        return ESUCCESS;
     }
 
 
-    Error Bus::init()
+    void Bus::init()
     {
-        Error err = detectSlaves();
-        if (err) { return err; }
+        detectSlaves();
+        resetSlaves();
+        setAddresses();
 
-        err = resetSlaves();
-        if (err) { return err; }
-
-        err = setAddresses();
-        if (err) { return err; }
-
-        err = requestState(State::INIT);
-        if (err) { return err; }
+        requestState(State::INIT);
         waitForState(State::INIT, 5000ms);
 
-        err = fetchEeprom();
-        if (err) { return err; }
-
-        err = configureMailboxes();
-        if (err) {  return err; }
+        fetchEeprom();
+        configureMailboxes();
 
         requestState(State::PRE_OP);
-        return waitForState(State::PRE_OP, 3000ms);
+        waitForState(State::PRE_OP, 3000ms);
     }
 
 
-    Error Bus::requestState(State request)
+    void Bus::requestState(State request)
     {
         uint16_t param = request | State::ACK;
         uint16_t wkc = broadcastWrite(reg::AL_CONTROL, &param, sizeof(param));
         if (wkc != slaves_.size())
         {
-            return EERROR("failed to request state");
+            throw "Invalid working counter";
         }
-
-        return ESUCCESS;
     }
 
 
     State Bus::getCurrentState(Slave const& slave)
     {
         addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2);
-        Error err = processFrames();
-        if (err)
+        try
         {
-            err.what();
+            processFrames();
+
+            auto [header, data, wkc] = nextDatagram<uint8_t>();
+            uint8_t state = data[0];
+
+            // error indicator flag set: check status code
+            if (state & 0x10)
+            {
+                addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS_CODE), nullptr, 2);
+                try
+                {
+                    processFrames();
+                }
+                catch (...)
+                {
+                    return State::INVALID;
+                }
+
+                auto [h, error, w] = nextDatagram<uint16_t>();
+                if (*error == 0)
+                {
+                    // no real error -> filter the flag
+                    return State(state & 0xF);
+                }
+            }
+            return State(state);
+        }
+        catch(...)
+        {
             return State::INVALID;
         }
-
-        auto [header, data, wkc] = nextDatagram<uint8_t>();
-        uint8_t state = data[0];
-
-        // error indicator flag set: check status code
-        if (state & 0x10)
-        {
-            addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS_CODE), nullptr, 2);
-            err = processFrames();
-            if (err)
-            {
-                err.what();
-                return State::INVALID;
-            }
-            auto [h, error, w] = nextDatagram<uint16_t>();
-            if (*error == 0)
-            {
-                // no real error -> filter the flag
-                return State(state & 0xF);
-            }
-        }
-        return State(state);
     }
 
 
-    Error Bus::waitForState(State request, nanoseconds timeout)
+    void Bus::waitForState(State request, nanoseconds timeout)
     {
         nanoseconds now = since_epoch();
 
@@ -202,12 +179,12 @@ namespace kickcat
 
             if (is_state_reached)
             {
-                return ESUCCESS;
+                return;
             }
 
             if (elapsed_time(now) > timeout)
             {
-                return EERROR("timeout");
+                throw "Timeout";
             }
 
             sleep(1ms);
@@ -215,7 +192,7 @@ namespace kickcat
     }
 
 
-    Error Bus::resetSlaves()
+    void Bus::resetSlaves()
     {
         // buffer to reset them all
         uint8_t param[256];
@@ -239,12 +216,10 @@ namespace kickcat
 
         // eeprom to master
         broadcastWrite(reg::EEPROM_CONFIG, param, 2);
-
-        return ESUCCESS;
     }
 
 
-    Error Bus::setAddresses()
+    void Bus::setAddresses()
     {
         for (int i = 0; i < slaves_.size(); ++i)
         {
@@ -252,18 +227,11 @@ namespace kickcat
             addDatagram(Command::APWR, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
         }
 
-        Error err = processFrames();
-        if (err)
-        {
-            err.what();
-            return err;
-        }
-
-        return ESUCCESS;
+        processFrames();
     }
 
 
-    Error Bus::configureMailboxes()
+    void Bus::configureMailboxes()
     {
         for (auto& slave : slaves_)
         {
@@ -289,12 +257,7 @@ namespace kickcat
             }
         }
 
-        Error err = processFrames();
-        if (err)
-        {
-            return err;
-        }
-
+        processFrames();
         for (auto& slave : slaves_)
         {
             if (not slave.supported_mailbox)
@@ -305,15 +268,13 @@ namespace kickcat
             auto [header, _, wkc] = nextDatagram<uint8_t>();
             if (wkc != 1)
             {
-                err += EERROR("one slave didn't answer");
+                throw "Invalid working counter";
             }
         }
-
-        return err;
     }
 
 
-    Error Bus::detectMapping()
+    void Bus::detectMapping()
     {
         // helper: compute byte size from bit size, round up
         auto bits_to_bytes = [](int32_t bits) -> int32_t
@@ -393,12 +354,10 @@ namespace kickcat
                 mapping->bsize = bits_to_bytes(mapping->size);
             }
         }
-
-        return ESUCCESS;
     }
 
 
-    Error Bus::createMapping(uint8_t* iomap)
+    void Bus::createMapping(uint8_t* iomap)
     {
         // First we need to know:
         // - how many bits to map per slave
@@ -463,22 +422,18 @@ namespace kickcat
         }
 
         // Fourth step: program FMMUs and SyncManagers
-        Error err = configureFMMUs();
-        if (err) { return err; }
-
-        return ESUCCESS;
+        configureFMMUs();
     }
 
 
-    Error Bus::processDataRead()
+    void Bus::processDataRead()
     {
         for (auto const& frame : pi_frames_)
         {
             addDatagram(Command::LRD, frame.address, nullptr, frame.size);
         }
 
-        Error err = processFrames();
-        if (err) { return err; }
+        processFrames();
 
         for (auto const& frame : pi_frames_)
         {
@@ -486,7 +441,7 @@ namespace kickcat
 
             if (wkc != frame.inputs.size())
             {
-                err = EERROR("wrong wkc -> expected " + std::to_string(frame.inputs.size()) + " got " + std::to_string(wkc));
+                throw "Invalid working counter";
             }
 
             for (auto& input : frame.inputs)
@@ -494,12 +449,10 @@ namespace kickcat
                 std::memcpy(input.iomap, data + input.offset, input.size);
             }
         }
-
-       return err;
     }
 
 
-    Error Bus::processDataWrite()
+    void Bus::processDataWrite()
     {
         for (auto const& frame : pi_frames_)
         {
@@ -512,8 +465,7 @@ namespace kickcat
             addDatagram(Command::LWR, frame.address, buffer, frame.size);
         }
 
-        Error err = processFrames();
-        if (err) { return err; }
+        processFrames();
 
         for (auto const& frame : pi_frames_)
         {
@@ -521,15 +473,13 @@ namespace kickcat
 
             if (wkc != frame.outputs.size())
             {
-                err = EERROR("wrong wkc -> expected " + std::to_string(frame.outputs.size()) + " got " + std::to_string(wkc));
+                throw "Invalid working counter";
             }
         }
-
-        return err;
     }
 
 
-    Error Bus::configureFMMUs()
+    void Bus::configureFMMUs()
     {
         auto prepareDatagrams = [this](Slave& slave, Slave::PIMapping& mapping, SyncManagerType type)
         {
@@ -570,7 +520,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
-            printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, physical_address);
+            //printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, physical_address);
 
             return 2; // number of datagrams
         };
@@ -582,23 +532,15 @@ namespace kickcat
             frame_sent += prepareDatagrams(slave, slave.output, SyncManagerType::Output);
         }
 
-        Error err = processFrames();
-        if (err)
-        {
-            err.what();
-            return err;
-        }
-
+        processFrames();
         for (int32_t i = 0; i < frame_sent; ++i)
         {
             auto [h, _, wkc] = nextDatagram<uint8_t>();
             if (wkc != 1)
             {
-                err += EERROR("wrong wkc!");
+                throw "Invalid working counter";
             }
         }
-
-        return ESUCCESS;
     }
 
 
@@ -612,10 +554,13 @@ namespace kickcat
             {
                 addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2);
             }
-            Error err = processFrames();
-            if (err)
+
+            try
             {
-                err.what();
+                processFrames();
+            }
+            catch (...)
+            {
                 return false;
             }
 
@@ -627,8 +572,7 @@ namespace kickcat
                 header = h;
                 if (wkc != 1)
                 {
-                    Error err = EERROR("no answer!");
-                    err.what();
+                    return false;
                 }
                 if (*answer & 0x8000)
                 {
@@ -651,7 +595,7 @@ namespace kickcat
     }
 
 
-    Error Bus::readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply)
+    void Bus::readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply)
     {
         // eeprom request
         struct Request
@@ -668,14 +612,13 @@ namespace kickcat
         uint16_t wkc = broadcastWrite(reg::EEPROM_CONTROL, &req, sizeof(req));
         if (wkc != slaves_.size())
         {
-            return EERROR("wrong slave number");
-
+            throw "Invalid working counter";
         }
 
         // wait for all eeprom to be ready
         if (not areEepromReady())
         {
-            return EERROR("eeprom not ready - timeout");
+            throw "Timeout";
         }
 
         // Read result
@@ -683,11 +626,7 @@ namespace kickcat
         {
             addDatagram(Command::FPRD, createAddress(slave->address, reg::EEPROM_DATA), nullptr, 4);
         }
-        Error err = processFrames();
-        if (err)
-        {
-            return err;
-        }
+        processFrames();
 
         // Extract result and store it
         for (auto& slave : slaves)
@@ -695,17 +634,14 @@ namespace kickcat
             auto [header, answer, wkc] = nextDatagram<uint32_t>();
             if (wkc != 1)
             {
-                Error err = EERROR("no answer!");
-                err.what();
+                throw "invalid working counter";
             }
             apply(*slave, *answer);
         }
-
-        return ESUCCESS;
     }
 
 
-    Error Bus::fetchEeprom()
+    void Bus::fetchEeprom()
     {
         std::vector<Slave*> slaves;
         for (auto& slave : slaves_)
@@ -761,8 +697,6 @@ namespace kickcat
         {
             slave.parseSII();
         }
-
-        return ESUCCESS;
     }
 
 
@@ -788,13 +722,7 @@ namespace kickcat
             addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1);
         }
 
-        Error err = processFrames();
-        if (err)
-        {
-            err.what();
-            return;
-        }
-
+        processFrames();
         for (auto& slave : slaves_)
         {
             if (slave.supported_mailbox == 0)
@@ -807,7 +735,6 @@ namespace kickcat
                 auto [header, state, wkc] = nextDatagram<uint8_t>();
                 if (wkc != 1)
                 {
-                    EERROR("error while reading mailboxes state").what();
                     return stable_value;
                 }
                 return ((*state & 0x08) == 0x08);
@@ -837,44 +764,33 @@ namespace kickcat
         }
     }
 
-    Error Bus::clearErrorCounters()
+    void Bus::clearErrorCounters()
     {
         uint16_t clear_param[20]; // Note: value is not taken into acocunt by the slave and result will always be zero
         uint16_t wkc = broadcastWrite(reg::ERROR_COUNTERS, clear_param, 20);
         if (wkc != slaves_.size())
         {
-            return EERROR("invalid wkc");
+            throw "Invalid working counter";
         }
-
-        return ESUCCESS;
     }
 
-    Error Bus::refreshErrorCounters()
+    void Bus::refreshErrorCounters()
     {
-        printf("size %d\n", sizeof(ErrorCounters));
         for (auto& slave : slaves_)
         {
             addDatagram(Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), slave.error_counters);
         }
 
-        Error err = processFrames();
-        if (err)
-        {
-            return err;
-        }
-
+        processFrames();
         for (auto& slave : slaves_)
         {
             auto [h, answer, wkc] = nextDatagram<ErrorCounters>();
             if (wkc != 1)
             {
-                err += EERROR("Wrong wkc");
+                throw "Invalid working counter";
             }
 
             slave.error_counters = *answer;
         }
-
-        return ESUCCESS;
     }
-
 }
