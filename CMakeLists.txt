@@ -3,7 +3,6 @@ project(KickCAT)
 
 add_library(kickcat src/Bus.cc
                     src/CoE.cc
-                    src/Error.cc
                     src/Frame.cc
                     src/LinuxSocket.cc
                     src/protocol.cc

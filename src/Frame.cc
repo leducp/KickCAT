@@ -1,8 +1,7 @@
-#include "Frame.h"
 #include <cstring>
 #include <unistd.h>
 
-#include <fstream> // debug
+#include "Frame.h"
 
 namespace kickcat
 {
@@ -160,18 +159,18 @@ namespace kickcat
     }
 
 
-    Error Frame::read(std::shared_ptr<AbstractSocket> socket)
+    void Frame::read(std::shared_ptr<AbstractSocket> socket)
     {
         int32_t read = socket->read(frame_.data(), frame_.size());
         if (read < 0)
         {
-            return EERROR(std::strerror(errno));
+            THROW_SYSTEM_ERROR("read()");
         }
 
         // check if the frame is an EtherCAT one. if not, drop it and try again
         if (ethernet_->type != ETH_ETHERCAT_TYPE)
         {
-            return EERROR("Wrong frame type");
+            THROW_ERROR("Invalid frame type");
         }
 
         int32_t expected = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
@@ -182,45 +181,33 @@ namespace kickcat
         }
         if (read != expected)
         {
-            return EERROR("wrong number of read bytes: expected " + std::to_string(expected) + " got " + std::to_string(read));
+            THROW_ERROR("Wrong number of bytes read");
         }
 
         isDatagramAvailable_ = true;
-        return ESUCCESS;
     }
 
 
-    Error Frame::write(std::shared_ptr<AbstractSocket> socket)
+    void Frame::write(std::shared_ptr<AbstractSocket> socket)
     {
         int32_t toWrite = finalize();
         int32_t written = socket->write(frame_.data(), toWrite);
-/*
-        std::ofstream myfile;
-        myfile.open ("yolo.bin", std::ios::out | std::ios::binary | std::ios::trunc);
-        myfile.write((char const*)frame_.data(), frame_.size());
-*/
+
         if (written < 0)
         {
-            return EERROR(std::strerror(errno));
+            THROW_SYSTEM_ERROR("write()");
         }
 
         if (written != toWrite)
         {
-            return EERROR("wrong number of written bytes: expected " + std::to_string(toWrite) + ", written  " + std::to_string(written));
+            THROW_ERROR("Wrong number of bytes written");
         }
-
-        return ESUCCESS;
     }
 
 
-    Error Frame::writeThenRead(std::shared_ptr<AbstractSocket> socket)
+    void Frame::writeThenRead(std::shared_ptr<AbstractSocket> socket)
     {
-        Error err = write(socket);
-        if (err) { err += EERROR(""); return err; }
-
-        err = read(socket);
-        if (err) { err += EERROR(""); return err; }
-
-        return ESUCCESS;
+        write(socket);
+        read(socket);
     }
 }

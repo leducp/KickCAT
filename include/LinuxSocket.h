@@ -9,15 +9,18 @@ namespace kickcat
     {
     public:
         LinuxSocket() = default;
-        virtual ~LinuxSocket() = default;
+        virtual ~LinuxSocket()
+        {
+            close();
+        }
 
-        Error open(std::string const& interface) override;
-        Error close() override;
+        void open(std::string const& interface, microseconds timeout) override;
+        void close() noexcept override;
         int32_t read(uint8_t* frame, int32_t frame_size) override;
         int32_t write(uint8_t const* frame, int32_t frame_size) override;
 
     private:
-        int fd_;
+        int fd_{-1};
     };
 }
 

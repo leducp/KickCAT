@@ -3,6 +3,7 @@
 #include <cerrno>
 
 #include "Time.h"
+#include "Error.h"
 
 namespace kickcat
 {
@@ -31,8 +32,7 @@ namespace kickcat
             }
 
             // only possible if timespec is wrongly defined or wrong clock ID
-            perror("something wrong happened");
-            break;
+            THROW_SYSTEM_ERROR("clock_nanosleep()");
         }
     }
 

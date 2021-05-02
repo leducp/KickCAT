@@ -1,41 +1,29 @@
 #ifndef KICKCAT_ERROR_H
 #define KICKCAT_ERROR_H
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include <exception>
+#include <system_error>
 
 namespace kickcat
 {
-    #define ESUCCESS Error()
-    #define EERROR(err) Error(err, __FUNCTION__, __FILE__, __LINE__)
+    #define STR1(x) #x
+    #define STR2(x) STR1(x)
+    #define LOCATION __FILE__ ":" STR2(__LINE__)
+    #define THROW_ERROR(msg) (throw Error{LOCATION ": " msg})
+    #define THROW_SYSTEM_ERROR(msg) (throw std::system_error(errno, std::generic_category(), LOCATION ": " msg))
 
-    class Error
+    struct Error : public std::exception
     {
-    public:
-        Error()  = default;
-        ~Error() = default;
+        Error(char const* message)
+            : message(message)
+        { }
 
-        Error(Error&& other) = default;
-        Error& operator=(Error&& other) = default;
+        char const* what() const noexcept override
+        {
+            return message;
+        }
 
-        Error(Error const& other) = delete;
-        Error& operator=(Error const& other) = delete;
-
-        Error(std::string const& message,
-                  std::string const& function,
-                  std::string const& file,
-                  int32_t line);
-
-        Error& operator+=(Error&& other);
-
-        operator bool() const { return isError_; }
-        void what() const;
-
-    private:
-        bool isError_{false};
-        std::string what_{"success"};
-        std::vector<std::string> backtrace_;
+        char const* message;
     };
 }
 
