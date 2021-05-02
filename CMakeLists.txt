@@ -5,6 +5,7 @@ add_library(kickcat src/Bus.cc
                     src/CoE.cc
                     src/Frame.cc
                     src/LinuxSocket.cc
+                    src/Mailbox.cc
                     src/protocol.cc
                     src/Slave.cc
                     src/Time.cc

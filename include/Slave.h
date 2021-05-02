@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "protocol.h"
+#include "Mailbox.h"
 
 namespace kickcat
 {
@@ -23,23 +24,10 @@ namespace kickcat
         uint32_t revision_number;
         uint32_t serial_number;
 
-        struct Mailbox
-        {
-            uint16_t recv_offset;
-            uint16_t recv_size;
-            uint16_t send_offset;
-            uint16_t send_size;
-
-            bool can_read;   // data available on the slave
-            bool can_write;  // free space for a new message on the slave
-            uint8_t counter; // sessionhandle, from 1 to 7
-            bool toggle;     // for SDO segmented transfer
-
-            uint8_t nextCounter();
-        };
         Mailbox mailbox;
         Mailbox mailbox_bootstrap;
         eeprom::MailboxProtocol supported_mailbox;
+        int32_t waiting_datagram; // how many datagram to process for this slave
 
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;

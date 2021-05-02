@@ -2,6 +2,7 @@
 #include "LinuxSocket.h"
 
 #include <iostream>
+#include <algorithm>
 
 using namespace kickcat;
 
@@ -53,37 +54,48 @@ int main()
         std::cerr << e.what() << std::endl;
         return 1;
     }
-    catch (char const* e)
+    catch (...)
     {
-        std::cerr << e << std::endl;
         return 2;
     }
 
-    auto& slave = bus.slaves().at(0);
-    for (int32_t i = 0; i < 5000; ++i)
+    constexpr int32_t LOOP_NUMBER = 10000;
+    std::vector<nanoseconds> stats;
+    stats.resize(LOOP_NUMBER);
+
+    auto& easycat = bus.slaves().at(0);
+    for (int32_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(10ms);
+        sleep(5ms);
 
         try
         {
+            nanoseconds t1 = since_epoch();
+
             bus.processDataRead();
 
-            for (int32_t j = 0;  j < slave.input.bsize; ++j)
+            for (int32_t j = 0;  j < easycat.input.bsize; ++j)
             {
-                printf("%02x ", slave.input.data[j]);
+                printf("%02x ", easycat.input.data[j]);
             }
             printf("\r");
 
             // blink a led - EasyCAT example for Arduino
             if ((i % 50) < 25)
             {
-                slave.output.data[0] = 1;
+                easycat.output.data[0] = 1;
             }
             else
             {
-                slave.output.data[0] = 0;
+                easycat.output.data[0] = 0;
             }
             bus.processDataWrite();
+
+            // handle messages
+            bus.processMessages();
+
+            nanoseconds t4 = since_epoch();
+            stats[i] = t4 - t1;
         }
         catch (std::exception const& e)
         {
@@ -106,5 +118,12 @@ int main()
         }
     }
     printf("\n");
+
+    std::sort(stats.begin(), stats.end());
+    printf("min %03ldus max %03ldus med %03ldus\n",
+        duration_cast<microseconds>(stats.at(1)).count(),
+        duration_cast<microseconds>(stats.at(stats.size() - 2)).count(),
+        duration_cast<microseconds>(stats.at(stats.size() / 2)).count());
+
     return 0;
 }

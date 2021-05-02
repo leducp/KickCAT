@@ -107,6 +107,9 @@ namespace kickcat
 
         requestState(State::PRE_OP);
         waitForState(State::PRE_OP, 3000ms);
+
+        // clear mailboxes
+        processMessages();
     }
 
 
@@ -223,7 +226,7 @@ namespace kickcat
     {
         for (int i = 0; i < slaves_.size(); ++i)
         {
-            slaves_[i].address = 0x1000 + i;
+            slaves_[i].address = i;
             addDatagram(Command::APWR, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address);
         }
 
@@ -791,6 +794,64 @@ namespace kickcat
             }
 
             slave.error_counters = *answer;
+        }
+    }
+
+    void Bus::processMessages()
+    {
+        if (check_loop_)
+        {
+            checkMailboxes();
+            check_loop_ = false;
+            return;
+        }
+        check_loop_ = true;
+
+        int32_t datagram_sent = 0;
+        for (auto& slave : slaves_)
+        {
+            if ((slave.mailbox.can_write) and (not slave.mailbox.to_send.empty()))
+            {
+                // send one waiting message
+                auto message = slave.mailbox.to_send.front();
+                slave.mailbox.to_send.pop();
+                addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data().data(), message->data().size());
+                datagram_sent++;
+
+                // add message to processing queue if needed
+                if (message->status() == MessageStatus::RUNNING)
+                {
+                    slave.mailbox.to_process.push_back(message);
+                }
+            }
+
+            if (slave.mailbox.can_read)
+            {
+                // retrieve waiting message
+                addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size);
+                datagram_sent++;
+            }
+        }
+
+        processFrames();
+        for (int32_t i = 0; i < datagram_sent; ++i)
+        {
+            auto [h, data, wkc] = nextDatagram<uint8_t>();
+            if (wkc != 1)
+            {
+                THROW_ERROR("Invalid working counter");
+            }
+
+            if (h->command == Command::FPRD)
+            {
+                int32_t slave_index = (h->address & 0xFFFF);
+                auto& slave = slaves_.at(slave_index);
+
+                if (not slave.mailbox.receive(data))
+                {
+                    printf("Slave %d: receive a message but didn't process it\n", slave_index);
+                }
+            }
         }
     }
 }

@@ -14,17 +14,7 @@
 
 namespace kickcat
 {
-    // max 8 frames for process data - arbitrary setup for now
-    constexpr int32_t MAX_PI_FRAMES = 8;
-
     class AbstractSocket;
-
-    struct RawMessage
-    {
-        uint16_t id;
-        std::vector<uint8_t> payload;
-    };
-
 
     class Bus
     {
@@ -61,10 +51,12 @@ namespace kickcat
         void processDataReadWrite();
 
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t* data_size);
-        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void const* data, uint32_t data_size);
+        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size);
 
         void clearErrorCounters();
         void refreshErrorCounters();
+
+        void processMessages();
 
     protected: // for unit testing
         uint8_t idx_{0};
@@ -107,9 +99,6 @@ namespace kickcat
         void checkMailboxes();
         bool waitForMessage(Slave& slave, nanoseconds timeout);
 
-        // CoE helpers
-        void SDORequest(Slave& slave, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void const* data = nullptr, uint32_t size = 0);
-
         std::shared_ptr<AbstractSocket> socket_;
         std::vector<Frame> frames_;
         int32_t current_frame_{0};
@@ -134,6 +123,8 @@ namespace kickcat
             std::vector<blockIO> outputs;
         };
         std::vector<PIFrame> pi_frames_; // PI frame description
+
+        bool check_loop_{true}; // check slaves mailbox or process messages, but do not do all in the same row to reduce loop latency
     };
 }
 
