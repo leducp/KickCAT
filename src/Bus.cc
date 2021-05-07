@@ -126,40 +126,44 @@ namespace kickcat
 
     State Bus::getCurrentState(Slave const& slave)
     {
+        uint8_t state = State::INVALID;
+
         addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2);
         try
         {
             processFrames();
 
             auto [header, data, wkc] = nextDatagram<uint8_t>();
-            uint8_t state = data[0];
-
-            // error indicator flag set: check status code
-            if (state & 0x10)
-            {
-                addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS_CODE), nullptr, 2);
-                try
-                {
-                    processFrames();
-                }
-                catch (...)
-                {
-                    return State::INVALID;
-                }
-
-                auto [h, error, w] = nextDatagram<uint16_t>();
-                if (*error == 0)
-                {
-                    // no real error -> filter the flag
-                    return State(state & 0xF);
-                }
-            }
-            return State(state);
+            state = data[0];
         }
         catch(...)
         {
             return State::INVALID;
         }
+
+        // error indicator flag set: check status code
+        if (state & 0x10)
+        {
+            addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS_CODE), nullptr, 2);
+            try
+            {
+                processFrames();
+            }
+            catch (...)
+            {
+                return State::INVALID;
+            }
+
+            auto [h, error, w] = nextDatagram<uint16_t>();
+            if (*error == 0)
+            {
+                // no real error -> filter the flag
+                return State(state & 0xF);
+            }
+
+            THROW_ERROR_CODE("State transition error", *error);
+        }
+        return State(state);
     }
 
 
@@ -298,7 +302,7 @@ namespace kickcat
                 // Slave support CAN over EtherCAT -> use mailbox/SDO to get mapping size
                 uint8_t sm[64];
                 uint32_t sm_size = sizeof(sm);
-                readSDO(slave, CoE::SM_COM_TYPE, 1, true, sm, &sm_size);
+                readSDO(slave, CoE::SM_COM_TYPE, 1, Access::EMULATE_COMPLETE, sm, &sm_size);
 
                 for (int i = 0; i < sm_size; ++i)
                 {
@@ -318,13 +322,13 @@ namespace kickcat
 
                     uint16_t mapped_index[64];
                     uint32_t map_size = sizeof(mapped_index);
-                    readSDO(slave, CoE::SM_CHANNEL + i, 1, true, mapped_index, &map_size);
+                    readSDO(slave, CoE::SM_CHANNEL + i, 1, Access::EMULATE_COMPLETE, mapped_index, &map_size);
 
                     for (int32_t j = 0; j < (map_size / 2); ++j)
                     {
                         uint8_t object[64];
                         uint32_t object_size = sizeof(object);
-                        readSDO(slave, mapped_index[j], 1, true, object, &object_size);
+                        readSDO(slave, mapped_index[j], 1, Access::EMULATE_COMPLETE, object, &object_size);
 
                         for (int32_t k = 0; k < object_size; k += 4)
                         {
@@ -333,6 +337,7 @@ namespace kickcat
                     }
 
                     mapping->bsize = bits_to_bytes(mapping->size);
+                    printf("mapping: %d\n", mapping->bsize);
                 }
             }
             else
@@ -514,6 +519,7 @@ namespace kickcat
             sm.activate      = 0x01; // Sync Manager enable
             sm.pdi_control   = 0x00; // RO register
             addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
+            printf("SM[%d] type %d - start address %04x\n", mapping.sync_manager, type, physical_address);
 
             fmmu.logical_address    = mapping.address;
             fmmu.length             = mapping.bsize;
@@ -523,7 +529,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
-            //printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, physical_address);
+            printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, physical_address);
 
             return 2; // number of datagrams
         };

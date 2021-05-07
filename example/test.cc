@@ -28,13 +28,19 @@ int main()
             printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
         }
 
-        bus.printSlavesInfo();
-
         uint8_t io_buffer[1024];
         bus.createMapping(io_buffer);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
 
+    try
+    {
         bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 10ms);
+        bus.waitForState(State::SAFE_OP, 10s);
         for (auto& slave : bus.slaves())
         {
             State state = bus.getCurrentState(slave);
@@ -49,16 +55,17 @@ int main()
             printf("Slave %04x state is %s\n", slave.address, toString(state));
         }
     }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
     catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
     }
-    catch (...)
-    {
-        return 2;
-    }
-
+/*
     constexpr int32_t LOOP_NUMBER = 10000;
     std::vector<nanoseconds> stats;
     stats.resize(LOOP_NUMBER);
@@ -124,6 +131,6 @@ int main()
         duration_cast<microseconds>(stats.at(1)).count(),
         duration_cast<microseconds>(stats.at(stats.size() - 2)).count(),
         duration_cast<microseconds>(stats.at(stats.size() / 2)).count());
-
+*/
     return 0;
 }

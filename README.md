@@ -1,25 +1,23 @@
-A C++ implementation of EtherCAT master stack.
+# A C++ implementation of EtherCAT master stack.
 
-Current state:
+### Current state:
  - Can go to OP state
  - Can read and write PI (no read/write though)
  - Can read SDO  - blocking call
  - Can write SDO - blocking call
-
-TODO:
  - CoE: read and write SDO - async call
- - CoE: segmented transfer
+
+### TODO:
+ - CoE: segmented transfer - partial implementation
  - read/write PI
- - rework error handling
  - CoE: Emergency message
  - bus diagnostic
- - better mailbox handling - timeout, answer queue (to avoid drop of unexpected messages that may be useful like CoE emergency)
  - CoE: diagnosis message - 0x10F3
  - FoE
  - Distributed clock
 
 
-### Latency
+## Latency
 To improve latency, you have to
  - use Linux RT (PREMPT_RT patches),
  - set a real time scheduler for the program (i.e. with chrt)
@@ -27,7 +25,7 @@ To improve latency, you have to
  - disable RT throttling
 
 
-### EtherCAT doc
+## EtherCAT doc
 https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html&id=3196541253205318339
 https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf
 

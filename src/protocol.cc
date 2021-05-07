@@ -43,4 +43,73 @@ namespace kickcat
             }
         }
     }
+
+
+    char const* ALStatus_to_string(uint16_t code)
+    {
+        switch (code)
+        {
+            case 0x0000:    { return "no error"; }
+
+            case 0x0001:    { return "No error code is defined for occurred error"; }
+            case 0x0002:    { return "Less hardware memory, slave needs more memory."; }
+            case 0x0004:    { return "Output/Input mapping is not valid for this hardware or software revision (0x1018:03)"; }
+            case 0x0011:    { return "Invalid requested state change"; }
+            case 0x0012:    { return "Unknown requested state change"; }
+            case 0x0013:    { return "Boot state not supported"; }
+            case 0x0014:    { return "No valid firmware"; }
+            case 0x0015:    { return "Invalid mailbox configuration - bootstrap"; }
+            case 0x0016:    { return "Invalid mailbox configuration - safeop"; }
+            case 0x0017:    { return "Invalid Sync Manager configuration"; }
+            case 0x0018:    { return "No valid inputs available"; }
+            case 0x0019:    { return "No valid outputs available"; }
+            case 0x001A:    { return "Synchronization error"; }
+            case 0x001B:    { return "Sync manager watchdog"; }
+            case 0x001C:    { return "Invalid Sync Manager Types"; }
+            case 0x001D:    { return "SM configuration for output process data is invalid"; }
+            case 0x001E:    { return "SM configuration for input process data is invalid"; }
+            case 0x001F:    { return "Invalid Watchdog Configuration"; }
+
+            case 0x0020:    { return "Slave needs cold start"; }
+            case 0x0021:    { return "Slave needs INIT"; }
+            case 0x0022:    { return "Slave needs PREOP"; }
+            case 0x0023:    { return "Slave needs SAFEOP"; }
+            case 0x0024:    { return "Invalid Input Mapping"; }
+            case 0x0025:    { return "Invalid Output Mapping"; }
+            case 0x0026:    { return "Inconsistent Settings"; }
+            case 0x0027:    { return "Freerun not supported"; }
+            case 0x0028:    { return "Synchronization not supported"; }
+            case 0x0029:    { return "Freerun needs 3 Buffer Mode"; }
+            case 0x002A:    { return "Background Watchdog"; }
+            case 0x002B:    { return "No Valid Inputs and Outputs"; }
+            case 0x002C:    { return "Fatal Sync Error"; }
+            case 0x002D:    { return "SyncSignal not received"; }
+
+            case 0x0030:    { return "Invalid DC SYNC Configuration"; }
+            case 0x0031:    { return "Invalid DC Latch Configuration"; }
+            case 0x0032:    { return "PLL Error"; }
+            case 0x0033:    { return "DC Sync IO Error"; }
+            case 0x0034:    { return "DC Sync Timeout Error"; }
+            case 0x0035:    { return "DC Invalid Sync Cycle Time"; }
+            case 0x0036:    { return "DC Sync0 Cycle Time"; }
+            case 0x0037:    { return "DC Sync1 Cycle Time"; }
+
+            case 0x0041:    { return "MBX_AOE"; }
+            case 0x0042:    { return "MBX_EOE"; }
+            case 0x0043:    { return "MBX_COE"; }
+            case 0x0044:    { return "MBX_FOE"; }
+            case 0x0045:    { return "MBX_SOE"; }
+            case 0x004F:    { return "MBX_VOE"; }
+
+            case 0x0050:    { return "EEPROM No Access"; }
+            case 0x0051:    { return "EEPROM access error"; }
+
+            case 0x0060:    { return "Slave Requested Locally"; }
+            case 0x0061:    { return "Device Identification Value updated"; }
+
+            case 0x00F0:    { return "Application Controller available"; }
+
+            default:        { return "Unknown error code"; }
+        }
+    }
 }
