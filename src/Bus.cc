@@ -337,7 +337,6 @@ namespace kickcat
                     }
 
                     mapping->bsize = bits_to_bytes(mapping->size);
-                    printf("mapping: %d\n", mapping->bsize);
                 }
             }
             else
@@ -479,9 +478,41 @@ namespace kickcat
         {
             auto [header, data, wkc] = nextDatagram<uint8_t>();
 
-            if (wkc != frame.outputs.size())
+            if (wkc != frame.outputs.size() + 2)
             {
                 THROW_ERROR("Invalid working counter");
+            }
+        }
+    }
+
+
+    void Bus::processDataReadWrite()
+    {
+        for (auto const& frame : pi_frames_)
+        {
+            uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
+            for (auto const& output : frame.outputs)
+            {
+                std::memcpy(buffer + output.offset, output.iomap, output.size);
+            }
+
+            addDatagram(Command::LRW, frame.address, buffer, frame.size);
+        }
+
+        processFrames();
+
+        for (auto const& frame : pi_frames_)
+        {
+            auto [header, data, wkc] = nextDatagram<uint8_t>();
+
+            if (wkc != (frame.inputs.size() + frame.outputs.size() * 2))
+            {
+                THROW_ERROR("Invalid working counter");
+            }
+
+            for (auto& input : frame.inputs)
+            {
+                std::memcpy(input.iomap, data + input.offset, input.size);
             }
         }
     }
@@ -497,7 +528,8 @@ namespace kickcat
                 return 0;
             }
 
-            uint16_t physical_address = slave.sii.syncManagers_[mapping.sync_manager]->start_adress;
+            // Get SYncManager configuration from SII
+            auto& sii_sm = slave.sii.syncManagers_[mapping.sync_manager];
 
             SyncManager sm;
             FMMU fmmu;
@@ -505,7 +537,7 @@ namespace kickcat
             std::memset(&fmmu, 0, sizeof(FMMU));
 
             uint16_t targeted_fmmu = reg::FMMU; // FMMU0 - outputs
-            sm.control = 0x64;                  // 3 buffers - write access - PDI IRQ ON - wdg ON
+            sm.control = sii_sm->control_register;
             fmmu.type  = 2;                     // write access
             if (type == SyncManagerType::Input)
             {
@@ -513,23 +545,23 @@ namespace kickcat
                 fmmu.type  = 1;                 // read access
                 targeted_fmmu += 0x10;          // FMMU1 - inputs (slave to master)
             }
-            sm.start_address = physical_address;
+            sm.start_address = sii_sm->start_adress;
             sm.length        = mapping.bsize;
             sm.status        = 0x00; // RO register
             sm.activate      = 0x01; // Sync Manager enable
             sm.pdi_control   = 0x00; // RO register
             addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
-            printf("SM[%d] type %d - start address %04x\n", mapping.sync_manager, type, physical_address);
+            //printf("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
 
             fmmu.logical_address    = mapping.address;
             fmmu.length             = mapping.bsize;
             fmmu.logical_start_bit  = 0;   // we map every bits
             fmmu.logical_stop_bit   = 0x7; // we map every bits
-            fmmu.physical_address   = physical_address;
+            fmmu.physical_address   = sii_sm->start_adress;
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
-            printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, physical_address);
+            //printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
 
             return 2; // number of datagrams
         };

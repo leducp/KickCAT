@@ -2,17 +2,17 @@
 
 ### Current state:
  - Can go to OP state
- - Can read and write PI (no read/write though)
+ - Can read and write PI
  - Can read SDO  - blocking call
  - Can write SDO - blocking call
  - CoE: read and write SDO - async call
+ - Bus diagnostic: can reset and get errors counters
 
 ### TODO:
  - CoE: segmented transfer - partial implementation
- - read/write PI
  - CoE: Emergency message
- - bus diagnostic
  - CoE: diagnosis message - 0x10F3
+ - Bus diagnostic: auto discover broken wire (on top of error counters)
  - FoE
  - Distributed clock
 

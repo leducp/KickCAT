@@ -17,19 +17,29 @@ int main()
 {
     auto socket = std::make_shared<LinuxSocket>();
     Bus bus(socket);
+
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
     try
     {
         socket->open("enp0s31f6", 1us);
         bus.init();
 
-        for (auto& slave : bus.slaves())
-        {
-            State state = bus.getCurrentState(slave);
-            printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
-        }
+        print_current_state();
 
         uint8_t io_buffer[1024];
         bus.createMapping(io_buffer);
+
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
     }
     catch (std::exception const& e)
     {
@@ -39,21 +49,19 @@ int main()
 
     try
     {
-        bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 10s);
-        for (auto& slave : bus.slaves())
-        {
-            State state = bus.getCurrentState(slave);
-            printf("Slave %04x state is %s\n", slave.address, toString(state));
-        }
+        bus.processDataReadWrite();
+    }
+    catch (...)
+    {
+        //TODO: need a way to check expected working counter depending on state
+        // -> in safe op write is not working
+    }
 
+    try
+    {
         bus.requestState(State::OPERATIONAL);
-        bus.waitForState(State::OPERATIONAL, 10ms);
-        for (auto& slave : bus.slaves())
-        {
-            State state = bus.getCurrentState(slave);
-            printf("Slave %04x state is %s\n", slave.address, toString(state));
-        }
+        bus.waitForState(State::OPERATIONAL, 100ms);
+        print_current_state();
     }
     catch (ErrorCode const& e)
     {
@@ -65,7 +73,7 @@ int main()
         std::cerr << e.what() << std::endl;
         return 1;
     }
-/*
+
     constexpr int32_t LOOP_NUMBER = 10000;
     std::vector<nanoseconds> stats;
     stats.resize(LOOP_NUMBER);
@@ -79,7 +87,7 @@ int main()
         {
             nanoseconds t1 = since_epoch();
 
-            bus.processDataRead();
+            //bus.processDataRead();
 
             for (int32_t j = 0;  j < easycat.input.bsize; ++j)
             {
@@ -96,7 +104,7 @@ int main()
             {
                 easycat.output.data[0] = 0;
             }
-            bus.processDataWrite();
+            bus.processDataReadWrite();
 
             // handle messages
             bus.processMessages();
@@ -131,6 +139,6 @@ int main()
         duration_cast<microseconds>(stats.at(1)).count(),
         duration_cast<microseconds>(stats.at(stats.size() - 2)).count(),
         duration_cast<microseconds>(stats.at(stats.size() / 2)).count());
-*/
+
     return 0;
 }
