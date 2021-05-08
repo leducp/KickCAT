@@ -1,6 +1,8 @@
-# A C++ implementation of EtherCAT master stack.
+# A simple C++ EtherCAT master stack.
 
-### Current state:
+Kick-start your slaves!
+
+### Current state:
  - Can go to OP state
  - Can read and write PI
  - Can read SDO  - blocking call
