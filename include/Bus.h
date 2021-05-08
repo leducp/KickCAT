@@ -50,7 +50,13 @@ namespace kickcat
         void processDataWrite();
         void processDataReadWrite();
 
-        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t* data_size);
+        enum Access
+        {
+            PARTIAL = 0,
+            COMPLETE = 1,
+            EMULATE_COMPLETE = 2
+        };
+        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size);
 
         void clearErrorCounters();

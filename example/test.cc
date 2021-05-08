@@ -17,46 +17,61 @@ int main()
 {
     auto socket = std::make_shared<LinuxSocket>();
     Bus bus(socket);
+
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
     try
     {
         socket->open("enp0s31f6", 1us);
         bus.init();
 
-        for (auto& slave : bus.slaves())
-        {
-            State state = bus.getCurrentState(slave);
-            printf("Slave %d state is %s - %x\n", slave.address, toString(state), state);
-        }
-
-        bus.printSlavesInfo();
+        print_current_state();
 
         uint8_t io_buffer[1024];
         bus.createMapping(io_buffer);
 
         bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 10ms);
-        for (auto& slave : bus.slaves())
-        {
-            State state = bus.getCurrentState(slave);
-            printf("Slave %04x state is %s\n", slave.address, toString(state));
-        }
-
-        bus.requestState(State::OPERATIONAL);
-        bus.waitForState(State::OPERATIONAL, 10ms);
-        for (auto& slave : bus.slaves())
-        {
-            State state = bus.getCurrentState(slave);
-            printf("Slave %04x state is %s\n", slave.address, toString(state));
-        }
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
     }
     catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
     }
+
+    try
+    {
+        bus.processDataReadWrite();
+    }
     catch (...)
     {
-        return 2;
+        //TODO: need a way to check expected working counter depending on state
+        // -> in safe op write is not working
+    }
+
+    try
+    {
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 100ms);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
     }
 
     constexpr int32_t LOOP_NUMBER = 10000;
@@ -72,7 +87,7 @@ int main()
         {
             nanoseconds t1 = since_epoch();
 
-            bus.processDataRead();
+            //bus.processDataRead();
 
             for (int32_t j = 0;  j < easycat.input.bsize; ++j)
             {
@@ -89,7 +104,7 @@ int main()
             {
                 easycat.output.data[0] = 0;
             }
-            bus.processDataWrite();
+            bus.processDataReadWrite();
 
             // handle messages
             bus.processMessages();
