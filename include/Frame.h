@@ -17,6 +17,7 @@ namespace kickcat
     public:
         Frame(uint8_t const src_mac[6]);
         Frame(Frame&& other);
+        Frame(Frame const& other) = delete;
         ~Frame() = default;
 
         /// \brief Add a datagram in the frame
@@ -33,8 +34,6 @@ namespace kickcat
         /// \return a tuple with a pointer on the datagram header, a pointer on the datagram data, the working counter
         std::tuple<DatagramHeader const*, uint8_t const*, uint16_t> nextDatagram();
 
-        EthernetFrame const& frame() const { return frame_; }
-
         /// \return number of datagram already written in the frame
         int32_t datagramCounter() const { return datagram_counter_; }
 
@@ -45,7 +44,7 @@ namespace kickcat
         bool isFull() const;
 
         /// \return true if datagram can be extracted, false otherwise
-        bool isDatagramAvailable() const { return isDatagramAvailable_; }
+        bool isDatagramAvailable() const { return is_datagram_available_; }
 
         // handle bus access
         void read(std::shared_ptr<AbstractSocket> socket);
@@ -56,11 +55,11 @@ namespace kickcat
         EthernetFrame frame_;
         EthernetHeader* const ethernet_;
         EthercatHeader* const header_;
-        uint8_t* const first_datagram_; // First datagram of the frame - immutable
-        uint8_t* last_datagram_;        // Last **written** datagram
-        uint8_t* next_datagram_;        // Next datagram **to write** or **to read**
-        int32_t datagram_counter_;      // number of datagram already written
-        bool isDatagramAvailable_{false};
+        uint8_t* const first_datagram_;     // First datagram of the frame - immutable
+        uint8_t* last_datagram_{nullptr};   // Last **written** datagram
+        uint8_t* next_datagram_{nullptr};   // Next datagram **to write** or **to read**
+        int32_t datagram_counter_{0};       // number of datagram already written
+        bool is_datagram_available_{false};
     };
 }
 
