@@ -134,13 +134,11 @@ TEST(Frame, write_multiples_datagrams)
     frame.write(io);
 }
 
-
 TEST(Frame, nextDatagram)
 {
     Frame frame{PRIMARY_IF_MAC};
 
     constexpr int32_t PAYLOAD_SIZE = 32;
-    constexpr int32_t EXPECTED_SIZE = sizeof(EthernetHeader) + sizeof(EthercatHeader) + 3 * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE);
     uint8_t buffer[PAYLOAD_SIZE];
     for (int32_t i = 0; i < PAYLOAD_SIZE; ++i)
     {
@@ -208,7 +206,6 @@ TEST(Frame, write_error)
     ASSERT_THROW(frame.write(io), Error);
 }
 
-
 TEST(Frame, read_error)
 {
     std::shared_ptr<MockSocket> io = std::make_shared<MockSocket>();
@@ -216,10 +213,22 @@ TEST(Frame, read_error)
 
     EXPECT_CALL(*io, read(_,_))
         .WillOnce(Return(-1))
-        .WillOnce(Return(0));
+        .WillOnce(Return(0))
+        .WillOnce(Invoke([&](uint8_t* frame, int32_t frame_size)
+        {
+            EthernetHeader* header = reinterpret_cast<EthernetHeader*>(frame);
+            header->type = 0;
+            return frame_size;
+        }))
+        .WillOnce(Return(MAX_ETHERCAT_PAYLOAD_SIZE / 2));
     ASSERT_THROW(frame.read(io), std::system_error);
     ASSERT_THROW(frame.read(io), Error);
+    ASSERT_THROW(frame.read(io), Error);
     ASSERT_FALSE(frame.isDatagramAvailable());
+
+    frame.clear();
+    frame.addDatagram(0, Command::BRD, 0, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
+    ASSERT_THROW(frame.read(io), Error);
 }
 
 
@@ -262,4 +271,15 @@ TEST(Frame, move_constructor)
 
     Frame frameB = std::move(frameA);
     ASSERT_EQ(2, frameB.datagramCounter());
+}
+
+TEST(Frame, write_then_read_garbage)
+{
+    std::shared_ptr<MockSocket> io = std::make_shared<MockSocket>();
+    Frame frame{PRIMARY_IF_MAC};
+
+    EXPECT_CALL(*io, write(_,ETH_MIN_SIZE)).WillOnce(Return(ETH_MIN_SIZE));
+    EXPECT_CALL(*io, read(_, ETH_MAX_SIZE)).WillOnce(Return(ETH_MIN_SIZE));
+    frame.writeThenRead(io);
+    ASSERT_TRUE(frame.isDatagramAvailable());
 }

@@ -49,7 +49,7 @@ if (${CODE_COVERAGE})
   setup_target_for_coverage_gcovr_html(
       NAME coverage  
       EXECUTABLE unit
-      EXCLUDE "unit/*" ".*gtest.*" "example"
+      EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*"
       )
 endif()
 
