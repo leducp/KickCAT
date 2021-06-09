@@ -9,11 +9,9 @@ namespace kickcat
         : ethernet_{reinterpret_cast<EthernetHeader*>(frame_.data())}
         , header_  {reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader))}
         , first_datagram_{frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader)}
-        , next_datagram_{first_datagram_}
-        , last_datagram_{next_datagram_}
-        , datagram_counter_{0}
-        , isDatagramAvailable_{false}
     {
+        clear();
+
         // prepare Ethernet header once for the all future communication
         std::memset(ethernet_->dst_mac, 0xFF, sizeof(ethernet_->dst_mac));      // broadcast
         std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
@@ -32,10 +30,10 @@ namespace kickcat
         , ethernet_{reinterpret_cast<EthernetHeader*>(frame_.data())}
         , header_  {reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader))}
         , first_datagram_{frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader)}
-        , next_datagram_{first_datagram_}
-        , last_datagram_{next_datagram_}
-        , datagram_counter_{0}
-        , isDatagramAvailable_{false}
+        , next_datagram_{other.next_datagram_}
+        , last_datagram_{other.last_datagram_}
+        , datagram_counter_{other.datagram_counter_}
+        , is_datagram_available_{other.is_datagram_available_}
     {
 
     }
@@ -43,7 +41,7 @@ namespace kickcat
 
     int32_t Frame::freeSpace() const
     {
-        return ETH_MTU_SIZE - sizeof(EthercatHeader) - (next_datagram_ - first_datagram_);
+        int32_t size =  ETH_MTU_SIZE - sizeof(EthercatHeader) - (next_datagram_ - first_datagram_);
     }
 
 
@@ -54,7 +52,7 @@ namespace kickcat
             return true;
         }
 
-        if (freeSpace() <= (sizeof(DatagramHeader) + sizeof(uint16_t)))
+        if (freeSpace() == 0)
         {
             return true;
         }
@@ -119,7 +117,7 @@ namespace kickcat
         next_datagram_ = first_datagram_;
         last_datagram_ = first_datagram_;
         datagram_counter_ = 0;
-        isDatagramAvailable_ = false;
+        is_datagram_available_ = false;
     }
 
 
@@ -184,7 +182,7 @@ namespace kickcat
             THROW_ERROR("Wrong number of bytes read");
         }
 
-        isDatagramAvailable_ = true;
+        is_datagram_available_ = true;
     }
 
 
