@@ -42,6 +42,7 @@ namespace kickcat
     int32_t Frame::freeSpace() const
     {
         int32_t size =  ETH_MTU_SIZE - sizeof(EthercatHeader) - (next_datagram_ - first_datagram_);
+        return size;
     }
 
 

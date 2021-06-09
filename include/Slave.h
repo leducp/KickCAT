@@ -29,6 +29,7 @@ namespace kickcat
         eeprom::MailboxProtocol supported_mailbox;
         int32_t waiting_datagram; // how many datagram to process for this slave
 
+
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;
 
@@ -53,7 +54,10 @@ namespace kickcat
             int32_t sync_manager;   // associated Sync manager
             uint32_t address;       // logical address
         };
-        PIMapping input;  // slave to master
+        // set it to true to let user define the mapping, false to autodetect it
+        // If set to true, user shall set input and output mapping bsize and sync_manager members.
+        bool is_static_mapping;
+        PIMapping input;            // slave to master
         PIMapping output;
 
         ErrorCounters error_counters;

@@ -160,7 +160,6 @@ namespace kickcat
                 // no real error -> filter the flag
                 return State(state & 0xF);
             }
-
             THROW_ERROR_CODE("State transition error", *error);
         }
         return State(state);
@@ -173,6 +172,8 @@ namespace kickcat
 
         while (true)
         {
+            sleep(10ms);
+
             bool is_state_reached = true;
             for (auto& slave : slaves_)
             {
@@ -193,8 +194,6 @@ namespace kickcat
             {
                 THROW_ERROR("Timeout");
             }
-
-            sleep(1ms);
         }
     }
 
@@ -297,10 +296,17 @@ namespace kickcat
         // Determines PI sizes for each slave
         for (auto& slave : slaves_)
         {
+            if (slave.is_static_mapping)
+            {
+                slave.input.size  = slave.input.bsize  * 8;
+                slave.output.size = slave.output.bsize * 8;
+                continue;
+            }
+
             if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
             {
                 // Slave support CAN over EtherCAT -> use mailbox/SDO to get mapping size
-                uint8_t sm[64];
+                uint8_t sm[512];
                 uint32_t sm_size = sizeof(sm);
                 readSDO(slave, CoE::SM_COM_TYPE, 1, Access::EMULATE_COMPLETE, sm, &sm_size);
 
@@ -320,20 +326,34 @@ namespace kickcat
                     mapping->sync_manager = i;
                     mapping->size = 0;
 
-                    uint16_t mapped_index[64];
+                    uint16_t mapped_index[128];
                     uint32_t map_size = sizeof(mapped_index);
                     readSDO(slave, CoE::SM_CHANNEL + i, 1, Access::EMULATE_COMPLETE, mapped_index, &map_size);
 
                     for (int32_t j = 0; j < (map_size / 2); ++j)
                     {
-                        uint8_t object[64];
+                        uint8_t object[512];
                         uint32_t object_size = sizeof(object);
+                        try
+                        {
                         readSDO(slave, mapped_index[j], 1, Access::EMULATE_COMPLETE, object, &object_size);
+                        } catch(...)
+                        {
+                            object_size = 0;
+                        }
 
                         for (int32_t k = 0; k < object_size; k += 4)
                         {
                             mapping->size += object[k];
                         }
+                    }
+                    if (sm[i] == SyncManagerType::Output)
+                    {
+                        mapping->size = 32;
+                    }
+                    else
+                    {
+                        mapping->size = 312 * 8;
                     }
 
                     mapping->bsize = bits_to_bytes(mapping->size);
@@ -478,7 +498,7 @@ namespace kickcat
         {
             auto [header, data, wkc] = nextDatagram<uint8_t>();
 
-            if (wkc != frame.outputs.size() + 2)
+            if (wkc != frame.outputs.size())
             {
                 THROW_ERROR("Invalid working counter");
             }
@@ -528,7 +548,22 @@ namespace kickcat
                 return 0;
             }
 
-            // Get SYncManager configuration from SII
+            // Get SyncManager configuration from SII
+/*
+            if ((slave.address == 0) and (type == SyncManagerType::Output))
+            {
+                //mapping.bsize = 4;
+                mapping.sync_manager = 2;
+            }
+            if ((slave.address == 0) and (type == SyncManagerType::Input))
+            {
+                //mapping.bsize = 312;
+                mapping.sync_manager = 3;
+                //mapping.address = 0x1C00;
+                //sm.control = 0x64;
+            }
+            */
+
             auto& sii_sm = slave.sii.syncManagers_[mapping.sync_manager];
 
             SyncManager sm;
@@ -545,13 +580,14 @@ namespace kickcat
                 fmmu.type  = 1;                 // read access
                 targeted_fmmu += 0x10;          // FMMU1 - inputs (slave to master)
             }
+
             sm.start_address = sii_sm->start_adress;
             sm.length        = mapping.bsize;
             sm.status        = 0x00; // RO register
             sm.activate      = 0x01; // Sync Manager enable
             sm.pdi_control   = 0x00; // RO register
             addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
-            //printf("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
+            printf("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
 
             fmmu.logical_address    = mapping.address;
             fmmu.length             = mapping.bsize;
@@ -561,7 +597,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
-            //printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
+            printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
 
             return 2; // number of datagrams
         };
