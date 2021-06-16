@@ -10,19 +10,22 @@
 
 namespace kickcat
 {
+    // Definition of an Ethernet frame (maximal size)
     using EthernetFrame = std::array<uint8_t, ETH_MAX_SIZE>;
 
     class Frame
     {
     public:
-        Frame(uint8_t const src_mac[6]);
+        Frame(uint8_t const src_mac[6] = PRIMARY_IF_MAC);
         Frame(Frame&& other);
         Frame(Frame const& other) = delete;
+        Frame& operator=(Frame&& other);
         ~Frame() = default;
 
         /// \brief Add a datagram in the frame
         /// \warning Doesn't check anything - max datagram nor max size!
-        void addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size);
+        /// \return true if full after adding datagram, false otherwise
+        bool addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size);
 
         void clear(); // reset frame context
 
@@ -46,16 +49,19 @@ namespace kickcat
         /// \return true if datagram can be extracted, false otherwise
         bool isDatagramAvailable() const { return is_datagram_available_; }
 
+        // accessors on frame ID (first datagram index field is used to store it)
+        void setIndex(uint8_t id);
+        uint8_t index() const;
+
         // handle bus access
         void read(std::shared_ptr<AbstractSocket> socket);
         void write(std::shared_ptr<AbstractSocket> socket);
-        void writeThenRead(std::shared_ptr<AbstractSocket> socket);
 
     private:
         EthernetFrame frame_;
-        EthernetHeader* const ethernet_;
-        EthercatHeader* const header_;
-        uint8_t* const first_datagram_;     // First datagram of the frame - immutable
+        EthernetHeader* ethernet_;
+        EthercatHeader* header_;
+        uint8_t* first_datagram_;           // First datagram of the frame - immutable (but non const for move() semantic)
         uint8_t* last_datagram_{nullptr};   // Last **written** datagram
         uint8_t* next_datagram_{nullptr};   // Next datagram **to write** or **to read**
         int32_t datagram_counter_{0};       // number of datagram already written

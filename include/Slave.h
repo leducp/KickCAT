@@ -43,7 +43,7 @@ namespace kickcat
             std::vector<eeprom::PDOEntry const*> TxPDO;
 
         };
-        SII sii;
+        SII sii{};
 
         struct PIMapping
         {

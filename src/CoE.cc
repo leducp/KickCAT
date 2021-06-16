@@ -5,16 +5,31 @@
 
 namespace kickcat
 {
+    void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout)
+    {
+        auto error_callback = [&](){ THROW_ERROR("error while checking mailboxes"); };
+        nanoseconds now = since_epoch();
+
+        while (message->status() == MessageStatus::RUNNING)
+        {
+            checkMailboxes(error_callback);
+            processMessages(error_callback);
+            sleep(200us);
+
+            if (elapsed_time(now) > timeout)
+            {
+                THROW_ERROR("Timeout");
+            }
+        }
+    }
+
+
     void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size)
     {
         if ((CA == Access::PARTIAL) or (CA == Access::COMPLETE))
         {
             auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::UPLOAD, data, data_size);
-            while (sdo->status() == MessageStatus::RUNNING)
-            {
-                processMessages();
-                sleep(200us);
-            }
+            waitForMessage(sdo);
             return;
         }
 
@@ -22,11 +37,7 @@ namespace kickcat
         int32_t object_size = 0;
         uint32_t size = sizeof(object_size);
         auto sdo = slave.mailbox.createSDO(index, 0, false, CoE::SDO::request::UPLOAD, &object_size, &size);
-        while (sdo->status() == MessageStatus::RUNNING)
-        {
-            processMessages();
-            sleep(200us);
-        }
+        waitForMessage(sdo);
 
         uint8_t* pos = reinterpret_cast<uint8_t*>(data);
         size = *data_size;
@@ -40,11 +51,7 @@ namespace kickcat
             }
 
             sdo = slave.mailbox.createSDO(index, i, false, CoE::SDO::request::UPLOAD, pos, &size);
-            while (sdo->status() == MessageStatus::RUNNING)
-            {
-                processMessages();
-                sleep(200us);
-            }
+            waitForMessage(sdo);
 
             if (sdo->status() != MessageStatus::SUCCESS)
             {
@@ -62,10 +69,6 @@ namespace kickcat
     void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size)
     {
         auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::DOWNLOAD, data, &data_size);
-        while (sdo->status() == MessageStatus::RUNNING)
-        {
-            processMessages();
-            sleep(200us);
-        }
+        waitForMessage(sdo);
     }
 }

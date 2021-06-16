@@ -12,6 +12,9 @@ namespace kickcat
     {
         clear();
 
+        // cleanup memory
+        std::memset(frame_.data(), 0, frame_.size());
+
         // prepare Ethernet header once for the all future communication
         std::memset(ethernet_->dst_mac, 0xFF, sizeof(ethernet_->dst_mac));      // broadcast
         std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
@@ -26,16 +29,22 @@ namespace kickcat
 
 
     Frame::Frame(Frame&& other)
-        : frame_{std::move(other.frame_)}
-        , ethernet_{reinterpret_cast<EthernetHeader*>(frame_.data())}
-        , header_  {reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader))}
-        , first_datagram_{frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader)}
-        , next_datagram_{other.next_datagram_}
-        , last_datagram_{other.last_datagram_}
-        , datagram_counter_{other.datagram_counter_}
-        , is_datagram_available_{other.is_datagram_available_}
     {
+        *this = std::move(other);
+    }
 
+
+    Frame& Frame::operator=(Frame&& other)
+    {
+        frame_ = std::move(other.frame_);
+        ethernet_ = reinterpret_cast<EthernetHeader*>(frame_.data());
+        header_   = reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader));
+        first_datagram_ = frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        next_datagram_  = other.next_datagram_;
+        last_datagram_  = other.last_datagram_;
+        datagram_counter_ = other.datagram_counter_;
+        is_datagram_available_ = other.is_datagram_available_;
+        return *this;
     }
 
 
@@ -62,7 +71,7 @@ namespace kickcat
     }
 
 
-    void Frame::addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
+    bool Frame::addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
     {
         DatagramHeader* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
         uint8_t* pos = next_datagram_;
@@ -109,6 +118,8 @@ namespace kickcat
         last_datagram_ = reinterpret_cast<uint8_t*>(header);    // save last datagram header to finalize frame when ready
         next_datagram_ = pos;                                   // set next datagram
         ++datagram_counter_;                                    // one more datagram in the frame to be sent
+
+        return isFull();
     }
 
 
@@ -158,6 +169,20 @@ namespace kickcat
     }
 
 
+    void Frame::setIndex(uint8_t id)
+    {
+        DatagramHeader* header = reinterpret_cast<DatagramHeader*>(first_datagram_);
+        header->index = id;
+    }
+
+
+    uint8_t Frame::index() const
+    {
+        DatagramHeader const* header = reinterpret_cast<DatagramHeader const*>(first_datagram_);
+        return header->index;
+    }
+
+
     void Frame::read(std::shared_ptr<AbstractSocket> socket)
     {
         int32_t read = socket->read(frame_.data(), frame_.size());
@@ -191,6 +216,7 @@ namespace kickcat
     {
         int32_t toWrite = finalize();
         int32_t written = socket->write(frame_.data(), toWrite);
+        header_->len = 0; // reset len for future usage
 
         if (written < 0)
         {
@@ -201,12 +227,5 @@ namespace kickcat
         {
             THROW_ERROR("Wrong number of bytes written");
         }
-    }
-
-
-    void Frame::writeThenRead(std::shared_ptr<AbstractSocket> socket)
-    {
-        write(socket);
-        read(socket);
     }
 }
