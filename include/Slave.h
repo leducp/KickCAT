@@ -29,7 +29,6 @@ namespace kickcat
         eeprom::MailboxProtocol supported_mailbox;
         int32_t waiting_datagram; // how many datagram to process for this slave
 
-
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;
 

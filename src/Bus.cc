@@ -334,26 +334,12 @@ namespace kickcat
                     {
                         uint8_t object[512];
                         uint32_t object_size = sizeof(object);
-                        try
-                        {
                         readSDO(slave, mapped_index[j], 1, Access::EMULATE_COMPLETE, object, &object_size);
-                        } catch(...)
-                        {
-                            object_size = 0;
-                        }
 
                         for (int32_t k = 0; k < object_size; k += 4)
                         {
                             mapping->size += object[k];
                         }
-                    }
-                    if (sm[i] == SyncManagerType::Output)
-                    {
-                        mapping->size = 32;
-                    }
-                    else
-                    {
-                        mapping->size = 312 * 8;
                     }
 
                     mapping->bsize = bits_to_bytes(mapping->size);
@@ -549,21 +535,6 @@ namespace kickcat
             }
 
             // Get SyncManager configuration from SII
-/*
-            if ((slave.address == 0) and (type == SyncManagerType::Output))
-            {
-                //mapping.bsize = 4;
-                mapping.sync_manager = 2;
-            }
-            if ((slave.address == 0) and (type == SyncManagerType::Input))
-            {
-                //mapping.bsize = 312;
-                mapping.sync_manager = 3;
-                //mapping.address = 0x1C00;
-                //sm.control = 0x64;
-            }
-            */
-
             auto& sii_sm = slave.sii.syncManagers_[mapping.sync_manager];
 
             SyncManager sm;
@@ -587,7 +558,7 @@ namespace kickcat
             sm.activate      = 0x01; // Sync Manager enable
             sm.pdi_control   = 0x00; // RO register
             addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm);
-            printf("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
+            //printf("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
 
             fmmu.logical_address    = mapping.address;
             fmmu.length             = mapping.bsize;
@@ -597,7 +568,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu);
-            printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
+            //printf("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
 
             return 2; // number of datagrams
         };
