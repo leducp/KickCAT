@@ -9,6 +9,7 @@ Kick-start your slaves!
  - Can write SDO - blocking call
  - CoE: read and write SDO - async call
  - Bus diagnostic: can reset and get errors counters
+ - hook to configure non compliant slaves
 
 ### TODO:
  - CoE: segmented transfer - partial implementation
@@ -17,6 +18,8 @@ Kick-start your slaves!
  - Bus diagnostic: auto discover broken wire (on top of error counters)
  - FoE
  - Distributed clock
+ - consecutives writes tor educe latency
+ - AF_XDP Linux socket to improve performance
 
 
 ## Latency
@@ -25,6 +28,8 @@ To improve latency, you have to
  - set a real time scheduler for the program (i.e. with chrt)
  - disable NIC IRQ coalescing (with ethtool)
  - disable RT throttling
+ - isolate ethercat task and network IRQ on a dedicated core
+ - change network IRQ priority
 
 
 ## EtherCAT doc
