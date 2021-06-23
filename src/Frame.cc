@@ -71,7 +71,7 @@ namespace kickcat
     }
 
 
-    bool Frame::addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
+    void Frame::addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
     {
         DatagramHeader* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
         uint8_t* pos = next_datagram_;
@@ -118,8 +118,6 @@ namespace kickcat
         last_datagram_ = reinterpret_cast<uint8_t*>(header);    // save last datagram header to finalize frame when ready
         next_datagram_ = pos;                                   // set next datagram
         ++datagram_counter_;                                    // one more datagram in the frame to be sent
-
-        return isFull();
     }
 
 
