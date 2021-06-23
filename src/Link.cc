@@ -11,43 +11,75 @@ namespace kickcat
 
     }
 
-    Link::~Link()
+
+    void Link::writeThenRead(Frame& frame)
     {
-        socket_->close();
+        frame.write(socket_);
+        frame.read(socket_);
     }
 
-    void Link::addFrame(Frame& frame, std::function<bool(Frame&)>& process, std::function<void()> const& error)
+
+    void Link::sendFrame()
+    {
+        frame_.write(socket_);
+        ++sent_frame_;
+    }
+
+
+    void Link::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
+                           std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
+                           std::function<void()> const& error)
     {
         if (index_ == 255)
         {
-            THROW_ERROR("Too many frame in flight. Max is 256");
+            THROW_ERROR("Too many datagrams in flight. Max is 256");
         }
+
+        uint16_t const needed_space = datagram_size(data_size);
+        if (frame_.freeSpace() < needed_space)
+        {
+            sendFrame();
+        }
+
+        frame_.addDatagram(index_, command, address, data, data_size);
         callbacks_[index_].process = process;
         callbacks_[index_].error = error;
-
-        frame.setIndex(index_);
-        frame.write(socket_);
         ++index_;
+
+        if (frame_.isFull())
+        {
+            sendFrame();
+        }
     }
 
-    // read the frame associated with the id 'frame_id'
-    void Link::processFrames()
+
+    void Link::finalizeDatagrams()
     {
-        uint8_t waiting_frame = index_;
+        if (frame_.datagramCounter() != 0)
+        {
+            sendFrame();
+        }
+    }
+
+
+    void Link::processDatagrams()
+    {
+        finalizeDatagrams();
+
+        uint8_t waiting_frame = sent_frame_;
+        sent_frame_ = 0;
+        uint8_t waiting_datagrams_ = index_;
         index_ = 0;
 
-        Frame frame;
         for (int32_t i = 0; i < waiting_frame; ++i)
         {
             try
             {
-                frame.read(socket_);
-                uint8_t index = frame.index();
-
-                callbacks_[index].was_run = true;
-                if (not callbacks_[index].process(frame))
+                frame_.read(socket_);
+                while (frame_.isDatagramAvailable())
                 {
-                    callbacks_[index].error();
+                    auto [header, data, wkc] = frame_.nextDatagram();
+                    callbacks_[header->index].in_error = callbacks_[header->index].process(header, data, wkc);
                 }
             }
             catch(std::exception const& e)
@@ -56,20 +88,13 @@ namespace kickcat
             }
         }
 
-        for (int32_t i = 0; i < waiting_frame; ++i)
+        for (int32_t i = 0; i < waiting_datagrams_; ++i)
         {
-            if (callbacks_[i].was_run == false)
+            if (callbacks_[i].in_error)
             {
-                // frame was lost
+                // datagram was either lost or processing it encountered an errro
                 callbacks_[i].error();
             }
         }
-    }
-
-
-    void Link::writeThenRead(Frame& frame)
-    {
-        frame.write(socket_);
-        frame.read(socket_);
     }
 }

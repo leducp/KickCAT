@@ -25,7 +25,7 @@ namespace kickcat
         /// \brief Add a datagram in the frame
         /// \warning Doesn't check anything - max datagram nor max size!
         /// \return true if full after adding datagram, false otherwise
-        bool addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size);
+        void addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size);
 
         void clear(); // reset frame context
 
