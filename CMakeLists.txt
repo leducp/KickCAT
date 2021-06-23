@@ -7,6 +7,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 add_library(kickcat src/Bus.cc
                     src/CoE.cc
                     src/Frame.cc
+                    src/Link.cc
                     src/LinuxSocket.cc
                     src/Mailbox.cc
                     src/protocol.cc
@@ -47,7 +48,7 @@ if (${CODE_COVERAGE})
   append_coverage_compiler_flags()
   set(GCOVR_ADDITIONAL_ARGS "--exclude-unreachable-branches")
   setup_target_for_coverage_gcovr_html(
-      NAME coverage  
+      NAME coverage
       EXECUTABLE unit
       EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*"
       )

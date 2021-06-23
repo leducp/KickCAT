@@ -67,7 +67,7 @@ TEST(Frame, write_multiples_datagrams)
     .WillOnce(Invoke([&](uint8_t const* frame, int32_t frame_size)
     {
         EXPECT_EQ(EXPECTED_SIZE, frame_size);
-    
+
         {
             EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame);
             EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
@@ -85,7 +85,7 @@ TEST(Frame, write_multiples_datagrams)
 
         for (int32_t i = 0; i < 3; ++i)
         {
-            uint8_t const* datagram = reinterpret_cast<uint8_t const*>(frame + sizeof(EthernetHeader) + sizeof(EthercatHeader) 
+            uint8_t const* datagram = reinterpret_cast<uint8_t const*>(frame + sizeof(EthernetHeader) + sizeof(EthercatHeader)
                                                                         + i * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE));
             DatagramHeader const* header = reinterpret_cast<DatagramHeader const*>(datagram);
             uint8_t const* payload = datagram + sizeof(DatagramHeader);
@@ -128,7 +128,7 @@ TEST(Frame, write_multiples_datagrams)
                 }
             }
         }
-        
+
         return EXPECTED_SIZE;
     }));
     frame.write(io);
@@ -271,15 +271,4 @@ TEST(Frame, move_constructor)
 
     Frame frameB = std::move(frameA);
     ASSERT_EQ(2, frameB.datagramCounter());
-}
-
-TEST(Frame, write_then_read_garbage)
-{
-    std::shared_ptr<MockSocket> io = std::make_shared<MockSocket>();
-    Frame frame{PRIMARY_IF_MAC};
-
-    EXPECT_CALL(*io, write(_,ETH_MIN_SIZE)).WillOnce(Return(ETH_MIN_SIZE));
-    EXPECT_CALL(*io, read(_, ETH_MAX_SIZE)).WillOnce(Return(ETH_MIN_SIZE));
-    frame.writeThenRead(io);
-    ASSERT_TRUE(frame.isDatagramAvailable());
 }

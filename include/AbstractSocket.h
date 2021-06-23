@@ -20,6 +20,9 @@ namespace kickcat
         virtual void close() noexcept = 0;
         virtual int32_t read(uint8_t* frame, int32_t frame_size) = 0;
         virtual int32_t write(uint8_t const* frame, int32_t frame_size) = 0;
+
+        int read_counter{0};
+        int write_counter{0};
     };
 }
 

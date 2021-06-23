@@ -9,6 +9,7 @@
 
 #include "LinuxSocket.h"
 #include "protocol.h"
+#include "Time.h"
 
 namespace kickcat
 {
@@ -36,8 +37,22 @@ namespace kickcat
             THROW_SYSTEM_ERROR("setsockopt(SO_SNDTIMEO)");
         }
 
+
+        constexpr int buffer_size = ETH_MAX_SIZE * 256; // max 256 frames on the wire
+        rc = setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size));
+        if (rc < 0)
+        {
+            THROW_SYSTEM_ERROR("setsockopt(SO_SNDBUF)");
+        }
+
+        rc = setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
+        if (rc < 0)
+        {
+            THROW_SYSTEM_ERROR("setsockopt(SO_RCVBUF)");
+        }
+
         // EtherCAT frames shall not be routed to another network, but only on the dedicated interface
-        int const dont_route = 1;
+        constexpr int dont_route = 1;
         rc = setsockopt(fd_, SOL_SOCKET, SO_DONTROUTE, &dont_route, sizeof(dont_route));
         if (rc < 0)
         {
@@ -96,11 +111,14 @@ namespace kickcat
 
     int32_t LinuxSocket::read(uint8_t* frame, int32_t frame_size)
     {
+        read_counter++;
         return ::recv(fd_, frame, frame_size, 0);
     }
 
     int32_t LinuxSocket::write(uint8_t const* frame, int32_t frame_size)
     {
+        write_counter++;
         return ::send(fd_, frame, frame_size, 0);
+
     }
 }

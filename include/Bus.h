@@ -9,6 +9,7 @@
 
 #include "Error.h"
 #include "Frame.h"
+#include "Link.h"
 #include "Slave.h"
 #include "Time.h"
 
@@ -46,9 +47,27 @@ namespace kickcat
 
         std::vector<Slave>& slaves() { return slaves_; }
 
-        void processDataRead();
-        void processDataWrite();
-        void processDataReadWrite();
+        // asynchrone read/write/mailbox methods
+        // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
+
+        void sendLogicalRead(std::function<void()> const& error);
+        void sendLogicalWrite(std::function<void()> const& error);
+        void sendLogicalReadWrite(std::function<void()> const& error);
+        void sendMailboxesChecks(std::function<void()> const& error); // Fetch in/out mailboxes states (full/empty) of compatible slaves
+        void finalizeAwaitingFrames();
+
+        // Process messages (read or write slave mailbox) - one at once per slave.
+        void sendReadMessages(std::function<void()> const& error);
+        void sendWriteMessages(std::function<void()> const& error);
+        void sendrefreshErrorCounters(std::function<void()> const& error);
+
+        // helpers around start/finalize oeprations
+        void processDataRead(std::function<void()> const& error);
+        void processDataWrite(std::function<void()> const& error);
+        void processDataReadWrite(std::function<void()> const& error);
+
+        void checkMailboxes( std::function<void()> const& error);
+        void processMessages(std::function<void()> const& error);
 
         enum Access
         {
@@ -60,12 +79,9 @@ namespace kickcat
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size);
 
         void clearErrorCounters();
-        void refreshErrorCounters();
 
-        void processMessages();
 
     protected: // for unit testing
-        uint8_t idx_{0};
 
         // Helpers for broadcast commands, mainly for init purpose
         /// \return working counter
@@ -80,7 +96,10 @@ namespace kickcat
         {
             addDatagram(command, address, &data, sizeof(data));
         }
+
+        // helper with trivial bus management (write then read)
         void processFrames();
+
         template<typename T>
         std::tuple<DatagramHeader const*, T const*, uint16_t> nextDatagram();
 
@@ -101,11 +120,9 @@ namespace kickcat
         void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
-        // Update slaves mailboxes state
-        void checkMailboxes();
-        bool waitForMessage(Slave& slave, nanoseconds timeout);
+        void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout = 1s);
 
-        std::shared_ptr<AbstractSocket> socket_;
+        Link link_;
         std::vector<Frame> frames_;
         int32_t current_frame_{0};
         std::vector<Slave> slaves_;
@@ -129,8 +146,6 @@ namespace kickcat
             std::vector<blockIO> outputs;
         };
         std::vector<PIFrame> pi_frames_; // PI frame description
-
-        bool check_loop_{true}; // check slaves mailbox or process messages, but do not do all in the same row to reduce loop latency
     };
 }
 
