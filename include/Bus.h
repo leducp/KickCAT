@@ -89,14 +89,6 @@ namespace kickcat
         /// \return working counter
         uint16_t broadcastWrite(uint16_t ADO, void const* data, uint16_t data_size);
 
-        // helpers to aggregate multiple datagrams and process them on the line
-        void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size);
-        template<typename T>
-        void addDatagram(enum Command command, uint32_t address, T const& data)
-        {
-            addDatagram(command, address, &data, sizeof(data));
-        }
-
         // helper with trivial bus management (write then read)
         void processFrames();
 
@@ -123,8 +115,6 @@ namespace kickcat
         void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout = 1s);
 
         Link link_;
-        std::vector<Frame> frames_;
-        int32_t current_frame_{0};
         std::vector<Slave> slaves_;
 
         uint8_t* iomap_read_section_;   // pointer on read section (to write back inputs)
@@ -148,7 +138,5 @@ namespace kickcat
         std::vector<PIFrame> pi_frames_; // PI frame description
     };
 }
-
-#include "Bus.tpp"
 
 #endif
