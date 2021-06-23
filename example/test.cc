@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
 
 
             nanoseconds t3 = since_epoch();
-            bus.finalizeAwaitingFrames();
+            bus.processAwaitingFrames();
             nanoseconds t4 = since_epoch();
 
             for (int32_t j = 0;  j < easycat.input.bsize; ++j)

@@ -404,6 +404,11 @@ namespace kickcat
 
     // helpers
 
+    constexpr uint16_t datagram_size(uint16_t data_size)
+    {
+        return sizeof(DatagramHeader) + data_size + sizeof(uint16_t);
+    }
+
     /// extract the n-ieme byte of a contiguous data T
     template<typename T>
     constexpr uint8_t extractByte(int32_t n, T const& data)

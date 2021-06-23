@@ -205,7 +205,7 @@ namespace kickcat
         {
             auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
-                printf("wkc = %d\n", wkc);
+                //printf("wkc = %d\n", wkc);
                 return false;
             };
 
@@ -429,34 +429,31 @@ namespace kickcat
     {
         for (auto const& pi_frame : pi_frames_)
         {
-            Frame frame;
-            frame.addDatagram(0, Command::LRD, pi_frame.address, nullptr, pi_frame.size);
-
-            std::function<bool(Frame&)> callback = [pi_frame](Frame& frame)
+            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                auto [_, data, wkc] = frame.nextDatagram();
                 if (wkc != pi_frame.inputs.size())
                 {
                     DEBUG_PRINT("Invalid working counter\n");
-                    return false;
+                    return true;
                 }
 
                 for (auto& input : pi_frame.inputs)
                 {
                     std::memcpy(input.iomap, data + input.offset, input.size);
                 }
-                return true;
+                return false;
             };
 
-            link_.addFrame(frame, callback, error);
+            link_.addDatagram(Command::LRD, pi_frame.address, nullptr, pi_frame.size, process, error);
         }
+        link_.finalizeDatagrams();
     }
 
 
     void Bus::processDataRead(std::function<void()> const& error)
     {
         sendLogicalRead(error);
-        link_.processFrames();
+        link_.processDatagrams();
     }
 
 
@@ -470,29 +467,25 @@ namespace kickcat
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
             }
 
-            Frame frame;
-            frame.addDatagram(0, Command::LWR, pi_frame.address, buffer, pi_frame.size);
-
-            std::function<bool(Frame&)> callback = [pi_frame](Frame& frame)
+            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                auto [_, data, wkc] = frame.nextDatagram();
-
                 if (wkc != pi_frame.outputs.size())
                 {
                     DEBUG_PRINT("Invalid working counter\n");
-                    return false;
+                    return true;
                 }
-                return true;
+                return false;
             };
-            link_.addFrame(frame, callback, error);
+            link_.addDatagram(Command::LWR, pi_frame.address, buffer, pi_frame.size, process, error);
         }
+        link_.finalizeDatagrams();
     }
 
 
     void Bus::processDataWrite(std::function<void()> const& error)
     {
         sendLogicalWrite(error);
-        link_.processFrames();
+        link_.processDatagrams();
     }
 
 
@@ -506,32 +499,30 @@ namespace kickcat
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
             }
 
-            Frame frame;
-            frame.addDatagram(0, Command::LRW, pi_frame.address, buffer, pi_frame.size);
-
-            std::function<bool(Frame&)> callback = [pi_frame](Frame& frame)
+            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                auto [_, data, wkc] = frame.nextDatagram();
                 if (wkc != pi_frame.inputs.size())
                 {
                     DEBUG_PRINT("Invalid working counter\n");
-                    return false;
+                    return true;
                 }
 
                 for (auto& input : pi_frame.inputs)
                 {
                     std::memcpy(input.iomap, data + input.offset, input.size);
                 }
-                return true;
+                return false;
             };
-            link_.addFrame(frame, callback, error);
+
+            link_.addDatagram(Command::LRW, pi_frame.address, buffer, pi_frame.size, process, error);
         }
+        link_.finalizeDatagrams();
     }
 
     void Bus::processDataReadWrite(std::function<void()> const& error)
     {
         sendLogicalReadWrite(error);
-        link_.processFrames();
+        link_.processDatagrams();
     }
 
 
@@ -780,84 +771,59 @@ namespace kickcat
 
     void Bus::sendMailboxesChecks(std::function<void()> const& error)
     {
-        std::function<bool(Frame&)> callback = [this](Frame& frame)
+        auto isFull = [](uint8_t state, uint16_t wkc, bool stable_value)
         {
-            auto isFull = [](uint8_t state, uint16_t wkc, bool stable_value)
+            if (wkc != 1)
             {
-                if (wkc != 1)
-                {
-                    DEBUG_PRINT("Invalid working counter\n");
-                    return stable_value;
-                }
-                return ((state & 0x08) == 0x08);
-            };
-
-            while (frame.isDatagramAvailable())
-            {
-                auto [header, state, wkc] = frame.nextDatagram();
-                int32_t slave_index = header->address & 0xFFFF;
-                int32_t mailbox     = header->address >> 16;
-                auto& slave = slaves_.at(slave_index);
-
-                if (mailbox == reg::SYNC_MANAGER_0 + reg::SM_STATS)
-                {
-                    slave.mailbox.can_write = not isFull(*state, wkc, true);
-                }
-                else
-                {
-                    slave.mailbox.can_read  = isFull(*state, wkc, false);
-                }
+                DEBUG_PRINT("Invalid working counter\n");
+                return stable_value;
             }
-            return true;
+            return ((state & 0x08) == 0x08);
         };
 
-        Frame frame;
         for (auto& slave : slaves_)
         {
+            auto process_write = [&slave, isFull](DatagramHeader const* header, uint8_t const* state, uint16_t wkc)
+            {
+                slave.mailbox.can_write = not isFull(*state, wkc, true);
+                return false;
+            };
+
+            auto process_read = [&slave, isFull](DatagramHeader const* header, uint8_t const* state, uint16_t wkc)
+            {
+                slave.mailbox.can_read = isFull(*state, wkc, false);
+                return false;
+            };
+
             if (slave.supported_mailbox == 0)
             {
                 continue;
             }
-            if (frame.addDatagram (0, Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1))
-            {
-                link_.addFrame(frame, callback, error);
-            }
-            if (frame.addDatagram(0, Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1))
-            {
-                link_.addFrame(frame, callback, error);
-            }
+            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1, process_write, error);
+            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1, process_read,  error);
         }
-
-        if (frame.datagramCounter() != 0)
-        {
-            link_.addFrame(frame, callback, error);
-        }
+        link_.finalizeDatagrams();
     }
 
     void Bus::checkMailboxes(std::function<void()> const& error)
     {
         sendMailboxesChecks(error);
-        link_.processFrames();
+        link_.processDatagrams();
     }
 
 
     void Bus::sendWriteMessages(std::function<void()> const& error)
     {
-        std::function<bool(Frame&)> callback = [this](Frame& frame)
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
         {
-            while (frame.isDatagramAvailable())
+            if (wkc != 1)
             {
-                auto [_, __, wkc] = frame.nextDatagram();
-                if (wkc != 1)
-                {
-                    DEBUG_PRINT("Invalid working counter\n");
-                    return false;
-                }
+                DEBUG_PRINT("Invalid working counter\n");
+                return true;
             }
-            return true;
+            return false;
         };
 
-        Frame frame;
         for (auto& slave : slaves_)
         {
             if ((slave.mailbox.can_write) and (not slave.mailbox.to_send.empty()))
@@ -865,10 +831,7 @@ namespace kickcat
                 // send one waiting message
                 auto message = slave.mailbox.to_send.front();
                 slave.mailbox.to_send.pop();
-                if(frame.addDatagram(0, Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data().data(), message->data().size()))
-                {
-                    link_.addFrame(frame, callback, error);
-                }
+                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data().data(), message->data().size(), process, error);
 
                 // add message to processing queue if needed
                 if (message->status() == MessageStatus::RUNNING)
@@ -877,56 +840,39 @@ namespace kickcat
                 }
             }
         }
-
-        if (frame.datagramCounter() != 0)
-        {
-            link_.addFrame(frame, callback, error);
-        }
+        link_.finalizeDatagrams();
     }
 
     void Bus::sendReadMessages(std::function<void()> const& error)
     {
-        std::function<bool(Frame&)> callback = [this](Frame& frame)
+        Frame frame;
+        for (auto& slave : slaves_)
         {
-            bool result = true;
-            while (frame.isDatagramAvailable())
+            auto process = [&slave](DatagramHeader const* header, uint8_t const* data, uint16_t wkc)
             {
-                auto [header, data, wkc] = frame.nextDatagram();
-                int32_t slave_index = header->address & 0xFFFF;
-                auto& slave = slaves_.at(slave_index);
+                bool result = true;
                 if (wkc != 1)
                 {
-                    DEBUG_PRINT("Invalid working counter for slave %d\n", slave_index);
-                    result = false;
-                    continue;
+                    DEBUG_PRINT("Invalid working counter for slave %d\n", slave.address);
+                    return true;
                 }
 
                 if (not slave.mailbox.receive(data))
                 {
-                    DEBUG_PRINT("Slave %d: receive a message but didn't process it\n", slave_index);
-                    result = false;
+                    DEBUG_PRINT("Slave %d: receive a message but didn't process it\n", slave.address);
+                    return true;
                 }
-            }
-            return result;
-        };
 
-        Frame frame;
-        for (auto& slave : slaves_)
-        {
+                return false;
+            };
+
             if (slave.mailbox.can_read)
             {
                 // retrieve waiting message
-                if(frame.addDatagram(0, Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size))
-                {
-                    link_.addFrame(frame, callback, error);
-                }
+                link_.addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size, process, error);
             }
         }
-
-        if (frame.datagramCounter() != 0)
-        {
-            link_.addFrame(frame, callback, error);
-        }
+        link_.finalizeDatagrams();
     }
 
 
@@ -934,13 +880,13 @@ namespace kickcat
     {
         sendWriteMessages(error);
         sendReadMessages(error);
-        link_.processFrames();
+        link_.processDatagrams();
     }
 
 
-    void Bus::finalizeAwaitingFrames()
+    void Bus::processAwaitingFrames()
     {
-        link_.processFrames();
+        link_.processDatagrams();
     }
 
 
@@ -956,39 +902,22 @@ namespace kickcat
 
     void Bus::sendrefreshErrorCounters(std::function<void()> const& error)
     {
-        std::function<bool(Frame&)> callback = [this](Frame& frame)
+        for (auto& slave : slaves_)
         {
-            bool result = true;
-            while (frame.isDatagramAvailable())
+            auto process = [&slave](DatagramHeader const* header, uint8_t const* data, uint16_t wkc)
             {
-                auto [header, data, wkc] = frame.nextDatagram();
-                int32_t slave_index = header->address & 0xFFFF;
-                auto& slave = slaves_.at(slave_index);
                 if (wkc != 1)
                 {
-                    DEBUG_PRINT("Invalid working counter for slave %d\n", slave_index);
-                    result = false;
-                    continue;
+                    DEBUG_PRINT("Invalid working counter for slave %d\n", slave.address);
+                    return true;
                 }
 
                 std::memcpy(&slave.error_counters, data, sizeof(ErrorCounters));
-            }
-            return result;
-        };
+                return false;
+            };
 
-        Frame frame;
-        for (auto& slave : slaves_)
-        {
-            if (frame.addDatagram(0, Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), nullptr, sizeof(ErrorCounters)))
-            {
-                link_.addFrame(frame, callback, error);
-            }
+            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), nullptr, sizeof(ErrorCounters), process, error);
         }
-
-        if (frame.datagramCounter() != 0)
-        {
-            link_.addFrame(frame, callback, error);
-        }
+        link_.finalizeDatagrams();
     }
-
 }

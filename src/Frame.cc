@@ -62,7 +62,7 @@ namespace kickcat
             return true;
         }
 
-        if (freeSpace() == 0)
+        if (freeSpace() < datagram_size(0)) // no more space for a datagram metadata ?
         {
             return true;
         }

@@ -54,7 +54,7 @@ namespace kickcat
         void sendLogicalWrite(std::function<void()> const& error);
         void sendLogicalReadWrite(std::function<void()> const& error);
         void sendMailboxesChecks(std::function<void()> const& error); // Fetch in/out mailboxes states (full/empty) of compatible slaves
-        void finalizeAwaitingFrames();
+        void processAwaitingFrames();
 
         // Process messages (read or write slave mailbox) - one at once per slave.
         void sendReadMessages(std::function<void()> const& error);
