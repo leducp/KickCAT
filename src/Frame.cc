@@ -28,6 +28,17 @@ namespace kickcat
     }
 
 
+    Frame::Frame(uint8_t const* data, int32_t data_size)
+        : ethernet_ { reinterpret_cast<EthernetHeader*>(frame_.data()) }
+        , header_   { reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader)) }
+        , first_datagram_{ frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader) }
+    {
+        std::memcpy(frame_.data(), data, data_size);
+        clear();
+        is_datagram_available_ = true;
+    }
+
+
     Frame::Frame(Frame&& other)
     {
         *this = std::move(other);
@@ -164,20 +175,6 @@ namespace kickcat
         }
 
         return std::make_tuple(header, data, *wkc);
-    }
-
-
-    void Frame::setIndex(uint8_t id)
-    {
-        DatagramHeader* header = reinterpret_cast<DatagramHeader*>(first_datagram_);
-        header->index = id;
-    }
-
-
-    uint8_t Frame::index() const
-    {
-        DatagramHeader const* header = reinterpret_cast<DatagramHeader const*>(first_datagram_);
-        return header->index;
     }
 
 

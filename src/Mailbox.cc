@@ -151,7 +151,7 @@ namespace kickcat
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
             std::string_view text = CoE::SDO::abort_to_str(code);
-            printf("Abort requested! code %08x - %.*s\n", code, text.size(), text.data());
+            printf("Abort requested! code %08x - %.*s\n", code, static_cast<int>(text.size()), text.data());
             status_ = code;
             return ProcessingResult::FINALIZE;
         }
@@ -183,7 +183,7 @@ namespace kickcat
         if (coe->transfer_type == 1)
         {
             // expedited transfer
-            int32_t size = 4 - coe->block_size;
+            uint32_t size = 4 - coe->block_size;
             if(*client_data_size_ < size)
             {
                 status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
@@ -197,7 +197,7 @@ namespace kickcat
         }
 
         // standard or segmented transfer
-        uint32_t complete_size = *reinterpret_cast<uint32_t const*>(payload);
+        uint32_t const complete_size = *reinterpret_cast<uint32_t const*>(payload);
         payload += 4;
 
         if (*client_data_size_ < complete_size)
@@ -206,7 +206,8 @@ namespace kickcat
             return ProcessingResult::FINALIZE;
         }
 
-        if ((header->len - 10) >= complete_size)
+        uint32_t const data_len = header->len - 10;
+        if (data_len >= complete_size)
         {
             // standard
             std::memcpy(client_data_, payload, complete_size);
@@ -275,7 +276,7 @@ namespace kickcat
         return ProcessingResult::CONTINUE;
     }
 
-    ProcessingResult SDOMessage::processDownload(mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload)
+    ProcessingResult SDOMessage::processDownload(mailbox::Header const*, mailbox::ServiceData const* coe, uint8_t const*)
     {
         if (coe->command != CoE::SDO::response::DOWNLOAD)
         {
@@ -287,7 +288,7 @@ namespace kickcat
         return ProcessingResult::FINALIZE;
     }
 
-    ProcessingResult SDOMessage::processDownloadSegmented(mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload)
+    ProcessingResult SDOMessage::processDownloadSegmented(mailbox::Header const*, mailbox::ServiceData const* coe, uint8_t const*)
     {
         if (coe->command != CoE::SDO::response::DOWNLOAD_SEGMENTED)
         {

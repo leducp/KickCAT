@@ -18,6 +18,7 @@ namespace kickcat
     public:
         Frame(uint8_t const src_mac[6] = PRIMARY_IF_MAC);
         Frame(Frame&& other);
+        Frame(uint8_t const* data, int32_t data_size);
         Frame(Frame const& other) = delete;
         Frame& operator=(Frame&& other);
         ~Frame() = default;
@@ -48,10 +49,6 @@ namespace kickcat
 
         /// \return true if datagram can be extracted, false otherwise
         bool isDatagramAvailable() const { return is_datagram_available_; }
-
-        // accessors on frame ID (first datagram index field is used to store it)
-        void setIndex(uint8_t id);
-        uint8_t index() const;
 
         // handle bus access
         void read(std::shared_ptr<AbstractSocket> socket);

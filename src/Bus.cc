@@ -50,7 +50,7 @@ namespace kickcat
         }
 
         slaves_.resize(wkc);
-        printf("-*-*-*- %d slave detected on the network -*-*-*-\n", slaves_.size());
+        printf("-*-*-*- %lu slave detected on the network -*-*-*-\n", slaves_.size());
     }
 
 
@@ -201,11 +201,15 @@ namespace kickcat
 
     void Bus::setAddresses()
     {
-        for (int i = 0; i < slaves_.size(); ++i)
+        size_t detected_slaves = slaves_.size();
+        for (size_t i = 0; i < slaves_.size(); ++i)
         {
-            auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+            auto process = [detected_slaves](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
-                //printf("wkc = %d\n", wkc);
+                if (wkc != detected_slaves)
+                {
+                    return true;
+                }
                 return false;
             };
 
@@ -214,7 +218,7 @@ namespace kickcat
                 THROW_ERROR("Invalid working counter");
             };
 
-            slaves_[i].address = i;
+            slaves_[i].address = static_cast<uint16_t>(i);
             link_.addDatagram(Command::APWR, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address, process, error);
         }
 
@@ -296,7 +300,7 @@ namespace kickcat
                 uint32_t sm_size = sizeof(sm);
                 readSDO(slave, CoE::SM_COM_TYPE, 1, Access::EMULATE_COMPLETE, sm, &sm_size);
 
-                for (int i = 0; i < sm_size; ++i)
+                for (uint32_t i = 0; i < sm_size; ++i)
                 {
                     //TODO we support only one input and one output per slave for now
                     if (sm[i] <= 2) // mailboxes
@@ -316,13 +320,13 @@ namespace kickcat
                     uint32_t map_size = sizeof(mapped_index);
                     readSDO(slave, CoE::SM_CHANNEL + i, 1, Access::EMULATE_COMPLETE, mapped_index, &map_size);
 
-                    for (int32_t j = 0; j < (map_size / 2); ++j)
+                    for (uint32_t j = 0; j < (map_size / 2); ++j)
                     {
                         uint8_t object[512];
                         uint32_t object_size = sizeof(object);
                         readSDO(slave, mapped_index[j], 1, Access::EMULATE_COMPLETE, object, &object_size);
 
-                        for (int32_t k = 0; k < object_size; k += 4)
+                        for (uint32_t k = 0; k < object_size; k += 4)
                         {
                             mapping->size += object[k];
                         }
@@ -380,7 +384,7 @@ namespace kickcat
 
                 // current size will overflow the frame at the current offset: set in on the next frame
                 address = pi_frames_.size() * MAX_ETHERCAT_PAYLOAD_SIZE;
-                pi_frames_.push_back({address, 0});
+                pi_frames_.push_back({address, 0, {}, {}});
             }
 
             // create block IO entries
@@ -467,7 +471,7 @@ namespace kickcat
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
             }
 
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
                 if (wkc != pi_frame.outputs.size())
                 {
@@ -660,22 +664,22 @@ namespace kickcat
         Request req;
 
         // Request specific address
-        req = { eeprom::Command::READ, address, 0 };
-        uint16_t wkc = broadcastWrite(reg::EEPROM_CONTROL, &req, sizeof(req));
-        if (wkc != slaves_.size())
         {
-            THROW_ERROR("Invalid working counter");
-        }
+            req = { eeprom::Command::READ, address, 0 };
+            uint16_t wkc = broadcastWrite(reg::EEPROM_CONTROL, &req, sizeof(req));
+            if (wkc != slaves_.size())
+            {
+                THROW_ERROR("Invalid working counter");
+            }
 
-        // wait for all eeprom to be ready
-        if (not areEepromReady())
-        {
-            THROW_ERROR("Timeout");
+            // wait for all eeprom to be ready
+            if (not areEepromReady())
+            {
+                THROW_ERROR("Timeout");
+            }
         }
 
         // Read result
-
-
         auto error = []()
         {
             THROW_ERROR("Invalid working counter");
@@ -783,13 +787,13 @@ namespace kickcat
 
         for (auto& slave : slaves_)
         {
-            auto process_write = [&slave, isFull](DatagramHeader const* header, uint8_t const* state, uint16_t wkc)
+            auto process_write = [&slave, isFull](DatagramHeader const*, uint8_t const* state, uint16_t wkc)
             {
                 slave.mailbox.can_write = not isFull(*state, wkc, true);
                 return false;
             };
 
-            auto process_read = [&slave, isFull](DatagramHeader const* header, uint8_t const* state, uint16_t wkc)
+            auto process_read = [&slave, isFull](DatagramHeader const*, uint8_t const* state, uint16_t wkc)
             {
                 slave.mailbox.can_read = isFull(*state, wkc, false);
                 return false;
@@ -848,9 +852,8 @@ namespace kickcat
         Frame frame;
         for (auto& slave : slaves_)
         {
-            auto process = [&slave](DatagramHeader const* header, uint8_t const* data, uint16_t wkc)
+            auto process = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                bool result = true;
                 if (wkc != 1)
                 {
                     DEBUG_PRINT("Invalid working counter for slave %d\n", slave.address);
@@ -904,7 +907,7 @@ namespace kickcat
     {
         for (auto& slave : slaves_)
         {
-            auto process = [&slave](DatagramHeader const* header, uint8_t const* data, uint16_t wkc)
+            auto process = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
                 if (wkc != 1)
                 {
