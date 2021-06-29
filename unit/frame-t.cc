@@ -24,10 +24,10 @@ TEST(Frame, write_invalid_frame)
     Frame frame{PRIMARY_IF_MAC};
 
     EXPECT_CALL(*io, write(_,ETH_MIN_SIZE))
-    .WillOnce(Invoke([](uint8_t const* frame, int32_t)
+    .WillOnce(Invoke([](uint8_t const* frame_in, int32_t)
     {
         {
-            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame);
+            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
             EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
             for (int32_t i = 0; i < 6; ++i)
             {
@@ -37,7 +37,7 @@ TEST(Frame, write_invalid_frame)
         }
 
         {
-            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame + sizeof(EthernetHeader));
+            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
             EXPECT_EQ(header->len, 0);
         }
         return ETH_MIN_SIZE;
@@ -64,12 +64,12 @@ TEST(Frame, write_multiples_datagrams)
     EXPECT_EQ(3, frame.datagramCounter());
 
     EXPECT_CALL(*io, write(_, _))
-    .WillOnce(Invoke([&](uint8_t const* frame, int32_t frame_size)
+    .WillOnce(Invoke([&](uint8_t const* frame_in, int32_t frame_size)
     {
         EXPECT_EQ(EXPECTED_SIZE, frame_size);
 
         {
-            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame);
+            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
             EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
             for (int32_t i = 0; i < 6; ++i)
             {
@@ -79,13 +79,13 @@ TEST(Frame, write_multiples_datagrams)
         }
 
         {
-            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame + sizeof(EthernetHeader));
+            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
             EXPECT_EQ(header->len, 3 * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE));
         }
 
         for (int32_t i = 0; i < 3; ++i)
         {
-            uint8_t const* datagram = reinterpret_cast<uint8_t const*>(frame + sizeof(EthernetHeader) + sizeof(EthercatHeader)
+            uint8_t const* datagram = reinterpret_cast<uint8_t const*>(frame_in + sizeof(EthernetHeader) + sizeof(EthercatHeader)
                                                                         + i * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE));
             DatagramHeader const* header = reinterpret_cast<DatagramHeader const*>(datagram);
             uint8_t const* payload = datagram + sizeof(DatagramHeader);
@@ -214,9 +214,9 @@ TEST(Frame, read_error)
     EXPECT_CALL(*io, read(_,_))
         .WillOnce(Return(-1))
         .WillOnce(Return(0))
-        .WillOnce(Invoke([&](uint8_t* frame, int32_t frame_size)
+        .WillOnce(Invoke([&](uint8_t* frame_in, int32_t frame_size)
         {
-            EthernetHeader* header = reinterpret_cast<EthernetHeader*>(frame);
+            EthernetHeader* header = reinterpret_cast<EthernetHeader*>(frame_in);
             header->type = 0;
             return frame_size;
         }))

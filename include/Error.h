@@ -15,8 +15,7 @@ namespace kickcat
 
 #define DEBUG 1
 #ifdef DEBUG
-    #define DEBUG_PRINT(fmt, ...) fprintf(stderr, "DEBUG: %s:%d: " fmt, \
-        __FILE__, __LINE__, ##__VA_ARGS__)
+    #define DEBUG_PRINT(...) do { fprintf(stderr, "DEBUG: %s:%d: ", __FILE__, __LINE__); fprintf(stderr, ##__VA_ARGS__); } while(0);
 #else
     #define DEBUG_PRINT(fmt, ...)
 #endif

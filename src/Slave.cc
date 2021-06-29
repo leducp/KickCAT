@@ -44,19 +44,19 @@ namespace kickcat
     {
         uint8_t const* pos = section_start;
 
-        uint16_t index = *reinterpret_cast<uint16_t const*>(pos);
+        //uint16_t index = *reinterpret_cast<uint16_t const*>(pos); // not used yet
         pos += 2;
 
         uint8_t number_of_entries = *pos;
         pos += 1;
 
-        uint8_t sync_manager = *pos;
+        //uint8_t sync_manager = *pos; // not used yet
         pos +=1;
 
-        uint8_t synchronization = *pos;
+        //uint8_t synchronization = *pos; // not use yet
         pos += 1;
 
-        uint8_t name_index = *pos;
+        //uint8_t name_index = *pos; // not used yet
         pos += 1;
 
         // flags (word) - unused
@@ -147,17 +147,17 @@ namespace kickcat
         printf("mailbox out: size %d - offset 0x%04x\n", mailbox.send_size, mailbox.send_offset);
         printf("supported mailbox protocol: 0x%02x\n", supported_mailbox);
         printf("EEPROM: size: %d - version 0x%02x\n",  eeprom_size, eeprom_version);
-        printf("\nSII size: %d\n",                     sii.buffer.size() * sizeof(uint32_t));
+        printf("\nSII size: %lu\n",                    sii.buffer.size() * sizeof(uint32_t));
 
-        for (int32_t i = 0; i < sii.fmmus_.size(); ++i)
+        for (size_t i = 0; i < sii.fmmus_.size(); ++i)
         {
-            printf("FMMU[%d] %d\n", i, sii.fmmus_[i]);
+            printf("FMMU[%lu] %d\n", i, sii.fmmus_[i]);
         }
 
-        for (int32_t i = 0; i < sii.syncManagers_.size(); ++i)
+        for (size_t i = 0; i < sii.syncManagers_.size(); ++i)
         {
             auto const& sm = sii.syncManagers_[i];
-            printf("SM[%d] config\n", i);
+            printf("SM[%lu] config\n", i);
             printf("     physical address: %x\n", sm->start_adress);
             printf("     length:           %d\n", sm->length);
             printf("     type:             %d\n", sm->type);
@@ -170,22 +170,22 @@ namespace kickcat
         if (not sii.RxPDO.empty())
         {
             printf("RxPDO\n");
-            for (int32_t i = 0; i < sii.RxPDO.size(); ++i)
+            for (size_t i = 0; i < sii.RxPDO.size(); ++i)
             {
                 auto const& pdo = sii.RxPDO[i];
                 auto const& name = sii.strings[pdo->name];
-                printf("    (0x%04x ; 0x%02x) - %d bit(s) - %.*s\n", pdo->index, pdo->subindex, pdo->bitlen, name.size(), name.data());
+                printf("    (0x%04x ; 0x%02x) - %d bit(s) - %.*s\n", pdo->index, pdo->subindex, pdo->bitlen, static_cast<int>(name.size()), name.data());
             }
         }
 
         if (not sii.TxPDO.empty())
         {
             printf("TxPDO\n");
-            for (int32_t i = 0; i < sii.TxPDO.size(); ++i)
+            for (size_t i = 0; i < sii.TxPDO.size(); ++i)
             {
                 auto const& pdo = sii.TxPDO[i];
                 auto const& name = sii.strings[pdo->name];
-                printf("    (0x%04x ; 0x%02x) - %d bit(s) - %.*s\n", pdo->index, pdo->subindex, pdo->bitlen, name.size(), name.data());
+                printf("    (0x%04x ; 0x%02x) - %d bit(s) - %.*s\n", pdo->index, pdo->subindex, pdo->bitlen, static_cast<int>(name.size()), name.data());
             }
         }
     }

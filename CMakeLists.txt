@@ -3,6 +3,7 @@ project(KickCAT)
 
 # custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicated-cond -Wshadow -Wmissing-noreturn")
 
 add_library(kickcat src/Bus.cc
                     src/CoE.cc
@@ -15,12 +16,12 @@ add_library(kickcat src/Bus.cc
                     src/Time.cc
                     )
 target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-add_compile_options(-Wall -Wextra -pedantic)# -Werror)
 set_target_properties(kickcat PROPERTIES
   CXX_STANDARD 17
   CXX_STANDARD_REQUIRED YES
   CXX_EXTENSIONS NO
   POSITION_INDEPENDENT_CODE ON
+  COMPILE_FLAGS ${WARNINGS_FLAGS}
 )
 
 include(FetchContent)
@@ -31,16 +32,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_executable(unit unit/bus-t.cc
-                    unit/frame-t.cc
-                    )
-target_link_libraries(unit kickcat gtest gtest_main gmock)
-set_target_properties(unit PROPERTIES
+add_executable(kickcat_unit unit/link-t.cc
+                            unit/frame-t.cc
+              )
+target_link_libraries(kickcat_unit kickcat gtest gtest_main gmock)
+set_target_properties(kickcat_unit PROPERTIES
   CXX_STANDARD 17
   CXX_STANDARD_REQUIRED YES
   CXX_EXTENSIONS NO
   POSITION_INDEPENDENT_CODE ON
+  COMPILE_FLAGS ${WARNINGS_FLAGS}
 )
+add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 option(CODE_COVERAGE "Enable code coverage - gcovr shall be in the PATH" FALSE)
 if (${CODE_COVERAGE})
@@ -49,7 +52,7 @@ if (${CODE_COVERAGE})
   set(GCOVR_ADDITIONAL_ARGS "--exclude-unreachable-branches")
   setup_target_for_coverage_gcovr_html(
       NAME coverage
-      EXECUTABLE unit
+      EXECUTABLE kickcat_unit
       EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*"
       )
 endif()
