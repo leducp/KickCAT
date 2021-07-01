@@ -92,7 +92,7 @@ namespace kickcat
         }
     }
 
-    char const* ALStatus_to_string(uint16_t code);
+    char const* ALStatus_to_string(int32_t code);
 
     //TODO need unit test on bitfield to check position !
 

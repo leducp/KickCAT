@@ -12,9 +12,9 @@ namespace kickcat
     }
 
 
-    uint16_t Bus::getSlavesOnNetwork()
+    int32_t Bus::detectedSlaves() const
     {
-        return static_cast<uint16_t>(slaves_.size());
+        return slaves_.size();
     }
 
 
@@ -50,7 +50,7 @@ namespace kickcat
         }
 
         slaves_.resize(wkc);
-        printf("-*-*-*- %lu slave detected on the network -*-*-*-\n", slaves_.size());
+        DEBUG_PRINT("%lu slave detected on the network\n", slaves_.size());
     }
 
 
@@ -884,6 +884,13 @@ namespace kickcat
         sendWriteMessages(error);
         sendReadMessages(error);
         link_.processDatagrams();
+    }
+
+
+    void Bus::sendNop(std::function<void()> const& error)
+    {
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t) { return false; };
+        link_.addDatagram(Command::NOP, 0, nullptr, 1, process, error);
     }
 
 

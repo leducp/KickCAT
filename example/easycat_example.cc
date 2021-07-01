@@ -1,5 +1,5 @@
-#include "Bus.h"
-#include "LinuxSocket.h"
+#include "kickcat/Bus.h"
+#include "kickcat/LinuxSocket.h"
 
 #include <iostream>
 #include <fstream>

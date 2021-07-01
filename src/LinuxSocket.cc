@@ -111,14 +111,11 @@ namespace kickcat
 
     int32_t LinuxSocket::read(uint8_t* frame, int32_t frame_size)
     {
-        read_counter++;
         return ::recv(fd_, frame, frame_size, 0);
     }
 
     int32_t LinuxSocket::write(uint8_t const* frame, int32_t frame_size)
     {
-        write_counter++;
         return ::send(fd_, frame, frame_size, 0);
-
     }
 }
