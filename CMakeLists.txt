@@ -15,7 +15,8 @@ add_library(kickcat src/Bus.cc
                     src/Slave.cc
                     src/Time.cc
                     )
-target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(kickcat PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
 set_target_properties(kickcat PROPERTIES
   CXX_STANDARD 17
   CXX_STANDARD_REQUIRED YES
@@ -35,6 +36,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(kickcat_unit unit/link-t.cc
                             unit/frame-t.cc
               )
+
 target_link_libraries(kickcat_unit kickcat gtest gtest_main gmock)
 set_target_properties(kickcat_unit PROPERTIES
   CXX_STANDARD 17

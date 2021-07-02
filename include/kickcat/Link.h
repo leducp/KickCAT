@@ -42,7 +42,8 @@ namespace kickcat
         void sendFrame();
 
         std::shared_ptr<AbstractSocket> socket_;
-        uint8_t index_{0};
+        uint8_t index_queue_{0};
+        uint8_t index_head_{0};
         uint8_t sent_frame_{0};
         Frame frame_{PRIMARY_IF_MAC};
 

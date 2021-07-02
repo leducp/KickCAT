@@ -53,6 +53,7 @@ namespace kickcat
                     it = to_process.erase(it);
                     return true;
                 }
+                default: { }
             }
         }
 
@@ -83,7 +84,7 @@ namespace kickcat
         coe_->number = 0;
         coe_->service = CoE::Service::SDO_REQUEST;
         coe_->complete_access = CA;
-        coe_->command         = request;
+        coe_->command         = request & 0x7;
         coe_->block_size      = 0;
         coe_->transfer_type   = 0;
         coe_->size_indicator  = 0;
@@ -103,7 +104,7 @@ namespace kickcat
                 // expedited transfer
                 coe_->transfer_type  = 1;
                 coe_->size_indicator = 1;
-                coe_->block_size = 4 - size;
+                coe_->block_size = (4 - size) & 0x3;
                 std::memcpy(payload_, data, size);
             }
             else
@@ -151,7 +152,7 @@ namespace kickcat
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
             std::string_view text = CoE::SDO::abort_to_str(code);
-            printf("Abort requested! code %08x - %.*s\n", code, static_cast<int>(text.size()), text.data());
+            printf("Abort requested for %x:%d ! code %08x - %.*s\n", coe->index, coe->subindex, code, static_cast<int>(text.size()), text.data());
             status_ = code;
             return ProcessingResult::FINALIZE;
         }

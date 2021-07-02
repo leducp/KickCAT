@@ -34,7 +34,7 @@ namespace kickcat
         virtual ~AbstractMessage() = default;
 
         // set message counter (aka session handle)
-        void setCounter(uint8_t counter) { header_->count = counter; }
+        void setCounter(uint8_t counter) { header_->count = counter & 0x7; }
 
         /// \return  true if the message need an acknowledge, false otherwise
         virtual bool needAcknowledge() const = 0;

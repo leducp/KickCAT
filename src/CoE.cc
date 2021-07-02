@@ -42,7 +42,7 @@ namespace kickcat
         uint8_t* pos = reinterpret_cast<uint8_t*>(data);
         size = *data_size;
         uint32_t already_read = 0;
-        for (int32_t i = 1; i <= object_size; ++i)
+        for (uint8_t i = 1; i <= object_size; ++i)
         {
             size = *data_size - already_read;
             if (size == 0)

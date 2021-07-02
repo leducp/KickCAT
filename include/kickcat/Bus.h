@@ -26,8 +26,8 @@ namespace kickcat
         // set the bus from an unknown state to PREOP state
         void init();
 
-        // detect the number of slaves on the line
-        uint16_t getSlavesOnNetwork();
+        /// \return the number of slaves detected on the bus
+        int32_t detectedSlaves() const;
 
         // request a state for all slaves
         void requestState(State request);
@@ -53,7 +53,8 @@ namespace kickcat
         void sendLogicalRead(std::function<void()> const& error);
         void sendLogicalWrite(std::function<void()> const& error);
         void sendLogicalReadWrite(std::function<void()> const& error);
-        void sendMailboxesChecks(std::function<void()> const& error); // Fetch in/out mailboxes states (full/empty) of compatible slaves
+        void sendMailboxesChecks(std::function<void()> const& error);   // Fetch in/out mailboxes states (full/empty) of compatible slaves
+        void sendNop(std::function<void()> const& error);               // Send a NOP datagram
         void processAwaitingFrames();
 
         // Process messages (read or write slave mailbox) - one at once per slave.

@@ -1,11 +1,11 @@
 #include <gmock/gmock.h>
-#include "AbstractSocket.h"
+#include "kickcat/AbstractSocket.h"
 
 
 namespace kickcat
 {
     class MockSocket : public AbstractSocket
-    {   
+    {
     public:
         MOCK_METHOD(void,    open,  (std::string const& interface, microseconds timeout), (override));
         MOCK_METHOD(void,    close, (), (noexcept override));

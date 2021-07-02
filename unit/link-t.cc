@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "Link.h"
+#include "kickcat/Link.h"
 #include "Mocks.h"
 
 using ::testing::Return;

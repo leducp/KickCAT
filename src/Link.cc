@@ -30,7 +30,8 @@ namespace kickcat
                            std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                            std::function<void()> const& error)
     {
-        if (index_ == 255)
+
+        if (index_queue_ == (index_head_ + 1))
         {
             THROW_ERROR("Too many datagrams in flight. Max is 256");
         }
@@ -41,10 +42,11 @@ namespace kickcat
             sendFrame();
         }
 
-        frame_.addDatagram(index_, command, address, data, data_size);
-        callbacks_[index_].process = process;
-        callbacks_[index_].error = error;
-        ++index_;
+        frame_.addDatagram(index_head_, command, address, data, data_size);
+        callbacks_[index_head_].process = process;
+        callbacks_[index_head_].error = error;
+        callbacks_[index_head_].in_error = true;
+        ++index_head_;
 
         if (frame_.isFull())
         {
@@ -68,8 +70,6 @@ namespace kickcat
 
         uint8_t waiting_frame = sent_frame_;
         sent_frame_ = 0;
-        uint8_t waiting_datagrams_ = index_;
-        index_ = 0;
 
         for (int32_t i = 0; i < waiting_frame; ++i)
         {
@@ -84,17 +84,23 @@ namespace kickcat
             }
             catch(std::exception const& e)
             {
-                std::cout << e.what() << std::endl;
+                //std::cout << e.what() << std::endl;
             }
         }
 
-        for (int32_t i = 0; i < waiting_datagrams_; ++i)
+        for (uint8_t i = index_queue_; i != index_head_; ++i)
         {
             if (callbacks_[i].in_error)
             {
                 // datagram was either lost or processing it encountered an errro
                 callbacks_[i].error();
             }
+
+            // attach a callback to handle not THAT lost frames
+            // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it)
+            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return false; };
         }
+
+        index_queue_ = index_head_;
     }
 }

@@ -45,7 +45,7 @@ namespace kickcat
     }
 
 
-    char const* ALStatus_to_string(uint16_t code)
+    char const* ALStatus_to_string(int32_t code)
     {
         switch (code)
         {
