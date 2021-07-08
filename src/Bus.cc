@@ -204,9 +204,9 @@ namespace kickcat
         size_t detected_slaves = slaves_.size();
         for (size_t i = 0; i < slaves_.size(); ++i)
         {
-            auto process = [detected_slaves](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+            auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
-                if (wkc != detected_slaves)
+                if (wkc != 1)
                 {
                     return true;
                 }
