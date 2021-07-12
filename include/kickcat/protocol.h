@@ -271,17 +271,26 @@ namespace kickcat
             uint8_t device_order_id;
             uint8_t device_name_id;
             uint8_t reserved_A;
-            uint8_t CoE_details;
+            uint8_t SDO_set : 1, // CoE details
+                    SDO_info : 1,
+                    PDO_assign : 1,
+                    PDO_configuration : 1,
+                    PDO_upload : 1,
+                    SDO_complete_access : 1,
+                    unused : 2;
             uint8_t FoE_details;
             uint8_t EoE_details;
             uint8_t SoE_channels;
             uint8_t DS402_channels;
             uint8_t SysmanClass;
             uint8_t flags;
-            int16_t current_on_ebus;
+            int16_t current_on_ebus; // mA, negative means feeding current
             uint8_t group_info_id_dup;
             uint8_t reserved_B;
-            uint16_t physical_port;
+            uint16_t port_0 : 4,
+                     port_1 : 4,
+                     port_2 : 4,
+                     port_3 : 4;
             uint16_t physical_memory_address;
             uint8_t reserved_C[12];
         } __attribute__((__packed__));
@@ -344,12 +353,24 @@ namespace kickcat
             uint16_t index;
             uint8_t subindex;
         } __attribute__((__packed__));
+
+        /// ETG 1000.6
+        struct Emergency
+        {
+            uint16_t number : 9,
+                     reserved : 3,
+                     service : 4; // i.e. request, response
+
+            uint16_t error_code;
+            uint8_t  error_register;
+            uint8_t  data[5];
+        } __attribute__((__packed__));
     }
 
     namespace CoE
     {
-        constexpr uint16_t SM_COM_TYPE = 0x1C00; // each sub-entry described SM[x] com type (mailbox in/out, PDO in/out, not used)
-        constexpr uint16_t SM_CHANNEL  = 0x1C10; // each entry is associated with the mapped PDOs (if in used)
+        constexpr uint16_t SM_COM_TYPE       = 0x1C00; // each sub-entry described SM[x] com type (mailbox in/out, PDO in/out, not used)
+        constexpr uint16_t SM_CHANNEL        = 0x1C10; // each entry is associated with the mapped PDOs (if in used)
 
         enum Service
         {

@@ -73,6 +73,16 @@ namespace kickcat
         auto error_callback = [&](){ THROW_ERROR("init error while cleaning slaves mailboxes"); };
         checkMailboxes(error_callback);
         processMessages(error_callback);
+
+        // create CoE emergency reception callback
+        for (auto& slave : slaves_)
+        {
+            if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
+            {
+                auto emg = std::make_shared<EmergencyMessage>(slave.mailbox);
+                slave.mailbox.to_process.push_back(emg);
+            }
+        }
     }
 
 
@@ -204,9 +214,9 @@ namespace kickcat
         size_t detected_slaves = slaves_.size();
         for (size_t i = 0; i < slaves_.size(); ++i)
         {
-            auto process = [detected_slaves](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+            auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
-                if (wkc != detected_slaves)
+                if (wkc != 1)
                 {
                     return true;
                 }

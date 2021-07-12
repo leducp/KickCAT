@@ -1,4 +1,5 @@
 #include "Slave.h"
+#include "Error.h"
 
 namespace kickcat
 {
@@ -90,7 +91,7 @@ namespace kickcat
                 }
                 case eeprom::Category::DataTypes:
                 {
-                    printf("DataTypes!\n");
+                    DEBUG_PRINT("DataTypes!\n");
                     break;
                 }
                 case eeprom::Category::General:
@@ -120,7 +121,7 @@ namespace kickcat
                 }
                 case eeprom::Category::DC:
                 {
-                    printf("DC!\n");
+                    DEBUG_PRINT("DC!\n");
                     break;
                 }
                 case eeprom::Category::End:
