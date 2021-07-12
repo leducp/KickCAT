@@ -5,20 +5,18 @@ Kick-start your slaves!
 ### Current state:
  - Can go to OP state
  - Can read and write PI
- - Can read SDO  - blocking call
- - Can write SDO - blocking call
- - CoE: read and write SDO - async call
+ - CoE: read and write SDO - blocking and async call
+ - CoE: Emergency message 
  - Bus diagnostic: can reset and get errors counters
  - hook to configure non compliant slaves
  - consecutives writes to reduce latency - up to 256 datagrams in flight
 
 ### TODO:
  - CoE: segmented transfer - partial implementation
- - CoE: Emergency message
  - CoE: diagnosis message - 0x10F3
  - Bus diagnostic: auto discover broken wire (on top of error counters)
  - Link: handle interface redundancy
- - FoE
+ - More profiles: FoE, EoE, AoE, SoE
  - Distributed clock
  - AF_XDP Linux socket to improve performance
 
