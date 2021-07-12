@@ -12,8 +12,9 @@ namespace kickcat
     enum class ProcessingResult
     {
         NOOP,
+        CONTINUE,
         FINALIZE,
-        CONTINUE
+        FINALIZE_AND_KEEP
     };
 
     namespace MessageStatus
@@ -57,7 +58,31 @@ namespace kickcat
         uint32_t status_;               // message current status
     };
 
-    class SDOMessage : public AbstractMessage
+    struct Mailbox
+    {
+        uint16_t recv_offset;
+        uint16_t recv_size;
+        uint16_t send_offset;
+        uint16_t send_size;
+
+        bool can_read;      // data available on the slave
+        bool can_write;     // free space for a new message on the slave
+        uint8_t counter{0}; // session handle, from 1 to 7
+        bool toggle;        // for SDO segmented transfer
+
+        std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size);
+
+        bool receive(uint8_t const* raw_message);
+        std::queue<std::shared_ptr<AbstractMessage>> to_send;     // message waiting to be sent
+        std::list <std::shared_ptr<AbstractMessage>> to_process;  // message already sent, waiting for an answer
+
+        uint8_t nextCounter();
+
+        std::vector<mailbox::Emergency> emergencies;
+    private:
+    };
+
+        class SDOMessage : public AbstractMessage
     {
     public:
         SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size);
@@ -78,26 +103,17 @@ namespace kickcat
         uint32_t* client_data_size_;
     };
 
-    struct Mailbox
+    class EmergencyMessage : public AbstractMessage
     {
-        uint16_t recv_offset;
-        uint16_t recv_size;
-        uint16_t send_offset;
-        uint16_t send_size;
+    public:
+        EmergencyMessage(Mailbox& mailbox);
+        virtual ~EmergencyMessage() = default;
 
-        bool can_read;      // data available on the slave
-        bool can_write;     // free space for a new message on the slave
-        uint8_t counter{0}; // session handle, from 1 to 7
-        bool toggle;        // for SDO segmented transfer
+        bool needAcknowledge() const override { return false; }
+        ProcessingResult process(uint8_t const* received) override;
 
-        std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size);
-
-        bool receive(uint8_t const* raw_message);
-        std::queue<std::shared_ptr<AbstractMessage>> to_send;     // message waiting to be sent
-        std::list <std::shared_ptr<AbstractMessage>> to_process;  // message already sent, waiting for an answer
-
-        uint8_t nextCounter();
     private:
+        Mailbox& mailbox_;
     };
 }
 

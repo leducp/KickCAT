@@ -73,6 +73,16 @@ namespace kickcat
         auto error_callback = [&](){ THROW_ERROR("init error while cleaning slaves mailboxes"); };
         checkMailboxes(error_callback);
         processMessages(error_callback);
+
+        // create CoE emergency reception callback
+        for (auto& slave : slaves_)
+        {
+            if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
+            {
+                auto emg = std::make_shared<EmergencyMessage>(slave.mailbox);
+                slave.mailbox.to_process.push_back(emg);
+            }
+        }
     }
 
 

@@ -30,6 +30,7 @@ namespace kickcat
             case 0x06090030: { return "Value range of parameter exceeded";                                                          }
             case 0x06090031: { return "Value of parameter written too high";                                                        }
             case 0x06090032: { return "Value of parameter written too low";                                                         }
+            case 0x06090033: { return "Configured module list does not match detected module list";                                 }
             case 0x06090036: { return "Maximum value is less than minimum value";                                                   }
             case 0x08000000: { return "General error";                                                                              }
             case 0x08000020: { return "Data cannot be transferred or stored to the application";                                    }

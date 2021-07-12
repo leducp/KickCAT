@@ -53,6 +53,10 @@ namespace kickcat
                     it = to_process.erase(it);
                     return true;
                 }
+                case ProcessingResult::FINALIZE_AND_KEEP:
+                {
+                    return true;
+                }
                 default: { }
             }
         }
@@ -298,5 +302,33 @@ namespace kickcat
         }
 
         return ProcessingResult::FINALIZE;
+    }
+
+
+    EmergencyMessage::EmergencyMessage(Mailbox& mailbox)
+        : AbstractMessage(mailbox.recv_size)
+        , mailbox_{mailbox}
+    {
+
+    }
+
+    ProcessingResult EmergencyMessage::process(uint8_t const* received)
+    {
+        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(received);
+        mailbox::Emergency const* emg = reinterpret_cast<mailbox::Emergency const*>(received + sizeof(mailbox::Header));
+
+        // check if the received message is an emergency one
+        if (header->type != mailbox::Type::CoE)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        if (emg->service != CoE::Service::EMERGENCY)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        mailbox_.emergencies.push_back(*emg);
+        return ProcessingResult::FINALIZE_AND_KEEP;
     }
 }
