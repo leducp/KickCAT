@@ -29,9 +29,9 @@ namespace kickcat
                            std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                            std::function<void()> const& error)
     {
-        if (index_queue_ == (index_head_ + 1))
+        if (index_queue_ == static_cast<uint8_t>(index_head_ + 1))
         {
-            THROW_ERROR("Too many datagrams in flight. Max is 256");
+            THROW_ERROR("Too many datagrams in flight. Max is 255");
         }
 
         uint16_t const needed_space = datagram_size(data_size);
@@ -104,10 +104,11 @@ namespace kickcat
 
             // Attach a callback to handle not THAT lost frames.
             // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
-            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return false; };
+            callbacks_[i].process = [i, this](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return false; };
         }
 
         index_queue_ = index_head_;
+        frame_.clear();
 
         // Rethrow last catched client exception.
         if (client_exception)
