@@ -1,7 +1,6 @@
 #include "Link.h"
 #include "AbstractSocket.h"
 #include "Time.h"
-#include <iostream> //debug, to remove
 
 namespace kickcat
 {
@@ -30,7 +29,6 @@ namespace kickcat
                            std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                            std::function<void()> const& error)
     {
-
         if (index_queue_ == (index_head_ + 1))
         {
             THROW_ERROR("Too many datagrams in flight. Max is 256");
@@ -82,25 +80,39 @@ namespace kickcat
                     callbacks_[header->index].in_error = callbacks_[header->index].process(header, data, wkc);
                 }
             }
-            catch(std::exception const& e)
+            catch (std::exception const& e)
             {
-                //std::cout << e.what() << std::endl;
+                DEBUG_PRINT("%s\n", e.what());
             }
         }
 
+        std::exception_ptr client_exception;
         for (uint8_t i = index_queue_; i != index_head_; ++i)
         {
             if (callbacks_[i].in_error)
             {
-                // datagram was either lost or processing it encountered an errro
-                callbacks_[i].error();
+                // Datagram was either lost or processing it encountered an error.
+                try
+                {
+                    callbacks_[i].error();
+                }
+                catch (...)
+                {
+                    client_exception = std::current_exception();
+                }
             }
 
-            // attach a callback to handle not THAT lost frames
-            // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it)
+            // Attach a callback to handle not THAT lost frames.
+            // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
             callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return false; };
         }
 
         index_queue_ = index_head_;
+
+        // Rethrow last catched client exception.
+        if (client_exception)
+        {
+            std::rethrow_exception(client_exception);
+        }
     }
 }

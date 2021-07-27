@@ -424,20 +424,10 @@ namespace kickcat
     constexpr uint8_t SECONDARY_IF_MAC[6] = { 0x02, 0x00, 0xCA, 0xFF, 0xEE, 0xFF };
 
     // helpers
-
     constexpr uint16_t datagram_size(uint16_t data_size)
     {
         return sizeof(DatagramHeader) + data_size + sizeof(uint16_t);
     }
-
-    /// extract the n-ieme byte of a contiguous data T
-    template<typename T>
-    constexpr uint8_t extractByte(int32_t n, T const& data)
-    {
-        int32_t bit_pos = (n - 1) * 8;
-        return static_cast<uint8_t>((data >> bit_pos) & 0xFF);
-    }
-
 
     /// create a position or node address
     constexpr uint32_t createAddress(uint16_t position, uint16_t offset)

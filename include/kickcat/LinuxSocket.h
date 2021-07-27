@@ -8,7 +8,7 @@ namespace kickcat
     class LinuxSocket : public AbstractSocket
     {
     public:
-        LinuxSocket() = default;
+        LinuxSocket(microseconds rx_coalescing = -1us);
         virtual ~LinuxSocket()
         {
             close();
@@ -21,6 +21,7 @@ namespace kickcat
 
     private:
         int fd_{-1};
+        microseconds rx_coalescing_;
     };
 }
 
