@@ -4,6 +4,8 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #include <linux/if_packet.h>
+#include <linux/ethtool.h>
+#include <linux/sockios.h>
 
 #include <cstring>
 
@@ -13,6 +15,14 @@
 
 namespace kickcat
 {
+    LinuxSocket::LinuxSocket(microseconds rx_coalescing)
+        : AbstractSocket()
+        , fd_{-1}
+        , rx_coalescing_{rx_coalescing}
+    {
+
+    }
+
     void LinuxSocket::open(std::string const& interface, microseconds requested_timeout)
     {
         // RAW socket with EtherCAT type
@@ -82,6 +92,30 @@ namespace kickcat
         {
             THROW_SYSTEM_ERROR("ioctl(SIOCSIFFLAGS)");
         }
+
+        // apply coalescing if asked
+        if (rx_coalescing_ >= 0us)
+        {
+            struct ethtool_coalesce ecoal;
+            ecoal.cmd = ETHTOOL_GCOALESCE;
+            ifr.ifr_data = (char*)&ecoal;
+            rc = ioctl(fd_, SIOCETHTOOL, &ifr);
+            if (rc < 0)
+            {
+                THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_GCOALESCE)");
+            }
+            DEBUG_PRINT("old rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
+
+            ecoal.cmd = ETHTOOL_SCOALESCE;
+            ecoal.rx_coalesce_usecs = static_cast<unsigned int>(rx_coalescing_.count());
+            rc = ioctl(fd_, SIOCETHTOOL, &ifr);
+            if (rc < 0)
+            {
+                THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_GCOALESCE)");
+            }
+            DEBUG_PRINT("applied rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
+        }
+
 
         struct sockaddr_ll link_layer;
         link_layer.sll_family = AF_PACKET;

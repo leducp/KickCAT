@@ -18,6 +18,8 @@ namespace kickcat
         void printErrorCounters() const;
 
         uint16_t address;
+        uint8_t al_status{State::INVALID};
+        uint16_t al_status_code;
 
         uint32_t vendor_id;
         uint32_t product_code;

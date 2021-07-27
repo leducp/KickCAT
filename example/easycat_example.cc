@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
         }
         catch (std::exception const& e)
         {
-            int delta = i - last_error;
+            int64_t delta = i - last_error;
             last_error = i;
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }

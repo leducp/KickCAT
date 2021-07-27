@@ -33,7 +33,7 @@ namespace kickcat
         void requestState(State request);
 
         // Get the state a specific slave
-        State getCurrentState(Slave const& slave);
+        State getCurrentState(Slave& slave);
 
         // wait for all slaves to reached a state
         void waitForState(State request, nanoseconds timeout);
@@ -47,8 +47,9 @@ namespace kickcat
 
         std::vector<Slave>& slaves() { return slaves_; }
 
-        // asynchrone read/write/mailbox methods
+        // asynchrone read/write/mailbox/state methods
         // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
+        void sendGetALStatus(Slave& slave, std::function<void()> const& error);
 
         void sendLogicalRead(std::function<void()> const& error);
         void sendLogicalWrite(std::function<void()> const& error);

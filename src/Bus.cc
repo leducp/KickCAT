@@ -3,7 +3,6 @@
 #include "Bus.h"
 #include "AbstractSocket.h"
 
-
 namespace kickcat
 {
     Bus::Bus(std::shared_ptr<AbstractSocket> socket)
@@ -70,7 +69,7 @@ namespace kickcat
         waitForState(State::PRE_OP, 3000ms);
 
         // clear mailboxes
-        auto error_callback = [&](){ THROW_ERROR("init error while cleaning slaves mailboxes"); };
+        auto error_callback = [](){ THROW_ERROR("init error while cleaning slaves mailboxes"); };
         checkMailboxes(error_callback);
         processMessages(error_callback);
 
@@ -97,56 +96,45 @@ namespace kickcat
     }
 
 
-    State Bus::getCurrentState(Slave const& slave)
+    void Bus::sendGetALStatus(Slave& slave, std::function<void()> const& error)
     {
-        uint8_t state = State::INVALID;
-
+        slave.al_status = State::INVALID;
+        auto process = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
         {
-            auto process = [&state](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            if (wkc != 1)
             {
-                if (wkc != 1)
-                {
-                    return true;
-                }
+                return true;
+            }
 
-                state = *data;
-                return false;
-            };
+            slave.al_status = data[0];
+            slave.al_status_code = *reinterpret_cast<uint16_t const*>(data + 4);
+            return false;
+        };
 
-            auto error = []()
-            {
-                DEBUG_PRINT("Error while trying to get slave state.");
-            };
+        link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 6, process, error);
+    }
 
-            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 2, process, error);
-            link_.processDatagrams();
-        }
+
+    State Bus::getCurrentState(Slave& slave)
+    {
+        auto error = []()
+        {
+            DEBUG_PRINT("Error while trying to get slave state.");
+        };
+
+        sendGetALStatus(slave, error);
+        link_.processDatagrams();
 
         // error indicator flag set: check status code
-        if (state & 0x10)
+        if (slave.al_status & 0x10)
         {
-            uint16_t error_code;
-            auto process = [&error_code, &state](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            if (slave.al_status_code == 0)
             {
-                if (wkc != 1)
-                {
-                    return true;
-                }
-
-                error_code = *reinterpret_cast<uint16_t const*>(data);
-                return false;
-            };
-
-            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS_CODE), error_code, process, [](){});
-            link_.processDatagrams();
-
-            if (error_code == 0)
-            {
-                return State(state & 0xF);
+                return State(slave.al_status & 0xF);
             }
-            THROW_ERROR_CODE("State transition error", error_code);
+            THROW_ERROR_CODE("State transition error", slave.al_status_code);
         }
-        return State(state);
+        return State(slave.al_status);
     }
 
 
