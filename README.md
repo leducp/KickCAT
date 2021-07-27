@@ -6,10 +6,10 @@ Kick-start your slaves!
  - Can go to OP state
  - Can read and write PI
  - CoE: read and write SDO - blocking and async call
- - CoE: Emergency message 
+ - CoE: Emergency message
  - Bus diagnostic: can reset and get errors counters
  - hook to configure non compliant slaves
- - consecutives writes to reduce latency - up to 256 datagrams in flight
+ - consecutives writes to reduce latency - up to 255 datagrams in flight
 
 ### TODO:
  - CoE: segmented transfer - partial implementation

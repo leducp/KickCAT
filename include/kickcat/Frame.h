@@ -54,6 +54,8 @@ namespace kickcat
         void read(std::shared_ptr<AbstractSocket> socket);
         void write(std::shared_ptr<AbstractSocket> socket);
 
+        uint8_t const* data() const { return frame_.data(); }
+
     private:
         EthernetFrame frame_;
         EthernetHeader* ethernet_;

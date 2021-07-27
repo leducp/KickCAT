@@ -199,7 +199,6 @@ namespace kickcat
 
     void Bus::setAddresses()
     {
-        size_t detected_slaves = slaves_.size();
         for (size_t i = 0; i < slaves_.size(); ++i)
         {
             auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
