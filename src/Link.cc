@@ -104,7 +104,7 @@ namespace kickcat
 
             // Attach a callback to handle not THAT lost frames.
             // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
-            callbacks_[i].process = [i, this](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return false; };
+            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return false; };
         }
 
         index_queue_ = index_head_;

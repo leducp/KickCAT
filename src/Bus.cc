@@ -144,7 +144,7 @@ namespace kickcat
 
         while (true)
         {
-            sleep(10ms);
+            sleep(big_wait);
 
             bool is_state_reached = true;
             for (auto& slave : slaves_)
@@ -622,7 +622,7 @@ namespace kickcat
 
         for (int i = 0; i < 10; ++i)
         {
-            sleep(200us);
+            sleep(tiny_wait);
             for (auto& slave : slaves_)
             {
                 link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2, process, error);

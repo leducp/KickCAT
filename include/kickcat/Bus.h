@@ -23,6 +23,10 @@ namespace kickcat
         Bus(std::shared_ptr<AbstractSocket> socket);
         ~Bus() = default;
 
+        // Enable user to adapt defaults values if they dont fit the current application (i.e. unit tests)
+        void configureWaitLatency(nanoseconds tiny, nanoseconds big)
+        { tiny_wait = tiny; big_wait = big; }
+
         // set the bus from an unknown state to PREOP state
         void init();
 
@@ -138,6 +142,9 @@ namespace kickcat
             std::vector<blockIO> outputs;
         };
         std::vector<PIFrame> pi_frames_; // PI frame description
+
+        nanoseconds tiny_wait{200us};
+        nanoseconds big_wait{10ms};
     };
 }
 

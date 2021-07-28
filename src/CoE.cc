@@ -13,7 +13,7 @@ namespace kickcat
         {
             checkMailboxes(error_callback);
             processMessages(error_callback);
-            sleep(200us);
+            sleep(tiny_wait);
 
             if (elapsed_time(now) > timeout)
             {
