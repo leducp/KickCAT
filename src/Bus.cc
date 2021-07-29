@@ -830,15 +830,8 @@ namespace kickcat
             if ((slave.mailbox.can_write) and (not slave.mailbox.to_send.empty()))
             {
                 // send one waiting message
-                auto message = slave.mailbox.to_send.front();
-                slave.mailbox.to_send.pop();
-                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data().data(), message->data().size(), process, error);
-
-                // add message to processing queue if needed
-                if (message->status() == MessageStatus::RUNNING)
-                {
-                    slave.mailbox.to_process.push_back(message);
-                }
+                auto message = slave.mailbox.send();
+                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data(), message->size(), process, error);
             }
         }
         link_.finalizeDatagrams();

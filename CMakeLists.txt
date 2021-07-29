@@ -36,6 +36,8 @@ FetchContent_MakeAvailable(googletest)
 add_executable(kickcat_unit unit/link-t.cc
                             unit/frame-t.cc
                             unit/bus-t.cc
+                            unit/mailbox-t.cc
+                            unit/protocol-t.cc
               )
 
 target_link_libraries(kickcat_unit kickcat gtest gtest_main gmock)

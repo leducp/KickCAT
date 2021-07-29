@@ -30,6 +30,20 @@ namespace kickcat
     }
 
 
+    std::shared_ptr<AbstractMessage> Mailbox::send()
+    {
+        auto message = to_send.front();
+        to_send.pop();
+
+        // add message to processing queue if needed
+        if (message->status() == MessageStatus::RUNNING)
+        {
+            to_process.push_back(message);
+        }
+        return message;
+    }
+
+
     bool Mailbox::receive(uint8_t const* raw_message)
     {
         for (auto it = to_process.begin(); it != to_process.end(); ++it)
@@ -155,8 +169,7 @@ namespace kickcat
         {
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
-            std::string_view text = CoE::SDO::abort_to_str(code);
-            printf("Abort requested for %x:%d ! code %08x - %.*s\n", coe->index, coe->subindex, code, static_cast<int>(text.size()), text.data());
+            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", coe->index, coe->subindex, code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }

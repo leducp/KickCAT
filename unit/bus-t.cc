@@ -318,7 +318,14 @@ TEST_F(BusTest, AL_status_error)
     checkSendFrame(Command::FPRD);
     handleReply(al);
 
-    EXPECT_THROW(bus.getCurrentState(slave), ErrorCode);
+    try
+    {
+        bus.getCurrentState(slave);
+    }
+    catch(ErrorCode const & error)
+    {
+        ASSERT_EQ(0x0020, error.code());
+    }
     ASSERT_EQ(0x11, slave.al_status);
 
     slave.al_status = State::INVALID;
