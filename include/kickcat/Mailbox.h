@@ -68,6 +68,9 @@ namespace kickcat
         uint8_t counter{0}; // session handle, from 1 to 7
         bool toggle;        // for SDO segmented transfer
 
+        //
+        void generateSMConfig(SyncManager SM[2]);
+
         // messages factory
         std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size);
 

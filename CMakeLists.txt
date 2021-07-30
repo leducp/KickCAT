@@ -14,7 +14,7 @@ add_library(kickcat src/Bus.cc
                     src/protocol.cc
                     src/Slave.cc
                     src/Time.cc
-                    )
+)
 target_include_directories(kickcat PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
 set_target_properties(kickcat PROPERTIES
@@ -33,12 +33,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_executable(kickcat_unit unit/link-t.cc
+add_executable(kickcat_unit unit/bus-t.cc
                             unit/frame-t.cc
-                            unit/bus-t.cc
+                            unit/link-t.cc
                             unit/mailbox-t.cc
                             unit/protocol-t.cc
-              )
+                            unit/slave-t.cc
+)
 
 target_link_libraries(kickcat_unit kickcat gtest gtest_main gmock)
 set_target_properties(kickcat_unit PROPERTIES
@@ -58,7 +59,7 @@ if (${CODE_COVERAGE})
   setup_target_for_coverage_gcovr_html(
       NAME coverage
       EXECUTABLE kickcat_unit
-      EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*"
+      EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*"
       )
 endif()
 
