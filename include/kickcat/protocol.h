@@ -77,20 +77,7 @@ namespace kickcat
         OPERATIONAL = 0x08,
         ACK         = 0x10  // Acknowledge flag request - check AL_STATUS
     };
-    constexpr char const* toString(State state)
-    {
-        uint8_t raw_state = state & 0xF;
-        switch (raw_state)
-        {
-            case INVALID:     { return "invalid";     }
-            case INIT:        { return "init";        }
-            case PRE_OP:      { return "pre-op";      }
-            case BOOT:        { return "boot";        }
-            case SAFE_OP:     { return "safe-op";     }
-            case OPERATIONAL: { return "operational"; }
-            default:          { return "unknown";     }
-        }
-    }
+    char const* toString(State state);
 
     char const* ALStatus_to_string(int32_t code);
 
@@ -236,11 +223,12 @@ namespace kickcat
 
         enum MailboxProtocol // get from EEPROM
         {
-            AoE = 0x01,
-            EoE = 0x02,
-            CoE = 0x04,
-            FoE = 0x08,
-            SoE = 0x10
+            None = 0x0,
+            AoE  = 0x01,
+            EoE  = 0x02,
+            CoE  = 0x04,
+            FoE  = 0x08,
+            SoE  = 0x10
         };
 
         enum Command : uint16_t
@@ -415,7 +403,7 @@ namespace kickcat
                 constexpr uint8_t SDO_INFO_ERROR_REQ = 0x07;
             }
 
-            std::string_view abort_to_str(uint32_t abort_code);
+            char const* abort_to_str(uint32_t abort_code);
         }
     }
 

@@ -17,6 +17,25 @@ namespace kickcat
     }
 
 
+    void Mailbox::generateSMConfig(SyncManager SM[2])
+    {
+        // 0 is mailbox out, 1 is mailbox in - cf. default EtherCAT configuration if slave support a mailbox
+        // NOTE: mailbox out -> master to slave - mailbox in -> slave to master
+        SM[0].start_address = recv_offset;
+        SM[0].length        = recv_size;
+        SM[0].control       = 0x26; // 1 buffer - write access - PDI IRQ ON
+        SM[0].status        = 0x00; // RO register
+        SM[0].activate      = 0x01; // Sync Manager enable
+        SM[0].pdi_control   = 0x00; // RO register
+        SM[1].start_address = send_offset;
+        SM[1].length        = send_size;
+        SM[1].control       = 0x22; // 1 buffer - read access - PDI IRQ ON
+        SM[1].status        = 0x00; // RO register
+        SM[1].activate      = 0x01; // Sync Manager enable
+        SM[1].pdi_control   = 0x00; // RO register
+    }
+
+
     std::shared_ptr<AbstractMessage> Mailbox::createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size)
     {
         if (recv_size == 0)
@@ -27,6 +46,20 @@ namespace kickcat
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
         return sdo;
+    }
+
+
+    std::shared_ptr<AbstractMessage> Mailbox::send()
+    {
+        auto message = to_send.front();
+        to_send.pop();
+
+        // add message to processing queue if needed
+        if (message->status() == MessageStatus::RUNNING)
+        {
+            to_process.push_back(message);
+        }
+        return message;
     }
 
 
@@ -155,8 +188,7 @@ namespace kickcat
         {
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
-            std::string_view text = CoE::SDO::abort_to_str(code);
-            printf("Abort requested for %x:%d ! code %08x - %.*s\n", coe->index, coe->subindex, code, static_cast<int>(text.size()), text.data());
+            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", coe->index, coe->subindex, code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }

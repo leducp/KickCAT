@@ -144,7 +144,7 @@ namespace kickcat
 
         while (true)
         {
-            sleep(10ms);
+            sleep(big_wait);
 
             bool is_state_reached = true;
             for (auto& slave : slaves_)
@@ -243,22 +243,8 @@ namespace kickcat
         {
             if (slave.supported_mailbox)
             {
-                // 0 is mailbox out, 1 is mailbox in - cf. default EtherCAT configuration if slave support a mailbox
-                // NOTE: mailbox out -> master to slave - mailbox in -> slave to master
                 SyncManager SM[2];
-                SM[0].start_address = slave.mailbox.recv_offset;
-                SM[0].length        = slave.mailbox.recv_size;
-                SM[0].control       = 0x26; // 1 buffer - write access - PDI IRQ ON
-                SM[0].status        = 0x00; // RO register
-                SM[0].activate      = 0x01; // Sync Manager enable
-                SM[0].pdi_control   = 0x00; // RO register
-                SM[1].start_address = slave.mailbox.send_offset;
-                SM[1].length        = slave.mailbox.send_size;
-                SM[1].control       = 0x22; // 1 buffer - read access - PDI IRQ ON
-                SM[1].status        = 0x00; // RO register
-                SM[1].activate      = 0x01; // Sync Manager enable
-                SM[1].pdi_control   = 0x00; // RO register
-
+                slave.mailbox.generateSMConfig(SM);
                 link_.addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER), SM, process, error);
             }
         }
@@ -622,7 +608,7 @@ namespace kickcat
 
         for (int i = 0; i < 10; ++i)
         {
-            sleep(200us);
+            sleep(tiny_wait);
             for (auto& slave : slaves_)
             {
                 link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2, process, error);
@@ -760,16 +746,6 @@ namespace kickcat
     }
 
 
-    void Bus::printSlavesInfo()
-    {
-        for (auto const& slave : slaves_)
-        {
-            slave.printInfo();
-            printf("\n");
-        }
-    }
-
-
     void Bus::sendMailboxesChecks(std::function<void()> const& error)
     {
         auto isFull = [](uint8_t state, uint16_t wkc, bool stable_value)
@@ -830,15 +806,8 @@ namespace kickcat
             if ((slave.mailbox.can_write) and (not slave.mailbox.to_send.empty()))
             {
                 // send one waiting message
-                auto message = slave.mailbox.to_send.front();
-                slave.mailbox.to_send.pop();
-                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data().data(), message->data().size(), process, error);
-
-                // add message to processing queue if needed
-                if (message->status() == MessageStatus::RUNNING)
-                {
-                    slave.mailbox.to_process.push_back(message);
-                }
+                auto message = slave.mailbox.send();
+                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data(), message->size(), process, error);
             }
         }
         link_.finalizeDatagrams();

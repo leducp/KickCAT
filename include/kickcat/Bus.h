@@ -23,6 +23,10 @@ namespace kickcat
         Bus(std::shared_ptr<AbstractSocket> socket);
         ~Bus() = default;
 
+        // Enable user to adapt defaults values if they dont fit the current application (i.e. unit tests)
+        void configureWaitLatency(nanoseconds tiny, nanoseconds big)
+        { tiny_wait = tiny; big_wait = big; }
+
         // set the bus from an unknown state to PREOP state
         void init();
 
@@ -41,9 +45,6 @@ namespace kickcat
         // create thje mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state
         void createMapping(uint8_t* iomap);
-
-        // Print various info about slaves, mainly from SII
-        void printSlavesInfo();
 
         std::vector<Slave>& slaves() { return slaves_; }
 
@@ -77,8 +78,11 @@ namespace kickcat
             COMPLETE = 1,
             EMULATE_COMPLETE = 2
         };
-        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size);
-        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size);
+
+        // Note: timeout is used on a per message basis: if complete access is emulated,
+        // global call timeout will be at most N * timeout (with N the number of subindex to reached)
+        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
+        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA,   void* data, uint32_t  data_size, nanoseconds timeout = 1s);
 
         void clearErrorCounters();
 
@@ -114,7 +118,7 @@ namespace kickcat
         void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
-        void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout = 1s);
+        void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout);
 
         Link link_;
         std::vector<Slave> slaves_;
@@ -138,6 +142,9 @@ namespace kickcat
             std::vector<blockIO> outputs;
         };
         std::vector<PIFrame> pi_frames_; // PI frame description
+
+        nanoseconds tiny_wait{200us};
+        nanoseconds big_wait{10ms};
     };
 }
 

@@ -14,11 +14,6 @@ using namespace kickcat;
 class LinkTest : public testing::Test
 {
 public:
-    void SetUp() override
-    {
-
-    }
-
     void checkSendFrame(int32_t datagrams_number)
     {
         EXPECT_CALL(*io, write(_,_))

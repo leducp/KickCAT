@@ -2,7 +2,7 @@
 
 namespace kickcat
 {
-    std::string_view CoE::SDO::abort_to_str(uint32_t abort_code)
+    char const* CoE::SDO::abort_to_str(uint32_t abort_code)
     {
         switch (abort_code)
         {
@@ -111,6 +111,21 @@ namespace kickcat
             case 0x00F0:    { return "Application Controller available"; }
 
             default:        { return "Unknown error code"; }
+        }
+    }
+
+    char const* toString(State state)
+    {
+        uint8_t raw_state = state & 0xF;
+        switch (raw_state)
+        {
+            case INVALID:     { return "invalid";     }
+            case INIT:        { return "init";        }
+            case PRE_OP:      { return "pre-op";      }
+            case BOOT:        { return "boot";        }
+            case SAFE_OP:     { return "safe-op";     }
+            case OPERATIONAL: { return "operational"; }
+            default:          { return "unknown";     }
         }
     }
 }

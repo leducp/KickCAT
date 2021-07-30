@@ -54,7 +54,8 @@ namespace kickcat
         void read(std::shared_ptr<AbstractSocket> socket);
         void write(std::shared_ptr<AbstractSocket> socket);
 
-        uint8_t const* data() const { return frame_.data(); }
+        // helper to access raw frame (mostly for unit testing)
+        uint8_t* data() { return frame_.data(); }
 
     private:
         EthernetFrame frame_;
