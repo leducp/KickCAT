@@ -6,7 +6,7 @@ namespace kickcat
 {
     void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout)
     {
-        auto error_callback = [&](){ THROW_ERROR("error while checking mailboxes"); };
+        auto error_callback = [](){ THROW_ERROR("error while checking mailboxes"); };
         nanoseconds now = since_epoch();
 
         while (message->status() == MessageStatus::RUNNING)
@@ -23,12 +23,12 @@ namespace kickcat
     }
 
 
-    void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size)
+    void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout)
     {
         if ((CA == Access::PARTIAL) or (CA == Access::COMPLETE))
         {
             auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::UPLOAD, data, data_size);
-            waitForMessage(sdo);
+            waitForMessage(sdo, timeout);
             return;
         }
 
@@ -36,7 +36,7 @@ namespace kickcat
         int32_t object_size = 0;
         uint32_t size = sizeof(object_size);
         auto sdo = slave.mailbox.createSDO(index, 0, false, CoE::SDO::request::UPLOAD, &object_size, &size);
-        waitForMessage(sdo);
+        waitForMessage(sdo, timeout);
 
         uint8_t* pos = reinterpret_cast<uint8_t*>(data);
         size = *data_size;
@@ -50,7 +50,7 @@ namespace kickcat
             }
 
             sdo = slave.mailbox.createSDO(index, i, false, CoE::SDO::request::UPLOAD, pos, &size);
-            waitForMessage(sdo);
+            waitForMessage(sdo, timeout);
 
             if (sdo->status() != MessageStatus::SUCCESS)
             {
@@ -65,9 +65,9 @@ namespace kickcat
     }
 
 
-    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size)
+    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size, nanoseconds timeout)
     {
         auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::DOWNLOAD, data, &data_size);
-        waitForMessage(sdo);
+        waitForMessage(sdo, timeout);
     }
 }

@@ -103,7 +103,7 @@ TEST(Slave, parse_SII)
     testing::internal::CaptureStdout();
     slave.printInfo();
     std::string output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(450, output.size());
+    ASSERT_LT(430, output.size());
 
     testing::internal::CaptureStdout();
     slave.printPDOs();

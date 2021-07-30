@@ -81,8 +81,11 @@ namespace kickcat
             COMPLETE = 1,
             EMULATE_COMPLETE = 2
         };
-        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size);
-        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size);
+
+        // Note: timeout is used on a per message basis: if complete access is emulated,
+        // global call timeout will be at most N * timeout (with N the number of subindex to reached)
+        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
+        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA,   void* data, uint32_t  data_size, nanoseconds timeout = 1s);
 
         void clearErrorCounters();
 
@@ -118,7 +121,7 @@ namespace kickcat
         void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
-        void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout = 1s);
+        void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout);
 
         Link link_;
         std::vector<Slave> slaves_;

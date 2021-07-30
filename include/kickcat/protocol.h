@@ -223,11 +223,12 @@ namespace kickcat
 
         enum MailboxProtocol // get from EEPROM
         {
-            AoE = 0x01,
-            EoE = 0x02,
-            CoE = 0x04,
-            FoE = 0x08,
-            SoE = 0x10
+            None = 0x0,
+            AoE  = 0x01,
+            EoE  = 0x02,
+            CoE  = 0x04,
+            FoE  = 0x08,
+            SoE  = 0x10
         };
 
         enum Command : uint16_t
