@@ -746,16 +746,6 @@ namespace kickcat
     }
 
 
-    void Bus::printSlavesInfo()
-    {
-        for (auto const& slave : slaves_)
-        {
-            slave.printInfo();
-            printf("\n");
-        }
-    }
-
-
     void Bus::sendMailboxesChecks(std::function<void()> const& error)
     {
         auto isFull = [](uint8_t state, uint16_t wkc, bool stable_value)

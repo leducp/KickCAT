@@ -46,9 +46,6 @@ namespace kickcat
         // if OK, set the bus to SAFE_OP state
         void createMapping(uint8_t* iomap);
 
-        // Print various info about slaves, mainly from SII
-        void printSlavesInfo();
-
         std::vector<Slave>& slaves() { return slaves_; }
 
         // asynchrone read/write/mailbox/state methods

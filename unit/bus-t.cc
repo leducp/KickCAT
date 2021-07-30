@@ -11,6 +11,13 @@ using ::testing::InSequence;
 
 using namespace kickcat;
 
+struct SDOAnswer
+{
+    mailbox::Header header;
+    mailbox::ServiceData sdo;
+    uint8_t payload[4];
+} __attribute__((__packed__));
+
 class BusTest : public testing::Test
 {
 public:
@@ -192,6 +199,39 @@ public:
 
         ASSERT_EQ(1, slave.sii.TxPDO.size());
         ASSERT_EQ(2, slave.sii.RxPDO.size());
+    }
+
+    template<typename T>
+    void addReadEmulatedSDO(uint16_t index, std::vector<T> const& data_to_reply)
+    {
+        InSequence s;
+
+        SDOAnswer answer;
+        answer.header.len = 10;
+        answer.header.type = mailbox::Type::CoE;
+        answer.sdo.service = CoE::Service::SDO_RESPONSE;
+        answer.sdo.command = CoE::SDO::response::UPLOAD;
+        answer.sdo.index = index;
+        answer.sdo.transfer_type = 1;
+        answer.sdo.block_size = 4 - sizeof(T);
+        std::memset(answer.payload, 0, 4);
+
+        for (uint32_t i = 0; i < data_to_reply.size(); ++i)
+        {
+            checkSendFrame(Command::FPRD);
+            handleReply<uint8_t>({0, 0});// can write, nothing to read
+
+            checkSendFrame(Command::FPWR);  // write to mailbox
+            handleReply();
+
+            checkSendFrame(Command::FPRD);
+            handleReply<uint8_t>({0, 0x08});// can write, something to read
+
+            answer.sdo.subindex = i;
+            std::memcpy(answer.payload, &data_to_reply[i], sizeof(T));
+            checkSendFrame(Command::FPRD);
+            handleReply<SDOAnswer>({answer}); // read answer
+        }
     }
 
 protected:
@@ -389,13 +429,7 @@ TEST_F(BusTest, write_SDO_OK)
     checkSendFrame(Command::FPRD);
     handleReply<uint8_t>({0, 0x08});// can write, somethin to read
 
-    // answer
-    struct Answer
-    {
-        mailbox::Header header;
-        mailbox::ServiceData sdo;
-    } __attribute__((__packed__));
-    Answer answer;
+    SDOAnswer answer;
     answer.header.len = 10;
     answer.header.type = mailbox::Type::CoE;
     answer.sdo.service = CoE::Service::SDO_RESPONSE;
@@ -404,7 +438,7 @@ TEST_F(BusTest, write_SDO_OK)
     answer.sdo.subindex = 1;
 
     checkSendFrame(Command::FPRD);
-    handleReply<Answer>({answer}); // read answer
+    handleReply<SDOAnswer>({answer}); // read answer
 
     bus.writeSDO(slave, 0x1018, 1, false, &data, data_size);
 }
@@ -457,14 +491,7 @@ TEST_F(BusTest, read_SDO_OK)
     checkSendFrame(Command::FPRD);
     handleReply<uint8_t>({0, 0x08});// can write, somethin to read
 
-    // answer
-    struct Answer
-    {
-        mailbox::Header header;
-        mailbox::ServiceData sdo;
-        int32_t payload;
-    } __attribute__((__packed__));
-    Answer answer;
+    SDOAnswer answer;
     answer.header.len = 10;
     answer.header.type = mailbox::Type::CoE;
     answer.sdo.service = CoE::Service::SDO_RESPONSE;
@@ -473,10 +500,10 @@ TEST_F(BusTest, read_SDO_OK)
     answer.sdo.subindex = 1;
     answer.sdo.transfer_type = 1;
     answer.sdo.block_size = 0;
-    answer.payload = 0xDEADBEEF;
+    *reinterpret_cast<uint32_t*>(answer.payload) = 0xDEADBEEF;
 
     checkSendFrame(Command::FPRD);
-    handleReply<Answer>({answer}); // read answer
+    handleReply<SDOAnswer>({answer}); // read answer
 
     bus.readSDO(slave, 0x1018, 1, Bus::Access::PARTIAL, &data, &data_size);
     ASSERT_EQ(0xDEADBEEF, data);
@@ -485,46 +512,11 @@ TEST_F(BusTest, read_SDO_OK)
 
 TEST_F(BusTest, read_SDO_emulated_complete_access_OK)
 {
-    InSequence s;
+    addReadEmulatedSDO<uint32_t>(0x1018, { 3, 0xCAFE0000, 0x0000DECA, 0xFADEFACE });
 
-    // answer
-    struct Answer
-    {
-        mailbox::Header header;
-        mailbox::ServiceData sdo;
-        uint32_t payload;
-    } __attribute__((__packed__));
-    Answer answer;
-    answer.header.len = 10;
-    answer.header.type = mailbox::Type::CoE;
-    answer.sdo.service = CoE::Service::SDO_RESPONSE;
-    answer.sdo.command = CoE::SDO::response::UPLOAD;
-    answer.sdo.index = 0x1018;
-    answer.sdo.transfer_type = 1;
-
-    uint32_t payload_array[4] = { 3, 0xCAFE0000, 0x0000DECA, 0xFADEFACE };
-
+    auto& slave = bus.slaves().at(0);
     uint32_t data[3] = {0};
     uint32_t data_size = sizeof(data);
-    auto& slave = bus.slaves().at(0);
-
-    for (int i = 0; i < 4; ++i)
-    {
-        checkSendFrame(Command::FPRD);
-        handleReply<uint8_t>({0, 0});// can write, nothing to read
-
-        checkSendFrame(Command::FPWR);  // write to mailbox
-        handleReply();
-
-        checkSendFrame(Command::FPRD);
-        handleReply<uint8_t>({0, 0x08});// can write, something to read
-
-        answer.sdo.subindex = i;
-        answer.sdo.block_size = 0;
-        answer.payload = payload_array[i];
-        checkSendFrame(Command::FPRD);
-        handleReply<Answer>({answer}); // read answer
-    }
 
     bus.readSDO(slave, 0x1018, 1, Bus::Access::EMULATE_COMPLETE, &data, &data_size);
     ASSERT_EQ(0xCAFE0000, data[0]);
@@ -536,46 +528,39 @@ TEST_F(BusTest, read_SDO_emulated_complete_access_OK)
 
 TEST_F(BusTest, read_SDO_buffer_too_small)
 {
-    InSequence s;
+    addReadEmulatedSDO<uint32_t>(0x1018, { 3, 0xCAFE0000 });
 
-    // answer
-    struct Answer
-    {
-        mailbox::Header header;
-        mailbox::ServiceData sdo;
-        uint32_t payload;
-    } __attribute__((__packed__));
-    Answer answer;
-    answer.header.len = 10;
-    answer.header.type = mailbox::Type::CoE;
-    answer.sdo.service = CoE::Service::SDO_RESPONSE;
-    answer.sdo.command = CoE::SDO::response::UPLOAD;
-    answer.sdo.index = 0x1018;
-    answer.sdo.transfer_type = 1;
-
-    uint32_t payload_array[2] = { 3, 0xCAFE0000 };
-
+    auto& slave = bus.slaves().at(0);
     uint32_t data = {0};
     uint32_t data_size = sizeof(data);
-    auto& slave = bus.slaves().at(0);
-
-    for (int i = 0; i < 2; ++i)
-    {
-        checkSendFrame(Command::FPRD);
-        handleReply<uint8_t>({0, 0});// can write, nothing to read
-
-        checkSendFrame(Command::FPWR);  // write to mailbox
-        handleReply();
-
-        checkSendFrame(Command::FPRD);
-        handleReply<uint8_t>({0, 0x08});// can write, something to read
-
-        answer.sdo.subindex = i;
-        answer.sdo.block_size = 0;
-        answer.payload = payload_array[i];
-        checkSendFrame(Command::FPRD);
-        handleReply<Answer>({answer}); // read answer
-    }
 
     ASSERT_THROW(bus.readSDO(slave, 0x1018, 1, Bus::Access::EMULATE_COMPLETE, &data, &data_size), Error);
+}
+
+
+
+TEST_F(BusTest, detect_mapping_CoE)
+{
+    InSequence s;
+
+    addReadEmulatedSDO<uint8_t>(CoE::SM_COM_TYPE,    { 2, SyncManagerType::Output, SyncManagerType::Input});
+
+    addReadEmulatedSDO<uint16_t>(CoE::SM_CHANNEL + 0, { 2, 0x1A0A, 0x1A0B });
+    addReadEmulatedSDO<uint32_t>(0x1A0A, { 2,  8, 8 });
+    addReadEmulatedSDO<uint32_t>(0x1A0B, { 2, 16, 8 });
+
+    addReadEmulatedSDO<uint16_t>(CoE::SM_CHANNEL + 1, { 2, 0x160A, 0x160B });
+    addReadEmulatedSDO<uint32_t>(0x160A, { 2, 16, 16 });
+    addReadEmulatedSDO<uint32_t>(0x160B, { 2, 32, 16 });
+
+    // SM/FMMU configuration
+    checkSendFrame(Command::FPWR);
+    handleReply<uint8_t>({2, 3});
+
+    uint8_t iomap[64];
+    bus.createMapping(iomap);
+
+    auto& slave = bus.slaves().at(0);
+    ASSERT_EQ(5,  slave.output.bsize);
+    ASSERT_EQ(10, slave.input.bsize);
 }
