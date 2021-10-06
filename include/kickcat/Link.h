@@ -11,6 +11,14 @@ namespace kickcat
 {
     class AbstractSocket;
 
+    enum class DatagramState
+    {
+        LOST,
+        INVALID_WKC,
+        NO_HANDLER,
+        OK
+    };
+
     /// \brief Handle link layer
     /// \details This class is responsible to handle frames and datagrams on the link layers:
     ///           - associate an id to each datagram to call the associate callback later without depending on the read order
@@ -25,12 +33,12 @@ namespace kickcat
         void writeThenRead(Frame& frame);
 
         void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
-                         std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void()> const& error);
+                         std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
+                         std::function<void(DatagramState const& state)> const& error);
         template<typename T>
         void addDatagram(enum Command command, uint32_t address, T const& data,
-                         std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void()> const& error)
+                         std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
+                         std::function<void(DatagramState const& state)> const& error)
         {
             addDatagram(command, address, &data, sizeof(data), process, error);
         }
@@ -49,9 +57,9 @@ namespace kickcat
 
         struct Callbacks
         {
-            bool in_error{false};
-            std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> process;
-            std::function<void()> error;
+            DatagramState status{DatagramState::LOST};
+            std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> process;
+            std::function<void(DatagramState const& state)> error;
         };
         std::array<Callbacks, 256> callbacks_{};
     };

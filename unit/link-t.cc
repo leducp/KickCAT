@@ -38,9 +38,13 @@ public:
         [&, error](DatagramHeader const*, uint8_t const*, uint16_t)
         {
             process_callback_counter++;
-            return error;
+            if (error)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+            return DatagramState::OK;
         },
-        [&]()
+        [&](DatagramState const&)
         {
             error_callback_counter++;
         });
@@ -252,24 +256,24 @@ TEST_F(LinkTest, process_datagrams_error_rethrow)
     uint8_t payload;
 
     link.addDatagram(Command::BRD, 0, payload,
-        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return true; },
-        [&](){ throw std::runtime_error("A"); }
+        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::INVALID_WKC; },
+        [&](DatagramState const&){ throw std::runtime_error("A"); }
     );
     link.addDatagram(Command::BRD, 0, payload,
-        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return true; },
-        [&](){ throw std::out_of_range("B"); }
+        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::INVALID_WKC; },
+        [&](DatagramState const&){ throw std::out_of_range("B"); }
     );
     link.addDatagram(Command::BRD, 0, payload,
-        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return true; },
-        [&](){ throw std::logic_error("C"); }
+        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::INVALID_WKC; },
+        [&](DatagramState const&){ throw std::logic_error("C"); }
     );
     link.addDatagram(Command::BRD, 0, payload,
-        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return true; },
-        [&](){ throw std::overflow_error("D"); }
+        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::INVALID_WKC; },
+        [&](DatagramState const&){ throw std::overflow_error("D"); }
     );
     link.addDatagram(Command::BRD, 0, payload,
-        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return false; },
-        [&](){ throw std::underflow_error("E"); }
+        [&](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::OK; },
+        [&](DatagramState const&){ throw std::underflow_error("E"); }
     );
 
     EXPECT_CALL(*io, read(_,_))

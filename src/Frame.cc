@@ -61,7 +61,7 @@ namespace kickcat
 
     int32_t Frame::freeSpace() const
     {
-        int32_t size =  ETH_MTU_SIZE - sizeof(EthercatHeader) - (next_datagram_ - first_datagram_);
+        int32_t size = static_cast<int32_t>(ETH_MTU_SIZE - sizeof(EthercatHeader) - (next_datagram_ - first_datagram_));
         return size;
     }
 
@@ -126,7 +126,7 @@ namespace kickcat
         pos += 2;
 
         header_->len += sizeof(DatagramHeader) + data_size + 2; // +2 for wkc
-        last_datagram_ = reinterpret_cast<uint8_t*>(header);    // save last datagram header to finalize frame when ready
+        last_datagram_ = next_datagram_;                        // save last datagram header to finalize frame when ready
         next_datagram_ = pos;                                   // set next datagram
         ++datagram_counter_;                                    // one more datagram in the frame to be sent
     }
@@ -165,8 +165,10 @@ namespace kickcat
     {
         DatagramHeader const* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
         uint8_t* data = next_datagram_ + sizeof(DatagramHeader);
-        uint16_t* wkc = reinterpret_cast<uint16_t*>(data + header->len);
-        next_datagram_ = reinterpret_cast<uint8_t*>(wkc) + sizeof(uint16_t);
+        uint8_t* wkc_addr = data + header->len;
+        uint16_t wkc;
+        std::memcpy(&wkc, wkc_addr, sizeof(uint16_t));
+        next_datagram_ = wkc_addr + sizeof(uint16_t);
 
         if (header->multiple == 0)
         {
@@ -174,13 +176,13 @@ namespace kickcat
             clear();
         }
 
-        return std::make_tuple(header, data, *wkc);
+        return std::make_tuple(header, data, wkc);
     }
 
 
     void Frame::read(std::shared_ptr<AbstractSocket> socket)
     {
-        int32_t read = socket->read(frame_.data(), frame_.size());
+        int32_t read = socket->read(frame_.data(), static_cast<int32_t>(frame_.size()));
         if (read < 0)
         {
             THROW_SYSTEM_ERROR("read()");

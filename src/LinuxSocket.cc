@@ -15,16 +15,19 @@
 
 namespace kickcat
 {
-    LinuxSocket::LinuxSocket(microseconds rx_coalescing)
+    LinuxSocket::LinuxSocket(microseconds rx_coalescing, microseconds polling_period)
         : AbstractSocket()
         , fd_{-1}
         , rx_coalescing_{rx_coalescing}
+        , polling_period_(polling_period)
     {
 
     }
 
-    void LinuxSocket::open(std::string const& interface, microseconds requested_timeout)
+    void LinuxSocket::open(std::string const& interface, microseconds timeout)
     {
+        timeout_ = timeout;
+
         // RAW socket with EtherCAT type
         fd_ = socket(PF_PACKET, SOCK_RAW, ETH_ETHERCAT_TYPE);
         if (fd_ < 0)
@@ -32,24 +35,8 @@ namespace kickcat
             THROW_SYSTEM_ERROR("socket()");
         }
 
-        // Non-blocking mode
-        struct timeval timeout{0, requested_timeout.count()};
-
-        int rc = setsockopt(fd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-        if (rc < 0)
-        {
-            THROW_SYSTEM_ERROR("setsockopt(SO_RCVTIMEO)");
-        }
-
-        rc = setsockopt(fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-        if (rc < 0)
-        {
-            THROW_SYSTEM_ERROR("setsockopt(SO_SNDTIMEO)");
-        }
-
-
         constexpr int buffer_size = ETH_MAX_SIZE * 256; // max 256 frames on the wire
-        rc = setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size));
+        int rc = setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size));
         if (rc < 0)
         {
             THROW_SYSTEM_ERROR("setsockopt(SO_SNDBUF)");
@@ -128,6 +115,11 @@ namespace kickcat
         }
     }
 
+    void LinuxSocket::setTimeout(microseconds timeout)
+    {
+        timeout_ = timeout;
+    }
+
     void LinuxSocket::close() noexcept
     {
         if (fd_ == -1)
@@ -145,11 +137,29 @@ namespace kickcat
 
     int32_t LinuxSocket::read(uint8_t* frame, int32_t frame_size)
     {
-        return ::recv(fd_, frame, frame_size, 0);
+        nanoseconds deadline = since_epoch() + timeout_;
+
+        while (since_epoch() < deadline)
+        {
+            ssize_t read_size = ::recv(fd_, frame, frame_size, MSG_DONTWAIT);
+            if (read_size < 0)
+            {
+                if (errno == EAGAIN)
+                {
+                    sleep(polling_period_);
+                    continue;
+                }
+            }
+
+            return static_cast<int32_t>(read_size);
+        }
+
+        errno = ETIMEDOUT;
+        return -1;
     }
 
     int32_t LinuxSocket::write(uint8_t const* frame, int32_t frame_size)
     {
-        return ::send(fd_, frame, frame_size, 0);
+        return static_cast<int32_t>(::send(fd_, frame, frame_size, MSG_DONTWAIT));
     }
 }

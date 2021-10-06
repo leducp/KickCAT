@@ -146,7 +146,7 @@ namespace kickcat
             }
             else
             {
-                header_->len += size;
+                header_->len += static_cast<uint16_t>(size);
                 std::memcpy(payload_, &size, sizeof(uint32_t));
                 std::memcpy(payload_ + sizeof(uint32_t), data, size);
             }
