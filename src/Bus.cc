@@ -13,7 +13,7 @@ namespace kickcat
 
     int32_t Bus::detectedSlaves() const
     {
-        return slaves_.size();
+        return static_cast<int32_t>(slaves_.size());
     }
 
 
@@ -69,7 +69,7 @@ namespace kickcat
         waitForState(State::PRE_OP, 3000ms);
 
         // clear mailboxes
-        auto error_callback = [](){ THROW_ERROR("init error while cleaning slaves mailboxes"); };
+        auto error_callback = [](DatagramState const&){ THROW_ERROR("init error while cleaning slaves mailboxes"); };
         checkMailboxes(error_callback);
         processMessages(error_callback);
 
@@ -96,19 +96,19 @@ namespace kickcat
     }
 
 
-    void Bus::sendGetALStatus(Slave& slave, std::function<void()> const& error)
+    void Bus::sendGetALStatus(Slave& slave, std::function<void(DatagramState const&)> const& error)
     {
         slave.al_status = State::INVALID;
         auto process = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
         {
             if (wkc != 1)
             {
-                return true;
+                return DatagramState::INVALID_WKC;
             }
 
             slave.al_status = data[0];
             slave.al_status_code = *reinterpret_cast<uint16_t const*>(data + 4);
-            return false;
+            return DatagramState::OK;
         };
 
         link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 6, process, error);
@@ -117,7 +117,7 @@ namespace kickcat
 
     State Bus::getCurrentState(Slave& slave)
     {
-        auto error = []()
+        auto error = [](DatagramState const&)
         {
             DEBUG_PRINT("Error while trying to get slave state.");
         };
@@ -205,18 +205,19 @@ namespace kickcat
             {
                 if (wkc != 1)
                 {
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
-                return false;
+                return DatagramState::OK;
             };
 
-            auto error = []()
+            auto error = [](DatagramState const&)
             {
                 THROW_ERROR("Invalid working counter");
             };
 
             slaves_[i].address = static_cast<uint16_t>(i);
-            link_.addDatagram(Command::APWR, createAddress(0 - i, reg::STATION_ADDR), slaves_[i].address, process, error);
+            link_.addDatagram(Command::APWR, createAddress(0 - slaves_[i].address, reg::STATION_ADDR),
+                              slaves_[i].address, process, error);
         }
 
         link_.processDatagrams();
@@ -229,12 +230,12 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                return true;
+                return DatagramState::INVALID_WKC;
             }
-            return false;
+            return DatagramState::OK;
         };
 
-        auto error = []()
+        auto error = [](DatagramState const&)
         {
             THROW_ERROR("Invalid working counter");
         };
@@ -301,7 +302,7 @@ namespace kickcat
 
                     uint16_t mapped_index[128];
                     uint32_t map_size = sizeof(mapped_index);
-                    readSDO(slave, CoE::SM_CHANNEL + i, 1, Access::EMULATE_COMPLETE, mapped_index, &map_size);
+                    readSDO(slave, CoE::SM_CHANNEL + static_cast<uint16_t>(i), 1, Access::EMULATE_COMPLETE, mapped_index, &map_size);
 
                     for (uint32_t j = 0; j < (map_size / 2); ++j)
                     {
@@ -332,7 +333,6 @@ namespace kickcat
 
                 mapping = &slave.input;
                 mapping->sync_manager = 1;
-                mapping->size = 0;
                 for (auto const& pdo : slave.sii.TxPDO)
                 {
                     mapping->size += pdo->bitlen;
@@ -366,7 +366,7 @@ namespace kickcat
                 pi_frames_.back().size = address - pi_frames_.back().address; // frame size = current address - frame address
 
                 // current size will overflow the frame at the current offset: set in on the next frame
-                address = pi_frames_.size() * MAX_ETHERCAT_PAYLOAD_SIZE;
+                address = static_cast<uint32_t>(pi_frames_.size()) * MAX_ETHERCAT_PAYLOAD_SIZE;
                 pi_frames_.push_back({address, 0, {}, {}});
             }
 
@@ -412,7 +412,7 @@ namespace kickcat
     }
 
 
-    void Bus::sendLogicalRead(std::function<void()> const& error)
+    void Bus::sendLogicalRead(std::function<void(DatagramState const&)> const& error)
     {
         for (auto const& pi_frame : pi_frames_)
         {
@@ -421,30 +421,29 @@ namespace kickcat
                 if (wkc != pi_frame.inputs.size())
                 {
                     DEBUG_PRINT("Invalid working counter\n");
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
 
                 for (auto& input : pi_frame.inputs)
                 {
                     std::memcpy(input.iomap, data + input.offset, input.size);
                 }
-                return false;
+                return DatagramState::OK;
             };
 
-            link_.addDatagram(Command::LRD, pi_frame.address, nullptr, pi_frame.size, process, error);
+            link_.addDatagram(Command::LRD, pi_frame.address, nullptr, static_cast<uint16_t>(pi_frame.size), process, error);
         }
-        link_.finalizeDatagrams();
     }
 
 
-    void Bus::processDataRead(std::function<void()> const& error)
+    void Bus::processDataRead(std::function<void(DatagramState const&)> const& error)
     {
         sendLogicalRead(error);
         link_.processDatagrams();
     }
 
 
-    void Bus::sendLogicalWrite(std::function<void()> const& error)
+    void Bus::sendLogicalWrite(std::function<void(DatagramState const&)> const& error)
     {
         for (auto const& pi_frame : pi_frames_)
         {
@@ -459,24 +458,23 @@ namespace kickcat
                 if (wkc != pi_frame.outputs.size())
                 {
                     DEBUG_PRINT("Invalid working counter\n");
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
-                return false;
+                return DatagramState::OK;
             };
-            link_.addDatagram(Command::LWR, pi_frame.address, buffer, pi_frame.size, process, error);
+            link_.addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
         }
-        link_.finalizeDatagrams();
     }
 
 
-    void Bus::processDataWrite(std::function<void()> const& error)
+    void Bus::processDataWrite(std::function<void(DatagramState const&)> const& error)
     {
         sendLogicalWrite(error);
         link_.processDatagrams();
     }
 
 
-    void Bus::sendLogicalReadWrite(std::function<void()> const& error)
+    void Bus::sendLogicalReadWrite(std::function<void(DatagramState const&)> const& error)
     {
         for (auto const& pi_frame : pi_frames_)
         {
@@ -491,22 +489,21 @@ namespace kickcat
                 if (wkc != pi_frame.inputs.size())
                 {
                     DEBUG_PRINT("Invalid working counter\n");
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
 
                 for (auto& input : pi_frame.inputs)
                 {
                     std::memcpy(input.iomap, data + input.offset, input.size);
                 }
-                return false;
+                return DatagramState::OK;
             };
 
-            link_.addDatagram(Command::LRW, pi_frame.address, buffer, pi_frame.size, process, error);
+            link_.addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
         }
-        link_.finalizeDatagrams();
     }
 
-    void Bus::processDataReadWrite(std::function<void()> const& error)
+    void Bus::processDataReadWrite(std::function<void(DatagramState const&)> const& error)
     {
         sendLogicalReadWrite(error);
         link_.processDatagrams();
@@ -523,7 +520,7 @@ namespace kickcat
                 return;
             }
 
-            auto error = []()
+            auto error = [](DatagramState const&)
             {
                 THROW_ERROR("Invalid working counter");
             };
@@ -532,9 +529,9 @@ namespace kickcat
             {
                 if (wkc != 1)
                 {
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
-                return false;
+                return DatagramState::OK;
             };
 
             // Get SyncManager configuration from SII
@@ -556,15 +553,17 @@ namespace kickcat
             }
 
             sm.start_address = sii_sm->start_adress;
-            sm.length        = mapping.bsize;
+            sm.length        = static_cast<uint16_t>(mapping.bsize);
             sm.status        = 0x00; // RO register
             sm.activate      = 0x01; // Sync Manager enable
             sm.pdi_control   = 0x00; // RO register
-            link_.addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER + mapping.sync_manager * 8), sm, process, error);
+            link_.addDatagram(Command::FPWR,
+                              createAddress(slave.address, reg::SYNC_MANAGER + static_cast<uint16_t>(mapping.sync_manager * 8)),
+                              sm, process, error);
             DEBUG_PRINT("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
 
             fmmu.logical_address    = mapping.address;
-            fmmu.length             = mapping.bsize;
+            fmmu.length             = static_cast<uint16_t>(mapping.bsize);
             fmmu.logical_start_bit  = 0;   // we map every bits
             fmmu.logical_stop_bit   = 0x7; // we map every bits
             fmmu.physical_address   = sii_sm->start_adress;
@@ -591,17 +590,17 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                return true;
+                return DatagramState::INVALID_WKC;
             }
             uint16_t answer = *reinterpret_cast<uint16_t const*>(data);
             if (answer & 0x8000)
             {
                 ready = false;
             }
-            return false;
+            return DatagramState::OK;
         };
 
-        auto error = []()
+        auto error = [](DatagramState const&)
         {
             THROW_ERROR("Error while fetching eeprom state");
         };
@@ -663,7 +662,7 @@ namespace kickcat
         }
 
         // Read result
-        auto error = []()
+        auto error = [](DatagramState const&)
         {
             THROW_ERROR("Invalid working counter");
         };
@@ -674,11 +673,12 @@ namespace kickcat
             {
                 if (wkc != 1)
                 {
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
-                uint32_t answer = *reinterpret_cast<uint32_t const*>(data);
+                uint32_t answer;
+                std::memcpy(&answer, data, sizeof(uint32_t));
                 apply(*slave, answer);
-                return false;
+                return DatagramState::OK;
             };
 
             link_.addDatagram(Command::FPRD, createAddress(slave->address, reg::EEPROM_DATA), nullptr, 4, process, error);
@@ -703,9 +703,11 @@ namespace kickcat
 
         // Mailbox info
         readEeprom(eeprom::STANDARD_MAILBOX + eeprom::RECV_MBO_OFFSET, slaves,
-        [](Slave& s, uint32_t word) { s.mailbox.recv_offset = word; s.mailbox.recv_size = word >> 16; } );
+        [](Slave& s, uint32_t word) { s.mailbox.recv_offset = static_cast<uint16_t>(word);
+                                      s.mailbox.recv_size   = static_cast<uint16_t>(word >> 16); } );
         readEeprom(eeprom::STANDARD_MAILBOX + eeprom::SEND_MBO_OFFSET, slaves,
-        [](Slave& s, uint32_t word) { s.mailbox.send_offset = word; s.mailbox.send_size = word >> 16; } );
+        [](Slave& s, uint32_t word) { s.mailbox.send_offset = static_cast<uint16_t>(word);
+                                      s.mailbox.send_size   = static_cast<uint16_t>(word >> 16); } );
 
         readEeprom(eeprom::MAILBOX_PROTOCOL, slaves,
         [](Slave& s, uint32_t word) { s.supported_mailbox = static_cast<eeprom::MailboxProtocol>(word); });
@@ -715,14 +717,14 @@ namespace kickcat
         {
             s.eeprom_size = (word & 0xFF) + 1;  // 0 means 1024 bits
             s.eeprom_size *= 128;               // Kibit to bytes
-            s.eeprom_version = word >> 16;
+            s.eeprom_version = static_cast<uint16_t>(word >> 16);
         });
 
         // Get SII section
         int32_t pos = 0;
         while (not slaves.empty())
         {
-            readEeprom(eeprom::START_CATEGORY + pos, slaves,
+            readEeprom(eeprom::START_CATEGORY + static_cast<uint16_t>(pos), slaves,
             [](Slave& s, uint32_t word)
             {
                 s.sii.buffer.push_back(word);
@@ -746,7 +748,35 @@ namespace kickcat
     }
 
 
-    void Bus::sendMailboxesChecks(std::function<void()> const& error)
+    void Bus::sendMailboxesReadChecks(std::function<void(DatagramState const&)> const& error)
+    {
+        auto isFull = [](uint8_t state, uint16_t wkc, bool stable_value)
+        {
+            if (wkc != 1)
+            {
+                DEBUG_PRINT("Invalid working counter\n");
+                return stable_value;
+            }
+            return ((state & 0x08) == 0x08);
+        };
+
+        for (auto& slave : slaves_)
+        {
+            auto process_read = [&slave, isFull](DatagramHeader const*, uint8_t const* state, uint16_t wkc)
+            {
+                slave.mailbox.can_read = isFull(*state, wkc, false);
+                return DatagramState::OK;
+            };
+
+            if (slave.supported_mailbox == 0)
+            {
+                continue;
+            }
+            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1, process_read,  error);
+        }
+    }
+
+    void Bus::sendMailboxesWriteChecks(std::function<void(DatagramState const&)> const& error)
     {
         auto isFull = [](uint8_t state, uint16_t wkc, bool stable_value)
         {
@@ -763,13 +793,7 @@ namespace kickcat
             auto process_write = [&slave, isFull](DatagramHeader const*, uint8_t const* state, uint16_t wkc)
             {
                 slave.mailbox.can_write = not isFull(*state, wkc, true);
-                return false;
-            };
-
-            auto process_read = [&slave, isFull](DatagramHeader const*, uint8_t const* state, uint16_t wkc)
-            {
-                slave.mailbox.can_read = isFull(*state, wkc, false);
-                return false;
+                return DatagramState::OK;
             };
 
             if (slave.supported_mailbox == 0)
@@ -777,28 +801,27 @@ namespace kickcat
                 continue;
             }
             link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1, process_write, error);
-            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1, process_read,  error);
         }
-        link_.finalizeDatagrams();
     }
 
-    void Bus::checkMailboxes(std::function<void()> const& error)
+    void Bus::checkMailboxes(std::function<void(DatagramState const&)> const& error)
     {
-        sendMailboxesChecks(error);
+        sendMailboxesWriteChecks(error);
+        sendMailboxesReadChecks(error);
         link_.processDatagrams();
     }
 
 
-    void Bus::sendWriteMessages(std::function<void()> const& error)
+    void Bus::sendWriteMessages(std::function<void(DatagramState const&)> const& error)
     {
         auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
         {
             if (wkc != 1)
             {
                 DEBUG_PRINT("Invalid working counter\n");
-                return true;
+                return DatagramState::INVALID_WKC;
             }
-            return false;
+            return DatagramState::OK;
         };
 
         for (auto& slave : slaves_)
@@ -807,13 +830,13 @@ namespace kickcat
             {
                 // send one waiting message
                 auto message = slave.mailbox.send();
-                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data(), message->size(), process, error);
+                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data(),
+                                  static_cast<uint16_t>(message->size()), process, error);
             }
         }
-        link_.finalizeDatagrams();
     }
 
-    void Bus::sendReadMessages(std::function<void()> const& error)
+    void Bus::sendReadMessages(std::function<void(DatagramState const&)> const& error)
     {
         Frame frame;
         for (auto& slave : slaves_)
@@ -823,16 +846,16 @@ namespace kickcat
                 if (wkc != 1)
                 {
                     DEBUG_PRINT("Invalid working counter for slave %d\n", slave.address);
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
 
                 if (not slave.mailbox.receive(data))
                 {
                     DEBUG_PRINT("Slave %d: receive a message but didn't process it\n", slave.address);
-                    return true;
+                    return DatagramState::NO_HANDLER;
                 }
 
-                return false;
+                return DatagramState::OK;
             };
 
             if (slave.mailbox.can_read)
@@ -841,11 +864,10 @@ namespace kickcat
                 link_.addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size, process, error);
             }
         }
-        link_.finalizeDatagrams();
     }
 
 
-    void Bus::processMessages(std::function<void()> const& error)
+    void Bus::processMessages(std::function<void(DatagramState const&)> const& error)
     {
         sendWriteMessages(error);
         sendReadMessages(error);
@@ -853,9 +875,9 @@ namespace kickcat
     }
 
 
-    void Bus::sendNop(std::function<void()> const& error)
+    void Bus::sendNop(std::function<void(DatagramState const&)> const& error)
     {
-        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t) { return false; };
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::OK; };
         link_.addDatagram(Command::NOP, 0, nullptr, 1, process, error);
     }
 
@@ -863,6 +885,12 @@ namespace kickcat
     void Bus::processAwaitingFrames()
     {
         link_.processDatagrams();
+    }
+
+
+    void Bus::finalizeDatagrams()
+    {
+        link_.finalizeDatagrams();
     }
 
 
@@ -876,7 +904,7 @@ namespace kickcat
         }
     }
 
-    void Bus::sendrefreshErrorCounters(std::function<void()> const& error)
+    void Bus::sendRefreshErrorCounters(std::function<void(DatagramState const&)> const& error)
     {
         for (auto& slave : slaves_)
         {
@@ -885,15 +913,14 @@ namespace kickcat
                 if (wkc != 1)
                 {
                     DEBUG_PRINT("Invalid working counter for slave %d\n", slave.address);
-                    return true;
+                    return DatagramState::INVALID_WKC;
                 }
 
                 std::memcpy(&slave.error_counters, data, sizeof(ErrorCounters));
-                return false;
+                return DatagramState::OK;
             };
 
             link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), nullptr, sizeof(ErrorCounters), process, error);
         }
-        link_.finalizeDatagrams();
     }
 }

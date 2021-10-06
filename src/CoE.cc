@@ -6,7 +6,7 @@ namespace kickcat
 {
     void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout)
     {
-        auto error_callback = [](){ THROW_ERROR("error while checking mailboxes"); };
+        auto error_callback = [](DatagramState const&){ THROW_ERROR("error while checking mailboxes"); };
         nanoseconds now = since_epoch();
 
         while (message->status() == MessageStatus::RUNNING)

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string_view>
+#include <sstream>
 
 #include "protocol.h"
 #include "Mailbox.h"
@@ -14,8 +15,21 @@ namespace kickcat
         void parseSII();
 
         void printInfo() const;
+        std::string getInfo() const;
+
         void printPDOs() const;
+        std::string getPDOs() const;
+
         void printErrorCounters() const;
+        std::string getErrorCounters() const;
+        int computeErrorCounters() const;
+
+        /// \return the number of new errors since last call.
+        int computeRelativeErrorCounters();
+
+        /// \brief  Check the total number of errors since start of the slave
+        /// \return True if too many errors detected since start of the slave. Return false otherwise.
+        bool checkAbsoluteErrorCounters(int max_absolute_errors);
 
         uint16_t address;
         uint8_t al_status{State::INVALID};
@@ -62,6 +76,7 @@ namespace kickcat
         PIMapping output;
 
         ErrorCounters error_counters;
+        int previous_errors_sum{0};
 
     private:
         void parseStrings(uint8_t const* section_start);

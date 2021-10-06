@@ -26,8 +26,8 @@ namespace kickcat
 
 
     void Link::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
-                           std::function<bool(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                           std::function<void()> const& error)
+                           std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
+                           std::function<void(DatagramState const& state)> const& error)
     {
         if (index_queue_ == static_cast<uint8_t>(index_head_ + 1))
         {
@@ -43,7 +43,7 @@ namespace kickcat
         frame_.addDatagram(index_head_, command, address, data, data_size);
         callbacks_[index_head_].process = process;
         callbacks_[index_head_].error = error;
-        callbacks_[index_head_].in_error = true;
+        callbacks_[index_head_].status = DatagramState::LOST;
         ++index_head_;
 
         if (frame_.isFull())
@@ -77,7 +77,7 @@ namespace kickcat
                 while (frame_.isDatagramAvailable())
                 {
                     auto [header, data, wkc] = frame_.nextDatagram();
-                    callbacks_[header->index].in_error = callbacks_[header->index].process(header, data, wkc);
+                    callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
                 }
             }
             catch (std::exception const& e)
@@ -89,12 +89,12 @@ namespace kickcat
         std::exception_ptr client_exception;
         for (uint8_t i = index_queue_; i != index_head_; ++i)
         {
-            if (callbacks_[i].in_error)
+            if (callbacks_[i].status != DatagramState::OK)
             {
                 // Datagram was either lost or processing it encountered an error.
                 try
                 {
-                    callbacks_[i].error();
+                    callbacks_[i].error(callbacks_[i].status);
                 }
                 catch (...)
                 {
@@ -104,7 +104,7 @@ namespace kickcat
 
             // Attach a callback to handle not THAT lost frames.
             // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
-            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return false; };
+            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socket_); return DatagramState::OK; };
         }
 
         index_queue_ = index_head_;

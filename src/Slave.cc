@@ -1,6 +1,8 @@
 #include "Slave.h"
 #include "Error.h"
 
+#include <iomanip>
+
 namespace kickcat
 {
     void Slave::parseStrings(uint8_t const* section_start)
@@ -73,7 +75,7 @@ namespace kickcat
     void Slave::parseSII()
     {
         uint8_t const* pos = reinterpret_cast<uint8_t*>(sii.buffer.data());
-        uint8_t const* const max_pos = reinterpret_cast<uint8_t*>(sii.buffer.data() + sii.buffer.size());
+        uint8_t const* const max_pos = reinterpret_cast<uint8_t*>(sii.buffer.data() + sii.buffer.size() - 4);
 
         while (pos < max_pos)
         {
@@ -139,70 +141,139 @@ namespace kickcat
 
     void Slave::printInfo() const
     {
-        printf("-*-*-*-*- slave 0x%04x -*-*-*-*-\n", address);
-        printf("Vendor ID:       0x%08x\n", vendor_id);
-        printf("Product code:    0x%08x\n", product_code);
-        printf("Revision number: 0x%08x\n", revision_number);
-        printf("Serial number:   0x%08x\n", serial_number);
-        printf("mailbox in:  size %d - offset 0x%04x\n", mailbox.recv_size, mailbox.recv_offset);
-        printf("mailbox out: size %d - offset 0x%04x\n", mailbox.send_size, mailbox.send_offset);
-        printf("supported mailbox protocol: 0x%02x\n", supported_mailbox);
-        printf("EEPROM: size: %d - version 0x%02x\n",  eeprom_size, eeprom_version);
-        printf("\nSII size: %lu\n",                    sii.buffer.size() * sizeof(uint32_t));
+        printf("%s", getInfo().c_str());
+    }
+
+
+    std::string Slave::getInfo() const
+    {
+        std::stringstream os;
+        os << "\n -*-*-*-*- slave " << std::to_string(address) << " -*-*-*-*-\n";
+        os << "Vendor ID:       " << "0x" << std::setfill('0') << std::setw(8) << std::hex << vendor_id << "\n";
+        os << "Product code:    " << "0x" << std::setfill('0') << std::setw(8) << std::hex << product_code << "\n";
+        os << "Revision number: " << "0x" << std::setfill('0') << std::setw(8) << std::hex << revision_number << "\n";
+        os << "Serial number:   " << "0x" << std::setfill('0') << std::setw(8) << std::hex << serial_number << "\n";
+        os << "mailbox in:  size " << std::dec << mailbox.recv_size << " - offset " << "0x" << std::setfill('0')
+            << std::setw(4) << std::hex << mailbox.recv_offset << "\n";
+
+        os << "mailbox out: size " << std::dec << mailbox.send_size << " - offset " << "0x" << std::setfill('0')
+            << std::setw(4) << std::hex << mailbox.send_offset << "\n";
+
+        os << "supported mailbox protocol: " << "0x" << std::setfill('0') << std::setw(2)
+            << std::hex << supported_mailbox << "\n";
+
+        os << "EEPROM: size: " << std::dec << eeprom_size << " - version "<< "0x" << std::setfill('0')
+            << std::setw(2) << std::hex << eeprom_version << "\n";
+
+        os << "\nSII size: " << std::dec << sii.buffer.size() * sizeof(uint32_t) << "\n";
 
         for (size_t i = 0; i < sii.fmmus_.size(); ++i)
         {
-            printf("FMMU[%lu] %d\n", i, sii.fmmus_[i]);
+            os << "FMMU[" << std::to_string(i) << "] " << std::to_string(sii.fmmus_[i]) << "\n";
         }
 
         for (size_t i = 0; i < sii.syncManagers_.size(); ++i)
         {
             auto const& sm = sii.syncManagers_[i];
-            printf("SM[%lu] config\n", i);
-            printf("     physical address: %x\n", sm->start_adress);
-            printf("     length:           %d\n", sm->length);
-            printf("     type:             %d\n", sm->type);
+            os << "SM[" << std::dec << i << "] config\n";
+            os << "     physical address: " << "0x" << std::hex << sm->start_adress << "\n";
+            os << "     length:           " << std::dec << sm->length << "\n";
+            os << "     type:             " << std::dec << sm->type << "\n";
         }
+
+        return os.str();
     }
 
 
     void Slave::printPDOs() const
     {
+        printf("%s", getPDOs().c_str());
+    }
+
+
+    std::string Slave::getPDOs() const
+    {
+        std::stringstream os;
         if (not sii.RxPDO.empty())
         {
-            printf("RxPDO\n");
+            os <<"RxPDO\n";
             for (size_t i = 0; i < sii.RxPDO.size(); ++i)
             {
                 auto const& pdo = sii.RxPDO[i];
                 auto const& name = sii.strings[pdo->name];
-                printf("    (0x%04x ; 0x%02x) - %d bit(s) - %.*s\n", pdo->index, pdo->subindex, pdo->bitlen, static_cast<int>(name.size()), name.data());
+                os << "    (0x" << std::setfill('0') << std::setw(4) << std::hex << pdo->index <<
+                    " ; 0x" << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint16_t>(pdo->subindex) <<
+                    ") - " << std::to_string(pdo->bitlen) << " bit(s) - " << std::string(name) << "\n";
             }
         }
 
         if (not sii.TxPDO.empty())
         {
-            printf("TxPDO\n");
+            os << "TxPDO\n";
             for (size_t i = 0; i < sii.TxPDO.size(); ++i)
             {
                 auto const& pdo = sii.TxPDO[i];
                 auto const& name = sii.strings[pdo->name];
-                printf("    (0x%04x ; 0x%02x) - %d bit(s) - %.*s\n", pdo->index, pdo->subindex, pdo->bitlen, static_cast<int>(name.size()), name.data());
+                os << "    (0x" << std::setfill('0') << std::setw(4) << std::hex << pdo->index <<
+                    " ; 0x" << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint16_t>(pdo->subindex) <<
+                    ") - " << std::to_string(pdo->bitlen) << " bit(s) - " << std::string(name) << "\n";
             }
         }
+
+        return os.str();
     }
 
 
     void Slave::printErrorCounters() const
     {
-        printf("-*-*-*-*- slave 0x%04x -*-*-*-*-\n", address);
+        printf("%s", getErrorCounters().c_str());
+    }
+
+
+    std::string Slave::getErrorCounters() const
+    {
+        std::stringstream os;
+        os << "\n -*-*-*-*- slave " << std::to_string(address) << " -*-*-*-*-\n";
         for (int32_t i = 0; i < 4; ++i)
         {
-            printf("Port %d\n", i);
-            printf("  invalid frame:  %d\n", error_counters.rx[i].invalid_frame);
-            printf("  physical layer: %d\n", error_counters.rx[i].physical_layer);
-            printf("  forwarded:      %d\n", error_counters.forwarded[i]);
-            printf("  lost link:      %d\n", error_counters.lost_link[i]);
+            os << "Port " << std::to_string(i) << " \n";
+            os << "  invalid frame:  " << std::to_string(error_counters.rx[i].invalid_frame) << " \n";
+            os << "  physical layer: " << std::to_string(error_counters.rx[i].physical_layer) << " \n";
+            os << "  forwarded:      " << std::to_string(error_counters.forwarded[i]) << " \n";
+            os << "  lost link:      " << std::to_string(error_counters.lost_link[i]) << " \n";
         }
-        printf("\n");
+        os << " \n";
+
+        return os.str();
+    }
+
+
+    int Slave::computeRelativeErrorCounters()
+    {
+        int current_error_sum = computeErrorCounters();
+        int delta_error_sum = current_error_sum - previous_errors_sum;
+
+        previous_errors_sum = current_error_sum;
+        return delta_error_sum;
+    }
+
+
+    bool Slave::checkAbsoluteErrorCounters(int max_absolute_errors)
+    {
+        return computeErrorCounters() > max_absolute_errors;
+    }
+
+
+    int Slave::computeErrorCounters() const
+    {
+        int sum = 0;
+        for (int32_t i = 0; i < 4; ++i)
+        {
+            sum += error_counters.rx[i].invalid_frame;
+            sum += error_counters.rx[i].physical_layer;
+            sum += error_counters.lost_link[i];
+        }
+
+        return sum;
     }
 }

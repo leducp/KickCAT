@@ -55,7 +55,7 @@ TEST(Frame, write_multiples_datagrams)
     uint8_t buffer[PAYLOAD_SIZE];
     for (int32_t i = 0; i < PAYLOAD_SIZE; ++i)
     {
-        buffer[i] = i*i;
+        buffer[i] = static_cast<uint8_t>(i * i);
     }
 
     frame.addDatagram(17, Command::FPRD, 20, nullptr, PAYLOAD_SIZE);
@@ -126,6 +126,7 @@ TEST(Frame, write_multiples_datagrams)
                     }
                     break;
                 }
+                default: {}
             }
         }
 
@@ -142,7 +143,7 @@ TEST(Frame, nextDatagram)
     uint8_t buffer[PAYLOAD_SIZE];
     for (int32_t i = 0; i < PAYLOAD_SIZE; ++i)
     {
-        buffer[i] = i*i;
+        buffer[i] = static_cast<uint8_t>(i * i);
     }
 
     frame.addDatagram(17, Command::FPRD, 20, nullptr, PAYLOAD_SIZE);
@@ -188,6 +189,10 @@ TEST(Frame, nextDatagram)
                 {
                     ASSERT_EQ(static_cast<uint8_t>(j*j), payload[j]);
                 }
+                break;
+            }
+            default:
+            {
                 break;
             }
         }

@@ -50,27 +50,29 @@ namespace kickcat
 
         // asynchrone read/write/mailbox/state methods
         // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
-        void sendGetALStatus(Slave& slave, std::function<void()> const& error);
+        void sendGetALStatus(Slave& slave, std::function<void(DatagramState const&)> const& error);
 
-        void sendLogicalRead(std::function<void()> const& error);
-        void sendLogicalWrite(std::function<void()> const& error);
-        void sendLogicalReadWrite(std::function<void()> const& error);
-        void sendMailboxesChecks(std::function<void()> const& error);   // Fetch in/out mailboxes states (full/empty) of compatible slaves
-        void sendNop(std::function<void()> const& error);               // Send a NOP datagram
+        void sendLogicalRead(std::function<void(DatagramState const&)> const& error);
+        void sendLogicalWrite(std::function<void(DatagramState const&)> const& error);
+        void sendLogicalReadWrite(std::function<void(DatagramState const&)> const& error);
+        void sendMailboxesReadChecks (std::function<void(DatagramState const&)> const& error);  // Fetch in  mailboxes states (full/empty) of compatible slaves
+        void sendMailboxesWriteChecks(std::function<void(DatagramState const&)> const& error);  // Fetch out mailboxes states (full/empty) of compatible slaves
+        void sendNop(std::function<void(DatagramState const&)> const& error);                   // Send a NOP datagram
         void processAwaitingFrames();
 
         // Process messages (read or write slave mailbox) - one at once per slave.
-        void sendReadMessages(std::function<void()> const& error);
-        void sendWriteMessages(std::function<void()> const& error);
-        void sendrefreshErrorCounters(std::function<void()> const& error);
+        void sendReadMessages(std::function<void(DatagramState const&)> const& error);
+        void sendWriteMessages(std::function<void(DatagramState const&)> const& error);
+        void sendRefreshErrorCounters(std::function<void(DatagramState const&)> const& error);
 
-        // helpers around start/finalize oeprations
-        void processDataRead(std::function<void()> const& error);
-        void processDataWrite(std::function<void()> const& error);
-        void processDataReadWrite(std::function<void()> const& error);
+        // helpers around start/finalize operations
+        void finalizeDatagrams(); // send a frame if there is awaiting datagram inside
+        void processDataRead(std::function<void(DatagramState const&)> const& error);
+        void processDataWrite(std::function<void(DatagramState const&)> const& error);
+        void processDataReadWrite(std::function<void(DatagramState const&)> const& error);
 
-        void checkMailboxes( std::function<void()> const& error);
-        void processMessages(std::function<void()> const& error);
+        void checkMailboxes( std::function<void(DatagramState const&)> const& error);
+        void processMessages(std::function<void(DatagramState const&)> const& error);
 
         enum Access
         {

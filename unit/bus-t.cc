@@ -227,7 +227,7 @@ public:
             checkSendFrame(Command::FPRD);
             handleReply<uint8_t>({0, 0x08});// can write, something to read
 
-            answer.sdo.subindex = i;
+            answer.sdo.subindex = static_cast<uint8_t>(i);
             std::memcpy(answer.payload, &data_to_reply[i], sizeof(T));
             checkSendFrame(Command::FPRD);
             handleReply<SDOAnswer>({answer}); // read answer
@@ -249,7 +249,7 @@ TEST_F(BusTest, nop)
     checkSendFrame(Command::NOP);
     handleReply();
 
-    bus.sendNop([](){});
+    bus.sendNop([](DatagramState const&){});
     bus.processAwaitingFrames();
 }
 
@@ -266,7 +266,7 @@ TEST_F(BusTest, error_counters)
     checkSendFrame(Command::FPRD);
     handleReply<ErrorCounters>({counters});
 
-    bus.sendrefreshErrorCounters([](){});
+    bus.sendRefreshErrorCounters([](DatagramState const&){});
     bus.processAwaitingFrames();
 
     auto const& slave = bus.slaves().at(0);
@@ -300,7 +300,7 @@ TEST_F(BusTest, logical_cmd)
     int64_t logical_read = 0x0001020304050607;
     checkSendFrame(Command::LRD);
     handleReply<int64_t>({logical_read});
-    bus.processDataRead([](){});
+    bus.processDataRead([](DatagramState const&){});
 
     for (int i = 0; i < 8; ++i)
     {
@@ -311,7 +311,7 @@ TEST_F(BusTest, logical_cmd)
     std::memcpy(slave.output.data, &logical_write, sizeof(int64_t));
     checkSendFrame(Command::LWR, logical_write);
     handleReply<int64_t>({logical_write});
-    bus.processDataWrite([](){});
+    bus.processDataWrite([](DatagramState const&){});
 
     for (int i = 0; i < 8; ++i)
     {
@@ -323,7 +323,7 @@ TEST_F(BusTest, logical_cmd)
     std::memcpy(slave.output.data, &logical_write, sizeof(int64_t));
     checkSendFrame(Command::LRW, logical_write);
     handleReply<int64_t>({logical_read});
-    bus.processDataReadWrite([](){});
+    bus.processDataReadWrite([](DatagramState const&){});
 
     for (int i = 0; i < 8; ++i)
     {
@@ -333,15 +333,15 @@ TEST_F(BusTest, logical_cmd)
     // check error callbacks
     checkSendFrame(Command::LRD);
     handleReply(0);
-    ASSERT_THROW(bus.processDataRead([](){ throw std::out_of_range(""); }), std::out_of_range);
+    ASSERT_THROW(bus.processDataRead([](DatagramState const&){ throw std::out_of_range(""); }), std::out_of_range);
 
     checkSendFrame(Command::LWR);
     handleReply(0);
-    ASSERT_THROW(bus.processDataWrite([](){ throw std::logic_error(""); }), std::logic_error);
+    ASSERT_THROW(bus.processDataWrite([](DatagramState const&){ throw std::logic_error(""); }), std::logic_error);
 
     checkSendFrame(Command::LRW);
     handleReply(0);
-    ASSERT_THROW(bus.processDataReadWrite([](){ throw std::overflow_error(""); }), std::overflow_error);
+    ASSERT_THROW(bus.processDataReadWrite([](DatagramState const&){ throw std::overflow_error(""); }), std::overflow_error);
 }
 
 
@@ -396,12 +396,12 @@ TEST_F(BusTest, messages_errors)
 
     checkSendFrame(Command::FPRD);
     handleReply(0);
-    bus.sendReadMessages([](){ throw std::logic_error(""); });
+    bus.sendReadMessages([](DatagramState const&){ throw std::logic_error(""); });
     ASSERT_THROW(bus.processAwaitingFrames(), std::logic_error);
 
     checkSendFrame(Command::FPRD);
     handleReply();
-    bus.sendReadMessages([](){ throw std::out_of_range(""); });
+    bus.sendReadMessages([](DatagramState const&){ throw std::out_of_range(""); });
     ASSERT_THROW(bus.processAwaitingFrames(), std::out_of_range);
 }
 

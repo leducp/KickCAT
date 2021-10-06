@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
-        socket->open(argv[1], 100us);
+        socket->open(argv[1], 2ms);
         bus.init();
 
         print_current_state();
@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto callback_error = [](){ THROW_ERROR("something bad happened"); };
+    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
 
     try
     {
@@ -82,6 +82,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    socket->setTimeout(500us);
+
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
     fwrite("latency\n", 1, 8, stat_file);
@@ -90,17 +92,19 @@ int main(int argc, char* argv[])
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(20ms);
+        sleep(1ms);
 
         try
         {
             nanoseconds t1 = since_epoch();
             bus.sendLogicalRead(callback_error);
             bus.sendLogicalWrite(callback_error);
-            bus.sendrefreshErrorCounters(callback_error);
-            bus.sendMailboxesChecks(callback_error);
+            bus.sendRefreshErrorCounters(callback_error);
+            bus.sendMailboxesReadChecks(callback_error);
+            bus.sendMailboxesWriteChecks(callback_error);
             bus.sendReadMessages(callback_error);
             bus.sendWriteMessages(callback_error);
+            bus.finalizeDatagrams();
             nanoseconds t2 = since_epoch();
 
 
