@@ -322,7 +322,7 @@ TEST_F(BusTest, logical_cmd)
     logical_write = 0x1716151413121110;
     std::memcpy(slave.output.data, &logical_write, sizeof(int64_t));
     checkSendFrame(Command::LRW, logical_write);
-    handleReply<int64_t>({logical_read});
+    handleReply<int64_t>({logical_read}, 3);
     bus.processDataReadWrite([](DatagramState const&){});
 
     for (int i = 0; i < 8; ++i)
