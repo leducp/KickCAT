@@ -14,6 +14,7 @@ namespace kickcat
     enum class DatagramState
     {
         LOST,
+        SEND_ERROR,
         INVALID_WKC,
         NO_HANDLER,
         OK

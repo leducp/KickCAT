@@ -226,25 +226,12 @@ namespace kickcat
 
     void Slave::printErrorCounters() const
     {
-        printf("%s", getErrorCounters().c_str());
+        printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", address, toString(error_counters).c_str());
     }
 
-
-    std::string Slave::getErrorCounters() const
+    ErrorCounters const& Slave::errorCounters() const
     {
-        std::stringstream os;
-        os << "\n -*-*-*-*- slave " << std::to_string(address) << " -*-*-*-*-\n";
-        for (int32_t i = 0; i < 4; ++i)
-        {
-            os << "Port " << std::to_string(i) << " \n";
-            os << "  invalid frame:  " << std::to_string(error_counters.rx[i].invalid_frame) << " \n";
-            os << "  physical layer: " << std::to_string(error_counters.rx[i].physical_layer) << " \n";
-            os << "  forwarded:      " << std::to_string(error_counters.forwarded[i]) << " \n";
-            os << "  lost link:      " << std::to_string(error_counters.lost_link[i]) << " \n";
-        }
-        os << " \n";
-
-        return os.str();
+        return error_counters;
     }
 
 

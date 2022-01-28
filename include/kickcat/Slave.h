@@ -21,7 +21,7 @@ namespace kickcat
         std::string getPDOs() const;
 
         void printErrorCounters() const;
-        std::string getErrorCounters() const;
+        ErrorCounters const& errorCounters() const;
         int computeErrorCounters() const;
 
         /// \return the number of new errors since last call.

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string_view>
+#include <string>
 
 namespace kickcat
 {
@@ -159,6 +160,8 @@ namespace kickcat
         uint16_t axi_pdi;
         uint8_t lost_link[4];
     } __attribute__((__packed__));
+
+    std::string toString(ErrorCounters counters);
 
     struct SyncManager
     {

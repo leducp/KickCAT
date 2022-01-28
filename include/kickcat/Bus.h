@@ -42,7 +42,7 @@ namespace kickcat
         // wait for all slaves to reached a state
         void waitForState(State request, nanoseconds timeout);
 
-        // create thje mapping between slaves PI and client buffer
+        // create the mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state
         void createMapping(uint8_t* iomap);
 
