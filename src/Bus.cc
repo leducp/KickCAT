@@ -486,7 +486,7 @@ namespace kickcat
 
             auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                if (wkc != (pi_frame.inputs.size() + pi_frame.outputs.size() * 2))
+                if (wkc != pi_frame.inputs.size())
                 {
                     DEBUG_PRINT("Invalid working counter\n");
                     return DatagramState::INVALID_WKC;

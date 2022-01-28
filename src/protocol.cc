@@ -1,4 +1,5 @@
 #include "protocol.h"
+#include <sstream>
 
 namespace kickcat
 {
@@ -127,5 +128,20 @@ namespace kickcat
             case OPERATIONAL: { return "operational"; }
             default:          { return "unknown";     }
         }
+    }
+
+    std::string toString(ErrorCounters error_counters)
+    {
+        std::stringstream os;
+        for (int32_t i = 0; i < 4; ++i)
+        {
+            os << "Port " << std::to_string(i) << " \n";
+            os << "  invalid frame:  " << std::to_string(error_counters.rx[i].invalid_frame) << " \n";
+            os << "  physical layer: " << std::to_string(error_counters.rx[i].physical_layer) << " \n";
+            os << "  forwarded:      " << std::to_string(error_counters.forwarded[i]) << " \n";
+            os << "  lost link:      " << std::to_string(error_counters.lost_link[i]) << " \n";
+        }
+        os << " \n";
+        return os.str();
     }
 }

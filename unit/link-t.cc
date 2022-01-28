@@ -44,9 +44,10 @@ public:
             }
             return DatagramState::OK;
         },
-        [&](DatagramState const&)
+        [&](DatagramState const& status)
         {
             error_callback_counter++;
+            last_error = status;
         });
     }
 
@@ -56,6 +57,7 @@ protected:
 
     int32_t process_callback_counter{0};
     int32_t error_callback_counter{0};
+    DatagramState last_error{DatagramState::OK};
 };
 
 TEST_F(LinkTest, writeThenRead)
@@ -188,8 +190,9 @@ TEST_F(LinkTest, process_datagrams_invalid_frame)
     }));
     link.processDatagrams();
 
-    ASSERT_EQ(0, process_callback_counter); // datagram lost (invalid frame)
-    ASSERT_EQ(1, error_callback_counter);
+    ASSERT_EQ(0, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);    // datagram lost (invalid frame)
+    ASSERT_EQ(DatagramState::LOST, last_error);
 }
 
 
@@ -207,8 +210,9 @@ TEST_F(LinkTest, process_datagrams_invalid_size)
     }));
     link.processDatagrams();
 
-    ASSERT_EQ(0, process_callback_counter); // datagram lost (invalid frame)
-    ASSERT_EQ(1, error_callback_counter);
+    ASSERT_EQ(0, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);    // datagram lost (read error)
+    ASSERT_EQ(DatagramState::LOST, last_error);
 }
 
 
@@ -226,8 +230,9 @@ TEST_F(LinkTest, process_datagrams_OK)
     }));
     link.processDatagrams();
 
-    ASSERT_EQ(1, process_callback_counter); // datagram lost (invalid frame)
+    ASSERT_EQ(1, process_callback_counter);
     ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
 }
 
 
@@ -242,10 +247,11 @@ TEST_F(LinkTest, process_datagrams_send_error)
     uint8_t payload;
     addDatagram(payload);
 
-    ASSERT_THROW(link.processDatagrams(), Error);
+    ASSERT_NO_THROW(link.processDatagrams());
 
-    ASSERT_EQ(0, process_callback_counter); // datagram lost (invalid frame)
-    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(0, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);   // datagram lost (sent error)
+    ASSERT_EQ(DatagramState::SEND_ERROR, last_error);
 }
 
 

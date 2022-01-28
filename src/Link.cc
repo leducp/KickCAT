@@ -20,8 +20,24 @@ namespace kickcat
 
     void Link::sendFrame()
     {
-        frame_.write(socket_);
-        ++sent_frame_;
+        // save number of datagrams in the frame to handle send error properly if any
+        int32_t const datagrams = frame_.datagramCounter();
+
+        try
+        {
+            frame_.write(socket_);
+            ++sent_frame_;
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("%s\n", e.what());
+
+            for (int32_t i = 0; i < datagrams; ++i)
+            {
+                int32_t index = index_head_ - i - 1;
+                callbacks_[index].status = DatagramState::SEND_ERROR;
+            }
+        }
     }
 
 
