@@ -5,16 +5,31 @@ project(KickCAT)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicated-cond -Wshadow -Wmissing-noreturn")
 
-add_library(kickcat src/Bus.cc
-                    src/CoE.cc
-                    src/Frame.cc
-                    src/Link.cc
-                    src/LinuxSocket.cc
-                    src/Mailbox.cc
-                    src/protocol.cc
-                    src/Slave.cc
-                    src/Time.cc
+set(LIB_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cc
 )
+
+if (UNIX)
+  set(OS_LIB_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
+  )
+elseif(PIKEOS)
+  set(OS_LIB_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Socket.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/ErrorCategory.cc
+  )
+endif()
+
+add_library(kickcat ${LIB_SOURCES} ${OS_LIB_SOURCES})
 target_include_directories(kickcat PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
 set_target_properties(kickcat PROPERTIES
@@ -63,4 +78,4 @@ if (${CODE_COVERAGE})
       )
 endif()
 
-add_subdirectory(example)
+add_subdirectory(examples)

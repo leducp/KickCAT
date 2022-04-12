@@ -10,6 +10,7 @@ Kick-start your slaves!
  - Bus diagnostic: can reset and get errors counters
  - hook to configure non compliant slaves
  - consecutives writes to reduce latency - up to 255 datagrams in flight
+ - build for Linux and PikeOS
 
 ### TODO:
  - CoE: segmented transfer - partial implementation
@@ -19,16 +20,22 @@ Kick-start your slaves!
  - More profiles: FoE, EoE, AoE, SoE
  - Distributed clock
  - AF_XDP Linux socket to improve performance
+ - Addressing groups
 
-
-## Latency
-To improve latency, you have to
+## Operatings systems
+## Linux
+To improve latency on Linux, you have to
  - use Linux RT (PREMPT_RT patches),
  - set a real time scheduler for the program (i.e. with chrt)
  - disable NIC IRQ coalescing (with ethtool)
  - disable RT throttling
  - isolate ethercat task and network IRQ on a dedicated core
  - change network IRQ priority
+
+## PikeOS
+ - Tested on PikeOS 5.1 for native personnality (p4ext)
+ - You have to provide the CMake cross-toolchain file which shall define PIKEOS variable (or adapt the main CMakelists.txt to your needs)
+ - examples are provided with a working but non-optimal process/thread configuration (examples/PikeOS/p4ext_config.c): feel free to adapt it to your needs
 
 
 ## EtherCAT doc

@@ -1,4 +1,5 @@
 #include "protocol.h"
+#include "Error.h"
 #include <sstream>
 
 namespace kickcat
@@ -143,5 +144,16 @@ namespace kickcat
         }
         os << " \n";
         return os.str();
+    }
+
+    uint16_t computeWatchdogTime(nanoseconds watchdog, nanoseconds precision)
+    {
+        auto const wdg_time = watchdog / precision;
+        if ((wdg_time < 0) or (wdg_time > UINT16_MAX))
+        {
+            THROW_ERROR("Invalid watchdog");
+        }
+
+        return static_cast<uint16_t>(wdg_time);
     }
 }

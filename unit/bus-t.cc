@@ -105,7 +105,7 @@ public:
         handleReply<uint32_t>({word});
     }
 
-    void init_bus()
+    void detectAndReset()
     {
         InSequence s;
 
@@ -114,11 +114,31 @@ public:
         handleReply();
 
         // reset slaves
-        for (int i = 0; i < 9; ++i)
+        for (int i = 0; i < 8; ++i)
         {
             checkSendFrame(Command::BWR);
             handleReply();
         }
+    }
+
+    void init_bus(milliseconds watchdog = 100ms)
+    {
+        InSequence s;
+
+        detectAndReset();
+
+        // PDIO Watchdog
+        uint16_t watchdogTimeCheck = static_cast<uint16_t>(watchdog / 100us);
+        checkSendFrame(Command::BWR, uint16_t(0x09C2), true);
+        handleReply();
+        checkSendFrame(Command::BWR, watchdogTimeCheck, true);
+        handleReply();
+        checkSendFrame(Command::BWR, watchdogTimeCheck, true);
+        handleReply();
+
+        // eeprom to master
+        checkSendFrame(Command::BWR);
+        handleReply();
 
         // set addresses
         checkSendFrame(Command::APWR);
@@ -183,7 +203,7 @@ public:
         checkSendFrame(Command::FPRD);
         handleReply<uint8_t>({0x08, 0}); // can write, nothing to read
 
-        bus.init();
+        bus.init(watchdog);
 
         ASSERT_EQ(1, bus.detectedSlaves());
 
@@ -563,4 +583,26 @@ TEST_F(BusTest, detect_mapping_CoE)
     auto& slave = bus.slaves().at(0);
     ASSERT_EQ(5,  slave.output.bsize);
     ASSERT_EQ(10, slave.input.bsize);
+}
+
+
+TEST_F(BusTest, pdio_watchdogs)
+{
+    auto clearForInit = [&]()
+    {
+        ASSERT_EQ(1, bus.detectedSlaves());
+        auto& slave = bus.slaves().at(0);
+        slave.sii.TxPDO.clear();
+        slave.sii.RxPDO.clear();
+    };
+    clearForInit();
+    init_bus(0ms);
+    clearForInit();
+    init_bus(1234ms);
+    clearForInit();
+
+    detectAndReset();
+    ASSERT_THROW(bus.init(10s), Error);
+    detectAndReset();
+    ASSERT_THROW(bus.init(-1s), Error);
 }

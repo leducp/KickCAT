@@ -1,15 +1,15 @@
 #ifndef KICKAT_LINUX_SOCKET_H
 #define KICKAT_LINUX_SOCKET_H
 
-#include "AbstractSocket.h"
+#include "kickcat/AbstractSocket.h"
 
 namespace kickcat
 {
-    class LinuxSocket : public AbstractSocket
+    class Socket : public AbstractSocket
     {
     public:
-        LinuxSocket(microseconds rx_coalescing = -1us, microseconds polling_period = 20us);
-        virtual ~LinuxSocket()
+        Socket(microseconds rx_coalescing = -1us, microseconds polling_period = 20us);
+        virtual ~Socket()
         {
             close();
         }

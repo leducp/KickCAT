@@ -11,7 +11,6 @@
 #include "Frame.h"
 #include "Link.h"
 #include "Slave.h"
-#include "Time.h"
 
 namespace kickcat
 {
@@ -28,7 +27,8 @@ namespace kickcat
         { tiny_wait = tiny; big_wait = big; }
 
         // set the bus from an unknown state to PREOP state
-        void init();
+        // 0ms disables the watchdog
+        void init(nanoseconds watchdog = 100ms);
 
         /// \return the number of slaves detected on the bus
         int32_t detectedSlaves() const;
@@ -105,7 +105,7 @@ namespace kickcat
 
         // INIT state methods
         void detectSlaves();
-        void resetSlaves();
+        void resetSlaves(nanoseconds watchdog);
         void setAddresses();
         void configureMailboxes();
 
