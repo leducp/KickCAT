@@ -1,12 +1,18 @@
 #include "kickcat/Bus.h"
-#include "kickcat/LinuxSocket.h"
+
+#ifdef __linux__
+    #include "kickcat/OS/Linux/Socket.h"
+#elif __PikeOS__
+    #include "kickcat/OS/PikeOS/Socket.h"
+#else
+    #error "Unknown platform"
+#endif
 
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 
 using namespace kickcat;
-
 
 int main(int argc, char* argv[])
 {
@@ -16,7 +22,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto socket = std::make_shared<LinuxSocket>();
+    auto socket = std::make_shared<Socket>();
     Bus bus(socket);
 
     auto print_current_state = [&]()

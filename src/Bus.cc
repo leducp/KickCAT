@@ -53,10 +53,10 @@ namespace kickcat
     }
 
 
-    void Bus::init()
+    void Bus::init(nanoseconds watchdogTimePDIO)
     {
         detectSlaves();
-        resetSlaves();
+        resetSlaves(watchdogTimePDIO);
         setAddresses();
 
         requestState(State::INIT);
@@ -170,7 +170,7 @@ namespace kickcat
     }
 
 
-    void Bus::resetSlaves()
+    void Bus::resetSlaves(nanoseconds watchdog)
     {
         // buffer to reset them all
         uint8_t param[256];
@@ -191,6 +191,15 @@ namespace kickcat
 
         dc_param = 0x0c00;          // reset value
         broadcastWrite(reg::DC_TIME_FILTER, &dc_param, sizeof(dc_param));
+
+        // PDIO watchdogs
+        nanoseconds const precision = 100us;
+        uint16_t const wdg_divider = computeWatchdogDivider(precision);
+        uint16_t const wdg_time = computeWatchdogTime(watchdog, precision);
+
+        broadcastWrite(reg::WDG_DIVIDER,  &wdg_divider, sizeof(wdg_divider));
+        broadcastWrite(reg::WDG_TIME_PDI, &wdg_time,    sizeof(wdg_time));
+        broadcastWrite(reg::WDG_TIME_PDO, &wdg_time,    sizeof(wdg_time));
 
         // eeprom to master
         broadcastWrite(reg::EEPROM_CONFIG, param, 2);
@@ -896,7 +905,7 @@ namespace kickcat
 
     void Bus::clearErrorCounters()
     {
-        uint16_t clear_param[20]; // Note: value is not taken into account by the slave and result will always be zero
+        uint16_t clear_param[20] = {0}; // Note: value is not taken into account by the slave and result will always be zero
         uint16_t wkc = broadcastWrite(reg::ERROR_COUNTERS, clear_param, 20);
         if (wkc != slaves_.size())
         {

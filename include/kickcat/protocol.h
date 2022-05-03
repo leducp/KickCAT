@@ -6,6 +6,8 @@
 #include <string_view>
 #include <string>
 
+#include "Time.h"
+
 namespace kickcat
 {
     // Ethernet description
@@ -119,6 +121,10 @@ namespace kickcat
 
         constexpr uint16_t ECAT_EVENT_MASK = 0x200;
         constexpr uint16_t ERROR_COUNTERS  = 0x300;
+
+        constexpr uint16_t WDG_DIVIDER    = 0x400; // 2 bytes, Default 0x09C2 = 2498 = 100us
+        constexpr uint16_t WDG_TIME_PDI   = 0x410; // 2 bytes, Default 0x03E8: 1000 * WDG_DIVIDER = 100ms
+        constexpr uint16_t WDG_TIME_PDO   = 0x420; // 2 bytes, Default 0x03E8: 1000 * WDG_DIVIDER = 100ms
 
         constexpr uint16_t EEPROM_CONFIG  = 0x500;
         constexpr uint16_t EEPROM_PDI     = 0x501;
@@ -417,7 +423,7 @@ namespace kickcat
     // helpers
     constexpr uint16_t datagram_size(uint16_t data_size)
     {
-        return sizeof(DatagramHeader) + data_size + sizeof(uint16_t);
+        return static_cast<uint16_t>(sizeof(DatagramHeader) + data_size + sizeof(uint16_t));
     }
 
     /// create a position or node address
@@ -425,6 +431,18 @@ namespace kickcat
     {
         return ((offset << 16) | position);
     }
+
+    /// compute the watchdog divider to set from the required watchdog increment step
+    /// Note: the value to set is the divider minus 2
+    constexpr uint16_t computeWatchdogDivider(nanoseconds precision = 100us)
+    {
+        // clock speed is 25MHz -> 1/25MHz = 40ns
+        nanoseconds clock_period = 40ns;
+        return static_cast<uint16_t>((precision / clock_period) - 2);
+    }
+
+    /// compute the watchdog time from the watchdog precision
+    uint16_t computeWatchdogTime(nanoseconds watchdog, nanoseconds precision);
 }
 
 #endif

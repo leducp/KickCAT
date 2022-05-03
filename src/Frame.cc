@@ -1,5 +1,4 @@
 #include <cstring>
-#include <unistd.h>
 
 #include "Frame.h"
 
@@ -16,7 +15,7 @@ namespace kickcat
         std::memset(frame_.data(), 0, frame_.size());
 
         // prepare Ethernet header once for the all future communication
-        std::memset(ethernet_->dst_mac, 0xFF, sizeof(ethernet_->dst_mac));      // broadcast
+        std::memset(ethernet_->dst_mac, 0xFF,    sizeof(ethernet_->dst_mac));      // broadcast
         std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
 
         // type is EtherCAT

@@ -9,13 +9,13 @@
 
 #include <cstring>
 
-#include "LinuxSocket.h"
+#include "OS/Linux/Socket.h"
 #include "protocol.h"
 #include "Time.h"
 
 namespace kickcat
 {
-    LinuxSocket::LinuxSocket(microseconds rx_coalescing, microseconds polling_period)
+    Socket::Socket(microseconds rx_coalescing, microseconds polling_period)
         : AbstractSocket()
         , fd_{-1}
         , rx_coalescing_{rx_coalescing}
@@ -24,7 +24,7 @@ namespace kickcat
 
     }
 
-    void LinuxSocket::open(std::string const& interface, microseconds timeout)
+    void Socket::open(std::string const& interface, microseconds timeout)
     {
         timeout_ = timeout;
 
@@ -115,12 +115,12 @@ namespace kickcat
         }
     }
 
-    void LinuxSocket::setTimeout(microseconds timeout)
+    void Socket::setTimeout(microseconds timeout)
     {
         timeout_ = timeout;
     }
 
-    void LinuxSocket::close() noexcept
+    void Socket::close() noexcept
     {
         if (fd_ == -1)
         {
@@ -135,7 +135,7 @@ namespace kickcat
         fd_ = -1;
     }
 
-    int32_t LinuxSocket::read(uint8_t* frame, int32_t frame_size)
+    int32_t Socket::read(uint8_t* frame, int32_t frame_size)
     {
         nanoseconds deadline = since_epoch() + timeout_;
 
@@ -158,7 +158,7 @@ namespace kickcat
         return -1;
     }
 
-    int32_t LinuxSocket::write(uint8_t const* frame, int32_t frame_size)
+    int32_t Socket::write(uint8_t const* frame, int32_t frame_size)
     {
         return static_cast<int32_t>(::send(fd_, frame, frame_size, MSG_DONTWAIT));
     }
