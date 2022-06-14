@@ -33,6 +33,9 @@ namespace kickcat
         /// \return the number of slaves detected on the bus
         int32_t detectedSlaves() const;
 
+        /// \return the number of slaves detected on the bus
+        int32_t detectSlaves();
+
         // request a state for all slaves
         void requestState(State request);
 
@@ -104,7 +107,6 @@ namespace kickcat
         std::tuple<DatagramHeader const*, T const*, uint16_t> nextDatagram();
 
         // INIT state methods
-        void detectSlaves();
         void resetSlaves(nanoseconds watchdog);
         void setAddresses();
         void configureMailboxes();

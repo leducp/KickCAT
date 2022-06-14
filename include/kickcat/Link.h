@@ -5,20 +5,12 @@
 #include <memory>
 #include <functional>
 
+#include "KickCAT.h"
 #include "Frame.h"
 
 namespace kickcat
 {
     class AbstractSocket;
-
-    enum class DatagramState
-    {
-        LOST,
-        SEND_ERROR,
-        INVALID_WKC,
-        NO_HANDLER,
-        OK
-    };
 
     /// \brief Handle link layer
     /// \details This class is responsible to handle frames and datagrams on the link layers:
