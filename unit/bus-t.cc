@@ -24,7 +24,7 @@ public:
     void SetUp() override
     {
         bus.configureWaitLatency(0ns, 0ns);
-        init_bus();
+        initBus();
     }
 
     template<typename T>
@@ -121,7 +121,7 @@ public:
         }
     }
 
-    void init_bus(milliseconds watchdog = 100ms)
+    void initBus(milliseconds watchdog = 100ms)
     {
         InSequence s;
 
@@ -558,7 +558,6 @@ TEST_F(BusTest, read_SDO_buffer_too_small)
 }
 
 
-
 TEST_F(BusTest, detect_mapping_CoE)
 {
     InSequence s;
@@ -596,13 +595,21 @@ TEST_F(BusTest, pdio_watchdogs)
         slave.sii.RxPDO.clear();
     };
     clearForInit();
-    init_bus(0ms);
+    initBus(0ms);
     clearForInit();
-    init_bus(1234ms);
+    initBus(1234ms);
     clearForInit();
 
     detectAndReset();
     ASSERT_THROW(bus.init(10s), Error);
     detectAndReset();
     ASSERT_THROW(bus.init(-1s), Error);
+}
+
+
+TEST_F(BusTest, init_no_slave_detected)
+{
+    checkSendFrame(Command::BRD);
+    handleReply(0);
+    ASSERT_THROW(bus.init(), Error);
 }

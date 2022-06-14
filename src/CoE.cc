@@ -6,7 +6,10 @@ namespace kickcat
 {
     void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout)
     {
-        auto error_callback = [](DatagramState const&){ THROW_ERROR("error while checking mailboxes"); };
+        auto error_callback = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("error while checking mailboxes", state);
+        };
         nanoseconds now = since_epoch();
 
         while (message->status() == MessageStatus::RUNNING)
@@ -17,7 +20,7 @@ namespace kickcat
 
             if (elapsed_time(now) > timeout)
             {
-                THROW_ERROR("Timeout");
+                THROW_ERROR("Error while reading SDO - Timeout");
             }
         }
     }

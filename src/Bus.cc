@@ -39,23 +39,24 @@ namespace kickcat
     }
 
 
-    void Bus::detectSlaves()
+    int32_t Bus::detectSlaves()
     {
         // we dont really care about the type, we just want a working counter to detect the number of slaves
-        uint16_t wkc = broadcastRead(reg::TYPE, 1);
-        if (wkc == 0)
-        {
-            THROW_ERROR("Invalid working counter");
-        }
-
+        uint16_t wkc = 0;
+        wkc = broadcastRead(reg::TYPE, 1);
         slaves_.resize(wkc);
         DEBUG_PRINT("%lu slave detected on the network\n", slaves_.size());
+        return detectedSlaves();
     }
 
 
     void Bus::init(nanoseconds watchdogTimePDIO)
     {
-        detectSlaves();
+        if (detectSlaves() == 0)
+        {
+            THROW_ERROR("No slave detected");
+        }
+
         resetSlaves(watchdogTimePDIO);
         setAddresses();
 
@@ -69,7 +70,7 @@ namespace kickcat
         waitForState(State::PRE_OP, 3000ms);
 
         // clear mailboxes
-        auto error_callback = [](DatagramState const&){ THROW_ERROR("init error while cleaning slaves mailboxes"); };
+        auto error_callback = [](DatagramState const& state){ THROW_ERROR_DATAGRAM("init error while cleaning slaves mailboxes", state); };
         checkMailboxes(error_callback);
         processMessages(error_callback);
 
