@@ -19,7 +19,9 @@ namespace kickcat
     } __attribute__((__packed__));
 
     constexpr int32_t  ETH_MTU_SIZE = 1500;
+#ifndef ETH_FCS_SIZE
     constexpr int32_t  ETH_FCS_SIZE = 4;
+#endif
     constexpr int32_t  ETH_MAX_SIZE = sizeof(EthernetHeader) + ETH_MTU_SIZE + ETH_FCS_SIZE;
     constexpr int32_t  ETH_MIN_SIZE = 60; // Ethernet disallow sending less than 64 bytes (60 + FCS)
 
