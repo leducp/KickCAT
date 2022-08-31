@@ -10,7 +10,7 @@ env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
 
-jobs:
+jobs:  
   build:
     # The CMake configure and build commands are platform agnostic and should work equally
     # well on Windows or Mac.  You can convert this to a matrix build if you need
@@ -20,6 +20,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: turtlebrowser/get-conan@v1.1
+    
+    - name: GTest
+      run: |
+        mkdir -p ${{github.workspace}}/build
+        cd ${{github.workspace}}/build
+        conan install ../conan/conanfile.txt -pr ../conan/profile_linux_x86_64.txt --build=missing
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
@@ -35,4 +42,3 @@ jobs:
       # Execute tests defined by the CMake configuration.
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ./kickcat_unit
-
