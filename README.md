@@ -37,6 +37,37 @@ To improve latency on Linux, you have to
  - You have to provide the CMake cross-toolchain file which shall define PIKEOS variable (or adapt the main CMakelists.txt to your needs)
  - examples are provided with a working but non-optimal process/thread configuration (examples/PikeOS/p4ext_config.c): feel free to adapt it to your needs
 
+## Build:
+KickCAT project is handled through CMake. To build the project, call CMake to configure it and then the build tool (default on Linux is make):
+  1. Configure the project (more information on https://cmake.org/cmake/help/latest/)
+  ```
+  mkdir -p build
+  cd build
+  cmake ..
+  ```
+  2. Build the project
+  ```
+  make
+  ```
+
+### Build unit tests (optional)
+In order to build unit tests, you have to enable the option BUILD_UNIT_TESTS (default to ON) and to provide GTest package through CMake find_package mechanism.
+Note: you can easily provide GTest via conan package manager:
+  1. Install conan and setup PATH variable (more information on https://docs.conan.io/en/latest/installation.html)
+  ```
+  pip install conan
+  export PATH="$PATH:$HOME/.local/bin"
+  ```
+  2. Install GTest in your build folder:
+  ```
+  mkdir -p build
+  cd build
+  conan install ../conan/conanfile.txt -pr ../conan/profile_linux_x86_64.txt --build=missing
+  ```
+  3. Configure the project (can be done on an already configured project)
+  ```
+  cmake ..
+  ```
 
 ## EtherCAT doc
 https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html&id=3196541253205318339

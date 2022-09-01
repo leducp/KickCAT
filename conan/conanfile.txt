@@ -1,0 +1,8 @@
+[requires]
+gtest/1.12.1
+
+[generators]
+cmake_find_package
+
+[options]
+gtest:build_gmock=True
