@@ -1,4 +1,5 @@
 #include <cstring>
+#include <stack>
 
 #include "Bus.h"
 #include "AbstractSocket.h"
@@ -933,4 +934,27 @@ namespace kickcat
             link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), nullptr, sizeof(ErrorCounters), process, error);
         }
     }
+
+    void Bus::sendGetDLStatus(Slave& slave)
+    {
+        auto process = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+
+            slave.dl_status= *reinterpret_cast<reg::DLStatus const*>(data);
+            return DatagramState::OK;
+        };
+
+        auto error = [](DatagramState const&)
+        {
+            THROW_ERROR("Error while trying to get DL Status.");
+        };
+
+        link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
+        link_.processDatagrams();
+    }
+
 }

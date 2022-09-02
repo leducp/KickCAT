@@ -110,3 +110,25 @@ TEST(Slave, parse_SII)
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(100, output.size()); // No PDO to print
 }
+
+TEST(Slave, countOpenPorts)
+{
+
+    Slave slave;
+    constexpr std::uint8_t mask0 = 1;
+    constexpr std::uint8_t mask1 = 1 << 1;
+    constexpr std::uint8_t mask2 = 1 << 2;
+    constexpr std::uint8_t mask3 = 1 << 3;
+
+    // Testing all combinations of open/closed ports
+    // Enumerates all 4-bits combinations of 1's and 0's, and send n-th bit to n-th port by masking and shifting result to 0th postion
+    for (uint8_t n = 0; n < 16; ++n)
+    {   
+        slave.dl_status.PL_port0 = (n & mask0);
+        slave.dl_status.PL_port1 = (n & mask1) >> 1;
+        slave.dl_status.PL_port2 = (n & mask2) >> 2;
+        slave.dl_status.PL_port3 = (n & mask3) >> 3;
+
+        ASSERT_EQ((n & mask0) + ((n & mask1) >> 1) + ((n & mask2) >> 2) + ((n & mask3) >> 3), slave.countOpenPorts());
+    }
+}

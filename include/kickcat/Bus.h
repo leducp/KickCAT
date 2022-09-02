@@ -54,6 +54,30 @@ namespace kickcat
         // asynchrone read/write/mailbox/state methods
         // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
         void sendGetALStatus(Slave& slave, std::function<void(DatagramState const&)> const& error);
+        void sendGetDLStatus(Slave& slave);
+
+        template<typename T>
+        void sendGetRegister(uint16_t slave_address, uint16_t reg_address, T& value_read)
+        {
+            auto process = [&value_read](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+
+                value_read = *reinterpret_cast<T const*>(data);
+                return DatagramState::OK;
+            };
+
+            auto error = [](DatagramState const&)
+            {
+                THROW_ERROR("Error while trying to get slave register.");
+            };
+
+            link_.addDatagram(Command::FPRD, createAddress(slave_address, reg_address), nullptr, 2, process, error);
+            link_.processDatagrams();
+        }
 
         void sendLogicalRead(std::function<void(DatagramState const&)> const& error);
         void sendLogicalWrite(std::function<void(DatagramState const&)> const& error);
@@ -75,7 +99,8 @@ namespace kickcat
         void processDataReadWrite(std::function<void(DatagramState const&)> const& error);
 
         void checkMailboxes( std::function<void(DatagramState const&)> const& error);
-        void processMessages(std::function<void(DatagramState const&)> const& error);
+        void processMessages(std::function<void(DatagramState const&)> const& error);     
+
 
         enum Access
         {

@@ -9,6 +9,7 @@ set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicate
 set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
@@ -51,6 +52,7 @@ endif()
 
 if (GTest_FOUND)
   add_executable(kickcat_unit unit/bus-t.cc
+                              unit/diagnostics-t.cc
                               unit/frame-t.cc
                               unit/link-t.cc
                               unit/mailbox-t.cc

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <cstring>
+#include <unordered_map>
 
 #include "kickcat/Bus.h"
 #include "Mocks.h"

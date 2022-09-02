@@ -30,6 +30,10 @@ namespace kickcat
         /// \brief  Check the total number of errors since start of the slave
         /// \return True if too many errors detected since start of the slave. Return false otherwise.
         bool checkAbsoluteErrorCounters(int max_absolute_errors);
+        
+        int countOpenPorts();
+
+        void printDLStatus();
 
         uint16_t address;
         uint8_t al_status{State::INVALID};
@@ -47,6 +51,10 @@ namespace kickcat
 
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;
+
+        uint16_t reg_to_check; // For now we only need to check registers that are 16 bits long, this may change in the future
+
+        reg::DLStatus dl_status;
 
         struct SII
         {
@@ -84,6 +92,7 @@ namespace kickcat
         void parseSyncM(uint8_t const* section_start, uint16_t section_size);
         void parsePDO(uint8_t const* section_start, std::vector<eeprom::PDOEntry const*>& pdo);
     };
+
 }
 
 #endif
