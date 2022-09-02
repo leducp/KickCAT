@@ -1,4 +1,5 @@
 #include <cstring>
+#include <stack>
 
 #include "Bus.h"
 #include "AbstractSocket.h"
