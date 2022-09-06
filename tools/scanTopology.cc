@@ -117,7 +117,6 @@ int main(int argc, char* argv[])
 
     printTopology(topology);
 
-    fwrite("\n", 1, 1, top_file);
     fclose(top_file);
     printf("File written");
 }
