@@ -3,29 +3,6 @@
 
 using namespace kickcat;
 
-TEST(Slave, prints)
-{
-    // Test to ensure that nothing explode when using printing helpers (especially when the slave is not initialized)
-    // No check about the content (time consumming and unmaintainable).
-
-    Slave slave;
-
-    testing::internal::CaptureStdout();
-    slave.printInfo();
-    std::string output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(300, output.size());
-
-    testing::internal::CaptureStdout();
-    slave.printPDOs();
-    output = testing::internal::GetCapturedStdout();
-    ASSERT_EQ(0, output.size()); // No PDO to print
-
-    testing::internal::CaptureStdout();
-    slave.printErrorCounters();
-    output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(200, output.size());
-}
-
 
 TEST(Slave, parse_SII)
 {
@@ -98,17 +75,6 @@ TEST(Slave, parse_SII)
     ASSERT_EQ(2, slave.sii.strings.size()); // 2 strings since 0 is unused
     ASSERT_EQ(4, slave.sii.fmmus_.size());
     ASSERT_EQ(1, slave.sii.syncManagers_.size());
-
-    // ensure that print infos displays more stuff when SII is loaded
-    testing::internal::CaptureStdout();
-    slave.printInfo();
-    std::string output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(430, output.size());
-
-    testing::internal::CaptureStdout();
-    slave.printPDOs();
-    output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(100, output.size()); // No PDO to print
 }
 
 TEST(Slave, countOpenPorts)

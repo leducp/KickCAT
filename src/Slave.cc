@@ -5,6 +5,7 @@
 
 namespace kickcat
 {
+<<<<<<< HEAD
 
     void printGeneralEntry(eeprom::GeneralEntry const* general_entry)
     {
@@ -30,6 +31,8 @@ namespace kickcat
         printf( "port_3: %04x \n",                  general_entry->port_3);
     }
 
+=======
+>>>>>>> 2357ac1 (Moved prints to Prints.h)
     void Slave::parseStrings(uint8_t const* section_start)
     {
         sii.strings.push_back(std::string_view()); // index 0 is an empty string
@@ -163,13 +166,6 @@ namespace kickcat
         };
     }
 
-
-    void Slave::printInfo() const
-    {
-        printf("%s", getInfo().c_str());
-    }
-
-
     std::string Slave::getInfo() const
     {
         std::stringstream os;
@@ -209,13 +205,6 @@ namespace kickcat
         return os.str();
     }
 
-
-    void Slave::printPDOs() const
-    {
-        printf("%s", getPDOs().c_str());
-    }
-
-
     std::string Slave::getPDOs() const
     {
         std::stringstream os;
@@ -248,11 +237,6 @@ namespace kickcat
         return os.str();
     }
 
-
-    void Slave::printErrorCounters() const
-    {
-        printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", address, toString(error_counters).c_str());
-    }
 
     ErrorCounters const& Slave::errorCounters() const
     {
@@ -296,30 +280,4 @@ namespace kickcat
                 dl_status.PL_port2 +
                 dl_status.PL_port3;
     }
-
-    void Slave::printDLStatus()
-    {
-        printf("\n -*-*-*-*- slave %u -*-*-*-*-\n", address);
-        printf("Port 0: \n");
-        printf("  Physical Link :  %d \n", dl_status.PL_port0);
-        printf("  Communications : %d \n", dl_status.COM_port0);
-        printf("  Loop Function :  %d \n", dl_status.LOOP_port0);
-
-        printf("Port 1: \n");
-        printf("  Physical Link :  %d \n", dl_status.PL_port1);
-        printf("  Communications : %d \n", dl_status.COM_port1);
-        printf("  Loop Function :  %d \n", dl_status.LOOP_port1);
-
-        printf("Port 2: \n");
-        printf("  Physical Link :  %d \n", dl_status.PL_port2);
-        printf("  Communications : %d \n", dl_status.COM_port2);
-        printf("  Loop Function :  %d \n", dl_status.LOOP_port2);
-
-        printf("Port 3: \n");
-        printf("  Physical Link :  %d \n", dl_status.PL_port3);
-        printf("  Communications : %d \n", dl_status.COM_port3);
-        printf("  Loop Function :  %d \n", dl_status.LOOP_port3);
-    }
-
-
 }
