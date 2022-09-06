@@ -13,6 +13,7 @@ set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cc
@@ -56,6 +57,7 @@ if (GTest_FOUND)
                               unit/frame-t.cc
                               unit/link-t.cc
                               unit/mailbox-t.cc
+                              unit/prints-t.cc
                               unit/protocol-t.cc
                               unit/slave-t.cc
   )
@@ -75,6 +77,7 @@ if (GTest_FOUND)
     include(CodeCoverage)
     append_coverage_compiler_flags()
     set(GCOVR_ADDITIONAL_ARGS "--exclude-unreachable-branches")
+    set(COVERAGE_EXCLUDES "src/Prints.cc")
     setup_target_for_coverage_gcovr_html(
         NAME coverage
         EXECUTABLE kickcat_unit
