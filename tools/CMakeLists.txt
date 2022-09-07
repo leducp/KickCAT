@@ -1,6 +1,6 @@
 set(EXAMPLE_SRCS scanTopology.cc)
 
-add_executable(scanTopology ${EXAMPLE_SRCS} ${OS_SRCS})
+add_executable(scanTopology ${EXAMPLE_SRCS})
 target_link_libraries(scanTopology kickcat)
 set_target_properties(scanTopology PROPERTIES
     CXX_STANDARD 17

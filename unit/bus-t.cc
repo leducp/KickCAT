@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 #include <cstring>
-#include <unordered_map>
 
 #include "kickcat/Bus.h"
 #include "Mocks.h"
@@ -613,4 +612,21 @@ TEST_F(BusTest, init_no_slave_detected)
     checkSendFrame(Command::BRD);
     handleReply(0);
     ASSERT_THROW(bus.init(), Error);
+}
+
+TEST_F(BusTest, send_get_DL_status)
+{
+    auto& slave = bus.slaves().at(0);
+    checkSendFrame(Command::FPRD);
+    handleReply<uint16_t>({0x0530});    //Response is 0000010100110000
+
+    bus.sendGetDLStatus(slave);
+    ASSERT_EQ(slave.dl_status.PL_port0, 1);
+    ASSERT_EQ(slave.dl_status.PL_port1, 1);
+    ASSERT_EQ(slave.dl_status.PL_port2, 0);
+    ASSERT_EQ(slave.dl_status.PL_port3, 0);
+    ASSERT_EQ(slave.dl_status.COM_port0, 0);
+    ASSERT_EQ(slave.dl_status.COM_port1, 0);
+    ASSERT_EQ(slave.dl_status.LOOP_port0, 1);
+    ASSERT_EQ(slave.dl_status.LOOP_port1, 1);
 }

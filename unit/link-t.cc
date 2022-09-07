@@ -372,4 +372,3 @@ TEST_F(LinkTest, process_datagrams_old_frame)
     ASSERT_EQ(1, process_callback_counter); // datagram lost (invalid frame)
     ASSERT_EQ(2, error_callback_counter);
 }
-
