@@ -52,8 +52,6 @@ namespace kickcat
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;
 
-        uint16_t reg_to_check; // For now we only need to check registers that are 16 bits long, this may change in the future
-
         reg::DLStatus dl_status;
 
         struct SII
