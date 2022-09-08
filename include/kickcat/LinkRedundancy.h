@@ -1,5 +1,5 @@
-#ifndef KICKCAT_LINK_H
-#define KICKCAT_LINK_H
+#ifndef KICKCAT_LINK_REDUNDANCY_H
+#define KICKCAT_LINK_REDUNDANCY_H
 
 #include <array>
 #include <memory>
@@ -7,23 +7,24 @@
 
 #include "KickCAT.h"
 #include "Frame.h"
+#include "Link.h"
+
 
 namespace kickcat
 {
-    class AbstractSocket;
-
     /// \brief Handle link layer
     /// \details This class is responsible to handle frames and datagrams on the link layers:
     ///           - associate an id to each datagram to call the associate callback later without depending on the read order
-    ///           - handle link redundancy (TODO)
-    class Link
+    class LinkRedundancy : public Link
     {
     public:
-        Link(std::shared_ptr<AbstractSocket> socket);
-        virtual ~Link() = default;
+        LinkRedundancy(std::shared_ptr<AbstractSocket> socketNominal,
+                       std::shared_ptr<AbstractSocket> socketRedundancy,
+                       std::function<void(void)> const& redundancyActivatedCallback);
+        ~LinkRedundancy() = default;
 
         /// \brief helper for trivial access (i.e. most of the init bus frames)
-        virtual void writeThenRead(Frame& frame);
+        void writeThenRead(Frame& frame) override;
 
         void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                          std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
@@ -36,25 +37,17 @@ namespace kickcat
             addDatagram(command, address, &data, sizeof(data), process, error);
         }
 
+        bool isRedundancyNeeded();
+
         void finalizeDatagrams();
-        virtual void processDatagrams();
+        void processDatagrams() override;
 
-    protected:
-        virtual void sendFrame();
+    private:
+        void sendFrame() override;
 
-        std::shared_ptr<AbstractSocket> socketNominal_;
-        uint8_t index_queue_{0};
-        uint8_t index_head_{0};
-        uint8_t sent_frame_{0};
-        Frame frame_{PRIMARY_IF_MAC};
+        std::shared_ptr<AbstractSocket> socketRedundancy_;
 
-        struct Callbacks
-        {
-            DatagramState status{DatagramState::LOST};
-            std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> process;
-            std::function<void(DatagramState const& state)> error;
-        };
-        std::array<Callbacks, 256> callbacks_{};
+        std::function<void(void)> redundancyActivatedCallback_;
     };
 }
 

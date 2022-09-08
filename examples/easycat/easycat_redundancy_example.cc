@@ -1,5 +1,5 @@
 #include "kickcat/Bus.h"
-#include "kickcat/Prints.h"
+#include "kickcat/LinkRedundancy.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -17,15 +17,34 @@ using namespace kickcat;
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+    if (argc != 3)
     {
-        printf("usage: ./test NIC\n");
+        printf("usage: ./test NIC_nominal NIC_redundancy\n");
         return 1;
     }
 
-    auto socket = std::make_shared<Socket>();
 
-    std::unique_ptr<Link> link = std::make_unique<Link>(socket);
+    auto reportRedundancy = []()
+    {
+        printf("Redundancy has been activated due to loss of a cable \n");
+    };
+
+    auto socketNominal = std::make_shared<Socket>();
+    auto socketRedundancy = std::make_shared<Socket>();
+
+    try
+    {
+        socketNominal->open(argv[1], 2ms);
+        socketRedundancy->open(argv[2], 2ms);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    std::unique_ptr<LinkRedundancy> link= std::make_unique<LinkRedundancy>(socketNominal, socketRedundancy, reportRedundancy);
+
     Bus bus(std::move(link));
 
     auto print_current_state = [&]()
@@ -40,9 +59,9 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
-        socket->open(argv[1], 2ms);
         bus.init();
 
+        printf("Init done \n");
         print_current_state();
 
         bus.createMapping(io_buffer);
@@ -91,7 +110,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    socket->setTimeout(500us);
+    socketNominal->setTimeout(500us);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
@@ -139,7 +158,7 @@ int main(int argc, char* argv[])
 
             if ((i % 1000) == 0)
             {
-                printErrorCounters(easycat);
+                easycat.printErrorCounters();
             }
 
             microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);

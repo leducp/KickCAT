@@ -1,24 +1,53 @@
-#include "Link.h"
+#include "LinkRedundancy.h"
 #include "AbstractSocket.h"
 #include "Time.h"
 
 namespace kickcat
 {
-    Link::Link(std::shared_ptr<AbstractSocket> socket)
-        : socketNominal_(socket)
+    LinkRedundancy::LinkRedundancy(std::shared_ptr<AbstractSocket> socketNominal,
+                                   std::shared_ptr<AbstractSocket> socketRedundancy,
+                                   std::function<void(void)> const& redundancyActivatedCallback
+                                   )
+        : Link(socketNominal)
+        , socketRedundancy_(socketRedundancy)
+        , redundancyActivatedCallback_(redundancyActivatedCallback)
     {
-
+        if (isRedundancyNeeded())
+        {
+            redundancyActivatedCallback_();
+        }
     }
 
 
-    void Link::writeThenRead(Frame& frame)
+    bool LinkRedundancy::isRedundancyNeeded()
+    {
+        Frame frame;
+        frame.addDatagram(0, Command::BRD, createAddress(0, 0x0000), nullptr, 1);
+        frame.write(socketRedundancy_);
+
+        try
+        {
+            frame.read(socketNominal_);
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("%s\n Fail to read nominal interface \n", e.what());
+            frame.read(socketRedundancy_);
+        }
+
+        auto [header, _, wkc] = frame.nextDatagram();
+        return wkc != 0;
+    }
+
+
+    void LinkRedundancy::writeThenRead(Frame& frame)
     {
         frame.write(socketNominal_);
-        frame.read(socketNominal_);
+        frame.read(socketRedundancy_);
     }
 
 
-    void Link::sendFrame()
+    void LinkRedundancy::sendFrame()
     {
         // save number of datagrams in the frame to handle send error properly if any
         int32_t const datagrams = frame_.datagramCounter();
@@ -41,7 +70,7 @@ namespace kickcat
     }
 
 
-    void Link::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
+    void LinkRedundancy::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                            std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                            std::function<void(DatagramState const& state)> const& error)
     {
@@ -69,7 +98,7 @@ namespace kickcat
     }
 
 
-    void Link::finalizeDatagrams()
+    void LinkRedundancy::finalizeDatagrams()
     {
         if (frame_.datagramCounter() != 0)
         {
@@ -78,7 +107,7 @@ namespace kickcat
     }
 
 
-    void Link::processDatagrams()
+    void LinkRedundancy::processDatagrams()
     {
         finalizeDatagrams();
 
@@ -89,7 +118,7 @@ namespace kickcat
         {
             try
             {
-                frame_.read(socketNominal_);
+                frame_.read(socketRedundancy_);
                 while (frame_.isDatagramAvailable())
                 {
                     auto [header, data, wkc] = frame_.nextDatagram();
