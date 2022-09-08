@@ -19,7 +19,7 @@ namespace kickcat
     class Bus
     {
     public:
-        Bus(std::shared_ptr<AbstractSocket> socket);
+        Bus(std::unique_ptr<Link> link);
         ~Bus() = default;
 
         // Enable user to adapt defaults values if they dont fit the current application (i.e. unit tests)
@@ -126,7 +126,7 @@ namespace kickcat
         // mailbox helpers
         void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout);
 
-        Link link_;
+        std::unique_ptr<Link> link_;
         std::vector<Slave> slaves_;
 
         uint8_t* iomap_read_section_;   // pointer on read section (to write back inputs)

@@ -5,9 +5,9 @@
 
 namespace kickcat
 {
-    Bus::Bus(std::shared_ptr<AbstractSocket> socket)
-        : link_(socket)
+    Bus::Bus(std::unique_ptr<Link> link)
     {
+        link_ = std::move(link);
     }
 
 
@@ -21,8 +21,7 @@ namespace kickcat
     {
         Frame frame;
         frame.addDatagram(0, Command::BRD, createAddress(0, ADO), nullptr, data_size);
-        link_.writeThenRead(frame);
-
+        link_->writeThenRead(frame);
         auto [header, _, wkc] = frame.nextDatagram();
         return wkc;
     }
@@ -32,7 +31,7 @@ namespace kickcat
     {
         Frame frame;
         frame.addDatagram(0, Command::BWR, createAddress(0, ADO), data, data_size);
-        link_.writeThenRead(frame);
+        link_->writeThenRead(frame);
 
         auto [header, _, wkc] = frame.nextDatagram();
         return wkc;
@@ -56,7 +55,6 @@ namespace kickcat
         {
             THROW_ERROR("No slave detected");
         }
-
         resetSlaves(watchdogTimePDIO);
         setAddresses();
 
@@ -112,7 +110,7 @@ namespace kickcat
             return DatagramState::OK;
         };
 
-        link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 6, process, error);
+        link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::AL_STATUS), nullptr, 6, process, error);
     }
 
 
@@ -124,7 +122,7 @@ namespace kickcat
         };
 
         sendGetALStatus(slave, error);
-        link_.processDatagrams();
+        link_->processDatagrams();
 
         // error indicator flag set: check status code
         if (slave.al_status & 0x10)
@@ -226,11 +224,11 @@ namespace kickcat
             };
 
             slaves_[i].address = static_cast<uint16_t>(i);
-            link_.addDatagram(Command::APWR, createAddress(0 - slaves_[i].address, reg::STATION_ADDR),
+            link_->addDatagram(Command::APWR, createAddress(0 - slaves_[i].address, reg::STATION_ADDR),
                               slaves_[i].address, process, error);
         }
 
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -256,11 +254,11 @@ namespace kickcat
             {
                 SyncManager SM[2];
                 slave.mailbox.generateSMConfig(SM);
-                link_.addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER), SM, process, error);
+                link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER), SM, process, error);
             }
         }
 
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -441,7 +439,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            link_.addDatagram(Command::LRD, pi_frame.address, nullptr, static_cast<uint16_t>(pi_frame.size), process, error);
+            link_->addDatagram(Command::LRD, pi_frame.address, nullptr, static_cast<uint16_t>(pi_frame.size), process, error);
         }
     }
 
@@ -449,7 +447,7 @@ namespace kickcat
     void Bus::processDataRead(std::function<void(DatagramState const&)> const& error)
     {
         sendLogicalRead(error);
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -472,7 +470,7 @@ namespace kickcat
                 }
                 return DatagramState::OK;
             };
-            link_.addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
+            link_->addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
         }
     }
 
@@ -480,7 +478,7 @@ namespace kickcat
     void Bus::processDataWrite(std::function<void(DatagramState const&)> const& error)
     {
         sendLogicalWrite(error);
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -509,14 +507,14 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            link_.addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
+            link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
         }
     }
 
     void Bus::processDataReadWrite(std::function<void(DatagramState const&)> const& error)
     {
         sendLogicalReadWrite(error);
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -567,7 +565,7 @@ namespace kickcat
             sm.status        = 0x00; // RO register
             sm.activate      = 0x01; // Sync Manager enable
             sm.pdi_control   = 0x00; // RO register
-            link_.addDatagram(Command::FPWR,
+            link_->addDatagram(Command::FPWR,
                               createAddress(slave.address, reg::SYNC_MANAGER + static_cast<uint16_t>(mapping.sync_manager * 8)),
                               sm, process, error);
             DEBUG_PRINT("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
@@ -579,7 +577,7 @@ namespace kickcat
             fmmu.physical_address   = sii_sm->start_adress;
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
-            link_.addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu, process, error);
+            link_->addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu, process, error);
             DEBUG_PRINT("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
         };
 
@@ -589,7 +587,7 @@ namespace kickcat
             prepareDatagrams(slave, slave.output, SyncManagerType::Output);
         }
 
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -620,13 +618,13 @@ namespace kickcat
             sleep(tiny_wait);
             for (auto& slave : slaves_)
             {
-                link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2, process, error);
+                link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2, process, error);
             }
 
             ready = true; // rearm check
             try
             {
-                link_.processDatagrams();
+                link_->processDatagrams();
             }
             catch (...)
             {
@@ -691,9 +689,9 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            link_.addDatagram(Command::FPRD, createAddress(slave->address, reg::EEPROM_DATA), nullptr, 4, process, error);
+            link_->addDatagram(Command::FPRD, createAddress(slave->address, reg::EEPROM_DATA), nullptr, 4, process, error);
         }
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -782,7 +780,7 @@ namespace kickcat
             {
                 continue;
             }
-            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1, process_read,  error);
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1, process_read,  error);
         }
     }
 
@@ -810,7 +808,7 @@ namespace kickcat
             {
                 continue;
             }
-            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1, process_write, error);
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1, process_write, error);
         }
     }
 
@@ -818,7 +816,7 @@ namespace kickcat
     {
         sendMailboxesWriteChecks(error);
         sendMailboxesReadChecks(error);
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
@@ -840,7 +838,7 @@ namespace kickcat
             {
                 // send one waiting message
                 auto message = slave.mailbox.send();
-                link_.addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data(),
+                link_->addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data(),
                                   static_cast<uint16_t>(message->size()), process, error);
             }
         }
@@ -871,7 +869,7 @@ namespace kickcat
             if (slave.mailbox.can_read)
             {
                 // retrieve waiting message
-                link_.addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size, process, error);
+                link_->addDatagram(Command::FPRD, createAddress(slave.address, slave.mailbox.send_offset), nullptr, slave.mailbox.send_size, process, error);
             }
         }
     }
@@ -881,26 +879,26 @@ namespace kickcat
     {
         sendWriteMessages(error);
         sendReadMessages(error);
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
     void Bus::sendNop(std::function<void(DatagramState const&)> const& error)
     {
         auto process = [](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::OK; };
-        link_.addDatagram(Command::NOP, 0, nullptr, 1, process, error);
+        link_->addDatagram(Command::NOP, 0, nullptr, 1, process, error);
     }
 
 
     void Bus::processAwaitingFrames()
     {
-        link_.processDatagrams();
+        link_->processDatagrams();
     }
 
 
     void Bus::finalizeDatagrams()
     {
-        link_.finalizeDatagrams();
+        link_->finalizeDatagrams();
     }
 
 
@@ -930,7 +928,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), nullptr, sizeof(ErrorCounters), process, error);
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::ERROR_COUNTERS), nullptr, sizeof(ErrorCounters), process, error);
         }
     }
 
@@ -952,8 +950,8 @@ namespace kickcat
             THROW_ERROR("Error while trying to get DL Status.");
         };
 
-        link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
-        link_.processDatagrams();
+        link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
+        link_->processDatagrams();
     }
 
 }
