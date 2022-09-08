@@ -55,23 +55,4 @@ namespace kickcat
         }
         return topology;
     }
-<<<<<<< HEAD
-
-    void printTopology(std::unordered_map<uint16_t, uint16_t> topology)
-    {  
-        printf( "\n -*-*-*-*- Topology -*-*-*-*-\n" );
-        for (auto& it : topology)
-        {
-            if (it.first != it.second)
-            {
-                printf( "Slave %04x parent : slave %04x \n", it.first, it.second);
-            }
-            else
-            {
-                printf( "Slave %04x parent : master \n", it.first);
-            }
-        }
-    }
-=======
->>>>>>> 2357ac1 (Moved prints to Prints.h)
 }
