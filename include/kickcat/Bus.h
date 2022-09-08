@@ -54,6 +54,7 @@ namespace kickcat
         // asynchrone read/write/mailbox/state methods
         // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
         void sendGetALStatus(Slave& slave, std::function<void(DatagramState const&)> const& error);
+        void sendGetDLStatus(Slave& slave);
 
         void sendLogicalRead(std::function<void(DatagramState const&)> const& error);
         void sendLogicalWrite(std::function<void(DatagramState const&)> const& error);
@@ -75,7 +76,8 @@ namespace kickcat
         void processDataReadWrite(std::function<void(DatagramState const&)> const& error);
 
         void checkMailboxes( std::function<void(DatagramState const&)> const& error);
-        void processMessages(std::function<void(DatagramState const&)> const& error);
+        void processMessages(std::function<void(DatagramState const&)> const& error);     
+
 
         enum Access
         {
