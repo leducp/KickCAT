@@ -5,7 +5,9 @@
 
 namespace kickcat
 {
-    void printGeneralEntry(eeprom::GeneralEntry const* general_entry) {
+
+    void printGeneralEntry(eeprom::GeneralEntry const* general_entry)
+    {
         printf( "group_info_id: %i \n",             general_entry->group_info_id);
         printf( "image_name_id: %i \n",             general_entry->image_name_id);
         printf( "device_order_id: %i \n",           general_entry->device_order_id);
