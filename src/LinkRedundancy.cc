@@ -52,15 +52,33 @@ namespace kickcat
         // save number of datagrams in the frame to handle send error properly if any
         int32_t const datagrams = frame_.datagramCounter();
 
+        bool is_frame_sent = false;
         try
         {
             frame_.write(socketNominal_);
-            ++sent_frame_;
+            is_frame_sent = true;
         }
         catch (std::exception const& e)
         {
             DEBUG_PRINT("%s\n", e.what());
+        }
 
+        try
+        {
+            frame_.write(socketRedundancy_);
+            is_frame_sent = true;
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("%s\n", e.what());
+        }
+
+        if (is_frame_sent)
+        {
+            sent_frame_++;
+        }
+        else
+        {
             for (int32_t i = 0; i < datagrams; ++i)
             {
                 int32_t index = index_head_ - i - 1;
@@ -107,6 +125,33 @@ namespace kickcat
     }
 
 
+    bool LinkRedundancy::isDatagramAvailable()
+    {
+        return frame_.isDatagramAvailable() or frameRedundancy_.isDatagramAvailable();
+    }
+
+
+    void LinkRedundancy::nextDatagram()
+    {
+        auto [header_nominal, data_nominal, wkc_nominal] = frame_.nextDatagram();
+        auto [header_redundancy, data_redundancy, wkc_redundancy] = frameRedundancy_.nextDatagram();
+        // TODO handle case nominal is not send at all.
+//        printf("wkc_nominal %i, wkc_redundancy %i \n", wkc_nominal, wkc_redundancy);
+
+        for (uint8_t i = 0; i < header_nominal->len; i++)
+        {
+//            printf("Before: Nominal: %04x, Redundancy %04x \n", *(data_nominal + i), *(data_redundancy + i));
+            *(data_nominal + i) |= *(data_redundancy + i);
+//            printf("After: Res: %04x \n", *(data_nominal + i));
+        }
+
+        uint16_t wkc = wkc_nominal + wkc_redundancy;
+//        printf("After wkc_nominal %i, wkc_redundancy %i \n", wkc_nominal, wkc_redundancy);
+        callbacks_[header_nominal->index].status = callbacks_[header_nominal->index].process(header_nominal, data_nominal, wkc);
+//        printf("Callback index %i , status %s \n", header_nominal->index, toString(callbacks_[header_nominal->index].status));
+    }
+
+
     void LinkRedundancy::processDatagrams()
     {
         finalizeDatagrams();
@@ -119,16 +164,35 @@ namespace kickcat
             try
             {
                 frame_.read(socketRedundancy_);
-                while (frame_.isDatagramAvailable())
-                {
-                    auto [header, data, wkc] = frame_.nextDatagram();
-                    callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
-                }
+
             }
             catch (std::exception const& e)
             {
-                DEBUG_PRINT("%s\n", e.what());
+                DEBUG_PRINT("Nominal read fail %s\n", e.what());
             }
+
+            try
+            {
+                frameRedundancy_.read(socketNominal_);
+            }
+            catch (std::exception const& e)
+            {
+                DEBUG_PRINT("redundancy read fail %s\n", e.what());
+            }
+
+
+            while (isDatagramAvailable())
+            {
+                nextDatagram();
+            }
+
+            // isDatagramAvailable()
+
+//            while (frame_.isDatagramAvailable())
+//            {
+//                auto [header, data, wkc] = frame_.nextDatagram();
+//                callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
+//            }
         }
 
         std::exception_ptr client_exception;
@@ -139,6 +203,7 @@ namespace kickcat
                 // Datagram was either lost or processing it encountered an error.
                 try
                 {
+//                    printf("Error callback index %i \n", i);
                     callbacks_[i].error(callbacks_[i].status);
                 }
                 catch (...)
@@ -150,10 +215,12 @@ namespace kickcat
             // Attach a callback to handle not THAT lost frames.
             // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
             callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socketNominal_); return DatagramState::OK; };
+            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socketRedundancy_); return DatagramState::OK; };
         }
 
         index_queue_ = index_head_;
         frame_.clear();
+        frameRedundancy_.clear();
 
         // Rethrow last catched client exception.
         if (client_exception)

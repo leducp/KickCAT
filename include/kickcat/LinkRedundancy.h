@@ -45,7 +45,12 @@ namespace kickcat
     private:
         void sendFrame() override;
 
+        bool isDatagramAvailable();
+
+        void nextDatagram();
+
         std::shared_ptr<AbstractSocket> socketRedundancy_;
+        Frame frameRedundancy_{SECONDARY_IF_MAC};
 
         std::function<void(void)> redundancyActivatedCallback_;
     };

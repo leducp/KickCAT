@@ -36,7 +36,7 @@ namespace kickcat
 
         /// \brief helper to get access on next datagram
         /// \return a tuple with a pointer on the datagram header, a pointer on the datagram data, the working counter
-        std::tuple<DatagramHeader const*, uint8_t const*, uint16_t> nextDatagram();
+        std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram();
 
         /// \return number of datagram already written in the frame
         int32_t datagramCounter() const { return datagram_counter_; }
