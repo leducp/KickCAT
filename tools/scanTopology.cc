@@ -1,5 +1,6 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Diagnostics.h"
+#include "kickcat/Prints.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -61,7 +62,7 @@ int main(int argc, char* argv[])
         bus.sendGetDLStatus(slave);
         bus.finalizeDatagrams();
 
-        slave.printDLStatus();
+        printDLStatus(slave);
     }
 
     std::unordered_map<uint16_t, uint16_t> topology = getTopology(bus.slaves());
