@@ -13,6 +13,7 @@ set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cc
@@ -56,6 +57,7 @@ if (GTest_FOUND)
                               unit/frame-t.cc
                               unit/link-t.cc
                               unit/mailbox-t.cc
+                              unit/prints-t.cc
                               unit/protocol-t.cc
                               unit/slave-t.cc
   )
@@ -78,7 +80,7 @@ if (GTest_FOUND)
     setup_target_for_coverage_gcovr_html(
         NAME coverage
         EXECUTABLE kickcat_unit
-        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*"
+        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*" "src/Prints.cc"
         )
   endif()
 endif()
