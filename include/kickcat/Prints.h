@@ -10,14 +10,14 @@
 namespace kickcat
 {
     // Slaves utils
-    void printInfo(Slave slave);
-    void printPDOs(Slave slave);
-    void printErrorCounters(Slave slave);
-    void printDLStatus(Slave slave);
-    void printGeneralEntry(Slave slave);
+    void printInfo(const Slave& slave);
+    void printPDOs(const Slave& slave);
+    void printErrorCounters(const Slave& slave);
+    void printDLStatus(const Slave& slave);
+    void printGeneralEntry(const Slave& slave);
 
     // Topology utils
-    void printTopology(std::unordered_map<uint16_t, uint16_t> map);
+    void printTopology(const std::unordered_map<uint16_t, uint16_t>& topology_mapping);
 }
 
 #endif

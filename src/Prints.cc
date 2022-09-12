@@ -2,22 +2,22 @@
 
 namespace kickcat
 {
-    void printInfo(Slave slave)
+    void printInfo(const Slave& slave)
     {
         printf("%s", slave.getInfo().c_str());
     }
 
-    void printPDOs(Slave slave)
+    void printPDOs(const Slave& slave)
     {
         printf("%s", slave.getPDOs().c_str());
     }
 
-    void printErrorCounters(Slave slave)
+    void printErrorCounters(const Slave& slave)
     {
         printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", slave.address, toString(slave.error_counters).c_str());
     }
 
-    void printDLStatus(Slave slave)
+    void printDLStatus(const Slave& slave)
     {
         printf("\n -*-*-*-*- slave %u -*-*-*-*-\n", slave.address);
         printf("Port 0: \n");
@@ -41,7 +41,7 @@ namespace kickcat
         printf("  Loop Function :  %d \n", slave.dl_status.LOOP_port3);
     }
 
-    void printGeneralEntry(Slave slave) {
+    void printGeneralEntry(const Slave& slave) {
         eeprom::GeneralEntry const* general_entry = slave.sii.general;
         
         if (general_entry == NULL)
@@ -74,10 +74,10 @@ namespace kickcat
     }
 
 
-    void printTopology(std::unordered_map<uint16_t, uint16_t> topology)
+    void printTopology(const std::unordered_map<uint16_t, uint16_t>& topology_mapping)
     {  
         printf( "\n -*-*-*-*- Topology -*-*-*-*-\n" );
-        for (auto& it : topology)
+        for (auto& it : topology_mapping)
         {
             if (it.first != it.second)
             {
