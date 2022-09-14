@@ -41,10 +41,11 @@ namespace kickcat
         printf("  Loop Function :  %d \n", slave.dl_status.LOOP_port3);
     }
 
-    void printGeneralEntry(Slave const& slave) {
+    void printGeneralEntry(Slave const& slave) 
+    {
         eeprom::GeneralEntry const* general_entry = slave.sii.general;
         
-        if (general_entry == NULL)
+        if (general_entry == nullptr)
         {
             printf("Uninitialized SII - Nothing to print");
         }
