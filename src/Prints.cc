@@ -77,7 +77,7 @@ namespace kickcat
     void printTopology(std::unordered_map<uint16_t, uint16_t> const& topology_mapping)
     {  
         printf( "\n -*-*-*-*- Topology -*-*-*-*-\n" );
-        for (auto& it : topology_mapping)
+        for (auto const& it : topology_mapping)
         {
             if (it.first != it.second)
             {
