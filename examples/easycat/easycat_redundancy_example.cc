@@ -13,6 +13,9 @@
 #include <fstream>
 #include <algorithm>
 
+#include "kickcat/Teleplot.h"
+#include "kickcat/DebugHelper.h"
+
 using namespace kickcat;
 
 int main(int argc, char* argv[])
@@ -110,61 +113,79 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+//    uint16_t dl_status_slave0;
+//    LinkRedundancy linkDebug(socketNominal, socketRedundancy, reportRedundancy);
+//    sendGetRegister(linkDebug, 0, reg::ESC_DL_STATUS, dl_status_slave0);
+//    printf("DL status %06x \n", dl_status_slave0);
+//
+//    uint16_t dl_control_slave0;
+//    sendGetRegister(linkDebug, 0, reg::ESC_DL_CONTROL, dl_control_slave0);
+//    printf("DL control %06x \n", dl_control_slave0);
+//
+//    uint16_t dl_control_write = 0xC01;
+//    sendWriteRegister(linkDebug, 0, reg::ESC_DL_CONTROL, dl_control_write);
+//
+//    sendGetRegister(linkDebug, 0, reg::ESC_DL_CONTROL, dl_control_slave0);
+//    printf("DL control %06x \n", dl_control_slave0);
+
+//    std::abort();
     socketNominal->setTimeout(500us);
+    socketRedundancy->setTimeout(500us);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
-    FILE* stat_file = fopen("stats.csv", "w");
-    fwrite("latency\n", 1, 8, stat_file);
 
-    auto& easycat = bus.slaves().at(0);
+    auto& easycat0 = bus.slaves().at(0);
+    auto& easycat1 = bus.slaves().at(1);
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(1ms);
+        sleep(1000ms);
 
         try
         {
-            nanoseconds t1 = since_epoch();
             bus.sendLogicalRead(callback_error);
-            bus.sendLogicalWrite(callback_error);
-            bus.sendRefreshErrorCounters(callback_error);
-            bus.sendMailboxesReadChecks(callback_error);
-            bus.sendMailboxesWriteChecks(callback_error);
-            bus.sendReadMessages(callback_error);
-            bus.sendWriteMessages(callback_error);
+//            bus.sendLogicalWrite(callback_error);
+//            bus.sendRefreshErrorCounters(callback_error);
+//            bus.sendMailboxesReadChecks(callback_error);
+//            bus.sendMailboxesWriteChecks(callback_error);
+//            bus.sendReadMessages(callback_error);
+//            bus.sendWriteMessages(callback_error);
             bus.finalizeDatagrams();
-            nanoseconds t2 = since_epoch();
 
 
-            nanoseconds t3 = since_epoch();
             bus.processAwaitingFrames();
-            nanoseconds t4 = since_epoch();
 
-            for (int32_t j = 0;  j < easycat.input.bsize; ++j)
+//            sendGetRegister(linkDebug, 0, reg::ESC_DL_CONTROL, dl_control_slave0);
+//            printf("DL control %06x \n", dl_control_slave0);
+//
+//            sendGetRegister(linkDebug, 0, reg::ESC_DL_STATUS, dl_status_slave0);
+//            printf("DL status %06x \n", dl_status_slave0);
+
+            for (int32_t j = 0;  j < easycat0.input.bsize; ++j)
             {
-                printf("%02x ", easycat.input.data[j]);
+                printf("%02x ", easycat0.input.data[j]);
+            }
+            printf("\n");
+            for (int32_t j = 0;  j < easycat1.input.bsize; ++j)
+            {
+                printf("%02x ", easycat1.input.data[j]);
             }
             printf("\r");
 
-            // blink a led - EasyCAT example for Arduino
-            if ((i % 50) < 25)
-            {
-                easycat.output.data[0] = 1;
-            }
-            else
-            {
-                easycat.output.data[0] = 0;
-            }
+//
+//            if ((i % 1000) == 0)
+//            {
+//                easycat1.printErrorCounters();
+//            }
+//
+//            for (auto& slave : bus.slaves())
+//            {
+//                bus.sendGetDLStatus(slave);
+//                bus.finalizeDatagrams();
+//
+//                slave.printDLStatus();
+//            }
 
-            if ((i % 1000) == 0)
-            {
-                easycat.printErrorCounters();
-            }
-
-            microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);
-            std::string sample_str = std::to_string(sample.count());
-            fwrite(sample_str.data(), 1, sample_str.size(), stat_file);
-            fwrite("\n", 1, 1, stat_file);
         }
         catch (std::exception const& e)
         {
@@ -172,9 +193,9 @@ int main(int argc, char* argv[])
             last_error = i;
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
-    }
 
-    fclose(stat_file);
+        printf("\n ---------------------------------------------------------------------------- \n");
+    }
 
     return 0;
 }

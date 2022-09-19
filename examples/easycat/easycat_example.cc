@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    socket->setTimeout(500us);
+    socket->setTimeout(2000us);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
