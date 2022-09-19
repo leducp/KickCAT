@@ -90,6 +90,7 @@ namespace kickcat
         header->command = command;
         header->address = address;
         header->len = data_size;
+        header->circulating = 0;
         header->multiple = 1;   // by default, consider that more datagrams will follow
         header->IRQ = 0;        //TODO what's that ?
 
