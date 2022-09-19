@@ -5,7 +5,7 @@
 
 namespace kickcat
 {
-    Bus::Bus(std::unique_ptr<Link> link)
+    Bus::Bus(std::unique_ptr<LinkRedundancy> link)
     {
         link_ = std::move(link);
     }
@@ -19,22 +19,28 @@ namespace kickcat
 
     uint16_t Bus::broadcastRead(uint16_t ADO, uint16_t data_size)
     {
-        Frame frame;
+        Frame frame, frame_redundancy;
         frame.addDatagram(0, Command::BRD, createAddress(0, ADO), nullptr, data_size);
-        link_->writeThenRead(frame);
+        frame_redundancy.addDatagram(0, Command::BRD, createAddress(0, ADO), nullptr, data_size);
+        link_->writeThenRead(frame, frame_redundancy);
         auto [header, _, wkc] = frame.nextDatagram();
-        return wkc;
+        auto [header_red, _2, wkc_red] = frame_redundancy.nextDatagram();
+
+        printf("wkc N: %i, wkc R: %i \n", wkc, wkc_red);
+        return wkc + wkc_red;
     }
 
 
     uint16_t Bus::broadcastWrite(uint16_t ADO, void const* data, uint16_t data_size)
     {
-        Frame frame;
+        Frame frame, frame_redundancy;
         frame.addDatagram(0, Command::BWR, createAddress(0, ADO), data, data_size);
-        link_->writeThenRead(frame);
+        frame_redundancy.addDatagram(0, Command::BWR, createAddress(0, ADO), data, data_size);
+        link_->writeThenRead(frame, frame_redundancy);
 
         auto [header, _, wkc] = frame.nextDatagram();
-        return wkc;
+        auto [header_red, _2, wkc_red] = frame_redundancy.nextDatagram();
+        return wkc + wkc_red;
     }
 
 
@@ -428,7 +434,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.inputs.size())
                 {
-                    DEBUG_PRINT("Invalid working counter\n");
+                    DEBUG_PRINT("Invalid working counter wkc: %i\n", wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -465,7 +471,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.outputs.size())
                 {
-                    DEBUG_PRINT("Invalid working counter\n");
+                    DEBUG_PRINT("Invalid working counter: %i \n", wkc);
                     return DatagramState::INVALID_WKC;
                 }
                 return DatagramState::OK;

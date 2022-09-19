@@ -113,6 +113,7 @@ namespace kickcat
         constexpr uint16_t ESC_DL_PORT   = 0x101;
         constexpr uint16_t ESC_DL_ALIAS  = 0x103;
         constexpr uint16_t ESC_DL_STATUS = 0x110;
+        constexpr uint16_t ESC_DL_CONTROL = 0x100;
 
         constexpr uint16_t AL_CONTROL     = 0x120;
         constexpr uint16_t AL_STATUS      = 0x130;
@@ -436,8 +437,8 @@ namespace kickcat
     }
 
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
-    constexpr uint8_t PRIMARY_IF_MAC[6]   = { 0x02, 0x00, 0xCA, 0xCA, 0x00, 0xFF };
-    constexpr uint8_t SECONDARY_IF_MAC[6] = { 0x02, 0x00, 0xCA, 0xFF, 0xEE, 0xFF };
+    constexpr uint8_t PRIMARY_IF_MAC[6]   = { 0xCA, 0xDE, 0xCA, 0xDE, 0xDE, 0xFF };
+    constexpr uint8_t SECONDARY_IF_MAC[6] = { 0x03, 0x02, 0x02, 0x02, 0xFF, 0xFF };
 
     // helpers
     constexpr uint16_t datagram_size(uint16_t data_size)

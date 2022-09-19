@@ -2,6 +2,8 @@
 #include "AbstractSocket.h"
 #include "Time.h"
 
+#include "Teleplot.h"
+
 namespace kickcat
 {
     LinkRedundancy::LinkRedundancy(std::shared_ptr<AbstractSocket> socketNominal,
@@ -40,10 +42,43 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::writeThenRead(Frame& frame)
+    void LinkRedundancy::writeThenRead(Frame& frame, Frame& frame_redundancy)
     {
-        frame.write(socketNominal_);
-        frame.read(socketRedundancy_);
+        try
+        {
+            frame.write(socketNominal_);
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("%s\n", e.what());
+        }
+
+        try
+        {
+            frame_redundancy.write(socketRedundancy_);
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("%s\n", e.what());
+        }
+
+        try
+        {
+            frame.read(socketRedundancy_);
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("Nominal read fail %s\n", e.what());
+        }
+
+        try
+        {
+            frame_redundancy.read(socketNominal_);
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("redundancy read fail %s\n", e.what());
+        }
     }
 
 
@@ -65,7 +100,7 @@ namespace kickcat
 
         try
         {
-            frame_.write(socketRedundancy_);
+            frameRedundancy_.write(socketRedundancy_);
             is_frame_sent = true;
         }
         catch (std::exception const& e)
@@ -104,6 +139,7 @@ namespace kickcat
         }
 
         frame_.addDatagram(index_head_, command, address, data, data_size);
+        frameRedundancy_.addDatagram(index_head_, command, address, data, data_size);
         callbacks_[index_head_].process = process;
         callbacks_[index_head_].error = error;
         callbacks_[index_head_].status = DatagramState::LOST;
@@ -136,7 +172,9 @@ namespace kickcat
         auto [header_nominal, data_nominal, wkc_nominal] = frame_.nextDatagram();
         auto [header_redundancy, data_redundancy, wkc_redundancy] = frameRedundancy_.nextDatagram();
         // TODO handle case nominal is not send at all.
-//        printf("wkc_nominal %i, wkc_redundancy %i \n", wkc_nominal, wkc_redundancy);
+
+        Teleplot::localhost().update("wkc nominal frame", wkc_nominal);
+        Teleplot::localhost().update("wkc redundancy frame", wkc_redundancy);
 
         for (uint8_t i = 0; i < header_nominal->len; i++)
         {
@@ -146,9 +184,7 @@ namespace kickcat
         }
 
         uint16_t wkc = wkc_nominal + wkc_redundancy;
-//        printf("After wkc_nominal %i, wkc_redundancy %i \n", wkc_nominal, wkc_redundancy);
         callbacks_[header_nominal->index].status = callbacks_[header_nominal->index].process(header_nominal, data_nominal, wkc);
-//        printf("Callback index %i , status %s \n", header_nominal->index, toString(callbacks_[header_nominal->index].status));
     }
 
 
@@ -164,7 +200,6 @@ namespace kickcat
             try
             {
                 frame_.read(socketRedundancy_);
-
             }
             catch (std::exception const& e)
             {
@@ -180,19 +215,18 @@ namespace kickcat
                 DEBUG_PRINT("redundancy read fail %s\n", e.what());
             }
 
-
-            while (isDatagramAvailable())
-            {
-                nextDatagram();
-            }
-
-            // isDatagramAvailable()
-
-//            while (frame_.isDatagramAvailable())
+//            try
 //            {
-//                auto [header, data, wkc] = frame_.nextDatagram();
-//                callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
+                while (isDatagramAvailable())
+                {
+                    nextDatagram();
+                }
 //            }
+//            catch (std::exception const& e)
+//            {
+//                DEBUG_PRINT("Next datagram fail: %s\n", e.what());
+//            }
+
         }
 
         std::exception_ptr client_exception;
@@ -203,7 +237,6 @@ namespace kickcat
                 // Datagram was either lost or processing it encountered an error.
                 try
                 {
-//                    printf("Error callback index %i \n", i);
                     callbacks_[i].error(callbacks_[i].status);
                 }
                 catch (...)
@@ -214,8 +247,31 @@ namespace kickcat
 
             // Attach a callback to handle not THAT lost frames.
             // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
-            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socketNominal_); return DatagramState::OK; };
-            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socketRedundancy_); return DatagramState::OK; };
+            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t)
+                {
+                    try
+                    {
+                        frame_.read(socketNominal_);
+                        printf("socketNominal_ Read in lost frame \n");
+
+                    }
+                    catch (std::exception const& e)
+                    {
+                        DEBUG_PRINT("Process lost Nominal frame failed %s\n", e.what());
+                    }
+
+                    try
+                    {
+                        frame_.read(socketRedundancy_);
+                        printf("socketRedundancy_ Read in lost frame \n");
+
+                    }
+                    catch (std::exception const& e)
+                    {
+                        DEBUG_PRINT("Process lost Redundancy frame failed %s\n", e.what());
+                    }
+                    return DatagramState::OK;
+                };
         }
 
         index_queue_ = index_head_;

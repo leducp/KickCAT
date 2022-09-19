@@ -24,7 +24,7 @@ namespace kickcat
         ~LinkRedundancy() = default;
 
         /// \brief helper for trivial access (i.e. most of the init bus frames)
-        void writeThenRead(Frame& frame) override;
+        void writeThenRead(Frame& frame, Frame& frame_redundancy);
 
         void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                          std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
