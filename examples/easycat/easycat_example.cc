@@ -1,4 +1,5 @@
 #include "kickcat/Bus.h"
+#include "kickcat/Prints.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -136,7 +137,7 @@ int main(int argc, char* argv[])
 
             if ((i % 1000) == 0)
             {
-                easycat.printErrorCounters();
+                printErrorCounters(easycat);
             }
 
             microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);
