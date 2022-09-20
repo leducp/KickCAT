@@ -17,7 +17,7 @@ namespace kickcat
     void printGeneralEntry(Slave const& slave);
 
     // Topology utils
-    void printTopology(std::unordered_map<uint16_t, uint16_t> const& map);
+    void printTopology(std::unordered_map<uint16_t, uint16_t> const& topology_mapping);
 }
 
 #endif

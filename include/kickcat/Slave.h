@@ -15,7 +15,9 @@ namespace kickcat
         void parseSII();
 
         std::string getInfo() const;
+
         std::string getPDOs() const;
+
         ErrorCounters const& errorCounters() const;
         int computeErrorCounters() const;
 
@@ -27,7 +29,6 @@ namespace kickcat
         bool checkAbsoluteErrorCounters(int max_absolute_errors);
         
         int countOpenPorts();
-
 
         uint16_t address;
         uint8_t al_status{State::INVALID};

@@ -133,7 +133,6 @@ namespace kickcat
             {
                 return State(slave.al_status & 0xF);
             }
-            printf("At address %04x", slave.address);
             THROW_ERROR_CODE("State transition error", slave.al_status_code);
         }
         return State(slave.al_status);

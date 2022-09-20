@@ -1,6 +1,5 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Diagnostics.h"
-#include "kickcat/protocol.h"
 #include "kickcat/Prints.h"
 
 #ifdef __linux__
@@ -12,7 +11,6 @@
 #endif
 
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <algorithm>
 
@@ -44,54 +42,6 @@ int main(int argc, char* argv[])
         socket->open(argv[1], 2ms);
         bus.init();
 
-        Slave& pelvis = bus.slaves().at(0);
-        pelvis.is_static_mapping = true;
-        pelvis.input.bsize = 356;
-        pelvis.output.bsize = 8;
-        pelvis.input.sync_manager = 2;
-        pelvis.output.sync_manager = 1;
-
-        Slave& ankle = bus.slaves().at(1);
-        ankle.is_static_mapping = true;
-        ankle.input.bsize = 114;
-        ankle.output.bsize = 4;
-        ankle.input.sync_manager = 2;
-        ankle.output.sync_manager = 1;
-
-        print_current_state();
-
-        bus.createMapping(io_buffer);
-
-        bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 1s);
-        print_current_state();
-    }
-    catch (ErrorCode const& e)
-    {
-        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
-        return 1;
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << e.what() << std::endl;
-        return 1;
-    }
-
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-
-    try
-    {
-        bus.processDataRead(callback_error);
-    }
-    catch (...)
-    {
-        //We do not know expected wkc - To be completed if we do
-    }
-
-    try
-    {
-        //bus.requestState(State::OPERATIONAL);
-        //bus.waitForState(State::OPERATIONAL, 100ms);
         print_current_state();
     }
     catch (ErrorCode const& e)

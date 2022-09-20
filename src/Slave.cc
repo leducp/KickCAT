@@ -138,7 +138,6 @@ namespace kickcat
         };
     }
 
-
     std::string Slave::getInfo() const
     {
         std::stringstream os;

@@ -3,6 +3,7 @@
 
 using namespace kickcat;
 
+
 TEST(Slave, parse_SII)
 {
     Slave slave;
@@ -80,10 +81,10 @@ TEST(Slave, countOpenPorts)
 {
 
     Slave slave;
-    constexpr std::uint8_t mask0 = 1;
-    constexpr std::uint8_t mask1 = 1 << 1;
-    constexpr std::uint8_t mask2 = 1 << 2;
-    constexpr std::uint8_t mask3 = 1 << 3;
+    constexpr uint8_t mask0 = 1;
+    constexpr uint8_t mask1 = 1 << 1;
+    constexpr uint8_t mask2 = 1 << 2;
+    constexpr uint8_t mask3 = 1 << 3;
 
     // Testing all combinations of open/closed ports
     // Enumerates all 4-bits combinations of 1's and 0's, and send n-th bit to n-th port by masking and shifting result to 0th postion
