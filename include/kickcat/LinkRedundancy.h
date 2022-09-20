@@ -7,52 +7,51 @@
 
 #include "KickCAT.h"
 #include "Frame.h"
-#include "Link.h"
+#include "AbstractLink.h"
+#include "NetworkInterface.h"
 
 
 namespace kickcat
 {
-    /// \brief Handle link layer
-    /// \details This class is responsible to handle frames and datagrams on the link layers:
-    ///           - associate an id to each datagram to call the associate callback later without depending on the read order
-    class LinkRedundancy : public Link
+    class AbstractSocket;
+
+    class LinkRedundancy : public AbstractLink
     {
     public:
-        LinkRedundancy(std::shared_ptr<AbstractSocket> socketNominal,
-                       std::shared_ptr<AbstractSocket> socketRedundancy,
-                       std::function<void(void)> const& redundancyActivatedCallback);
+        LinkRedundancy(std::shared_ptr<AbstractSocket> socket_nominal,
+                       std::shared_ptr<AbstractSocket> socket_redundancy,
+                       std::function<void(void)> const& redundancyActivatedCallback,
+                       uint8_t const src_mac_nominal[MAC_SIZE] = PRIMARY_IF_MAC,
+                       uint8_t const src_mac_redundancy[MAC_SIZE] = SECONDARY_IF_MAC);
         ~LinkRedundancy() = default;
 
-        /// \brief helper for trivial access (i.e. most of the init bus frames)
-        void writeThenRead(Frame& frame, Frame& frame_redundancy);
+        /// \brief Since this method is only used for non real time operation, the redundancy mechanism used is slower
+        ///        but allow to keep a consistent interface between with and without redundancy.
+        void writeThenRead(Frame& frame) override;
 
-        void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
-                         std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void(DatagramState const& state)> const& error);
-        template<typename T>
-        void addDatagram(enum Command command, uint32_t address, T const& data,
-                         std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void(DatagramState const& state)> const& error)
-        {
-            addDatagram(command, address, &data, sizeof(data), process, error);
-        }
+        bool isRedundancyActivated() {return is_redundancy_activated_;};
+
+    private:
+        void readFrame() override;
+        void sendFrame() override;
+        bool isDatagramAvailable() override;
+        std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() override;
+        void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) override;
+        void resetFrameContext() override;
 
         bool isRedundancyNeeded();
 
-        void finalizeDatagrams();
-        void processDatagrams() override;
+        NetworkInterface nominal_interface_;
+        NetworkInterface redundancy_interface_;
 
-    private:
-        void sendFrame() override;
+        std::shared_ptr<AbstractSocket> socket_nominal_;
+        std::shared_ptr<AbstractSocket> socket_redundancy_;
 
-        bool isDatagramAvailable();
-
-        void nextDatagram();
-
-        std::shared_ptr<AbstractSocket> socketRedundancy_;
-        Frame frameRedundancy_{SECONDARY_IF_MAC};
+        Frame frame_redundancy_{};
 
         std::function<void(void)> redundancyActivatedCallback_;
+
+        bool is_redundancy_activated_{false};
     };
 }
 

@@ -7,6 +7,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicated-cond -Wshadow -Wmissing-noreturn")
 
 set(LIB_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractLink.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cc
@@ -14,6 +15,7 @@ set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/LinkRedundancy.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/NetworkInterface.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
@@ -81,7 +83,7 @@ endif()
 #    setup_target_for_coverage_gcovr_html(
 #        NAME coverage
 #        EXECUTABLE kickcat_unit
-        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*"
+#        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*"
 #        )
 
     setup_target_for_coverage_gcovr_xml(

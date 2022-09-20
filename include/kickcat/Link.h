@@ -5,56 +5,30 @@
 #include <memory>
 #include <functional>
 
-#include "KickCAT.h"
-#include "Frame.h"
+#include "AbstractLink.h"
 
 namespace kickcat
 {
     class AbstractSocket;
 
-    /// \brief Handle link layer
-    /// \details This class is responsible to handle frames and datagrams on the link layers:
-    ///           - associate an id to each datagram to call the associate callback later without depending on the read order
-    ///           - handle link redundancy (TODO)
-    class Link
+    class Link : public AbstractLink
     {
     public:
-        Link(std::shared_ptr<AbstractSocket> socket);
-        virtual ~Link() = default;
+        Link(std::shared_ptr<AbstractSocket> socket, uint8_t const src_mac[MAC_SIZE] = PRIMARY_IF_MAC);
+        ~Link() = default;
 
-        /// \brief helper for trivial access (i.e. most of the init bus frames)
-        virtual void writeThenRead(Frame& frame);
+        void writeThenRead(Frame& frame) override;
 
-        void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
-                         std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void(DatagramState const& state)> const& error);
-        template<typename T>
-        void addDatagram(enum Command command, uint32_t address, T const& data,
-                         std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void(DatagramState const& state)> const& error)
-        {
-            addDatagram(command, address, &data, sizeof(data), process, error);
-        }
+    private:
+        void sendFrame() override;
+        void readFrame() override;
+        bool isDatagramAvailable() override;
+        std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() override;
+        void resetFrameContext() override;
+        void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) override;
 
-        void finalizeDatagrams();
-        virtual void processDatagrams();
 
-    protected:
-        virtual void sendFrame();
-
-        std::shared_ptr<AbstractSocket> socketNominal_;
-        uint8_t index_queue_{0};
-        uint8_t index_head_{0};
-        uint8_t sent_frame_{0};
-        Frame frame_{PRIMARY_IF_MAC};
-
-        struct Callbacks
-        {
-            DatagramState status{DatagramState::LOST};
-            std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> process;
-            std::function<void(DatagramState const& state)> error;
-        };
-        std::array<Callbacks, 256> callbacks_{};
+        NetworkInterface nominal_interface_;
     };
 }
 

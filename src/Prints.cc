@@ -90,4 +90,16 @@ namespace kickcat
             }
         }
     }
+
+
+    void printDatagramHeader(DatagramHeader const& header)
+    {
+        printf("Header \n");
+        printf("  Command :  %d \n", static_cast<uint8_t>(header.command));
+        printf("  index :  %d \n", header.index);
+        printf("  length :  %d \n", header.len);
+        printf("  circulating %d \n", header.circulating);
+        printf("  multiple %d \n", header.multiple);
+        printf("  IRQ %d \n", header.IRQ);
+    }
 }
