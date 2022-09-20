@@ -1,11 +1,10 @@
 #include "Link.h"
 #include "AbstractSocket.h"
-#include "Time.h"
 
 namespace kickcat
 {
-    Link::Link(std::shared_ptr<AbstractSocket> socket)
-        : socketNominal_(socket)
+    Link::Link(std::shared_ptr<AbstractSocket> socket, uint8_t const src_mac[MAC_SIZE])
+        : nominal_interface_(socket, src_mac)
     {
 
     }
@@ -13,19 +12,20 @@ namespace kickcat
 
     void Link::writeThenRead(Frame& frame)
     {
-        frame.write(socketNominal_);
-        frame.read(socketNominal_);
+        nominal_interface_.write(frame);
+        nominal_interface_.read(frame);
+        frame.clear();
     }
 
 
     void Link::sendFrame()
     {
         // save number of datagrams in the frame to handle send error properly if any
-        int32_t const datagrams = frame_.datagramCounter();
-
+        int32_t const datagrams = frame_nominal_.datagramCounter();
         try
         {
-            frame_.write(socketNominal_);
+            nominal_interface_.write(frame_nominal_);
+            frame_nominal_.clear();
             ++sent_frame_;
         }
         catch (std::exception const& e)
@@ -41,95 +41,33 @@ namespace kickcat
     }
 
 
-    void Link::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
-                           std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                           std::function<void(DatagramState const& state)> const& error)
+    void Link::readFrame()
     {
-        if (index_queue_ == static_cast<uint8_t>(index_head_ + 1))
-        {
-            THROW_ERROR("Too many datagrams in flight. Max is 255");
-        }
-
-        uint16_t const needed_space = datagram_size(data_size);
-        if (frame_.freeSpace() < needed_space)
-        {
-            sendFrame();
-        }
-
-        frame_.addDatagram(index_head_, command, address, data, data_size);
-        callbacks_[index_head_].process = process;
-        callbacks_[index_head_].error = error;
-        callbacks_[index_head_].status = DatagramState::LOST;
-        ++index_head_;
-
-        if (frame_.isFull())
-        {
-            sendFrame();
-        }
+        nominal_interface_.read(frame_nominal_);
+        frame_nominal_.clear();
     }
 
 
-    void Link::finalizeDatagrams()
+    bool Link::isDatagramAvailable()
     {
-        if (frame_.datagramCounter() != 0)
-        {
-            sendFrame();
-        }
+        return frame_nominal_.isDatagramAvailable();
     }
 
 
-    void Link::processDatagrams()
+    std::tuple<DatagramHeader const*, uint8_t*, uint16_t> Link::nextDatagram()
     {
-        finalizeDatagrams();
+        return frame_nominal_.nextDatagram();
+    }
 
-        uint8_t waiting_frame = sent_frame_;
-        sent_frame_ = 0;
 
-        for (int32_t i = 0; i < waiting_frame; ++i)
-        {
-            try
-            {
-                frame_.read(socketNominal_);
-                while (frame_.isDatagramAvailable())
-                {
-                    auto [header, data, wkc] = frame_.nextDatagram();
-                    callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
-                }
-            }
-            catch (std::exception const& e)
-            {
-                DEBUG_PRINT("%s\n", e.what());
-            }
-        }
+    void Link::addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
+    {
+        frame_nominal_.addDatagram(index, command, address, data, data_size);
+    }
 
-        std::exception_ptr client_exception;
-        for (uint8_t i = index_queue_; i != index_head_; ++i)
-        {
-            if (callbacks_[i].status != DatagramState::OK)
-            {
-                // Datagram was either lost or processing it encountered an error.
-                try
-                {
-                    callbacks_[i].error(callbacks_[i].status);
-                }
-                catch (...)
-                {
-                    client_exception = std::current_exception();
-                }
-            }
 
-            // Attach a callback to handle not THAT lost frames.
-            // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
-            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t){ frame_.read(socketNominal_); return DatagramState::OK; };
-        }
-
-        index_queue_ = index_head_;
-        frame_.clear();
-
-        // Rethrow last catched client exception.
-        if (client_exception)
-        {
-            std::rethrow_exception(client_exception);
-        }
+    void Link::resetFrameContext()
+    {
+        frame_nominal_.resetContext();
     }
 }

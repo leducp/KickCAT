@@ -231,7 +231,7 @@ TEST(Frame, read_error)
     ASSERT_THROW(frame.read(io), Error);
     ASSERT_FALSE(frame.isDatagramAvailable());
 
-    frame.clear();
+    frame.resetContext();
     frame.addDatagram(0, Command::BRD, 0, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
     ASSERT_THROW(frame.read(io), Error);
 }

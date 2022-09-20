@@ -21,14 +21,3 @@ set_target_properties(easycat_redundancy_example PROPERTIES
     CXX_EXTENSIONS NO
     POSITION_INDEPENDENT_CODE ON
 )
-
-
-set(EXAMPLE_STUPID_REDUNDANCY_SRCS easycat_stupid_redundancy.cc)
-add_executable(easycat_stupid_redundancy ${EXAMPLE_STUPID_REDUNDANCY_SRCS} ${OS_SRCS})
-target_link_libraries(easycat_stupid_redundancy kickcat)
-set_target_properties(easycat_stupid_redundancy PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED YES
-    CXX_EXTENSIONS NO
-    POSITION_INDEPENDENT_CODE ON
-)
