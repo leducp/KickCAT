@@ -2,22 +2,22 @@
 
 namespace kickcat
 {
-    void printInfo(Slave const& slave)
+    void printInfo(Slave slave)
     {
         printf("%s", slave.getInfo().c_str());
     }
 
-    void printPDOs(Slave const& slave)
+    void printPDOs(Slave slave)
     {
         printf("%s", slave.getPDOs().c_str());
     }
 
-    void printErrorCounters(Slave const& slave)
+    void printErrorCounters(Slave slave)
     {
         printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", slave.address, toString(slave.error_counters).c_str());
     }
 
-    void printDLStatus(Slave const& slave)
+    void printDLStatus(Slave slave)
     {
         printf("\n -*-*-*-*- slave %u -*-*-*-*-\n", slave.address);
         printf("Port 0: \n");
@@ -41,11 +41,10 @@ namespace kickcat
         printf("  Loop Function :  %d \n", slave.dl_status.LOOP_port3);
     }
 
-    void printGeneralEntry(Slave const& slave) 
-    {
+    void printGeneralEntry(Slave slave) {
         eeprom::GeneralEntry const* general_entry = slave.sii.general;
         
-        if (general_entry == nullptr)
+        if (general_entry == NULL)
         {
             printf("Uninitialized SII - Nothing to print");
         }
@@ -56,6 +55,12 @@ namespace kickcat
             printf( "device_order_id: %i \n",           general_entry->device_order_id);
             printf( "device_name_id: %i \n",            general_entry->device_name_id);
             printf( "reserved_A: %i \n",                general_entry->reserved_A);
+            printf( "SDO_set: %i \n",                   general_entry->SDO_set);
+            printf( "SDO_info: %i \n",                  general_entry->SDO_info);
+            printf( "PDO_assign: %i \n",                general_entry->PDO_assign);
+            printf( "PDO_configuration: %i \n",         general_entry->PDO_configuration);
+            printf( "PDO_upload: %i \n",                general_entry->PDO_upload);
+            printf( "SDO_complete_access: %i \n",       general_entry->SDO_complete_access);
             printf( "FoE_details: %i \n",               general_entry->FoE_details);
             printf( "EoE_details: %i \n",               general_entry->EoE_details);
             printf( "SoE_channels: %i \n",              general_entry->SoE_channels);
@@ -75,10 +80,10 @@ namespace kickcat
     }
 
 
-    void printTopology(std::unordered_map<uint16_t, uint16_t> const& topology_mapping)
+    void printTopology(std::unordered_map<uint16_t, uint16_t> topology)
     {  
         printf( "\n -*-*-*-*- Topology -*-*-*-*-\n" );
-        for (auto const& it : topology_mapping)
+        for (auto& it : topology)
         {
             if (it.first != it.second)
             {

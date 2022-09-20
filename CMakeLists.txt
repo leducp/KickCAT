@@ -53,11 +53,11 @@ endif()
 
 if (GTest_FOUND)
   add_executable(kickcat_unit unit/bus-t.cc
+                              unit/debug-t.cc
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
                               unit/link-t.cc
                               unit/mailbox-t.cc
-                              unit/prints-t.cc
                               unit/protocol-t.cc
                               unit/slave-t.cc
   )
@@ -80,9 +80,10 @@ if (GTest_FOUND)
     setup_target_for_coverage_gcovr_html(
         NAME coverage
         EXECUTABLE kickcat_unit
-        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*" "src/Prints.cc"
+        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*"
         )
   endif()
 endif()
 
 add_subdirectory(examples)
+add_subdirectory(tools)

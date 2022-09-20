@@ -1,9 +1,6 @@
-#ifndef KICKCAT_DIAGNOSTICS_H
-#define KICKCAT_DIAGNOSTICS_H
-
-#include "Slave.h"
-
 #include <unordered_map>
+#include "Slave.h"
+#include <cstdint>
 #include <vector>
 
 namespace kickcat
@@ -12,5 +9,3 @@ namespace kickcat
     /// \return [key, value] pair : [slave adress, parent address] (the only slave that is its own parent is linked to the master) 
     std::unordered_map<uint16_t, uint16_t> getTopology(std::vector<Slave>& slaves);
 }
-
-#endif

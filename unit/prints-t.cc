@@ -1,6 +1,4 @@
 #include <gtest/gtest.h>
-#include <unordered_map>
-
 #include "kickcat/Slave.h"
 #include "kickcat/Prints.h"
 
@@ -12,7 +10,6 @@ TEST(Prints, slave_uninitialized_prints)
     // No check about the content (time consumming and unmaintainable).
 
     Slave slave;
-    std::unordered_map<uint16_t, uint16_t> topology({{0, 0}, {1, 0}, {2, 1}});
 
     testing::internal::CaptureStdout();
     printInfo(slave);
@@ -36,11 +33,6 @@ TEST(Prints, slave_uninitialized_prints)
 
     testing::internal::CaptureStdout();
     printGeneralEntry(slave);
-    output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(30, output.size());
-
-    testing::internal::CaptureStdout();
-    printTopology(topology);
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(30, output.size());
 
