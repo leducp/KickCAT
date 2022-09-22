@@ -29,7 +29,6 @@ int main(int argc, char* argv[])
     try
     {
         socket->open(argv[1], 2ms);
-        socket->setTimeout(1ms);
 
     }
     catch (std::exception const& e)
