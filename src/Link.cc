@@ -1,20 +1,22 @@
 #include "Link.h"
 #include "AbstractSocket.h"
+#include "Error.h"
+
+#include <cstring>
 
 namespace kickcat
 {
     Link::Link(std::shared_ptr<AbstractSocket> socket, uint8_t const src_mac[MAC_SIZE])
-        : nominal_interface_(socket, src_mac)
+        : socket_nominal_(socket)
     {
-
+        std::copy(src_mac, src_mac + MAC_SIZE, src_mac_nominal_);
     }
 
 
     void Link::writeThenRead(Frame& frame)
     {
-        nominal_interface_.write(frame);
-        nominal_interface_.read(frame);
-        frame.clear();
+        writeFrame(socket_nominal_, frame, src_mac_nominal_);
+        readFrame(socket_nominal_, frame);
     }
 
 
@@ -24,8 +26,7 @@ namespace kickcat
         int32_t const datagrams = frame_nominal_.datagramCounter();
         try
         {
-            nominal_interface_.write(frame_nominal_);
-            frame_nominal_.clear();
+            writeFrame(socket_nominal_, frame_nominal_, src_mac_nominal_);
             ++sent_frame_;
         }
         catch (std::exception const& e)
@@ -41,10 +42,16 @@ namespace kickcat
     }
 
 
-    void Link::readFrame()
+    void Link::read()
     {
-        nominal_interface_.read(frame_nominal_);
-        frame_nominal_.clear();
+        try
+        {
+            readFrame(socket_nominal_, frame_nominal_);
+        }
+        catch (std::exception const& e)
+        {
+            DEBUG_PRINT("Read fail %s\n", e.what());
+        }
     }
 
 

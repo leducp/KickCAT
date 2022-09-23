@@ -1,6 +1,5 @@
 #include "AbstractLink.h"
-//#include "Time.h" to remove ?
-
+#include "Error.h"
 
 namespace kickcat
 {
@@ -52,7 +51,7 @@ namespace kickcat
         {
             try
             {
-                readFrame();
+                read();
                 while (isDatagramAvailable())
                 {
                     auto [header, data, wkc] = nextDatagram();
@@ -86,7 +85,7 @@ namespace kickcat
             // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
             callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t)
                 {
-                    readFrame();
+                    read();
                     return DatagramState::OK;
                 };
         }
@@ -98,6 +97,54 @@ namespace kickcat
         if (client_exception)
         {
             std::rethrow_exception(client_exception);
+        }
+    }
+
+
+    void AbstractLink::readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame)
+    {
+        int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
+        if (read < 0)
+        {
+            THROW_SYSTEM_ERROR("read()");
+        }
+
+        // check if the frame is an EtherCAT one. if not, drop it and try again
+        if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
+        {
+            THROW_ERROR("Invalid frame type");
+        }
+
+        int32_t expected = frame.header()->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        frame.clear();
+        if (expected < ETH_MIN_SIZE)
+        {
+            expected = ETH_MIN_SIZE;
+        }
+        if (read != expected)
+        {
+            THROW_ERROR("Wrong number of bytes read");
+        }
+
+        frame.setIsDatagramAvailable(true);
+    }
+
+
+    void AbstractLink::writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE])
+    {
+        frame.setSourceMAC(src_mac);
+        int32_t toWrite = frame.finalize();
+        int32_t written = socket->write(frame.data(), toWrite);
+        frame.clear();
+
+        if (written < 0)
+        {
+            THROW_SYSTEM_ERROR("write()");
+        }
+
+        if (written != toWrite)
+        {
+            THROW_ERROR("Wrong number of bytes written");
         }
     }
 }

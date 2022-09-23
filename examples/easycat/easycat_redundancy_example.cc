@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::shared_ptr<LinkRedundancy> link= std::make_unique<LinkRedundancy>(socketNominal, socketRedundancy, reportRedundancy);
+    std::shared_ptr<LinkRedundancy> link= std::make_shared<LinkRedundancy>(socketNominal, socketRedundancy, reportRedundancy);
 
     Bus bus(link);
 

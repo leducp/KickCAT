@@ -1,6 +1,6 @@
 #include "LinkRedundancy.h"
 #include "AbstractSocket.h"
-#include "Time.h"
+#include "Error.h"
 
 #include <cstring>
 
@@ -11,17 +11,17 @@ namespace kickcat
                                    std::function<void(void)> const& redundancyActivatedCallback,
                                    uint8_t const src_mac_nominal[MAC_SIZE],
                                    uint8_t const src_mac_redundancy[MAC_SIZE])
-        : nominal_interface_(socket_nominal, src_mac_nominal)
-        , redundancy_interface_(socket_redundancy, src_mac_redundancy)
-        , redundancyActivatedCallback_(redundancyActivatedCallback)
+        : redundancyActivatedCallback_(redundancyActivatedCallback)
         , socket_nominal_(socket_nominal)
         , socket_redundancy_(socket_redundancy)
     {
-//        if (isRedundancyNeeded())
-//        {
-//            is_redundancy_activated_ = true;
-//            redundancyActivatedCallback_();
-//        }
+        std::copy(src_mac_nominal, src_mac_nominal + MAC_SIZE, src_mac_nominal_);
+        std::copy(src_mac_redundancy, src_mac_redundancy + MAC_SIZE, src_mac_redundancy_);
+        if (isRedundancyNeeded())
+        {
+            is_redundancy_activated_ = true;
+            redundancyActivatedCallback_();
+        }
     }
 
 
@@ -29,18 +29,18 @@ namespace kickcat
     {
         Frame frame;
         frame.addDatagram(0, Command::BRD, createAddress(0, 0x0000), nullptr, 1);
-        redundancy_interface_.write(frame);
+        writeFrame(socket_redundancy_, frame, SECONDARY_IF_MAC);
 
         try
         {
-            nominal_interface_.read(frame);
+            readFrame(socket_nominal_, frame);
         }
         catch (std::exception const& e1)
         {
             DEBUG_PRINT("%s\n Fail to read nominal interface \n", e1.what());
             try
             {
-                redundancy_interface_.read(frame);
+                readFrame(socket_redundancy_, frame);
             }
             catch (std::exception const& e2)
             {
@@ -106,149 +106,6 @@ namespace kickcat
         {
             THROW_ERROR("Wrong number of bytes read");
         }
-
-//
-//        lamda op[&](to, from, src_mac)
-//        {
-//            res = write(from);
-//            if (failed (res))
-//                return aie
-//
-//            res = read(to);
-//            if (failed(res))
-//            {
-//                res = read(from);
-//            }
-//            return res;
-//        }
-//
-//        res_count = 0;
-//        res += op (nom, red)
-//        res += op (red, nom)
-//
-//        if (res > 1)
-//        {
-//            THROW LENFER IT NEVER HAPPENED
-//        }
-//
-//        if (not isEthercatType(frame))
-//        {
-//            throw l'enfer
-//        }
-//
-//        cuurent_size = frame.len + sizeof(header ether) + siezof(headerCat))
-//        if (cur_size < 60) cur_size = 60;
-//        if cur_size != to_write
-//        {
-//            throw l'enfer'
-//        }
-
-
-
-
-
-
-//        /// WRITE without reset
-//        frame.setSourceMAC(PRIMARY_IF_MAC);
-//
-//        int32_t to_write = frame.finalize();
-//        int32_t written = socket_nominal_->write(frame.data(), to_write);
-//        printf("Writtent nominal %i \n", written);
-//
-//        // TODO check written ?
-//        int32_t error_count = 0;
-//
-//        /// READ
-//        int32_t read = socket_redundancy_->read(frame.data(), ETH_MAX_SIZE);
-//        // TODO check size coherency, check ethertype consistency  (Throw because frame has been messed up by someone on the network)
-//        // if read < 1 -> enregistre timeout
-//
-//        if (read <= 0)
-//        {
-//            read = socket_nominal_->read(frame.data(), ETH_MAX_SIZE);
-//            error_count++;
-//        }
-//
-//        if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
-//        {
-//            THROW_ERROR("Invalid frame type");
-//        }
-//
-//
-//
-//
-//        /// WRITE
-//        frame.setSourceMAC(SECONDARY_IF_MAC);
-//
-//        written = socket_redundancy_->write(frame.data(), to_write);
-//
-//        ///READ
-////        nominal_interface_.read(frame);
-//
-//        read = socket_nominal_->read(frame.data(), ETH_MAX_SIZE);
-//        if (read <= 0)
-//        {
-//            error_count++;
-//        }
-//
-//        if (error_count >= 2)
-//        {
-//            THROW_SYSTEM_ERROR("WriteThenRead was not able to read anything on both interfaces");
-//        }
-//
-//        // check if the frame is an EtherCAT one. if not, drop it and try again
-//        if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
-//        {
-//            THROW_ERROR("Invalid frame type");
-//        }
-//
-////        frame.clear();
-//        frame.setIsDatagramAvailable(true);
-//
-//
-//
-//
-//        printf("Written redundancy %i \n", written);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//        try
-//        {
-//            printf("Frame len %i  N\n", frame.header()->len);
-//            nominal_interface_.write(frame);
-//            redundancy_interface_.read(frame);
-//
-//        }
-//        catch (std::exception const& e)
-//        {
-//            DEBUG_PRINT("Nominal read fail %s\n", e.what());
-//        }
-//
-//        sleep(1s);
-//
-//        try
-//        {
-//            printf("Frame len %i  R\n", frame.header()->len);
-//            redundancy_interface_.write(frame);
-//            frame.resetContext();
-//            nominal_interface_.read(frame);
-//            frame.clear();
-//        }
-//        catch (std::exception const& e)
-//        {
-//            DEBUG_PRINT("Redundancy read fail %s\n", e.what());
-//        }
     }
 
 
@@ -257,26 +114,38 @@ namespace kickcat
         // save number of datagrams in the frame to handle send error properly if any
         int32_t const datagrams = frame_nominal_.datagramCounter();
 
-        bool is_frame_sent = false;
-        try
+        bool is_frame_sent = true;
+        frame_nominal_.setSourceMAC(PRIMARY_IF_MAC);
+        int32_t toWrite = frame_nominal_.finalize();
+        int32_t written = socket_nominal_->write(frame_nominal_.data(), toWrite);
+        if (written < 0)
         {
-            nominal_interface_.write(frame_nominal_);
-            is_frame_sent = true;
-        }
-        catch (std::exception const& e)
-        {
-            DEBUG_PRINT("nominal write %s\n", e.what());
+            is_frame_sent = false;
+            DEBUG_PRINT("Nominal: write failed\n");
         }
 
-        try
+        else if (written != toWrite)
         {
-            redundancy_interface_.write(frame_redundancy_);
-            is_frame_sent = true;
+            is_frame_sent = false;
+            DEBUG_PRINT("Nominal: Wrong number of bytes written");
         }
-        catch (std::exception const& e)
+
+        frame_nominal_.setSourceMAC(SECONDARY_IF_MAC);
+        written = socket_redundancy_->write(frame_nominal_.data(), toWrite);
+        frame_nominal_.clear();
+
+        if (written < 0)
         {
-            DEBUG_PRINT("Redundancy write %s\n", e.what());
+            is_frame_sent = false;
+            DEBUG_PRINT("Nominal: write failed\n");
         }
+
+        else if (written != toWrite)
+        {
+            is_frame_sent = false;
+            DEBUG_PRINT("Nominal: Wrong number of bytes written");
+        }
+
 
         if (is_frame_sent)
         {
@@ -292,11 +161,11 @@ namespace kickcat
         }
     }
 
-    void LinkRedundancy::readFrame()
+    void LinkRedundancy::read()
     {
         try
         {
-            redundancy_interface_.read(frame_nominal_);
+            readFrame(socket_redundancy_, frame_nominal_);
         }
         catch (std::exception const& e)
         {
@@ -305,7 +174,7 @@ namespace kickcat
 
         try
         {
-            nominal_interface_.read(frame_redundancy_);
+            readFrame(socket_nominal_, frame_redundancy_);
         }
         catch (std::exception const& e)
         {
@@ -317,7 +186,6 @@ namespace kickcat
     void LinkRedundancy::addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
     {
         frame_nominal_.addDatagram(index, command, address, data, data_size);
-        frame_redundancy_.addDatagram(index, command, address, data, data_size);
     }
 
 
@@ -348,7 +216,6 @@ namespace kickcat
 //        std::transform(data_nominal, data_nominal[header_nominal->len], data_redundancy, data_redundancy[header_nominal->len], )
 
         uint16_t wkc = wkc_nominal + wkc_redundancy;
-//        printf("next DTG, wkc n %i, wkc r %i wkc: %i\n", wkc_nominal, wkc_redundancy, wkc);
         return std::make_tuple(header_nominal, data_nominal, wkc);
     }
 }

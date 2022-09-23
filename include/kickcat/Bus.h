@@ -129,8 +129,8 @@ namespace kickcat
         std::shared_ptr<AbstractLink> link_;
         std::vector<Slave> slaves_;
 
-        uint8_t* iomap_read_section_;   // pointer on read section (to write back inputs)
-        uint8_t* iomap_write_section_;  // pointer on write section (to send to the slaves)
+        uint8_t* iomap_read_section_{};   // pointer on read section (to write back inputs)
+        uint8_t* iomap_write_section_{};  // pointer on write section (to send to the slaves)
 
         struct blockIO
         {

@@ -7,7 +7,8 @@
 
 #include "KickCAT.h"
 #include "Frame.h"
-#include "NetworkInterface.h"
+
+#include "AbstractSocket.h"
 
 namespace kickcat
 {
@@ -39,6 +40,9 @@ namespace kickcat
 
         bool isRedundancyActivated() {return false;};
 
+        void readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
+        void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE]);
+
     protected:
         uint8_t index_queue_{0};
         uint8_t index_head_{0};
@@ -53,12 +57,13 @@ namespace kickcat
         std::array<Callbacks, 256> callbacks_{};
 
         Frame frame_nominal_{};
+        uint8_t src_mac_nominal_[MAC_SIZE];
 
     private:
         virtual void sendFrame() = 0;
         virtual bool isDatagramAvailable() = 0;
         virtual std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() = 0;
-        virtual void readFrame() = 0;
+        virtual void read() = 0;
 
         virtual void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) = 0;
 

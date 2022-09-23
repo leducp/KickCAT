@@ -24,7 +24,6 @@ namespace kickcat
         frame.addDatagram(0, Command::BRD, createAddress(0, ADO), nullptr, data_size);
         link_->writeThenRead(frame);
         auto [header, _, wkc] = frame.nextDatagram();
-        printDatagramHeader(*header);
         return wkc;
     }
 
