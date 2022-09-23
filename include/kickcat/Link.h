@@ -21,14 +21,13 @@ namespace kickcat
 
     private:
         void sendFrame() override;
-        void readFrame() override;
+        void read() override;
         bool isDatagramAvailable() override;
         std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() override;
         void resetFrameContext() override;
         void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) override;
 
-
-        NetworkInterface nominal_interface_;
+        std::shared_ptr<AbstractSocket> socket_nominal_;
     };
 }
 

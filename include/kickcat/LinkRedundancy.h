@@ -8,7 +8,6 @@
 #include "KickCAT.h"
 #include "Frame.h"
 #include "AbstractLink.h"
-#include "NetworkInterface.h"
 
 
 namespace kickcat
@@ -32,7 +31,7 @@ namespace kickcat
         bool isRedundancyActivated() {return is_redundancy_activated_;};
 
     private:
-        void readFrame() override;
+        void read() override;
         void sendFrame() override;
         bool isDatagramAvailable() override;
         std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() override;
@@ -41,15 +40,14 @@ namespace kickcat
 
         bool isRedundancyNeeded();
 
-        NetworkInterface nominal_interface_;
-        NetworkInterface redundancy_interface_;
+        std::function<void(void)> redundancyActivatedCallback_;
 
         std::shared_ptr<AbstractSocket> socket_nominal_;
         std::shared_ptr<AbstractSocket> socket_redundancy_;
 
         Frame frame_redundancy_{};
+        uint8_t src_mac_redundancy_[MAC_SIZE];
 
-        std::function<void(void)> redundancyActivatedCallback_;
 
         bool is_redundancy_activated_{false};
     };
