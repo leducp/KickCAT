@@ -40,11 +40,13 @@ std::unordered_map<uint16_t, std::vector<uint16_t>> completeTopologyMap(std::vec
             case 1:
             {
                 ports.push_back(0);
+                break;
             }
             case 2:
             {
                 ports.push_back(0);
                 ports.push_back(1);
+                break;
             }
             case 3:
             {
@@ -52,6 +54,7 @@ std::unordered_map<uint16_t, std::vector<uint16_t>> completeTopologyMap(std::vec
                 if (slave.dl_status.PL_port3) {ports.push_back(3);};
                 if (slave.dl_status.PL_port1) {ports.push_back(1);};
                 if (slave.dl_status.PL_port2) {ports.push_back(2);};
+                break;
             }
             case 4:
             {
@@ -59,10 +62,11 @@ std::unordered_map<uint16_t, std::vector<uint16_t>> completeTopologyMap(std::vec
                 ports.push_back(3);
                 ports.push_back(1);
                 ports.push_back(2);
+                break;
             }
             default:
             {
-                DEBUG_PRINT("Error in ports order");
+                THROW_ERROR("Error in ports order\n");
             }
         }
         slaves_ports[slave.address] = ports;
@@ -84,21 +88,73 @@ std::unordered_map<uint16_t, std::vector<uint16_t>> completeTopologyMap(std::vec
     return completeTopology;
 }
 
-void PortsAnalysis(std::vector<Slave>& slaves)
+bool PortsAnalysis(std::vector<Slave>& slaves)
 {
     std::unordered_map<uint16_t, std::vector<uint16_t>> completeTopology = completeTopologyMap(slaves);
     uint16_t first_error = 0;
     uint16_t error_port = 0xFF;
+    bool check = true;
 
+    printf("\nPHY Layer Errors/Invalid Frames/Forwarded/Lost Links\n");
+    printf("  Slave  ");
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
+    {
+        printf(" %04x ", slave_id);
+    }
+    printf("|");
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
+    {
+        printf(" %04x ", slave_id);
+    }
+    printf("|");
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
+    {
+        printf(" %04x ", slave_id);
+    }
+    printf("|");
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
+    {
+        printf(" %04x ", slave_id);
+    }
+
+    printf("\n");
     for (auto port = 0; port < 4; ++port)
     {
+        printf("Port %i : ", port);
+
+        //PHY
         for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
         {
-            printf("%02x ", slaves.at(slave_id).error_counters.rx[port].physical_layer);
+            if (slaves.at(slave_id).error_counters.rx[port].physical_layer > 0) {check = false;}
+            printf("  %02x  ", slaves.at(slave_id).error_counters.rx[port].physical_layer);
+        }
+        printf("|");
+
+        //Invalid
+        for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
+        {
+            if (slaves.at(slave_id).error_counters.rx[port].invalid_frame > 0) {check = false;}
+            printf("  %02x  ", slaves.at(slave_id).error_counters.rx[port].invalid_frame);
+        }
+        printf("|");
+
+        //Forwarded
+        for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
+        {
+            if (slaves.at(slave_id).error_counters.forwarded[port] > 0) {check = false;}
+            printf("  %02x  ", slaves.at(slave_id).error_counters.forwarded[port]);
+        }
+        printf("|");
+
+        for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
+        {
+            if (slaves.at(slave_id).error_counters.lost_link[port] > 0) {check = false;}
+            printf("  %02x  ", slaves.at(slave_id).error_counters.lost_link[port]);
         }
         printf("\n");
     }
-    printf("\33F]\33F]\33F]\33F]");
+
+    return check;
 }
 
 int main(int argc, char* argv[])
@@ -118,7 +174,7 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
-        socket->open(argv[1], 2ms);
+        socket->open(argv[1], 10ms);
         bus.init();
         
         bus.createMapping(io_buffer);
@@ -140,7 +196,6 @@ int main(int argc, char* argv[])
         {
             bus.sendGetDLStatus(slave);
             bus.finalizeDatagrams();
-            printDLStatus(slave);
         }
     }
     catch (ErrorCode const& e)
@@ -166,7 +221,7 @@ int main(int argc, char* argv[])
     stateMachine.setCommand(can::CANOpenCommand::ENABLE);
     while(not stateMachine.isON())
     {
-        sleep(1ms);
+        sleep(2ms);
         bus.sendLogicalRead(callback_error);
         bus.finalizeDatagrams();
         bus.processAwaitingFrames();
@@ -182,7 +237,7 @@ int main(int argc, char* argv[])
 
     // Main Loop
     int64_t last_error = 0;
-    for (int64_t i = 0; i < 5000; ++i)
+    for (int64_t i = 0; i < 50000; ++i)
     {
         sleep(1ms);
 
@@ -193,7 +248,6 @@ int main(int argc, char* argv[])
 
             bus.sendRefreshErrorCounters(callback_error);
             bus.finalizeDatagrams();
-            PortsAnalysis(bus.slaves());
 
             stateMachine.statusWord_ = inputPDO->statusWord;
             stateMachine.update();
@@ -212,8 +266,10 @@ int main(int argc, char* argv[])
         {
             int64_t delta = i - last_error;
             last_error = i;
-            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+            //std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
+
+        PortsAnalysis(bus.slaves());
     }
 
     //Turn off
