@@ -98,6 +98,7 @@ void PortsAnalysis(std::vector<Slave>& slaves)
         }
         printf("\n");
     }
+    printf("\33F]\33F]\33F]\33F]");
 }
 
 int main(int argc, char* argv[])
@@ -139,6 +140,7 @@ int main(int argc, char* argv[])
         {
             bus.sendGetDLStatus(slave);
             bus.finalizeDatagrams();
+            printDLStatus(slave);
         }
     }
     catch (ErrorCode const& e)
