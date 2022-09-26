@@ -86,3 +86,4 @@ if (GTest_FOUND)
 endif()
 
 add_subdirectory(examples)
+add_subdirectory(tools)
