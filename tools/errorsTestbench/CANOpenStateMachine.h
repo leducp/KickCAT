@@ -124,7 +124,7 @@ namespace can
                         case CANOpenState::SAFE_RESET:
                             controlWord_ = control::word::SHUTDOWN;
                             //printf("CW : SHUTDOWN\n");
-                            if (kickcat::elapsed_time(startMotorTimestamp_) > 10ms)
+                            if (kickcat::elapsed_time(startMotorTimestamp_) > 1.0s)
                             {
                                 motorState_ = CANOpenState::PREPARE_TO_SWITCH_ON ;
                             }
@@ -180,6 +180,42 @@ namespace can
                     break;
                 }
                 case CANOpenCommand::NONE:
+                default:
+                {
+                    break;
+                }
+                // Time out, motor start failed
+                if (motorState_ != CANOpenState::OFF
+                    && kickcat::elapsed_time(startMotorTimestamp_) > 1.0s
+                    )
+                {
+                    DEBUG_PRINT("Can't enable motor: timeout, stuck in FAULT State\n");
+                }
+                break;
+            }
+        }
+
+        void resetFault()
+        {
+            switch (motorState_)
+            {
+                case CANOpenState::FAULT:
+                {
+                    startMotorTimestamp_ = kickcat::since_epoch();
+                    controlWord_ = control::word::FAULT_RESET;
+                    motorState_ = CANOpenState::SAFE_RESET;
+                }
+                break;
+
+                case CANOpenState::SAFE_RESET:
+                {
+                    if ((statusWord_ & status::value::OFF_STATE)== status::value::OFF_STATE)
+                        {
+                            motorState_ = CANOpenState::OFF ;
+                        }
+                }
+                break;
+
                 default:
                 {
                     break;

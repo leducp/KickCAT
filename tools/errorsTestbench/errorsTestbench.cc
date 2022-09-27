@@ -221,7 +221,6 @@ int main(int argc, char* argv[])
     stateMachine.setCommand(can::CANOpenCommand::ENABLE);
     while(not stateMachine.isON())
     {
-        sleep(2ms);
         bus.sendLogicalRead(callback_error);
         bus.finalizeDatagrams();
         bus.processAwaitingFrames();
@@ -266,10 +265,12 @@ int main(int argc, char* argv[])
         {
             int64_t delta = i - last_error;
             last_error = i;
-            //std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
-
-        PortsAnalysis(bus.slaves());
+        if (i%100 == 0)
+        {
+            PortsAnalysis(bus.slaves());
+        }
     }
 
     //Turn off
