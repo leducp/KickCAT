@@ -7,6 +7,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/Diagnostics.h"
 #include "ElmoProtocol.h"
+#include "CANOpenStateMachine.h"
 #include "Error.h"
 
 #ifdef __linux__
@@ -97,25 +98,13 @@ bool PortsAnalysis(std::vector<Slave>& slaves)
 
     printf("\nPHY Layer Errors/Invalid Frames/Forwarded/Lost Links\n");
     printf("  Slave  ");
-    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
-    {
-        printf(" %04x ", slave_id);
-    }
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id) {printf(" %04x ", slave_id);}
     printf("|");
-    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
-    {
-        printf(" %04x ", slave_id);
-    }
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id) {printf(" %04x ", slave_id);}
     printf("|");
-    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
-    {
-        printf(" %04x ", slave_id);
-    }
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id) {printf(" %04x ", slave_id);}
     printf("|");
-    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
-    {
-        printf(" %04x ", slave_id);
-    }
+    for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id) {printf(" %04x ", slave_id);}
 
     printf("\n");
     for (auto port = 0; port < 4; ++port)
@@ -157,10 +146,26 @@ bool PortsAnalysis(std::vector<Slave>& slaves)
     return check;
 }
 
-int main(int argc, char* argv[])
+void printInputPDO(hal::pdo::elmo::Input* inputPDO)
 {
-    auto socket = std::make_shared<Socket>();
-    Bus bus(socket);
+    printf("statusWord :        %04x            \n", inputPDO->statusWord);
+    printf("modeOfOperation :   %i              \n", inputPDO->modeOfOperationDisplay);
+    printf("actualPosition:     %i              \n", inputPDO->actualPosition);
+    printf("actualVelocity :    %i              \n", inputPDO->actualVelocity);
+    printf("demandTorque :      %i              \n", inputPDO->demandTorque);
+    printf("actualTorque :      %i              \n", inputPDO->actualTorque);  ///< Actual torque in RTU.
+    printf("dcVoltage:          %i              \n", inputPDO->dcVoltage);
+    printf("digitalInput :      %i              \n",  inputPDO->digitalInput);
+    printf("analogInput :       %i              \n",  inputPDO->analogInput);
+    printf("demandPosition :    %i              \n", inputPDO->demandPosition);
+    printf("\033[F\033[F\033[F\033[F\033[F\033[F\033[F\033[F\033[F\033[F");
+}
+
+
+
+int scramble(Bus& bus)
+{
+    printf("Mode of operation : SCRAMBLE\n");
 
     auto print_current_state = [&]()
     {
@@ -174,8 +179,18 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
-        socket->open(argv[1], 10ms);
-        bus.init();
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        //Configure Mapping
+        Slave& elmo = bus.slaves().at(1);
+        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::RxPDO.index, hal::sdo::elmo::RxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::RxMapping, Rx_length);
+        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::TxPDO.index, hal::sdo::elmo::TxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::TxMapping, Tx_length);
         
         bus.createMapping(io_buffer);
 
@@ -185,18 +200,12 @@ int main(int argc, char* argv[])
 
         auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
         bus.processDataRead(callback_error);
-        auto itWillBeWrong = [](DatagramState const&){printf("(Previous line was a False alarm) \n");};
+        auto itWillBeWrong = [](DatagramState const&){DEBUG_PRINT("(Previous line was a False alarm) \n");};
         bus.processDataWrite(itWillBeWrong);
 
         bus.requestState(State::OPERATIONAL);
         bus.waitForState(State::OPERATIONAL, 100ms);
         print_current_state();
-
-        for (auto& slave : bus.slaves())
-        {
-            bus.sendGetDLStatus(slave);
-            bus.finalizeDatagrams();
-        }
     }
     catch (ErrorCode const& e)
     {
@@ -211,16 +220,17 @@ int main(int argc, char* argv[])
 
     Slave& elmo = bus.slaves().at(1);
     hal::pdo::elmo::Input* inputPDO {nullptr};
+    inputPDO = reinterpret_cast<hal::pdo::elmo::Input*>(elmo.input.data);
     hal::pdo::elmo::Output* outputPDO {nullptr};
     outputPDO = reinterpret_cast<hal::pdo::elmo::Output*>(elmo.output.data);
-    inputPDO = reinterpret_cast<hal::pdo::elmo::Input*>(elmo.input.data);
     can::CANOpenStateMachine stateMachine;
 
 
     //Turn on
     stateMachine.setCommand(can::CANOpenCommand::ENABLE);
-    while(not stateMachine.isON())
+    do
     {
+        sleep(1ms);
         bus.sendLogicalRead(callback_error);
         bus.finalizeDatagrams();
         bus.processAwaitingFrames();
@@ -232,6 +242,8 @@ int main(int argc, char* argv[])
         bus.sendLogicalWrite(callback_error);
 
     }
+    while(not stateMachine.isON());
+
     stateMachine.printState();
 
     // Main Loop
@@ -246,6 +258,7 @@ int main(int argc, char* argv[])
             bus.sendLogicalWrite(callback_error);
 
             bus.sendRefreshErrorCounters(callback_error);
+
             bus.finalizeDatagrams();
 
             stateMachine.statusWord_ = inputPDO->statusWord;
@@ -253,7 +266,7 @@ int main(int argc, char* argv[])
 
             outputPDO->controlWord = stateMachine.controlWord_;
             outputPDO->modeOfOperation = 4;
-            outputPDO->targetTorque = 10;
+            outputPDO->targetTorque = 0;
             outputPDO->maxTorque = 3990;
             outputPDO->targetPosition = 0;
             outputPDO->velocityOffset = 0;
@@ -267,6 +280,7 @@ int main(int argc, char* argv[])
             last_error = i;
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
+
         if (i%100 == 0)
         {
             PortsAnalysis(bus.slaves());
@@ -289,6 +303,696 @@ int main(int argc, char* argv[])
         bus.processAwaitingFrames();
     }
     stateMachine.printState();
+    return 0;
+}
+
+int encoderFault(Bus& bus)
+{
+    printf("Mode of operation : ENCODER FAULT\n");
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
+    uint8_t io_buffer[2048];
+    try
+    {
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        //Configure Mapping
+        Slave& elmo = bus.slaves().at(1);
+        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::RxPDO.index, hal::sdo::elmo::RxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::RxMapping, Rx_length);
+        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::TxPDO.index, hal::sdo::elmo::TxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::TxMapping, Tx_length);
+        
+        bus.createMapping(io_buffer);
+
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
+
+        auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+        bus.processDataRead(callback_error);
+        auto itWillBeWrong = [](DatagramState const&){DEBUG_PRINT("(Previous line was a False alarm) \n");};
+        bus.processDataWrite(itWillBeWrong);
+
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 100ms);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    Slave& elmo = bus.slaves().at(1);
+    hal::pdo::elmo::Input* inputPDO {nullptr};
+    inputPDO = reinterpret_cast<hal::pdo::elmo::Input*>(elmo.input.data);
+    hal::pdo::elmo::Output* outputPDO {nullptr};
+    outputPDO = reinterpret_cast<hal::pdo::elmo::Output*>(elmo.output.data);
+    can::CANOpenStateMachine stateMachine;
+
+
+    //Turn on
+    stateMachine.setCommand(can::CANOpenCommand::ENABLE);
+    do
+    {
+        sleep(1ms);
+        bus.sendLogicalRead(callback_error);
+        bus.finalizeDatagrams();
+        bus.processAwaitingFrames();
+
+        stateMachine.statusWord_ = inputPDO->statusWord;
+        stateMachine.update();
+
+        outputPDO->controlWord = stateMachine.controlWord_;
+        bus.sendLogicalWrite(callback_error);
+
+    }
+    while(not stateMachine.isON());
+
+    stateMachine.printState();
+
+    // Main Loop
+    int64_t last_error = 0;
+    for (int64_t i = 0; i < 50000; ++i)
+    {
+        sleep(1ms);
+
+        try
+        {
+            bus.sendLogicalRead(callback_error);
+            bus.sendLogicalWrite(callback_error);
+
+            bus.checkMailboxes(callback_error);
+            bus.sendReadMessages(callback_error);
+
+            bus.finalizeDatagrams();
+
+            stateMachine.statusWord_ = inputPDO->statusWord;
+            stateMachine.update();
+
+            outputPDO->controlWord = stateMachine.controlWord_;
+            outputPDO->modeOfOperation = 4;
+            outputPDO->targetTorque = 0;
+            outputPDO->maxTorque = 3990;
+            outputPDO->targetPosition = 0;
+            outputPDO->velocityOffset = 0;
+            outputPDO->digitalOutput = 0;
+
+            bus.processAwaitingFrames();
+        }
+        catch (std::exception const& e)
+        {
+            int64_t delta = i - last_error;
+            last_error = i;
+            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+        }
+
+        if (i%100 == 0)
+        {
+            for (auto& em : elmo.mailbox.emergencies)
+            {
+                printf("Emergency sent : %04x - %s", em.error_code, can::emergency::errorCode::codeToError(em.error_code));
+            }
+            if (elmo.mailbox.emergencies.size() > 0)
+            {
+                stateMachine.printState();
+                print_current_state();
+                elmo.mailbox.emergencies.resize(0);
+            }
+        }
+    }
+
+    //Turn off
+    stateMachine.setCommand(can::CANOpenCommand::DISABLE);
+    while(stateMachine.isON())
+    {
+        
+        bus.sendLogicalRead(callback_error);
+        bus.finalizeDatagrams();
+
+        stateMachine.statusWord_ = inputPDO->statusWord;
+        stateMachine.update();
+
+        outputPDO->controlWord = stateMachine.controlWord_;
+        bus.sendLogicalWrite(callback_error);
+        bus.processAwaitingFrames();
+    }
+    stateMachine.printState();
+
+
+    return 0;
+}
+
+int cutBefore(Bus& bus)
+{
+    printf("Mode of operation : CUT CABLES BEFORE PROCESS\n");
+    uint8_t io_buffer[2048];
+    try
+    {
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        std::unordered_map<uint16_t, uint16_t> topology = getTopology(bus.slaves());
+        std::unordered_map<uint16_t, uint16_t> expected = {{0, 0}, {1, 0}, {2, 0}};
+        if (topology == expected)
+        {
+            printf("Topology seem correct, no cut cable detected\n");
+        }
+        else
+        {
+            printf("Topology does not match expected, a slave is either unresponsive, or a link is missing\n");
+        }
+        return 1;
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+}
+
+int cut(Bus& bus)
+{
+    printf("Mode of operation : CUT CABLES DURING PROCESS\n");
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
+    uint8_t io_buffer[2048];
+    try
+    {
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        //Configure Mapping
+        Slave& elmo = bus.slaves().at(1);
+        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::RxPDO.index, hal::sdo::elmo::RxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::RxMapping, Rx_length);
+        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::TxPDO.index, hal::sdo::elmo::TxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::TxMapping, Tx_length);
+        
+        bus.createMapping(io_buffer);
+
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
+
+        auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+        bus.processDataRead(callback_error);
+        auto itWillBeWrong = [](DatagramState const&){DEBUG_PRINT("(Previous line was a False alarm) \n");};
+        bus.processDataWrite(itWillBeWrong);
+
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 100ms);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    for (int64_t i = 0; i < 50000; ++i)
+    {
+        sleep(1ms);
+
+        try
+        {
+            for (auto& slave : bus.slaves())
+            {
+                bus.ping(slave, [slave](DatagramState const&){printf("Wrong WKC for slave %04x\n", slave.address);} );
+            }
+            bus.finalizeDatagrams();
+            bus.processAwaitingFrames();
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+        }
+        
+    }
+    return 1;
+}
+
+int realtimeLoss(Bus& bus)
+{
+    printf("Mode of operation : REALTIME LOSS\n");
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
+    uint8_t io_buffer[2048];
+    try
+    {
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        //Configure Mapping
+        Slave& elmo = bus.slaves().at(1);
+        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::RxPDO.index, hal::sdo::elmo::RxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::RxMapping, Rx_length);
+        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::TxPDO.index, hal::sdo::elmo::TxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::TxMapping, Tx_length);
+        
+        bus.createMapping(io_buffer);
+
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
+
+        auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+        bus.processDataRead(callback_error);
+        auto itWillBeWrong = [](DatagramState const&){DEBUG_PRINT("(Previous line was a False alarm) \n");};
+        bus.processDataWrite(itWillBeWrong);
+
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 100ms);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    Slave& elmo = bus.slaves().at(1);
+    hal::pdo::elmo::Input* inputPDO {nullptr};
+    inputPDO = reinterpret_cast<hal::pdo::elmo::Input*>(elmo.input.data);
+    hal::pdo::elmo::Output* outputPDO {nullptr};
+    outputPDO = reinterpret_cast<hal::pdo::elmo::Output*>(elmo.output.data);
+    can::CANOpenStateMachine stateMachine;
+
+
+    //Turn on
+    stateMachine.setCommand(can::CANOpenCommand::ENABLE);
+    do
+    {
+        sleep(1ms);
+        bus.sendLogicalRead(callback_error);
+        bus.finalizeDatagrams();
+        bus.processAwaitingFrames();
+
+        stateMachine.statusWord_ = inputPDO->statusWord;
+        stateMachine.update();
+
+        outputPDO->controlWord = stateMachine.controlWord_;
+        bus.sendLogicalWrite(callback_error);
+
+    }
+    while(not stateMachine.isON());
+
+    stateMachine.printState();
+
+    // Main Loop
+    int64_t last_error = 0;
+    for (int64_t i = 0; i < 50000; ++i)
+    {
+        sleep(1ms);
+
+        try
+        {
+            bus.checkMailboxes(callback_error);
+            bus.sendReadMessages(callback_error);
+            bus.sendLogicalRead(callback_error);
+            if (i<1001)
+            {
+                bus.sendLogicalWrite(callback_error);
+            }
+            if (i == 1001)
+            {
+                printf("\n\n\nStopping LogicalWrite operations\n");
+            }
+
+            bus.finalizeDatagrams();
+
+            stateMachine.statusWord_ = inputPDO->statusWord;
+            stateMachine.update();
+
+            outputPDO->controlWord = stateMachine.controlWord_;
+            outputPDO->modeOfOperation = 4;
+            outputPDO->targetTorque = 0;
+            outputPDO->maxTorque = 3990;
+            outputPDO->targetPosition = 0;
+            outputPDO->velocityOffset = 0;
+            outputPDO->digitalOutput = 0;
+
+            bus.processAwaitingFrames();
+        }
+        catch (std::exception const& e)
+        {
+            int64_t delta = i - last_error;
+            last_error = i;
+            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+        }
+
+        if (i%100 == 0)
+        {
+            for (auto& em : elmo.mailbox.emergencies)
+            {
+                printf("Emergency sent : %04x - %s", em.error_code, can::emergency::errorCode::codeToError(em.error_code));
+            }
+            if (elmo.mailbox.emergencies.size() > 0)
+            {
+                stateMachine.printState();
+                print_current_state();
+                elmo.mailbox.emergencies.resize(0);
+            }
+        }
+    }
+
+    //Turn off
+    stateMachine.setCommand(can::CANOpenCommand::DISABLE);
+    while(stateMachine.isON())
+    {
+        
+        bus.sendLogicalRead(callback_error);
+        bus.finalizeDatagrams();
+
+        stateMachine.statusWord_ = inputPDO->statusWord;
+        stateMachine.update();
+
+        outputPDO->controlWord = stateMachine.controlWord_;
+        bus.sendLogicalWrite(callback_error);
+        bus.processAwaitingFrames();
+    }
+    stateMachine.printState();
+
+
+    return 0;
+}
+
+int invalidConfigEtherCAT1(Bus& bus)
+{
+    printf("Mode of operation : INVALID CONFIG ETHERCAT 1\n");
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
+    printf("\n\n----Purposely configuring wrong SYNC MANAGERS for Elmo\n");
+    uint8_t io_buffer[2048];
+    try
+    {
+        bus.init();
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        //Configure Mapping
+        Slave& elmo = bus.slaves().at(1);
+
+        elmo.is_static_mapping = true;
+        elmo.input.bsize = 356;
+        elmo.input.sync_manager = 3;
+        elmo.output.bsize = 8;
+        elmo.output.sync_manager = 2;
+        
+        bus.createMapping(io_buffer);
+
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
+    return 1;
+}
+
+int invalidConfigEtherCAT2(Bus& bus)
+{
+    printf("Mode of operation : INVALID CONFIG ETHERCAT 2\n");
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
+    printf("\n\n----Requesting OPERATIONAL state before SAFEOP\n");
+
+    uint8_t io_buffer[2048];
+    try
+    {
+        bus.init();
+        print_current_state();
+
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        Slave& elmo = bus.slaves().at(1);
+        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::RxPDO.index, hal::sdo::elmo::RxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::RxMapping, Rx_length);
+        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::TxPDO.index, hal::sdo::elmo::TxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::TxMapping, Tx_length);
+        
+
+        //Configure Mapping
+        bus.createMapping(io_buffer);
+
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 1s);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+    return 1;
+}
+
+int invalidConfigEtherCAT3(Bus& bus)
+{
+    printf("Mode of operation : INVALID CONFIG ETHERCAT 3\n");
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
+    printf("\n\n----Requesting OPERATIONAL without sending valid Read/Write\n");
+
+    uint8_t io_buffer[2048];
+    try
+    {
+        bus.init();
+        print_current_state();
+
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        Slave& elmo = bus.slaves().at(1);
+        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::RxPDO.index, hal::sdo::elmo::RxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::RxMapping, Rx_length);
+        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
+        bus.writeSDO(elmo, hal::sdo::elmo::TxPDO.index, hal::sdo::elmo::TxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::TxMapping, Tx_length);
+        
+
+        //Configure Mapping
+        bus.createMapping(io_buffer);
+
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
+
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 100ms);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+    return 1;
+}
+
+int invalidConfigCANOpen(Bus& bus)
+{
+    printf("Mode of operation : INVALID CONGFIG CANOPEN 1\n");
+
+    printf("\n\n----SM should be invalid + abort requests\n");
+    auto print_current_state = [&]()
+    {
+        for (auto& slave : bus.slaves())
+        {
+            State state = bus.getCurrentState(slave);
+            printf("Slave %d state is %s\n", slave.address, toString(state));
+        }
+    };
+
+    uint8_t io_buffer[2048];
+    try
+    {
+        bus.init();
+        for (auto& slave : bus.slaves())
+        {
+            bus.sendGetDLStatus(slave);
+            bus.finalizeDatagrams();
+        }
+
+        //Configure Mapping
+        Slave& elmo = bus.slaves().at(1);
+        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
+        bus.writeSDO(elmo, 0x0000, hal::sdo::elmo::RxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::RxMapping, Rx_length);
+        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
+        bus.writeSDO(elmo, 0x0000, hal::sdo::elmo::TxPDO.subindex, Bus::Access::COMPLETE, (void*) hal::pdo::elmo::TxMapping, Tx_length);
+        
+        bus.createMapping(io_buffer);
+
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
+
+        auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+        bus.processDataRead(callback_error);
+        auto itWillBeWrong = [](DatagramState const&){DEBUG_PRINT("(Previous line was a False alarm) \n");};
+        bus.processDataWrite(itWillBeWrong);
+
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 100ms);
+        print_current_state();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+    return 1;
+}
+
+
+int main(int argc, char* argv[])
+{
+    int count = 0; 
+    while(argv[++count]);
+    std::vector<std::string> args = {"", "", "", ""};
+    for (int i = 1; i < std::min(count, 4); ++i) {args[i] = std::string(argv[i]);}
+
+    auto socket = std::make_shared<Socket>();
+    Bus bus(socket);
+
+    try
+    {
+        socket->open(argv[1], 5ms);
+        bus.init();
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+        return 1;
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+
+    if      (args[2] == "--scramble")       { scramble(bus); }
+    else if (args[2] == "--encoder-fault")  { encoderFault(bus); }
+    else if (args[2] == "--cut-before")     { cutBefore(bus); }
+    else if (args[2] == "--cut")            { cut(bus); }
+    else if (args[2] == "--realtime-loss")  { realtimeLoss(bus); }
+    else if (args[2] == "--conf-can")       { invalidConfigCANOpen(bus); }
+    else if (args[2] == "--conf-eth")
+    {
+        if      (args[3] == "1")        { invalidConfigEtherCAT1(bus); }
+        else if (args[3] == "2")        { invalidConfigEtherCAT2(bus); }
+        else if (args[3] == "3")        { invalidConfigEtherCAT3(bus); }
+        else                            { invalidConfigEtherCAT1(bus); }
+    }
+
+    else                                    { printf("No mode of operation\n"); }
 
 
     return 0;

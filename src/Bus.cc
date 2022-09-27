@@ -891,6 +891,12 @@ namespace kickcat
         link_.addDatagram(Command::NOP, 0, nullptr, 1, process, error);
     }
 
+    void Bus::ping(Slave& slave, std::function<void(DatagramState const&)> const& error)
+    {
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc) {if (wkc != 1) {return DatagramState::INVALID_WKC;} else {return DatagramState::OK;} };
+        link_.addDatagram(Command::FPRD, createAddress(slave.address, 0), nullptr, 1, process, error);
+    }
+
 
     void Bus::processAwaitingFrames()
     {

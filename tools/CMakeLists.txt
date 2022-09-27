@@ -9,7 +9,7 @@ set_target_properties(scanTopology PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-set(EXAMPLE_SRCS errorsTestbench/errorsTestbench.cc)
+set(EXAMPLE_SRCS ./errorsTestbench/errorsTestbench.cc)
 
 add_executable(errorsTestbench ${EXAMPLE_SRCS})
 target_link_libraries(errorsTestbench kickcat)

@@ -64,6 +64,8 @@ namespace kickcat
         void sendNop(std::function<void(DatagramState const&)> const& error);                   // Send a NOP datagram
         void processAwaitingFrames();
 
+        void ping(Slave& slave, std::function<void(DatagramState const&)> const& error);
+
         // Process messages (read or write slave mailbox) - one at once per slave.
         void sendReadMessages(std::function<void(DatagramState const&)> const& error);
         void sendWriteMessages(std::function<void(DatagramState const&)> const& error);
