@@ -133,6 +133,7 @@ namespace kickcat
             {
                 return State(slave.al_status & 0xF);
             }
+            printf("Slave %04x is in error 0x%04x\n", slave.address, slave.al_status_code);
             THROW_ERROR_CODE("State transition error", slave.al_status_code);
         }
         return State(slave.al_status);
@@ -893,8 +894,12 @@ namespace kickcat
 
     void Bus::ping(Slave& slave, std::function<void(DatagramState const&)> const& error)
     {
-        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc) {if (wkc != 1) {return DatagramState::INVALID_WKC;} else {return DatagramState::OK;} };
-        link_.addDatagram(Command::FPRD, createAddress(slave.address, 0), nullptr, 1, process, error);
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+        {
+            if (wkc != 1) {return DatagramState::INVALID_WKC;} 
+            else {return DatagramState::OK;} 
+        };
+        link_.addDatagram(Command::FPRD, createAddress(slave.address, 0), nullptr, 2, process, error);
     }
 
 

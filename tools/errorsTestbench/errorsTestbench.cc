@@ -115,7 +115,7 @@ bool PortsAnalysis(std::vector<Slave>& slaves)
         for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
         {
             if (slaves.at(slave_id).error_counters.rx[port].physical_layer > 0) {check = false;}
-            printf("  %02x  ", slaves.at(slave_id).error_counters.rx[port].physical_layer);
+            printf("  %03d ", slaves.at(slave_id).error_counters.rx[port].physical_layer);
         }
         printf("|");
 
@@ -123,7 +123,7 @@ bool PortsAnalysis(std::vector<Slave>& slaves)
         for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
         {
             if (slaves.at(slave_id).error_counters.rx[port].invalid_frame > 0) {check = false;}
-            printf("  %02x  ", slaves.at(slave_id).error_counters.rx[port].invalid_frame);
+            printf("  %03d ", slaves.at(slave_id).error_counters.rx[port].invalid_frame);
         }
         printf("|");
 
@@ -131,14 +131,14 @@ bool PortsAnalysis(std::vector<Slave>& slaves)
         for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
         {
             if (slaves.at(slave_id).error_counters.forwarded[port] > 0) {check = false;}
-            printf("  %02x  ", slaves.at(slave_id).error_counters.forwarded[port]);
+            printf("  %03d ", slaves.at(slave_id).error_counters.forwarded[port]);
         }
         printf("|");
 
         for (uint16_t slave_id = 0; slave_id < (uint16_t) slaves.size(); ++slave_id)
         {
             if (slaves.at(slave_id).error_counters.lost_link[port] > 0) {check = false;}
-            printf("  %02x  ", slaves.at(slave_id).error_counters.lost_link[port]);
+            printf("  %03d ", slaves.at(slave_id).error_counters.lost_link[port]);
         }
         printf("\n");
     }
@@ -166,7 +166,7 @@ void printInputPDO(hal::pdo::elmo::Input* inputPDO)
 int scramble(Bus& bus)
 {
     printf("Mode of operation : SCRAMBLE\n");
-
+    DEBUG_PRINT("Ignore DEBUG_PRINTS that indicate invalid working counters, they are thrown by process messages, to keep slave state operational\n\n\n\n")
     auto print_current_state = [&]()
     {
         for (auto& slave : bus.slaves())
@@ -217,34 +217,7 @@ int scramble(Bus& bus)
         std::cerr << e.what() << std::endl;
         return 1;
     }
-
-    Slave& elmo = bus.slaves().at(1);
-    hal::pdo::elmo::Input* inputPDO {nullptr};
-    inputPDO = reinterpret_cast<hal::pdo::elmo::Input*>(elmo.input.data);
-    hal::pdo::elmo::Output* outputPDO {nullptr};
-    outputPDO = reinterpret_cast<hal::pdo::elmo::Output*>(elmo.output.data);
-    can::CANOpenStateMachine stateMachine;
-
-
-    //Turn on
-    stateMachine.setCommand(can::CANOpenCommand::ENABLE);
-    do
-    {
-        sleep(1ms);
-        bus.sendLogicalRead(callback_error);
-        bus.finalizeDatagrams();
-        bus.processAwaitingFrames();
-
-        stateMachine.statusWord_ = inputPDO->statusWord;
-        stateMachine.update();
-
-        outputPDO->controlWord = stateMachine.controlWord_;
-        bus.sendLogicalWrite(callback_error);
-
-    }
-    while(not stateMachine.isON());
-
-    stateMachine.printState();
+    printf("Init done successfully, you can proceed to tests\n\n\n");
 
     // Main Loop
     int64_t last_error = 0;
@@ -254,23 +227,11 @@ int scramble(Bus& bus)
 
         try
         {
-            bus.sendLogicalRead(callback_error);
-            bus.sendLogicalWrite(callback_error);
 
             bus.sendRefreshErrorCounters(callback_error);
+            bus.sendLogicalWrite([](DatagramState const&){});
 
             bus.finalizeDatagrams();
-
-            stateMachine.statusWord_ = inputPDO->statusWord;
-            stateMachine.update();
-
-            outputPDO->controlWord = stateMachine.controlWord_;
-            outputPDO->modeOfOperation = 4;
-            outputPDO->targetTorque = 0;
-            outputPDO->maxTorque = 3990;
-            outputPDO->targetPosition = 0;
-            outputPDO->velocityOffset = 0;
-            outputPDO->digitalOutput = 0;
 
             bus.processAwaitingFrames();
         }
@@ -286,23 +247,6 @@ int scramble(Bus& bus)
             PortsAnalysis(bus.slaves());
         }
     }
-
-    //Turn off
-    stateMachine.setCommand(can::CANOpenCommand::DISABLE);
-    while(stateMachine.isON())
-    {
-        
-        bus.sendLogicalRead(callback_error);
-        bus.finalizeDatagrams();
-
-        stateMachine.statusWord_ = inputPDO->statusWord;
-        stateMachine.update();
-
-        outputPDO->controlWord = stateMachine.controlWord_;
-        bus.sendLogicalWrite(callback_error);
-        bus.processAwaitingFrames();
-    }
-    stateMachine.printState();
     return 0;
 }
 
@@ -370,6 +314,7 @@ int encoderFault(Bus& bus)
 
     //Turn on
     stateMachine.setCommand(can::CANOpenCommand::ENABLE);
+    nanoseconds startTime = since_epoch();
     do
     {
         sleep(1ms);
@@ -384,9 +329,15 @@ int encoderFault(Bus& bus)
         bus.sendLogicalWrite(callback_error);
 
     }
-    while(not stateMachine.isON());
+    while((not stateMachine.isON()) & (elapsed_time(startTime) < 5s));
 
     stateMachine.printState();
+    if (not stateMachine.isON())
+    {
+        printf("Timeout : motor failed to start\n");
+        return 1;
+    }
+    printf("Init done successfully, you can proceed to tests\n\n\n");
 
     // Main Loop
     int64_t last_error = 0;
@@ -473,7 +424,7 @@ int cutBefore(Bus& bus)
         }
 
         std::unordered_map<uint16_t, uint16_t> topology = getTopology(bus.slaves());
-        std::unordered_map<uint16_t, uint16_t> expected = {{0, 0}, {1, 0}, {2, 0}};
+        std::unordered_map<uint16_t, uint16_t> expected = {{0, 0}, {1, 0}};
         if (topology == expected)
         {
             printf("Topology seem correct, no cut cable detected\n");
@@ -499,6 +450,8 @@ int cutBefore(Bus& bus)
 int cut(Bus& bus)
 {
     printf("Mode of operation : CUT CABLES DURING PROCESS\n");
+
+    DEBUG_PRINT("Ignore DEBUG_PRINTS that indicate invalid working counters, they are thrown by process messages, to keep slave state operational\n\n\n\n")
     auto print_current_state = [&]()
     {
         for (auto& slave : bus.slaves())
@@ -549,6 +502,7 @@ int cut(Bus& bus)
         std::cerr << e.what() << std::endl;
         return 1;
     }
+    printf("Init done successfully, you can proceed to tests\n\n\n");
 
     for (int64_t i = 0; i < 50000; ++i)
     {
@@ -556,17 +510,32 @@ int cut(Bus& bus)
 
         try
         {
+            bus.sendLogicalWrite([](DatagramState const&){});
+            bus.sendRefreshErrorCounters([](DatagramState const&){});
+
             for (auto& slave : bus.slaves())
             {
-                bus.ping(slave, [slave](DatagramState const&){printf("Wrong WKC for slave %04x\n", slave.address);} );
+                bus.ping(slave, [slave](DatagramState const& datagramStatus)
+                                    {
+                                        if (datagramStatus == DatagramState::LOST) {printf("Lost frame initially sent to %04x\n", slave.address);} 
+                                        else {printf("Wrong WKC for slave %04x\n", slave.address);}
+                                    } );
             }
+
+            if (i%300 == 0)
+            {
+                PortsAnalysis(bus.slaves());
+                print_current_state();
+            }
+
             bus.finalizeDatagrams();
             bus.processAwaitingFrames();
         }
         catch(const std::exception& e)
         {
-            std::cerr << e.what() << '\n';
+            DEBUG_PRINT(e.what() << '\n');
         }
+
         
     }
     return 1;
@@ -636,6 +605,7 @@ int realtimeLoss(Bus& bus)
 
     //Turn on
     stateMachine.setCommand(can::CANOpenCommand::ENABLE);
+    nanoseconds startTime = since_epoch();
     do
     {
         sleep(1ms);
@@ -650,13 +620,17 @@ int realtimeLoss(Bus& bus)
         bus.sendLogicalWrite(callback_error);
 
     }
-    while(not stateMachine.isON());
+    while((not stateMachine.isON()) && (elapsed_time(startTime) < 5s));
 
     stateMachine.printState();
+    if (not stateMachine.isON())
+    {
+        printf("Timeout : motor failed to start\n");
+        return 1;
+    }
 
     // Main Loop
-    int64_t last_error = 0;
-    for (int64_t i = 0; i < 50000; ++i)
+    for (int64_t i = 0; i < 1500; ++i)
     {
         sleep(1ms);
 
@@ -688,12 +662,15 @@ int realtimeLoss(Bus& bus)
             outputPDO->digitalOutput = 0;
 
             bus.processAwaitingFrames();
+
+            //Flexin
+            if (i == 250) {printf("3\n");}
+            if (i == 500) {printf("2\n");}
+            if (i == 750) {printf("1\n");}
         }
         catch (std::exception const& e)
         {
-            int64_t delta = i - last_error;
-            last_error = i;
-            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+            DEBUG_PRINT(e.what() << " at " << i << "\n");
         }
 
         if (i%100 == 0)
@@ -705,7 +682,15 @@ int realtimeLoss(Bus& bus)
             if (elmo.mailbox.emergencies.size() > 0)
             {
                 stateMachine.printState();
-                print_current_state();
+                try
+                {
+                    print_current_state();
+                }
+                catch(const std::exception& e)
+                {
+                    DEBUG_PRINT(e.what() << '\n');
+                }
+                
                 elmo.mailbox.emergencies.resize(0);
             }
         }
@@ -713,20 +698,32 @@ int realtimeLoss(Bus& bus)
 
     //Turn off
     stateMachine.setCommand(can::CANOpenCommand::DISABLE);
-    while(stateMachine.isON())
+    nanoseconds endTime = since_epoch();
+    while(stateMachine.isON() && (elapsed_time(endTime) < 5s))
     {
-        
-        bus.sendLogicalRead(callback_error);
-        bus.finalizeDatagrams();
+        try
+        {
+            bus.sendLogicalRead(callback_error);
+            bus.finalizeDatagrams();
 
-        stateMachine.statusWord_ = inputPDO->statusWord;
-        stateMachine.update();
+            stateMachine.statusWord_ = inputPDO->statusWord;
+            stateMachine.update();
 
-        outputPDO->controlWord = stateMachine.controlWord_;
-        bus.sendLogicalWrite(callback_error);
-        bus.processAwaitingFrames();
+            outputPDO->controlWord = stateMachine.controlWord_;
+            bus.sendLogicalWrite(callback_error);
+            bus.processAwaitingFrames();
+        }
+        catch(const std::exception& e)
+        {
+            DEBUG_PRINT(e.what() << '\n');
+        }
     }
     stateMachine.printState();
+    if (stateMachine.isON())
+    {
+        printf("Timeout : motor failed to stop properly\n");
+        return 1;
+    }
 
 
     return 0;
@@ -748,7 +745,6 @@ int invalidConfigEtherCAT1(Bus& bus)
     uint8_t io_buffer[2048];
     try
     {
-        bus.init();
         for (auto& slave : bus.slaves())
         {
             bus.sendGetDLStatus(slave);
@@ -893,9 +889,9 @@ int invalidConfigEtherCAT3(Bus& bus)
 
 int invalidConfigCANOpen(Bus& bus)
 {
-    printf("Mode of operation : INVALID CONGFIG CANOPEN 1\n");
+    printf("Mode of operation : INVALID CONFIG CANOPEN 1\n");
 
-    printf("\n\n----SM should be invalid + abort requests\n");
+    printf("\n\n----SM should be invalid\n");
     auto print_current_state = [&]()
     {
         for (auto& slave : bus.slaves())

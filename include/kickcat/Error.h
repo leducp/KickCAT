@@ -16,7 +16,7 @@ namespace kickcat
     #define THROW_ERROR_DATAGRAM(msg, state) (throw ErrorDatagram{LOCATION ": " msg, state})
     #define THROW_SYSTEM_ERROR(msg)          (throw std::system_error(errno, std::generic_category(), LOCATION ": " msg))
 
-#define DEBUG 1
+//#define DEBUG 1
 #ifdef DEBUG
     #define DEBUG_PRINT(...) do { fprintf(stderr, "DEBUG: %s:%d: ", __FILE__, __LINE__); fprintf(stderr, ##__VA_ARGS__); } while(0);
 #else
