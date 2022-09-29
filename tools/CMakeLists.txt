@@ -19,3 +19,14 @@ set_target_properties(errorsTestbench PROPERTIES
     CXX_EXTENSIONS NO
     POSITION_INDEPENDENT_CODE ON
 )
+
+set(EXAMPLE_SRCS ./errorsTestbench/testsLinkDetection.cc)
+
+add_executable(testsLinkDetection ${EXAMPLE_SRCS})
+target_link_libraries(testsLinkDetection kickcat)
+set_target_properties(testsLinkDetection PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED YES
+    CXX_EXTENSIONS NO
+    POSITION_INDEPENDENT_CODE ON
+)
