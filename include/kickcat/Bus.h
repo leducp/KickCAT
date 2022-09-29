@@ -50,6 +50,7 @@ namespace kickcat
         void createMapping(uint8_t* iomap);
 
         std::vector<Slave>& slaves() { return slaves_; }
+        Link& link() { return link_; };
 
         // asynchrone read/write/mailbox/state methods
         // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
