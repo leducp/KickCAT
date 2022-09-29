@@ -128,7 +128,6 @@ namespace kickcat
         last_datagram_ = next_datagram_;                        // save last datagram header to finalize frame when ready
         next_datagram_ = pos;                                   // set next datagram
         ++datagram_counter_;                                    // one more datagram in the frame to be sent
-//        printf("Add frame datagram data size %i \n", header_->len);
     }
 
 
@@ -143,7 +142,6 @@ namespace kickcat
 
     void Frame::clear()
     {
-//        printf("Clear frame\n");
         header_->len = 0;
     }
 
@@ -157,7 +155,6 @@ namespace kickcat
         resetContext();
 
         int32_t to_write = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
-//        printf("finalize header len %i  sizeof(EthernetHeader) %i  sizeof(EthercatHeader) %i\n", header_->len, sizeof(EthernetHeader), sizeof(EthercatHeader));
         if (to_write < ETH_MIN_SIZE)
         {
             // reset padding
@@ -190,51 +187,4 @@ namespace kickcat
     {
         std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
     }
-
-
-//    void Frame::read(std::shared_ptr<AbstractSocket> socket)
-//    {
-//        int32_t read = socket->read(frame_.data(), static_cast<int32_t>(frame_.size()));
-//        if (read < 0)
-//        {
-//            THROW_SYSTEM_ERROR("read()");
-//        }
-//
-//        // check if the frame is an EtherCAT one. if not, drop it and try again
-//        if (ethernet_->type != ETH_ETHERCAT_TYPE)
-//        {
-//            THROW_ERROR("Invalid frame type");
-//        }
-//
-//        int32_t expected = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
-////        header_->len = 0; // reset len for future usage
-//        if (expected < ETH_MIN_SIZE)
-//        {
-//            expected = ETH_MIN_SIZE;
-//        }
-//        if (read != expected)
-//        {
-//            THROW_ERROR("Wrong number of bytes read");
-//        }
-//
-//        is_datagram_available_ = true;
-//    }
-//
-//
-//    void Frame::write(std::shared_ptr<AbstractSocket> socket)
-//    {
-//        int32_t toWrite = finalize();
-//        int32_t written = socket->write(frame_.data(), toWrite);
-////        header_->len = 0; // reset len for future usage
-//
-//        if (written < 0)
-//        {
-//            THROW_SYSTEM_ERROR("write()");
-//        }
-//
-//        if (written != toWrite)
-//        {
-//            THROW_ERROR("Wrong number of bytes written");
-//        }
-//    }
 }
