@@ -1,0 +1,132 @@
+{
+    "Bus":
+    {
+        "input_size": 1293,
+        "output_size": 256,
+        "adapter": "enp2s0",
+        "rx_coalescing": 0
+    },
+
+    "is_trap_motor_embedded": false,
+
+    "Slaves":
+    {
+        "Pelvis":
+        {
+            "type": "Pelvis",
+            "bus_id": 0,
+            "firmware_version" : 200000000,
+            "static_mapping": true,
+            "output_size": 8,
+            "output_sync_manager": 2,
+            "input_size": 356,
+            "input_sync_manager": 3
+        },
+        "RightFrontalHip":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/right/hip/frontal/motor",
+            "bus_id": 1
+        },
+        "RightTransverseHip":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/right/hip/transverse/motor",
+            "bus_id": 2
+        },
+        "RightSagittalHip":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/right/hip/sagittal/motor",
+            "bus_id": 3
+        },
+        "RightSagittalKnee":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/right/knee/sagittal/motor",
+            "bus_id": 4
+        },
+        "RightInternalAnkle":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/right/ankle/internal/motor",
+            "bus_id": 5
+        },
+        "RightExternalAnkle":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/right/ankle/external/motor",
+            "bus_id": 6
+        },
+        "RightAnkle":
+        {
+            "type": "Ankle",
+            "bus_id": 7,
+            "firmware_version" : 200000000,
+            "static_mapping": true,
+            "output_size": 4,
+            "output_sync_manager": 2,
+            "input_size": 312,
+            "input_sync_manager": 3
+        },
+        "LeftFrontalHip":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/left/hip/frontal/motor",
+            "bus_id": 8
+        },
+        "LeftTransverseHip":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/left/hip/transverse/motor",
+            "bus_id": 9
+        },
+        "LeftSagittalHip":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/left/hip/sagittal/motor",
+            "bus_id": 10
+        },
+        "LeftSagittalKnee":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/left/knee/sagittal/motor",
+            "bus_id": 11
+        },
+        "LeftInternalAnkle":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/left/ankle/internal/motor",
+            "bus_id": 12
+        },
+        "LeftExternalAnkle":
+        {
+            "type": "ElmoMotor",
+            "firmware_version" : 600000000,
+            "config": "/left/ankle/external/motor",
+            "bus_id": 13
+        },
+        "LeftAnkle":
+        {
+            "type": "Ankle",
+            "bus_id": 14,
+            "firmware_version" : 200000000,
+            "static_mapping": true,
+            "output_size": 4,
+            "output_sync_manager": 2,
+            "input_size": 312,
+            "input_sync_manager": 3
+        }
+    }
+}
