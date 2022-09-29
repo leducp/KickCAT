@@ -2,7 +2,7 @@
 #include "AbstractSocket.h"
 #include "Error.h"
 
-#include <cstring>
+#include <functional>
 
 namespace kickcat
 {
@@ -206,14 +206,8 @@ namespace kickcat
     {
         auto [header_nominal, data_nominal, wkc_nominal] = frame_nominal_.nextDatagram();
         auto [header_redundancy, data_redundancy, wkc_redundancy] = frame_redundancy_.nextDatagram();
-        // TODO handle case nominal is not send at all.
 
-        for (uint8_t i = 0; i < header_nominal->len; i++)
-        {
-            data_nominal[i] |= data_redundancy[i];  // todo test transform method.
-        }
-
-//        std::transform(data_nominal, data_nominal[header_nominal->len], data_redundancy, data_redundancy[header_nominal->len], )
+        std::transform(data_nominal, &data_nominal[header_nominal->len], data_redundancy, data_nominal, std::bit_or<uint8_t>());
 
         uint16_t wkc = wkc_nominal + wkc_redundancy;
         return std::make_tuple(header_nominal, data_nominal, wkc);

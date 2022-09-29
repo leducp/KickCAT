@@ -24,7 +24,7 @@ namespace kickcat
         /// \brief helper for trivial access (i.e. most of the init bus frames)
         virtual void writeThenRead(Frame& frame) = 0;
 
-        void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
+        virtual void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                          std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                          std::function<void(DatagramState const& state)> const& error);
         template<typename T>
@@ -35,8 +35,8 @@ namespace kickcat
             addDatagram(command, address, &data, sizeof(data), process, error);
         }
 
-        void finalizeDatagrams();
-        void processDatagrams();
+        virtual void finalizeDatagrams();
+        virtual void processDatagrams();
 
         bool isRedundancyActivated() {return false;};
 
