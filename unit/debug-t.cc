@@ -12,14 +12,7 @@ using ::testing::InSequence;
 
 using namespace kickcat;
 
-struct SDOAnswer
-{
-    mailbox::Header header;
-    mailbox::ServiceData sdo;
-    uint8_t payload[4];
-} __attribute__((__packed__));
-
-class FullLink : public testing::Test
+class LinkDebug : public testing::Test
 {
 public:
 
@@ -94,7 +87,7 @@ protected:
     uint8_t* payload;
 };
 
-TEST_F(FullLink, send_get_register)
+TEST_F(LinkDebug, send_get_register)
 {
     //Succesful read
     uint16_t value_read = 1;
@@ -110,7 +103,7 @@ TEST_F(FullLink, send_get_register)
     ASSERT_THROW(sendGetRegister(link, 0x00, 0x110, value_read), Error);
 }
 
-TEST_F(FullLink, send_write_register)
+TEST_F(LinkDebug, send_write_register)
 {
     // Succesful write
     checkSendFrame(Command::FPWR);
