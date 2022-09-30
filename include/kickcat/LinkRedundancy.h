@@ -28,8 +28,6 @@ namespace kickcat
         ///        but allow to keep a consistent interface between with and without redundancy.
         void writeThenRead(Frame& frame) override;
 
-        bool isRedundancyActivated() {return is_redundancy_activated_;};
-
     private:
         void read() override;
         void sendFrame() override;
