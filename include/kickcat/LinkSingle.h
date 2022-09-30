@@ -11,11 +11,11 @@ namespace kickcat
 {
     class AbstractSocket;
 
-    class Link : public AbstractLink
+    class LinkSingle : public AbstractLink
     {
     public:
-        Link(std::shared_ptr<AbstractSocket> socket, uint8_t const src_mac[MAC_SIZE] = PRIMARY_IF_MAC);
-        ~Link() = default;
+        LinkSingle(std::shared_ptr<AbstractSocket> socket, uint8_t const src_mac[MAC_SIZE] = PRIMARY_IF_MAC);
+        ~LinkSingle() = default;
 
         void writeThenRead(Frame& frame) override;
 

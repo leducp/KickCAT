@@ -1,5 +1,5 @@
+#include "kickcat/LinkSingle.h"
 #include "kickcat/Bus.h"
-#include "kickcat/Link.h"
 #include "kickcat/Prints.h"
 
 #ifdef __linux__
@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 
     auto socket = std::make_shared<Socket>();
 
-    std::shared_ptr<Link> link = std::make_shared<Link>(socket);
+    std::shared_ptr<LinkSingle> link = std::make_shared<LinkSingle>(socket);
     Bus bus(link);
 
     auto print_current_state = [&]()

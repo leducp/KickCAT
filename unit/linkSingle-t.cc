@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <cstring>
 
-#include "kickcat/Link.h"
+#include "LinkSingle.h"
 #include "Mocks.h"
 
 using ::testing::Return;
@@ -53,7 +53,7 @@ public:
 
 protected:
     std::shared_ptr<MockSocket> io{ std::make_shared<MockSocket>() };
-    Link link{ io };
+    LinkSingle link{ io };
 
     int32_t process_callback_counter{0};
     int32_t error_callback_counter{0};

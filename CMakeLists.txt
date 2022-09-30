@@ -12,7 +12,7 @@ set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/LinkSingle.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/LinkRedundancy.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
@@ -57,7 +57,7 @@ if (GTest_FOUND)
   add_executable(kickcat_unit #unit/bus-t.cc
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
-                             # unit/link-t.cc
+                             # unit/linkSingle-t.cc
                               unit/mailbox-t.cc
                               unit/prints-t.cc
                               unit/protocol-t.cc
