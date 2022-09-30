@@ -1,26 +1,26 @@
-#include "Link.h"
 #include "AbstractSocket.h"
 #include "Error.h"
 
 #include <cstring>
+#include "LinkSingle.h"
 
 namespace kickcat
 {
-    Link::Link(std::shared_ptr<AbstractSocket> socket, uint8_t const src_mac[MAC_SIZE])
+    LinkSingle::LinkSingle(std::shared_ptr<AbstractSocket> socket, uint8_t const src_mac[MAC_SIZE])
         : socket_nominal_(socket)
     {
         std::copy(src_mac, src_mac + MAC_SIZE, src_mac_nominal_);
     }
 
 
-    void Link::writeThenRead(Frame& frame)
+    void LinkSingle::writeThenRead(Frame& frame)
     {
         writeFrame(socket_nominal_, frame, src_mac_nominal_);
         readFrame(socket_nominal_, frame);
     }
 
 
-    void Link::sendFrame()
+    void LinkSingle::sendFrame()
     {
         // save number of datagrams in the frame to handle send error properly if any
         int32_t const datagrams = frame_nominal_.datagramCounter();
@@ -42,7 +42,7 @@ namespace kickcat
     }
 
 
-    void Link::read()
+    void LinkSingle::read()
     {
         try
         {
@@ -55,25 +55,25 @@ namespace kickcat
     }
 
 
-    bool Link::isDatagramAvailable()
+    bool LinkSingle::isDatagramAvailable()
     {
         return frame_nominal_.isDatagramAvailable();
     }
 
 
-    std::tuple<DatagramHeader const*, uint8_t*, uint16_t> Link::nextDatagram()
+    std::tuple<DatagramHeader const*, uint8_t*, uint16_t> LinkSingle::nextDatagram()
     {
         return frame_nominal_.nextDatagram();
     }
 
 
-    void Link::addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
+    void LinkSingle::addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
     {
         frame_nominal_.addDatagram(index, command, address, data, data_size);
     }
 
 
-    void Link::resetFrameContext()
+    void LinkSingle::resetFrameContext()
     {
         frame_nominal_.resetContext();
     }
