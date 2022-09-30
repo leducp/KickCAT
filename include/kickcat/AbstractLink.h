@@ -38,8 +38,6 @@ namespace kickcat
         virtual void finalizeDatagrams();
         virtual void processDatagrams();
 
-        bool isRedundancyActivated() {return false;};
-
         void readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
         void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE]);
 
@@ -51,8 +49,8 @@ namespace kickcat
         struct Callbacks
         {
             DatagramState status{DatagramState::LOST};
-            std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> process;
-            std::function<void(DatagramState const& state)> error;
+            std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> process; // Shall not throw exception.
+            std::function<void(DatagramState const& state)> error; // May throw exception.
         };
         std::array<Callbacks, 256> callbacks_{};
 

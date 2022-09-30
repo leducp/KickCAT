@@ -57,7 +57,7 @@ if (GTest_FOUND)
   add_executable(kickcat_unit #unit/bus-t.cc
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
-                             # unit/linkSingle-t.cc
+                              unit/linkSingle-t.cc
                               unit/mailbox-t.cc
                               unit/prints-t.cc
                               unit/protocol-t.cc

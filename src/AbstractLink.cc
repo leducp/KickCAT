@@ -49,20 +49,12 @@ namespace kickcat
 
         for (int32_t i = 0; i < waiting_frame; ++i)
         {
-            try
+            read();
+            while (isDatagramAvailable())
             {
-                read();
-                while (isDatagramAvailable())
-                {
-                    auto [header, data, wkc] = nextDatagram();
-                    callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
-                }
+                auto [header, data, wkc] = nextDatagram();
+                callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
             }
-            catch (std::exception const& e)
-            {
-                DEBUG_PRINT("Next datagram fail: %s\n", e.what());
-            }
-
         }
 
         std::exception_ptr client_exception;

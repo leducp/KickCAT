@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <cstring>
 
-#include "LinkSingle.h"
+#include "kickcat/LinkSingle.h"
 #include "Mocks.h"
 
 using ::testing::Return;
@@ -104,6 +104,173 @@ TEST_F(LinkTest, writeThenRead_error)
     ASSERT_THROW(link.writeThenRead(frame), Error);
 }
 
+
+
+
+
+/////////////////////////////////////////////Begin AbstractLink Test ////////////////////////////////////////////////
+TEST_F(LinkTest, read_error)
+{
+    Frame frame;
+
+    EXPECT_CALL(*io, read(_,_))
+        .WillOnce(Return(-1))
+        .WillOnce(Return(0))
+        .WillOnce(Invoke([&](uint8_t* frame_in, int32_t frame_size)
+        {
+            EthernetHeader* header = reinterpret_cast<EthernetHeader*>(frame_in);
+            header->type = 0;
+            return frame_size;
+        }))
+        .WillOnce(Return(MAX_ETHERCAT_PAYLOAD_SIZE / 2));
+    ASSERT_THROW(link.readFrame(io, frame), std::system_error);
+    ASSERT_THROW(link.readFrame(io, frame), Error);
+    ASSERT_THROW(link.readFrame(io, frame), Error);
+    ASSERT_FALSE(frame.isDatagramAvailable());
+
+    frame.resetContext();
+    frame.addDatagram(0, Command::BRD, 0, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
+    ASSERT_THROW(link.readFrame(io, frame), Error);
+}
+
+TEST_F(LinkTest, read_garbage)
+{
+    Frame frame;
+
+    EXPECT_CALL(*io, read(_,ETH_MAX_SIZE)).WillOnce(Return(ETH_MIN_SIZE));
+    link.readFrame(io, frame);
+    ASSERT_TRUE(frame.isDatagramAvailable());
+}
+
+
+TEST_F(LinkTest, write_invalid_frame)
+{
+    Frame frame;
+
+    EXPECT_CALL(*io, write(_,ETH_MIN_SIZE))
+    .WillOnce(Invoke([](uint8_t const* frame_in, int32_t)
+    {
+        {
+            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
+            EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
+            for (int32_t i = 0; i < 6; ++i)
+            {
+                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src_mac[i]);
+                EXPECT_EQ(0xff, header->dst_mac[i]);
+            }
+        }
+
+        {
+            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
+            EXPECT_EQ(header->len, 0);
+        }
+        return ETH_MIN_SIZE;
+    }));
+    link.writeFrame(io, frame, PRIMARY_IF_MAC);
+}
+
+TEST_F(LinkTest, write_multiples_datagrams)
+{
+    Frame frame;
+
+    constexpr int32_t PAYLOAD_SIZE = 32;
+    constexpr int32_t EXPECTED_SIZE = sizeof(EthernetHeader) + sizeof(EthercatHeader) + 3 * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE);
+    uint8_t buffer[PAYLOAD_SIZE];
+    for (int32_t i = 0; i < PAYLOAD_SIZE; ++i)
+    {
+        buffer[i] = static_cast<uint8_t>(i * i);
+    }
+
+    frame.addDatagram(17, Command::FPRD, 20, nullptr, PAYLOAD_SIZE);
+    frame.addDatagram(18, Command::BRD,  21, nullptr, PAYLOAD_SIZE);
+    frame.addDatagram(19, Command::BWR,  22, buffer,  PAYLOAD_SIZE);
+    EXPECT_EQ(3, frame.datagramCounter());
+
+    EXPECT_CALL(*io, write(_, _))
+    .WillOnce(Invoke([&](uint8_t const* frame_in, int32_t frame_size)
+    {
+        EXPECT_EQ(EXPECTED_SIZE, frame_size);
+
+        {
+            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
+            EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
+            for (int32_t i = 0; i < 6; ++i)
+            {
+                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src_mac[i]);
+                EXPECT_EQ(0xff, header->dst_mac[i]);
+            }
+        }
+
+        {
+            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
+            EXPECT_EQ(header->len, 3 * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE));
+        }
+
+        for (int32_t i = 0; i < 3; ++i)
+        {
+            uint8_t const* datagram = reinterpret_cast<uint8_t const*>(frame_in + sizeof(EthernetHeader) + sizeof(EthercatHeader)
+                                                                        + i * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE));
+            DatagramHeader const* header = reinterpret_cast<DatagramHeader const*>(datagram);
+            uint8_t const* payload = datagram + sizeof(DatagramHeader);
+            EXPECT_EQ(17 + i, header->index);
+            EXPECT_EQ(20 + i, header->address);
+            EXPECT_EQ(PAYLOAD_SIZE, header->len);
+            EXPECT_EQ(0, header->IRQ);
+
+            switch (i)
+            {
+                case 0:
+                {
+                    EXPECT_EQ(Command::FPRD, header->command);
+                    EXPECT_TRUE(header->multiple);
+                    for (int32_t j = 0; j < PAYLOAD_SIZE; ++j)
+                    {
+                        EXPECT_EQ(0, payload[j]);
+                    }
+                    break;
+                }
+                case 1:
+                {
+                    EXPECT_EQ(Command::BRD, header->command);
+                    EXPECT_TRUE(header->multiple);
+                    for (int32_t j = 0; j < PAYLOAD_SIZE; ++j)
+                    {
+                        EXPECT_EQ(0, payload[j]);
+                    }
+                    break;
+                }
+                case 2:
+                {
+                    EXPECT_EQ(Command::BWR, header->command);
+                    EXPECT_FALSE(header->multiple);
+                    for (int32_t j = 0; j < PAYLOAD_SIZE; ++j)
+                    {
+                        EXPECT_EQ(static_cast<uint8_t>(j*j), payload[j]);
+                    }
+                    break;
+                }
+                default: {}
+            }
+        }
+
+        return EXPECTED_SIZE;
+    }));
+    link.writeFrame(io, frame, PRIMARY_IF_MAC);
+}
+
+TEST_F(LinkTest, write_error)
+{
+    Frame frame;
+
+    EXPECT_CALL(*io, write(_,_))
+        .WillOnce(Return(-1))
+        .WillOnce(Return(0));
+    ASSERT_THROW(link.writeFrame(io, frame, PRIMARY_IF_MAC), std::system_error);
+    ASSERT_THROW(link.writeFrame(io, frame, PRIMARY_IF_MAC), Error);
+}
+
+///////////////////////////////////////////// END AbstractLink Test ////////////////////////////////////////////////
+
 TEST_F(LinkTest, add_datagram_more_than_15)
 {
     {
@@ -146,21 +313,20 @@ TEST_F(LinkTest, add_big_datagram)
     link.finalizeDatagrams();
 }
 
-
 TEST_F(LinkTest, add_too_many_datagrams)
 {
     constexpr int32_t SEND_DATAGRAMS_OK = 255;
     {
         InSequence s;
 
-        for (int32_t i = 0; i< (SEND_DATAGRAMS_OK / 15); ++i)
+        for (int32_t i = 0; i < (SEND_DATAGRAMS_OK / 15); ++i)
         {
             checkSendFrame(15);
         }
     }
 
     uint8_t data;
-    for (int32_t i=0; i<SEND_DATAGRAMS_OK; ++i)
+    for (int32_t i=0; i < SEND_DATAGRAMS_OK; ++i)
     {
         addDatagram(data);
     }
@@ -168,12 +334,10 @@ TEST_F(LinkTest, add_too_many_datagrams)
     link.finalizeDatagrams();
 }
 
-
 TEST_F(LinkTest, process_datagrams_nothing_to_do)
 {
     link.processDatagrams();
 }
-
 
 TEST_F(LinkTest, process_datagrams_invalid_frame)
 {
@@ -194,7 +358,6 @@ TEST_F(LinkTest, process_datagrams_invalid_frame)
     ASSERT_EQ(1, error_callback_counter);    // datagram lost (invalid frame)
     ASSERT_EQ(DatagramState::LOST, last_error);
 }
-
 
 TEST_F(LinkTest, process_datagrams_invalid_size)
 {
@@ -235,7 +398,6 @@ TEST_F(LinkTest, process_datagrams_OK)
     ASSERT_EQ(DatagramState::OK, last_error);
 }
 
-
 TEST_F(LinkTest, process_datagrams_send_error)
 {
     EXPECT_CALL(*io, write(_,_))
@@ -253,7 +415,6 @@ TEST_F(LinkTest, process_datagrams_send_error)
     ASSERT_EQ(1, error_callback_counter);   // datagram lost (sent error)
     ASSERT_EQ(DatagramState::SEND_ERROR, last_error);
 }
-
 
 TEST_F(LinkTest, process_datagrams_error_rethrow)
 {
@@ -289,7 +450,6 @@ TEST_F(LinkTest, process_datagrams_error_rethrow)
     }));
     EXPECT_THROW(link.processDatagrams(), std::overflow_error);
 }
-
 
 TEST_F(LinkTest, process_datagrams_old_frame)
 {
