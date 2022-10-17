@@ -1,6 +1,6 @@
-#include "diagnosticsBus.h"
-#include "diagnosticsServer.h"
-#include "diagnosticsAPI.h"
+#include "diagnosticsArchi/diagnosticsBus.h"
+#include "diagnosticsArchi/diagnosticsServer.h"
+#include "diagnosticsArchi/diagnosticsAPI.h"
 
 #include <thread>
 #include <future>
