@@ -1,6 +1,4 @@
-set(EXAMPLE_SRCS scanTopology.cc)
-
-add_executable(scanTopology ${EXAMPLE_SRCS})
+add_executable(scanTopology scanTopology.cc)
 target_link_libraries(scanTopology kickcat)
 set_target_properties(scanTopology PROPERTIES
     CXX_STANDARD 17
@@ -9,22 +7,9 @@ set_target_properties(scanTopology PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-set(EXAMPLE_SRCS ./errorsTestbench/errorsTestbench.cc)
-
-add_executable(errorsTestbench ${EXAMPLE_SRCS})
-target_link_libraries(errorsTestbench kickcat)
-set_target_properties(errorsTestbench PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED YES
-    CXX_EXTENSIONS NO
-    POSITION_INDEPENDENT_CODE ON
-)
-
-set(EXAMPLE_SRCS ./errorsTestbench/testsLinkDetection.cc)
-
-add_executable(testsLinkDetection ${EXAMPLE_SRCS})
-target_link_libraries(testsLinkDetection kickcat)
-set_target_properties(testsLinkDetection PROPERTIES
+add_executable(run ./diagnosticsArchi/run.cc)
+target_link_libraries(run kickcat)
+set_target_properties(run PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
     CXX_EXTENSIONS NO

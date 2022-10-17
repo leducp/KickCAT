@@ -4,9 +4,7 @@
 #ifndef CAN_ELMO_STATE_MACHINE_H
 #define CAN_ELMO_STATE_MACHINE_H
 
-
-#include "kickcat/Bus.h"
-#include "kickcat/Time.h"
+#include "Time.h"
 
 
 namespace can
@@ -111,73 +109,12 @@ namespace can
             {
                 case CANOpenCommand::ENABLE:
                 {
-                    switch (motorState_)
-                    {
-                        case CANOpenState::OFF:
-                        {
-                            startMotorTimestamp_ = kickcat::since_epoch();
-                            controlWord_ = control::word::FAULT_RESET;
-                            //printf("CW : FAULT RESET\n");
-                            motorState_ = CANOpenState::SAFE_RESET;
-                        }
-                        break;
-
-                        case CANOpenState::SAFE_RESET:
-                            controlWord_ = control::word::SHUTDOWN;
-                            //printf("CW : SHUTDOWN\n");
-                            if (kickcat::elapsed_time(startMotorTimestamp_) > 10ms)
-                            {
-                                motorState_ = CANOpenState::PREPARE_TO_SWITCH_ON ;
-                            }
-                            break;
-                        case CANOpenState::PREPARE_TO_SWITCH_ON:
-                            controlWord_ = control::word::SHUTDOWN;
-                            //printf("CW : SHUTDOWN 2\n");
-                            if ((statusWord_ & status::value::READY_TO_SWITCH_ON_STATE) == status::value::READY_TO_SWITCH_ON_STATE)
-                            {
-                                motorState_ = CANOpenState::SWITCH_ON;
-                            }
-                            break;
-                        case CANOpenState::SWITCH_ON:
-                            controlWord_ = control::word::ENABLE_OPERATION;
-                            //printf("CW : ENABLE OPERATION\n");
-                            if ((statusWord_ & status::value::ON_STATE)== status::value::ON_STATE)
-                            {
-                                motorState_ = CANOpenState::ON ;
-
-                                // Reset command now that the desired state has been reached.
-                                command_ = CANOpenCommand::NONE;
-                            }
-                            break;
-                        default:
-                        case CANOpenState::ON: printf("ON status achieved\n"); break;
-                        case CANOpenState::FAULT:
-                            // Do nothing
-                            break;
-                    }
-
-                    // Time out, motor start failed
-                    if (motorState_ != CANOpenState::ON
-                        && motorState_ != CANOpenState::FAULT
-                        && motorState_ != CANOpenState::OFF
-                        && kickcat::elapsed_time(startMotorTimestamp_) > 1.0s
-                        )
-                    {
-                        DEBUG_PRINT("Can't enable motor: timeout, start again from OFF state.\n");
-                        motorState_ = CANOpenState::OFF;
-                    }
+                    enable();
                     break;
                 }
                 case CANOpenCommand::DISABLE:
                 {
-                    controlWord_ = control::word::DISABLE_VOLTAGE;
-                    if ((status::value::OFF_STATE & statusWord_) == status::value::OFF_STATE)
-                    {
-                        motorState_ = CANOpenState::OFF;
-
-                        // Reset command now that the desired state has been reached.
-                        command_ = CANOpenCommand::NONE;
-                    }
+                    disable();
                     break;
                 }
                 case CANOpenCommand::NONE:
@@ -188,18 +125,79 @@ namespace can
             }
         }
 
+        void enable()
+        {
+            switch (motorState_)
+            {
+                case CANOpenState::OFF:
+                {
+                    startMotorTimestamp_ = kickcat::since_epoch();
+                    controlWord_ = control::word::FAULT_RESET;
+                    //printf("CW : FAULT RESET\n");
+                    motorState_ = CANOpenState::SAFE_RESET;
+                }
+                break;
+
+                case CANOpenState::SAFE_RESET:
+                    controlWord_ = control::word::SHUTDOWN;
+                    //printf("CW : SHUTDOWN\n");
+                    if (kickcat::elapsed_time(startMotorTimestamp_) > 10ms)
+                    {
+                        motorState_ = CANOpenState::PREPARE_TO_SWITCH_ON ;
+                    }
+                    break;
+                case CANOpenState::PREPARE_TO_SWITCH_ON:
+                    controlWord_ = control::word::SHUTDOWN;
+                    //printf("CW : SHUTDOWN 2\n");
+                    if ((statusWord_ & status::value::READY_TO_SWITCH_ON_STATE) == status::value::READY_TO_SWITCH_ON_STATE)
+                    {
+                        motorState_ = CANOpenState::SWITCH_ON;
+                    }
+                    break;
+                case CANOpenState::SWITCH_ON:
+                    controlWord_ = control::word::ENABLE_OPERATION;
+                    //printf("CW : ENABLE OPERATION\n");
+                    if ((statusWord_ & status::value::ON_STATE)== status::value::ON_STATE)
+                    {
+                        motorState_ = CANOpenState::ON ;
+
+                        // Reset command now that the desired state has been reached.
+                        command_ = CANOpenCommand::NONE;
+                    }
+                    break;
+                default:
+                case CANOpenState::ON: break;
+                case CANOpenState::FAULT:
+                    // Do nothing
+                    break;
+            }
+
+            // Time out, motor start failed
+            if (motorState_ != CANOpenState::ON
+                && motorState_ != CANOpenState::FAULT
+                && motorState_ != CANOpenState::OFF
+                && kickcat::elapsed_time(startMotorTimestamp_) > 1.0s
+                )
+            {
+                motorState_ = CANOpenState::OFF;
+            }
+        }
+
+        void disable()
+        {
+            controlWord_ = control::word::DISABLE_VOLTAGE;
+            if ((status::value::OFF_STATE & statusWord_) == status::value::OFF_STATE)
+            {
+                motorState_ = CANOpenState::OFF;
+
+                // Reset command now that the desired state has been reached.
+                command_ = CANOpenCommand::NONE;
+            }
+        }
+
         void setCommand(CANOpenCommand command)
         {
             command_ = command;
-        }
-
-        void printState()
-        {
-            if ((statusWord_ & can::status::value::OFF_STATE) == can::status::value::OFF_STATE) {printf("State is OFF\n");}
-            else if ((statusWord_ & can::status::value::ON_STATE) == can::status::value::ON_STATE) {printf("State is ON \n");}
-            else if ((statusWord_ & can::status::value::DISABLED_STATE) == can::status::value::DISABLED_STATE) {printf("State is DISABLED \n");}
-            else if ((statusWord_ & can::status::value::READY_TO_SWITCH_ON_STATE) == can::status::value::READY_TO_SWITCH_ON_STATE) {printf("State is READY_TO_SWITCH_ON \n");}
-            else if ((statusWord_ & can::status::value::FAULT_STATE) == can::status::value::FAULT_STATE) {printf("State is FAULT\n");}
         }
 
         bool isON()

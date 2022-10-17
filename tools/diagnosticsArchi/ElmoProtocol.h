@@ -6,7 +6,7 @@
 #define WDC_ELMO_PROTOCOL_H
 
 #include "kickcat/Bus.h"
-#include "CANOpenStateMachine.h"
+#include "kickcat/CANOpenStateMachine.h"
 
 struct SDOEntry
 {

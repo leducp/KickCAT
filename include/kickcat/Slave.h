@@ -7,6 +7,8 @@
 
 #include "protocol.h"
 #include "Mailbox.h"
+#include "Container.h"
+#include "CANOpenStateMachine.h"
 
 namespace kickcat
 {
@@ -78,6 +80,9 @@ namespace kickcat
 
         ErrorCounters error_counters;
         int previous_errors_sum{0};
+
+        SlaveErrorContainer* containerPointer;
+        can::CANOpenStateMachine CANstateMachine;
 
     private:
         void parseStrings(uint8_t const* section_start);

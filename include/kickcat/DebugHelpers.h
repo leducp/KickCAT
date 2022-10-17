@@ -20,18 +20,13 @@ namespace kickcat
             return DatagramState::OK;
         };
 
-        auto error = [](DatagramState const&)
+        auto error = [](DatagramState const& state)
         {
-            THROW_ERROR("Error while trying to get slave register.");
+            THROW_ERROR_DATAGRAM("Send get register", state);
         };
 
         link.addDatagram(Command::FPRD, createAddress(slave_address, reg_address), nullptr, process, error);
         link.processDatagrams();
-    }
-
-    void sendGetRegister(Link& link, uint16_t slave_address, uint16_t reg_address, uint16_t& value_read)
-    {
-        sendGetRegister<uint16_t>(link, slave_address, reg_address, value_read);
     }
 
     template<typename T>
@@ -46,18 +41,13 @@ namespace kickcat
             return DatagramState::OK;
         };
 
-        auto error = [](DatagramState const&)
+        auto error = [](DatagramState const& state)
         {
-            THROW_ERROR("Error while trying to set slave register.");
+            THROW_ERROR_DATAGRAM("Send write register", state);
         };
 
         link.addDatagram(Command::FPWR, createAddress(slave_address, reg_address), value_write, process, error);
         link.processDatagrams();
-    }
-
-    void sendWriteRegister(Link& link, uint16_t const& slave_address, uint16_t const& reg_address, uint16_t const& value_write)
-    {
-        sendWriteRegister<uint16_t>(link, slave_address, reg_address, value_write);
     }
 }
 
