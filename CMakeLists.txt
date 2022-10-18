@@ -58,6 +58,7 @@ if (GTest_FOUND)
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
                               unit/linkSingle-t.cc
+                              unit/linkRedundancy-t.cc
                               unit/mailbox-t.cc
                               unit/prints-t.cc
                               unit/protocol-t.cc
