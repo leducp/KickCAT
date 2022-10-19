@@ -934,7 +934,7 @@ namespace kickcat
         }
     }
 
-    void Bus::sendGetDLStatus(Slave& slave)
+    void Bus::sendGetDLStatus(Slave& slave, std::function<void(DatagramState const&)> const& error)
     {
         auto process = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
         {
@@ -945,11 +945,6 @@ namespace kickcat
 
             slave.dl_status= *reinterpret_cast<DLStatus const*>(data);
             return DatagramState::OK;
-        };
-
-        auto error = [](DatagramState const&)
-        {
-            THROW_ERROR("Error while trying to get DL Status.");
         };
 
         link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
