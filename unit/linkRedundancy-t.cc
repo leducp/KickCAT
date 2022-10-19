@@ -5,11 +5,13 @@
 #include "Mocks.h"
 #include "kickcat/LinkRedundancy.h"
 
+using ::testing::Return;
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::InSequence;
 
-using namespace kickcat;
+namespace kickcat
+{
 
 class LinkRedTest : public testing::Test
 {
@@ -20,12 +22,79 @@ public:
         is_redundancy_activated = true;
     }
 
+    void sendFrame()
+    {
+        link.sendFrame();
+    }
+
+    void checkSendFrameError()
+    {
+        ASSERT_EQ(link.sent_frame_, 0);
+        ASSERT_EQ(link.callbacks_[0].status, DatagramState::SEND_ERROR);
+    }
+
+
+    void checkSendFrame(int32_t datagrams_number)
+    {
+        EXPECT_CALL(*io_nominal, write(_,_))
+        .WillOnce(Invoke([this, datagrams_number](uint8_t const* data, int32_t data_size)
+        {
+            int32_t available_datagrams = 0;
+            Frame frame(data, data_size);
+            while (frame.isDatagramAvailable())
+            {
+                (void)frame.nextDatagram();
+                available_datagrams++;
+            }
+            EXPECT_EQ(datagrams_number, available_datagrams);
+            return data_size;
+        }));
+
+        EXPECT_CALL(*io_redundancy, write(_,_))
+        .WillOnce(Invoke([this, datagrams_number](uint8_t const* data, int32_t data_size)
+        {
+            int32_t available_datagrams = 0;
+            Frame frame(data, data_size);
+            while (frame.isDatagramAvailable())
+            {
+                (void)frame.nextDatagram();
+                available_datagrams++;
+            }
+            EXPECT_EQ(datagrams_number, available_datagrams);
+            return data_size;
+        }));
+    }
+
+    template<typename T>
+    void addDatagram(T& payload, bool error = false)
+    {
+        link.addDatagram(Command::BRD, 0, payload,
+        [&, error](DatagramHeader const*, uint8_t const*, uint16_t)
+        {
+            process_callback_counter++;
+            if (error)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+            return DatagramState::OK;
+        },
+        [&](DatagramState const& status)
+        {
+            error_callback_counter++;
+            last_error = status;
+        });
+    }
+
 protected:
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
     std::shared_ptr<MockSocket> io_redundancy{ std::make_shared<MockSocket>() };
     LinkRedundancy link{ io_nominal, io_redundancy, std::bind(&LinkRedTest::reportRedundancy, this), PRIMARY_IF_MAC, SECONDARY_IF_MAC};
 
     bool is_redundancy_activated{false};
+
+    int32_t process_callback_counter{0};
+    int32_t error_callback_counter{0};
+    DatagramState last_error{DatagramState::OK};
 };
 
 
@@ -370,5 +439,102 @@ TEST_F(LinkRedTest, isRedundancyNeeded_no_interfaces)
     ASSERT_EQ(is_redundancy_activated, false);
 }
 
+TEST_F(LinkRedTest, sendFrame_error_wrong_number_write)
+{
+    link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, nullptr, nullptr);
+    EXPECT_CALL(*io_nominal, write(_,_))
+        .WillOnce(Return(0));
 
+    EXPECT_CALL(*io_redundancy, write(_,_))
+        .WillOnce(Return(0));
 
+    sendFrame();
+    checkSendFrameError();
+}
+
+TEST_F(LinkRedTest, sendFrame_error_write)
+{
+    link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, nullptr, nullptr);
+    EXPECT_CALL(*io_nominal, write(_,_))
+        .WillOnce(Return(-1));
+
+    EXPECT_CALL(*io_redundancy, write(_,_))
+        .WillOnce(Return(-1));
+
+    sendFrame();
+    checkSendFrameError();
+}
+
+TEST_F(LinkRedTest, sendFrame_ok)
+{
+    EXPECT_CALL(*io_nominal, write(_,_))
+    .WillOnce(Invoke([](uint8_t const* frame_in, int32_t)
+    {
+        {
+            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
+            EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
+            for (int32_t i = 0; i < 6; ++i)
+            {
+                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src_mac[i]);
+                EXPECT_EQ(0xff, header->dst_mac[i]);
+            }
+        }
+
+        {
+            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
+            EXPECT_EQ(header->len, 0);
+        }
+        return ETH_MIN_SIZE;
+    }));
+
+    EXPECT_CALL(*io_redundancy, write(_,_))
+    .WillOnce(Invoke([](uint8_t const* frame_in, int32_t)
+    {
+        {
+            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
+            EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
+            for (int32_t i = 0; i < 6; ++i)
+            {
+                EXPECT_EQ(SECONDARY_IF_MAC[i], header->src_mac[i]);
+                EXPECT_EQ(0xff, header->dst_mac[i]);
+            }
+        }
+
+        {
+            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
+            EXPECT_EQ(header->len, 0);
+        }
+        return ETH_MIN_SIZE;
+    }));
+
+    sendFrame();
+}
+
+TEST_F(LinkRedTest, process_datagrams_OK)
+{
+    checkSendFrame(1);
+    uint8_t payload;
+    addDatagram(payload);
+
+    EXPECT_CALL(*io_nominal, read(_,_))
+    .WillOnce(Invoke([&](uint8_t*, int32_t)
+    {
+        return ETH_MIN_SIZE;
+    }));
+
+    EXPECT_CALL(*io_redundancy, read(_,_))
+    .WillOnce(Invoke([&](uint8_t*, int32_t)
+    {
+        return ETH_MIN_SIZE;
+    }));
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+// TODO fail read
+// TODO test fusion datagram
+
+}
