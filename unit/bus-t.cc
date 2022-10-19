@@ -620,7 +620,7 @@ TEST_F(BusTest, send_get_DL_status)
     checkSendFrame(Command::FPRD);
     handleReply<uint16_t>({0x0530});
 
-    bus.sendGetDLStatus(slave);
+    bus.sendGetDLStatus(slave, [](DatagramState const&){});
     ASSERT_EQ(slave.dl_status.PL_port0, 1);
     ASSERT_EQ(slave.dl_status.PL_port1, 1);
     ASSERT_EQ(slave.dl_status.PL_port2, 0);
