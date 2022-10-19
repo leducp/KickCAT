@@ -28,6 +28,7 @@ namespace kickcat
         ///        but allow to keep a consistent interface between with and without redundancy.
         void writeThenRead(Frame& frame) override;
 
+        void checkRedundancyNeeded();
     private:
         void read() override;
         void sendFrame() override;
@@ -36,7 +37,6 @@ namespace kickcat
         void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) override;
         void resetFrameContext() override;
 
-        bool isRedundancyNeeded();
 
         std::function<void(void)> redundancyActivatedCallback_;
 
