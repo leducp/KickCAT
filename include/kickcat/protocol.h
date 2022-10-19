@@ -149,25 +149,24 @@ namespace kickcat
         constexpr uint16_t DC_TIME_FILTER     = 0x934;
         constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
         constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
-
-
-        struct DLStatus
-        {
-            uint16_t unknown : 4,
-                PL_port0 : 1,
-                PL_port1 : 1,
-                PL_port2 : 1,
-                PL_port3 : 1,
-                LOOP_port0 : 1,
-                COM_port0 : 1,
-                LOOP_port1 : 1,
-                COM_port1 : 1,
-                LOOP_port2 : 1,
-                COM_port2 : 1,
-                LOOP_port3 : 1,
-                COM_port3 : 1;
-        }__attribute__((__packed__));
     }
+
+    struct DLStatus
+    {
+        uint16_t unknown : 4,
+            PL_port0 : 1,
+            PL_port1 : 1,
+            PL_port2 : 1,
+            PL_port3 : 1,
+            LOOP_port0 : 1,
+            COM_port0 : 1,
+            LOOP_port1 : 1,
+            COM_port1 : 1,
+            LOOP_port2 : 1,
+            COM_port2 : 1,
+            LOOP_port3 : 1,
+            COM_port3 : 1;
+    }__attribute__((__packed__));
 
     struct ErrorCounters
     {

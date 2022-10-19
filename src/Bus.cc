@@ -943,7 +943,7 @@ namespace kickcat
                 return DatagramState::INVALID_WKC;
             }
 
-            slave.dl_status= *reinterpret_cast<reg::DLStatus const*>(data);
+            slave.dl_status= *reinterpret_cast<DLStatus const*>(data);
             return DatagramState::OK;
         };
 

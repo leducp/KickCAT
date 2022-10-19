@@ -47,7 +47,7 @@ namespace kickcat
         uint32_t eeprom_size; // in bytes
         uint16_t eeprom_version;
 
-        reg::DLStatus dl_status;
+        DLStatus dl_status;
 
         struct SII
         {
