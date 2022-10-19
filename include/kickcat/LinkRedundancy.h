@@ -13,7 +13,6 @@
 namespace kickcat
 {
     class AbstractSocket;
-
     class LinkRedundancy : public AbstractLink
     {
     public:
@@ -29,6 +28,7 @@ namespace kickcat
         void writeThenRead(Frame& frame) override;
 
         void checkRedundancyNeeded();
+    friend class LinkRedTest;
     private:
         void read() override;
         void sendFrame() override;
