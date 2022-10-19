@@ -17,15 +17,10 @@ namespace kickcat
     {
         std::copy(src_mac_nominal, src_mac_nominal + MAC_SIZE, src_mac_nominal_);
         std::copy(src_mac_redundancy, src_mac_redundancy + MAC_SIZE, src_mac_redundancy_);
-        if (isRedundancyNeeded())
-        {
-            is_redundancy_activated_ = true;
-            redundancyActivatedCallback_();
-        }
     }
 
 
-    bool LinkRedundancy::isRedundancyNeeded()
+    void LinkRedundancy::checkRedundancyNeeded()
     {
         Frame frame;
         frame.addDatagram(0, Command::BRD, createAddress(0, 0x0000), nullptr, 1);
@@ -45,12 +40,16 @@ namespace kickcat
             catch (std::exception const& e2)
             {
                 DEBUG_PRINT("%s\n Fail to read redundancy interface, master redundancy interface is not connected \n", e2.what());
-                return true;
+                return;
             }
         }
 
         auto [header, _, wkc] = frame.nextDatagram();
-        return wkc != 0;
+        if (wkc != 0)
+        {
+            is_redundancy_activated_ = true;
+            redundancyActivatedCallback_();
+        }
     }
 
 
@@ -80,10 +79,9 @@ namespace kickcat
             return is_faulty;
         };
 
-
         int32_t error_count = 0;
-        error_count += write_read_callback(socket_nominal_, socket_redundancy_, PRIMARY_IF_MAC);
-        error_count += write_read_callback(socket_redundancy_, socket_nominal_, SECONDARY_IF_MAC);
+        error_count += write_read_callback(socket_redundancy_, socket_nominal_, PRIMARY_IF_MAC);
+        error_count += write_read_callback(socket_nominal_, socket_redundancy_, SECONDARY_IF_MAC);
 
         if (error_count > 1)
         {
