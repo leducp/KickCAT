@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 
     for (auto& slave : bus.slaves())
     {
-        bus.sendGetDLStatus(slave);
+        bus.sendGetDLStatus(slave, [](DatagramState const& state){THROW_ERROR_DATAGRAM("Error fetching DL Status", state);});
         bus.finalizeDatagrams();
 
         printDLStatus(slave);
