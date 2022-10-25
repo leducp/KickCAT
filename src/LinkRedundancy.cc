@@ -104,6 +104,7 @@ namespace kickcat
         {
             THROW_ERROR("Wrong number of bytes read");
         }
+        frame.setIsDatagramAvailable(true);
     }
 
 
@@ -131,6 +132,8 @@ namespace kickcat
         frame_nominal_.setSourceMAC(SECONDARY_IF_MAC);
         written = socket_redundancy_->write(frame_nominal_.data(), toWrite);
         frame_nominal_.clear();
+        frame_redundancy_.clear();
+        frame_redundancy_.resetContext();
 
         if (written < 0)
         {
@@ -167,6 +170,7 @@ namespace kickcat
         }
         catch (std::exception const& e)
         {
+            // TODO return code readFrame
             DEBUG_PRINT("Nominal read fail %s\n", e.what());
         }
 
@@ -202,11 +206,24 @@ namespace kickcat
 
     std::tuple<DatagramHeader const*, uint8_t*, uint16_t> LinkRedundancy::nextDatagram()
     {
+        bool nom = frame_nominal_.isDatagramAvailable();
+        bool red = frame_redundancy_.isDatagramAvailable();
+
         auto [header_nominal, data_nominal, wkc_nominal] = frame_nominal_.nextDatagram();
         auto [header_redundancy, data_redundancy, wkc_redundancy] = frame_redundancy_.nextDatagram();
 
-        std::transform(data_nominal, &data_nominal[header_nominal->len], data_redundancy, data_nominal, std::bit_or<uint8_t>());
+        if (nom and not red)
+        {
+            return std::make_tuple(header_nominal, data_nominal, wkc_nominal);
+        }
 
+        if (not nom and red)
+        {
+            return std::make_tuple(header_redundancy, data_redundancy, wkc_redundancy);
+        }
+
+        // all frames have data
+        std::transform(data_nominal, &data_nominal[header_nominal->len], data_redundancy, data_nominal, std::bit_or<uint8_t>());
         uint16_t wkc = wkc_nominal + wkc_redundancy;
         return std::make_tuple(header_nominal, data_nominal, wkc);
     }

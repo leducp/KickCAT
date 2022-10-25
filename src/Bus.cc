@@ -208,28 +208,33 @@ namespace kickcat
 
     void Bus::setAddresses()
     {
-        for (size_t i = 0; i < slaves_.size(); ++i)
-        {
-            auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
-            {
-                if (wkc != 1)
-                {
-                    return DatagramState::INVALID_WKC;
-                }
-                return DatagramState::OK;
-            };
+        // Regular processDatagram can't be used here with redundancy to avoid messing the slave address attribution.
 
-            auto error = [](DatagramState const&)
+        Frame frame;
+        auto process = [&]()
+        {
+            link_->writeThenRead(frame);
+            auto [header, _, wkc] = frame.nextDatagram();
+            if (wkc != 1)
             {
                 THROW_ERROR("Invalid working counter");
-            };
+            }
+        };
 
+        for (size_t i = 0; i < slaves_.size(); ++i)
+        {
             slaves_[i].address = static_cast<uint16_t>(i);
-            link_->addDatagram(Command::APWR, createAddress(0 - slaves_[i].address, reg::STATION_ADDR),
-                              slaves_[i].address, process, error);
+            frame.addDatagram(0, Command::APWR, createAddress(0 - slaves_[i].address, reg::STATION_ADDR), &slaves_[i].address, sizeof(slaves_[i].address));
+            if (frame.isFull())
+            {
+                process();
+            }
         }
 
-        link_->processDatagrams();
+        if (frame.datagramCounter() != 0)
+        {
+            process();
+        }
     }
 
 
