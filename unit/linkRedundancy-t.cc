@@ -36,8 +36,8 @@ public:
     template<typename T>
     void checkSendFrameRedundancy(Command cmd, T to_check, bool check_payload = true)
     {
-        mockBus.checkSendFrame(io_nominal, cmd, to_check, check_payload);
-        mockBus.checkSendFrame(io_redundancy, cmd, to_check, check_payload);
+        io_nominal->checkSendFrame(cmd, to_check, check_payload);
+        io_redundancy->checkSendFrame(cmd, to_check, check_payload);
     }
 
     template<typename T, typename U>
@@ -50,7 +50,6 @@ public:
 
             if (error)
             {
-                std::cout << "ERROR " << std::endl;
                 return DatagramState::INVALID_WKC;
             }
 
@@ -72,8 +71,6 @@ protected:
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
     std::shared_ptr<MockSocket> io_redundancy{ std::make_shared<MockSocket>() };
     LinkRedundancy link{ io_nominal, io_redundancy, std::bind(&LinkRedTest::reportRedundancy, this), PRIMARY_IF_MAC, SECONDARY_IF_MAC};
-
-    MockBus mockBus;
 
     bool is_redundancy_activated{false};
 
@@ -495,16 +492,16 @@ TEST_F(LinkRedTest, sendFrame_ok)
     sendFrame();
 }
 
-TEST_F(LinkRedTest, process_datagrams_OK)
+TEST_F(LinkRedTest, process_datagrams_line_ok)
 {
     InSequence s;
 
-    int64_t skip{1234};
+    int64_t skip{0};
     int64_t logical_read = 0x0001020304050607;
     addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
     checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
-    mockBus.handleReply<int64_t>(io_redundancy, {logical_read}, 2);
-    mockBus.handleReply<int64_t>(io_nominal, {skip}, 0);
+    io_redundancy->handleReply<int64_t>({logical_read}, 2);
+    io_nominal->handleReply<int64_t>({skip}, 0);
 
     link.processDatagrams();
 
@@ -512,6 +509,85 @@ TEST_F(LinkRedTest, process_datagrams_OK)
     ASSERT_EQ(0, error_callback_counter);
     ASSERT_EQ(DatagramState::OK, last_error);
 }
+
+TEST_F(LinkRedTest, process_datagrams_nom_cut_red_ok)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 0x0001020304050607;
+    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
+    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    io_redundancy->handleReply<int64_t>({logical_read}, 2);
+    io_nominal->readError();
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkRedTest, process_datagrams_nom_ok_red_nok)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 0x0001020304050607;
+    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
+    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    io_redundancy->readError();
+    io_nominal->handleReply<int64_t>({logical_read}, 2);
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkRedTest, process_datagrams_both_interfaces_cut)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 0x0001020304050607;
+    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
+    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    io_redundancy->readError();
+    io_nominal->readError();
+
+    link.processDatagrams();
+
+    ASSERT_EQ(0, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);
+    ASSERT_EQ(DatagramState::LOST, last_error);
+}
+
+
+TEST_F(LinkRedTest, process_datagrams_line_cut_between_slaves)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read_1 = 0x0001020300000000;
+    int64_t logical_read_2 = 0x0000000004050607;
+    int64_t logical_read_full = 0x0001020304050607;
+    addDatagram(Command::LRD, skip, logical_read_full, 2, false);
+    checkSendFrameRedundancy(Command::LRD, skip, false);
+    io_redundancy->handleReply<int64_t>({logical_read_2}, 1);
+    io_nominal->handleReply<int64_t>({logical_read_1}, 1);
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+// TODO no response each line
 
 // TODO fail read
 // TODO test fusion datagram
