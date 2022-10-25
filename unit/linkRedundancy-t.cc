@@ -33,49 +33,32 @@ public:
         ASSERT_EQ(link.callbacks_[0].status, DatagramState::SEND_ERROR);
     }
 
-
-    void checkSendFrame(int32_t datagrams_number)
+    template<typename T>
+    void checkSendFrameRedundancy(Command cmd, T to_check, bool check_payload = true)
     {
-        EXPECT_CALL(*io_nominal, write(_,_))
-        .WillOnce(Invoke([this, datagrams_number](uint8_t const* data, int32_t data_size)
-        {
-            int32_t available_datagrams = 0;
-            Frame frame(data, data_size);
-            while (frame.isDatagramAvailable())
-            {
-                (void)frame.nextDatagram();
-                available_datagrams++;
-            }
-            EXPECT_EQ(datagrams_number, available_datagrams);
-            return data_size;
-        }));
-
-        EXPECT_CALL(*io_redundancy, write(_,_))
-        .WillOnce(Invoke([this, datagrams_number](uint8_t const* data, int32_t data_size)
-        {
-            int32_t available_datagrams = 0;
-            Frame frame(data, data_size);
-            while (frame.isDatagramAvailable())
-            {
-                (void)frame.nextDatagram();
-                available_datagrams++;
-            }
-            EXPECT_EQ(datagrams_number, available_datagrams);
-            return data_size;
-        }));
+        mockBus.checkSendFrame(io_nominal, cmd, to_check, check_payload);
+        mockBus.checkSendFrame(io_redundancy, cmd, to_check, check_payload);
     }
 
-    template<typename T>
-    void addDatagram(T& payload, bool error = false)
+    template<typename T, typename U>
+    void addDatagram(Command cmd, T& payload, U& expected_data, uint16_t expected_wkc, bool error = false)
     {
-        link.addDatagram(Command::BRD, 0, payload,
-        [&, error](DatagramHeader const*, uint8_t const*, uint16_t)
+        link.addDatagram(cmd, 0, payload,
+        [&, error, expected_wkc, cmd](DatagramHeader const* header, uint8_t const* data, uint16_t wkc)
         {
             process_callback_counter++;
+
             if (error)
             {
+                std::cout << "ERROR " << std::endl;
                 return DatagramState::INVALID_WKC;
             }
+
+            EXPECT_EQ(wkc, expected_wkc);
+            EXPECT_EQ(0, std::memcmp(data, &expected_data, sizeof(expected_data)));
+            EXPECT_EQ(sizeof(expected_data), header->len);
+            EXPECT_EQ(cmd, header->command);
+
             return DatagramState::OK;
         },
         [&](DatagramState const& status)
@@ -89,6 +72,8 @@ protected:
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
     std::shared_ptr<MockSocket> io_redundancy{ std::make_shared<MockSocket>() };
     LinkRedundancy link{ io_nominal, io_redundancy, std::bind(&LinkRedTest::reportRedundancy, this), PRIMARY_IF_MAC, SECONDARY_IF_MAC};
+
+    MockBus mockBus;
 
     bool is_redundancy_activated{false};
 
@@ -512,21 +497,15 @@ TEST_F(LinkRedTest, sendFrame_ok)
 
 TEST_F(LinkRedTest, process_datagrams_OK)
 {
-    checkSendFrame(1);
-    uint8_t payload;
-    addDatagram(payload);
+    InSequence s;
 
-    EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([&](uint8_t*, int32_t)
-    {
-        return ETH_MIN_SIZE;
-    }));
+    int64_t skip{1234};
+    int64_t logical_read = 0x0001020304050607;
+    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
+    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    mockBus.handleReply<int64_t>(io_redundancy, {logical_read}, 2);
+    mockBus.handleReply<int64_t>(io_nominal, {skip}, 0);
 
-    EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([&](uint8_t*, int32_t)
-    {
-        return ETH_MIN_SIZE;
-    }));
     link.processDatagrams();
 
     ASSERT_EQ(1, process_callback_counter);

@@ -35,8 +35,8 @@ namespace kickcat
             addDatagram(command, address, &data, sizeof(data), process, error);
         }
 
-        virtual void finalizeDatagrams();
-        virtual void processDatagrams();
+        void finalizeDatagrams();
+        void processDatagrams();
 
         void readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
         void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE]);
