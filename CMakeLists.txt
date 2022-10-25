@@ -54,7 +54,7 @@ if (BUILD_UNIT_TESTS)
 endif()
 
 if (GTest_FOUND)
-  add_executable(kickcat_unit #unit/bus-t.cc
+  add_executable(kickcat_unit unit/bus-t.cc
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
                               unit/linkSingle-t.cc
