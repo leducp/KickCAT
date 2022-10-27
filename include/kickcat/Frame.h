@@ -49,7 +49,7 @@ namespace kickcat
 
         /// \return true if datagram can be extracted, false otherwise
         bool isDatagramAvailable() const { return is_datagram_available_; }
-        void setIsDatagramAvailable(bool value) { is_datagram_available_ = value; }
+        void setIsDatagramAvailable() { is_datagram_available_ = true; }
 
         void setSourceMAC(uint8_t const src_mac[MAC_SIZE]);
 

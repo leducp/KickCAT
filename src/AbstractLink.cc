@@ -118,7 +118,7 @@ namespace kickcat
             THROW_ERROR("Wrong number of bytes read");
         }
 
-        frame.setIsDatagramAvailable(true);
+        frame.setIsDatagramAvailable();
     }
 
 
