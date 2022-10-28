@@ -20,6 +20,148 @@ namespace kickcat
     }
 
 
+    void LinkRedundancy::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
+                               std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
+                               std::function<void(DatagramState const& state)> const& error)
+    {
+        if (index_queue_ == static_cast<uint8_t>(index_head_ + 1))
+        {
+            THROW_ERROR("Too many datagrams in flight. Max is 255");
+        }
+
+        uint16_t const needed_space = datagram_size(data_size);
+        if (frame_nominal_.freeSpace() < needed_space)
+        {
+            sendFrame();
+        }
+
+        addDatagramToFrame(index_head_, command, address, data, data_size);
+        callbacks_[index_head_].process = process;
+        callbacks_[index_head_].error = error;
+        callbacks_[index_head_].status = DatagramState::LOST;
+        ++index_head_;
+
+        if (frame_nominal_.isFull())
+        {
+            sendFrame();
+        }
+    }
+
+
+    void LinkRedundancy::finalizeDatagrams()
+    {
+        if (frame_nominal_.datagramCounter() != 0)
+        {
+            sendFrame();
+        }
+    }
+
+
+    void LinkRedundancy::processDatagrams()
+    {
+        finalizeDatagrams();
+
+        uint8_t waiting_frame = sent_frame_;
+        sent_frame_ = 0;
+
+        for (int32_t i = 0; i < waiting_frame; ++i)
+        {
+            read();
+            while (isDatagramAvailable())
+            {
+                auto [header, data, wkc] = nextDatagram();
+                callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
+            }
+        }
+
+        std::exception_ptr client_exception;
+        for (uint8_t i = index_queue_; i != index_head_; ++i)
+        {
+            if (callbacks_[i].status != DatagramState::OK)
+            {
+                // Datagram was either lost or processing it encountered an error.
+                try
+                {
+                    callbacks_[i].error(callbacks_[i].status);
+                }
+                catch (...)
+                {
+                    client_exception = std::current_exception();
+                }
+            }
+
+            // Attach a callback to handle not THAT lost frames.
+            // -> if a frame suspected to be lost was in fact in the pipe, it is needed to pop it
+            callbacks_[i].process = [&](DatagramHeader const*, uint8_t const*, uint16_t)
+                {
+                    read();
+                    return DatagramState::OK;
+                };
+        }
+
+        index_queue_ = index_head_;
+        resetFrameContext();
+
+        // Rethrow last catched client exception.
+        if (client_exception)
+        {
+            std::rethrow_exception(client_exception);
+        }
+    }
+
+
+    int32_t LinkRedundancy::readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame)
+    {
+        int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
+        if (read < 0)
+        {
+            DEBUG_PRINT("read() failed");
+            return read;
+        }
+
+        // check if the frame is an EtherCAT one. if not, drop it and try again
+        if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
+        {
+            DEBUG_PRINT("Invalid frame type");
+            return -1;
+        }
+
+        int32_t expected = frame.header()->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        frame.clear();
+        if (expected < ETH_MIN_SIZE)
+        {
+            expected = ETH_MIN_SIZE;
+        }
+        if (read != expected)
+        {
+            DEBUG_PRINT("Wrong number of bytes read");
+            return -1;
+        }
+
+        frame.setIsDatagramAvailable();
+        return read;
+    }
+
+
+    void LinkRedundancy::writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE])
+    {
+        frame.setSourceMAC(src_mac);
+        int32_t toWrite = frame.finalize();
+        int32_t written = socket->write(frame.data(), toWrite);
+        frame.clear();
+
+        if (written < 0)
+        {
+            THROW_SYSTEM_ERROR("write()");
+        }
+
+        if (written != toWrite)
+        {
+            THROW_ERROR("Wrong number of bytes written");
+        }
+    }
+
+
     void LinkRedundancy::checkRedundancyNeeded()
     {
         Frame frame;
@@ -56,8 +198,8 @@ namespace kickcat
     void LinkRedundancy::writeThenRead(Frame& frame)
     {
         int32_t to_write = frame.finalize();
-        auto write_read_callback = [&](std::shared_ptr<AbstractSocket> to,
-                                       std::shared_ptr<AbstractSocket> from,
+        auto write_read_callback = [&](std::shared_ptr<AbstractSocket> from,
+                                       std::shared_ptr<AbstractSocket> to,
                                        uint8_t const src_mac[MAC_SIZE])
         {
             int32_t is_faulty = 0;
@@ -80,8 +222,8 @@ namespace kickcat
         };
 
         int32_t error_count = 0;
-        error_count += write_read_callback(socket_redundancy_, socket_nominal_, PRIMARY_IF_MAC);
-        error_count += write_read_callback(socket_nominal_, socket_redundancy_, SECONDARY_IF_MAC);
+        error_count += write_read_callback(socket_nominal_, socket_redundancy_, PRIMARY_IF_MAC);
+        error_count += write_read_callback(socket_redundancy_, socket_nominal_, SECONDARY_IF_MAC);
 
         if (error_count > 1)
         {
@@ -113,22 +255,22 @@ namespace kickcat
         // save number of datagrams in the frame to handle send error properly if any
         int32_t const datagrams = frame_nominal_.datagramCounter();
 
-        bool is_frame_sent = true;
+        bool is_frame_sent_nominal = true;
         frame_nominal_.setSourceMAC(PRIMARY_IF_MAC);
         int32_t toWrite = frame_nominal_.finalize();
         int32_t written = socket_nominal_->write(frame_nominal_.data(), toWrite);
         if (written < 0)
         {
-            is_frame_sent = false;
+            is_frame_sent_nominal = false;
             DEBUG_PRINT("Nominal: write failed\n");
         }
-
         else if (written != toWrite)
         {
-            is_frame_sent = false;
+            is_frame_sent_nominal = false;
             DEBUG_PRINT("Nominal: Wrong number of bytes written");
         }
 
+        bool is_frame_sent_redundancy = true;
         frame_nominal_.setSourceMAC(SECONDARY_IF_MAC);
         written = socket_redundancy_->write(frame_nominal_.data(), toWrite);
         frame_nominal_.clear();
@@ -137,18 +279,17 @@ namespace kickcat
 
         if (written < 0)
         {
-            is_frame_sent = false;
-            DEBUG_PRINT("Nominal: write failed\n");
+            is_frame_sent_redundancy = false;
+            DEBUG_PRINT("Redundancy: write failed\n");
         }
 
         else if (written != toWrite)
         {
-            is_frame_sent = false;
-            DEBUG_PRINT("Nominal: Wrong number of bytes written");
+            is_frame_sent_redundancy = false;
+            DEBUG_PRINT("Redundancy: Wrong number of bytes written");
         }
 
-
-        if (is_frame_sent)
+        if (is_frame_sent_nominal or is_frame_sent_redundancy)
         {
             sent_frame_++;
         }
@@ -164,23 +305,14 @@ namespace kickcat
 
     void LinkRedundancy::read()
     {
-        try
+        if (readFrame(socket_redundancy_, frame_nominal_) < 0)
         {
-            readFrame(socket_redundancy_, frame_nominal_);
-        }
-        catch (std::exception const& e)
-        {
-            // TODO return code readFrame
-            DEBUG_PRINT("Nominal read fail %s\n", e.what());
+            DEBUG_PRINT("Nominal read fail\n");
         }
 
-        try
+        if (readFrame(socket_nominal_, frame_redundancy_) < 0)
         {
-            readFrame(socket_nominal_, frame_redundancy_);
-        }
-        catch (std::exception const& e)
-        {
-            DEBUG_PRINT("redundancy read fail %s\n", e.what());
+            DEBUG_PRINT("redundancy read fail\n");
         }
     }
 

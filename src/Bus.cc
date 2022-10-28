@@ -6,7 +6,7 @@
 
 namespace kickcat
 {
-    Bus::Bus(std::shared_ptr<AbstractLink> link)
+    Bus::Bus(std::shared_ptr<LinkRedundancy> link)
     : link_(link)
     {
     }

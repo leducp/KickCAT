@@ -13,7 +13,7 @@ using ::testing::InSequence;
 namespace kickcat
 {
 
-class LinkRedTest : public testing::Test
+class LinkTest : public testing::Test
 {
 public:
     void reportRedundancy()
@@ -70,7 +70,7 @@ public:
 protected:
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
     std::shared_ptr<MockSocket> io_redundancy{ std::make_shared<MockSocket>() };
-    LinkRedundancy link{ io_nominal, io_redundancy, std::bind(&LinkRedTest::reportRedundancy, this), PRIMARY_IF_MAC, SECONDARY_IF_MAC};
+    LinkRedundancy link{ io_nominal, io_redundancy, std::bind(&LinkTest::reportRedundancy, this), PRIMARY_IF_MAC, SECONDARY_IF_MAC};
 
     bool is_redundancy_activated{false};
 
@@ -80,7 +80,7 @@ protected:
 };
 
 
-TEST_F(LinkRedTest, writeThenRead_NomOK_RedOK)
+TEST_F(LinkTest, writeThenRead_NomOK_RedOK)
 {
     // Case we can read on both interface, either there is no line cut, either the cut is between two slaves.
 
@@ -113,7 +113,7 @@ TEST_F(LinkRedTest, writeThenRead_NomOK_RedOK)
     link.writeThenRead(frame);
 }
 
-TEST_F(LinkRedTest, writeThenRead_Nom_NOK_RedOK)
+TEST_F(LinkTest, writeThenRead_Nom_NOK_RedOK)
 {
     // Case frame are lost between nominal interface and first slave, frame comes back to redundancy interface.
 
@@ -166,7 +166,7 @@ TEST_F(LinkRedTest, writeThenRead_Nom_NOK_RedOK)
 }
 
 
-TEST_F(LinkRedTest, writeThenRead_NomOK_Red_NOK)
+TEST_F(LinkTest, writeThenRead_NomOK_Red_NOK)
 {
     // Case frame are lost between redundancy interface and last slave, frame comes back to nominal interface.
 
@@ -219,7 +219,7 @@ TEST_F(LinkRedTest, writeThenRead_NomOK_Red_NOK)
 }
 
 
-TEST_F(LinkRedTest, writeThenRead_NOK)
+TEST_F(LinkTest, writeThenRead_NOK)
 {
     // Case both interfaces can't read frames.
 
@@ -271,7 +271,7 @@ TEST_F(LinkRedTest, writeThenRead_NOK)
     ASSERT_THROW(link.writeThenRead(frame), std::system_error);
 }
 
-TEST_F(LinkRedTest, writeThenRead_error_frame_type)
+TEST_F(LinkTest, writeThenRead_error_frame_type)
 {
     Frame frame;
     EXPECT_CALL(*io_redundancy, write(_,_))
@@ -305,7 +305,7 @@ TEST_F(LinkRedTest, writeThenRead_error_frame_type)
     ASSERT_THROW(link.writeThenRead(frame), Error);
 }
 
-TEST_F(LinkRedTest, writeThenRead_error_wrong_number_bytes_read)
+TEST_F(LinkTest, writeThenRead_error_wrong_number_bytes_read)
 {
     Frame frame;
     EXPECT_CALL(*io_redundancy, write(_,_))
@@ -339,7 +339,7 @@ TEST_F(LinkRedTest, writeThenRead_error_wrong_number_bytes_read)
     ASSERT_THROW(link.writeThenRead(frame), Error);
 }
 
-TEST_F(LinkRedTest, isRedundancyNeeded_true)
+TEST_F(LinkTest, isRedundancyNeeded_true)
 {
     EXPECT_CALL(*io_redundancy, write(_,_))
     .WillOnce(Invoke([&](uint8_t const*, int32_t)
@@ -375,7 +375,7 @@ TEST_F(LinkRedTest, isRedundancyNeeded_true)
     ASSERT_EQ(is_redundancy_activated, true);
 }
 
-TEST_F(LinkRedTest, isRedundancyNeeded_false)
+TEST_F(LinkTest, isRedundancyNeeded_false)
 {
     EXPECT_CALL(*io_redundancy, write(_,_))
     .WillOnce(Invoke([&](uint8_t const*, int32_t)
@@ -395,7 +395,7 @@ TEST_F(LinkRedTest, isRedundancyNeeded_false)
     ASSERT_EQ(is_redundancy_activated, false);
 }
 
-TEST_F(LinkRedTest, isRedundancyNeeded_no_interfaces)
+TEST_F(LinkTest, isRedundancyNeeded_no_interfaces)
 {
     EXPECT_CALL(*io_redundancy, write(_,_))
     .WillOnce(Invoke([&](uint8_t const*, int32_t)
@@ -421,7 +421,7 @@ TEST_F(LinkRedTest, isRedundancyNeeded_no_interfaces)
     ASSERT_EQ(is_redundancy_activated, false);
 }
 
-TEST_F(LinkRedTest, sendFrame_error_wrong_number_write)
+TEST_F(LinkTest, sendFrame_error_wrong_number_write)
 {
     link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, nullptr, nullptr);
     EXPECT_CALL(*io_nominal, write(_,_))
@@ -434,7 +434,7 @@ TEST_F(LinkRedTest, sendFrame_error_wrong_number_write)
     checkSendFrameError();
 }
 
-TEST_F(LinkRedTest, sendFrame_error_write)
+TEST_F(LinkTest, sendFrame_error_write)
 {
     link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, nullptr, nullptr);
     EXPECT_CALL(*io_nominal, write(_,_))
@@ -447,7 +447,7 @@ TEST_F(LinkRedTest, sendFrame_error_write)
     checkSendFrameError();
 }
 
-TEST_F(LinkRedTest, sendFrame_ok)
+TEST_F(LinkTest, sendFrame_ok)
 {
     EXPECT_CALL(*io_nominal, write(_,_))
     .WillOnce(Invoke([](uint8_t const* frame_in, int32_t)
@@ -492,7 +492,7 @@ TEST_F(LinkRedTest, sendFrame_ok)
     sendFrame();
 }
 
-TEST_F(LinkRedTest, process_datagrams_line_ok)
+TEST_F(LinkTest, process_datagrams_line_ok)
 {
     InSequence s;
 
@@ -510,7 +510,7 @@ TEST_F(LinkRedTest, process_datagrams_line_ok)
     ASSERT_EQ(DatagramState::OK, last_error);
 }
 
-TEST_F(LinkRedTest, process_datagrams_nom_cut_red_ok)
+TEST_F(LinkTest, process_datagrams_nom_cut_red_ok)
 {
     InSequence s;
 
@@ -529,7 +529,7 @@ TEST_F(LinkRedTest, process_datagrams_nom_cut_red_ok)
 }
 
 
-TEST_F(LinkRedTest, process_datagrams_nom_ok_red_nok)
+TEST_F(LinkTest, process_datagrams_nom_ok_red_nok)
 {
     InSequence s;
 
@@ -548,7 +548,7 @@ TEST_F(LinkRedTest, process_datagrams_nom_ok_red_nok)
 }
 
 
-TEST_F(LinkRedTest, process_datagrams_both_interfaces_cut)
+TEST_F(LinkTest, process_datagrams_both_interfaces_cut)
 {
     InSequence s;
 
@@ -567,7 +567,7 @@ TEST_F(LinkRedTest, process_datagrams_both_interfaces_cut)
 }
 
 
-TEST_F(LinkRedTest, process_datagrams_line_cut_between_slaves)
+TEST_F(LinkTest, process_datagrams_line_cut_between_slaves)
 {
     InSequence s;
 

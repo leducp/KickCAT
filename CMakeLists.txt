@@ -7,12 +7,12 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicated-cond -Wshadow -Wmissing-noreturn")
 
 set(LIB_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractLink.cc
+#  ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractLink.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/LinkSingle.cc
+#  ${CMAKE_CURRENT_SOURCE_DIR}/src/LinkSingle.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/LinkRedundancy.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
@@ -57,7 +57,7 @@ if (GTest_FOUND)
   add_executable(kickcat_unit unit/bus-t.cc
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
-                              unit/linkSingle-t.cc
+#                              unit/linkSingle-t.cc
                               unit/linkRedundancy-t.cc
                               unit/mailbox-t.cc
                               unit/prints-t.cc
