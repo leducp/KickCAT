@@ -12,8 +12,22 @@ namespace kickcat
     {
         Frame inflight;
         uint8_t* datagram;
-        DatagramHeader* header;
+        DatagramHeader const* header;
         uint8_t* payload;
+    };
+
+    template<typename T>
+    struct DatagramCheck
+    {
+        Command cmd;
+        T to_check;
+        bool check_payload{true};
+        DatagramCheck(Command cmd_, T to_check_, bool check_payload_ = true)
+        : cmd(cmd_)
+        , check_payload(check_payload_)
+        {
+            std::memcpy(&to_check, &to_check_, sizeof(T));
+        }
     };
 
     class MockSocket : public AbstractSocket
@@ -48,6 +62,39 @@ namespace kickcat
             }));
         }
 
+
+        template<typename T>
+        void checkSendFrameMultipleDTG(std::vector<DatagramCheck<T>> expected_datagrams)
+        {
+            EXPECT_CALL(*this, write(::testing::_, ::testing::_))
+            .WillOnce(::testing::Invoke([this, expected_datagrams](uint8_t const* data, int32_t data_size)
+            {
+                // store datagram to forge the answer.
+                Frame frame(data, data_size);
+                context.inflight = std::move(frame);
+                context.datagram = context.inflight.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+                context.header = reinterpret_cast<DatagramHeader*>(context.datagram);
+                context.payload = context.datagram + sizeof(DatagramHeader);
+
+                int32_t i = 0;
+                while (context.inflight.isDatagramAvailable())
+                {
+                    if (expected_datagrams[i].check_payload)
+                    {
+                        EXPECT_EQ(0, std::memcmp(context.payload, &expected_datagrams[i].to_check, sizeof(T)));
+                    }
+                    EXPECT_EQ(expected_datagrams[i].cmd, context.header->command);
+
+                    std::tie(context.header, context.payload, std::ignore) = context.inflight.nextDatagram();
+                    i++;
+                }
+
+                EXPECT_EQ(expected_datagrams.size(), i);
+                return data_size;
+            }));
+        }
+
+
         template<typename T>
         void handleReply(std::vector<T> answers, uint16_t replied_wkc = 1)
         {
@@ -57,7 +104,7 @@ namespace kickcat
                 auto it = answers.begin();
                 uint16_t* wkc = reinterpret_cast<uint16_t*>(context.payload + context.header->len);
 
-                DatagramHeader* current_header = context.header;                     // current header to check loop condition
+                DatagramHeader const* current_header = context.header;                     // current header to check loop condition
                 do
                 {
                     std::memcpy(context.payload, &(*it), sizeof(T));
@@ -88,7 +135,7 @@ namespace kickcat
             }));
         }
 
-        // TODO QUEUE
+        // TODO QUEUE of frames
         FrameContext context;
     };
 }

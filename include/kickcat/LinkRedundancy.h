@@ -11,6 +11,9 @@
 namespace kickcat
 {
     class AbstractSocket;
+    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
+    void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE]);
+
     class LinkRedundancy
     {
     public:
@@ -41,8 +44,6 @@ namespace kickcat
         void finalizeDatagrams();
         void processDatagrams();
 
-        int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
-        void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE]);
 
         void checkRedundancyNeeded();
     friend class LinkTest;
@@ -72,7 +73,6 @@ namespace kickcat
         void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) ;
         void resetFrameContext() ;
 
-
         std::function<void(void)> redundancyActivatedCallback_;
 
         std::shared_ptr<AbstractSocket> socket_nominal_;
@@ -80,7 +80,6 @@ namespace kickcat
 
         Frame frame_redundancy_{};
         uint8_t src_mac_redundancy_[MAC_SIZE];
-
 
         bool is_redundancy_activated_{false};
     };
