@@ -233,11 +233,11 @@ protected:
 
 TEST_F(BusTest, nop)
 {
-//    checkSendFrameSimple(Command::NOP);
-//    handleReplySimple();
-//
-//    bus.sendNop([](DatagramState const&){});
-//    bus.processAwaitingFrames();
+    checkSendFrameSimple(Command::NOP);
+    handleReplySimple();
+
+    bus.sendNop([](DatagramState const&){});
+    bus.processAwaitingFrames();
 }
 
 
@@ -371,7 +371,7 @@ TEST_F(BusTest, AL_status_error)
     ASSERT_THROW(bus.waitForState(State::OPERATIONAL, 0ns), Error);
 
     checkSendFrameSimple(Command::BWR);
-    handleReplySimple(0);
+    handleReplyWriteThenRead(0);
     ASSERT_THROW(bus.requestState(State::INIT), Error);
 }
 
@@ -576,8 +576,9 @@ TEST_F(BusTest, pdio_watchdogs)
 
 TEST_F(BusTest, init_no_slave_detected)
 {
+    InSequence s;
     checkSendFrameSimple(Command::BRD);
-    handleReplySimple(0);
+    handleReplyWriteThenRead(0);
     ASSERT_THROW(bus.init(), Error);
 }
 

@@ -344,14 +344,15 @@ namespace kickcat
         auto [header_nominal, data_nominal, wkc_nominal] = frame_nominal_.nextDatagram();
         auto [header_redundancy, data_redundancy, wkc_redundancy] = frame_redundancy_.nextDatagram();
 
-        if (nom and not red)
-        {
-            return std::make_tuple(header_nominal, data_nominal, wkc_nominal);
-        }
-
+        // When using the bus without redundancy not nom and red is the used case.
         if (not nom and red)
         {
             return std::make_tuple(header_redundancy, data_redundancy, wkc_redundancy);
+        }
+
+        if (nom and not red)
+        {
+            return std::make_tuple(header_nominal, data_nominal, wkc_nominal);
         }
 
         // all frames have data
