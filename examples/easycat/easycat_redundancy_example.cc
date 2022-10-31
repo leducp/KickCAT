@@ -1,6 +1,7 @@
 #include "kickcat/Bus.h"
 #include "kickcat/LinkRedundancy.h"
 #include "kickcat/Prints.h"
+#include "kickcat/SocketNull.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -18,9 +19,10 @@ using namespace kickcat;
 
 int main(int argc, char* argv[])
 {
-    if (argc != 3)
+    if (argc != 3 and argc != 2)
     {
-        printf("usage: ./test NIC_nominal NIC_redundancy\n");
+        printf("usage redundancy mode : ./test NIC_nominal NIC_redundancy\n");
+        printf("usage no redundancy mode : ./test NIC_nominal\n");
         return 1;
     }
 
@@ -31,12 +33,26 @@ int main(int argc, char* argv[])
     };
 
     auto socketNominal = std::make_shared<Socket>();
-    auto socketRedundancy = std::make_shared<Socket>();
+
+    std::shared_ptr<AbstractSocket> socketRedundancy;
+    std::string red_interface_name;
+
+    if (argc == 2)
+    {
+        printf("No redundancy mode selected \n");
+        socketRedundancy = std::make_shared<SocketNull>();
+        red_interface_name = "null";
+    }
+    else
+    {
+        socketRedundancy = std::make_shared<Socket>();
+        red_interface_name = argv[2];
+    }
 
     try
     {
         socketNominal->open(argv[1], 2ms);
-        socketRedundancy->open(argv[2], 2ms);
+        socketRedundancy->open(red_interface_name, 2ms);
     }
     catch (std::exception const& e)
     {
