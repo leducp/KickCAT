@@ -344,6 +344,17 @@ TEST_F(LinkTest, writeThenRead_error_wrong_number_bytes_read)
     ASSERT_THROW(link.writeThenRead(frame), Error);
 }
 
+TEST_F(LinkTest, writeThenRead_error_write)
+{
+    Frame frame;
+    EXPECT_CALL(*io_nominal, write(_,_))
+    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    {
+        return -1;
+    }));
+    ASSERT_THROW(link.writeThenRead(frame), Error);
+}
+
 TEST_F(LinkTest, isRedundancyNeeded_true)
 {
     EXPECT_CALL(*io_redundancy, write(_,_))
@@ -936,7 +947,7 @@ TEST_F(LinkTest, process_datagrams_error_rethrow)
 {
     uint8_t payload;
     Command cmd = Command::BRD;
-    std::vector<DatagramCheck<uint8_t>> expecteds_5(1, {cmd, payload});
+    std::vector<DatagramCheck<uint8_t>> expecteds_5(5, {cmd, payload, false});
 
     checkSendFrameRedundancyMultiDTG(expecteds_5);
 
@@ -976,4 +987,122 @@ TEST_F(LinkTest, process_datagrams_error_rethrow)
 }
 
 
+TEST_F(LinkTest, process_datagrams_old_frame)
+{
+    uint8_t payload = 0;
+    Command cmd = Command::BRD;
+    std::vector<DatagramCheck<uint8_t>> expecteds_1(1, {cmd, payload, false});
+
+    // first frame - lost
+    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    addDatagram(cmd, payload, payload, 0);
+
+    EXPECT_CALL(*io_nominal, read(_,_))
+    .WillOnce(Invoke([](uint8_t*, int32_t)
+    {
+        errno = EAGAIN;
+        return -1;
+    })).RetiresOnSaturation();
+
+    EXPECT_CALL(*io_redundancy, read(_,_))
+    .WillOnce(Invoke([](uint8_t*, int32_t)
+    {
+        errno = EAGAIN;
+        return -1;
+    })).RetiresOnSaturation();
+
+    link.processDatagrams();
+
+    ASSERT_EQ(0, process_callback_counter); // datagram lost (invalid frame)
+    ASSERT_EQ(1, error_callback_counter);
+
+    // second frame - the previous one that was not THAT lost
+    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    addDatagram(cmd, payload, payload, 0);
+
+    {
+        InSequence s;
+
+        // handle only response on nominal
+        EXPECT_CALL(*io_redundancy, read(_,_))
+        .WillOnce(Invoke([](uint8_t*, int32_t)
+        {
+            return -1;
+        })).RetiresOnSaturation();
+
+        EXPECT_CALL(*io_nominal, read(_,_))
+        .WillOnce(Invoke([](uint8_t* data, int32_t)
+        {
+            Frame frame;
+            frame.addDatagram(0, Command::BRD,  0, nullptr, 1);
+            int32_t toWrite = frame.finalize();
+            std::memcpy(data, frame.data(), toWrite);
+            return toWrite;
+        })).RetiresOnSaturation();
+
+
+        EXPECT_CALL(*io_redundancy, read(_,_))
+        .WillOnce(Invoke([](uint8_t*, int32_t)
+        {
+            return -1;
+        })).RetiresOnSaturation();
+
+        EXPECT_CALL(*io_nominal, read(_,_))
+        .WillOnce(Invoke([](uint8_t*, int32_t)
+        {
+            errno = EAGAIN;
+            return -1;
+        })).RetiresOnSaturation();
+    }
+    link.processDatagrams();
+
+    ASSERT_EQ(0, process_callback_counter); // datagram lost (invalid frame)
+    ASSERT_EQ(2, error_callback_counter);
+
+    // third frame: read wrong frame but read the right one afterward
+    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    addDatagram(cmd, payload, payload, 0);
+
+    {
+        InSequence s;
+
+        // handle only response on nominal
+        EXPECT_CALL(*io_redundancy, read(_,_))
+        .WillOnce(Invoke([](uint8_t*, int32_t)
+        {
+            return -1;
+        })).RetiresOnSaturation();
+
+        EXPECT_CALL(*io_nominal, read(_,_))
+        .WillOnce(Invoke([](uint8_t* data, int32_t)
+        {
+            Frame frame;
+            frame.addDatagram(1, Command::BRD,  0, nullptr, 1);
+            int32_t toWrite = frame.finalize();
+            std::memcpy(data, frame.data(), toWrite);
+            return toWrite;
+        })).RetiresOnSaturation();
+
+        // handle only response on nominal
+        EXPECT_CALL(*io_redundancy, read(_,_))
+        .WillOnce(Invoke([](uint8_t*, int32_t)
+        {
+            return -1;
+        })).RetiresOnSaturation();
+
+        EXPECT_CALL(*io_nominal, read(_,_))
+        .WillOnce(Invoke([payload](uint8_t* data, int32_t)
+        {
+            Frame frame;
+            frame.addDatagram(2, Command::BRD,  0, &payload, 1);
+            int32_t toWrite = frame.finalize();
+            std::memcpy(data, frame.data(), toWrite);
+            return toWrite;
+        }));
+    }
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter); // datagram lost (invalid frame)
+    ASSERT_EQ(2, error_callback_counter);
+}
 }
