@@ -82,6 +82,12 @@ if (GTest_FOUND)
         EXECUTABLE kickcat_unit
         EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*" "src/Prints.cc"
         )
+
+    setup_target_for_coverage_gcovr_xml(
+        NAME coverage_xml
+        EXECUTABLE kickcat_unit
+        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*" "src/Prints.cc"
+        )
   endif()
 endif()
 
