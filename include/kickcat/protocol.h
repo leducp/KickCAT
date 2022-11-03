@@ -74,6 +74,7 @@ namespace kickcat
                  multiple : 1; // multiple EtherCAT datagram (0 if last, 1 otherwise)
         uint16_t IRQ;
     } __attribute__((__packed__));
+    std::string toString(DatagramHeader const& header);
 
 
     // EtherCAT state machine states
@@ -174,6 +175,8 @@ namespace kickcat
             COM_port3 : 1;
     }__attribute__((__packed__));
 
+    std::string toString(DLStatus const& counters);
+
     struct ErrorCounters
     {
         struct RX
@@ -192,7 +195,7 @@ namespace kickcat
         uint8_t lost_link[4];
     } __attribute__((__packed__));
 
-    std::string toString(ErrorCounters counters);
+    std::string toString(ErrorCounters const& counters);
 
     struct SyncManager
     {
@@ -337,6 +340,8 @@ namespace kickcat
             uint16_t flags;
         } __attribute__((__packed__));
     }
+
+    std::string toString(eeprom::GeneralEntry const& general_entry);
 
     namespace mailbox
     {
