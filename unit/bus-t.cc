@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 #include <cstring>
 
+#include "kickcat/Link.h"
 #include "kickcat/SocketNull.h"
 #include "kickcat/Bus.h"
-#include "kickcat/LinkRedundancy.h"
 #include "Mocks.h"
 
 using ::testing::Return;
@@ -33,11 +33,13 @@ public:
     }
 
 
-    void checkSendFrameSimple(Command cmd)
+    void checkSendFrameSimple(Command cmd, int32_t n=1)
     {
         uint8_t skip = 0;
-        io_nominal->checkSendFrame(cmd, skip, false);
+        std::vector<DatagramCheck<uint8_t>> expecteds(n, {cmd, skip, false});
+        io_nominal->checkSendFrame(expecteds);
     }
+
 
     void handleReplyWriteThenRead(uint16_t wkc = 1)
     {
@@ -99,11 +101,15 @@ public:
 
         // PDIO Watchdog
         uint16_t watchdogTimeCheck = static_cast<uint16_t>(watchdog / 100us);
-        io_nominal->checkSendFrame(Command::BWR, uint16_t(0x09C2), true);
+
+        std::vector<DatagramCheck<uint16_t>> expecteds_1(1, {Command::BWR, uint16_t(0x09C2)});
+        io_nominal->checkSendFrame(expecteds_1);
         handleReplyWriteThenRead();
-        io_nominal->checkSendFrame(Command::BWR, watchdogTimeCheck, true);
+
+        std::vector<DatagramCheck<uint16_t>> expecteds_2(1, {Command::BWR, watchdogTimeCheck});
+        io_nominal->checkSendFrame(expecteds_2);
         handleReplyWriteThenRead();
-        io_nominal->checkSendFrame(Command::BWR, watchdogTimeCheck, true);
+        io_nominal->checkSendFrame(expecteds_2);
         handleReplyWriteThenRead();
 
         // eeprom to master
@@ -170,7 +176,7 @@ public:
         io_nominal->handleReply<uint8_t>({State::PRE_OP});
 
         // clear mailbox
-        checkSendFrameSimple(Command::FPRD);
+        checkSendFrameSimple(Command::FPRD, 2);
         io_nominal->handleReply<uint8_t>({0x08, 0}); // can write, nothing to read
 
         bus.init(watchdog);
@@ -208,13 +214,13 @@ public:
 
         for (uint32_t i = 0; i < data_to_reply.size(); ++i)
         {
-            checkSendFrameSimple(Command::FPRD);
+            checkSendFrameSimple(Command::FPRD, 2);
             io_nominal->handleReply<uint8_t>({0, 0});// can write, nothing to read
 
             checkSendFrameSimple(Command::FPWR);  // write to mailbox
             handleReplySimple();
 
-            checkSendFrameSimple(Command::FPRD);
+            checkSendFrameSimple(Command::FPRD, 2);
             io_nominal->handleReply<uint8_t>({0, 0x08});// can write, something to read
 
             answer.sdo.subindex = static_cast<uint8_t>(i);
@@ -227,7 +233,7 @@ public:
 protected:
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
     std::shared_ptr<SocketNull> io_redundancy{ std::make_shared<SocketNull>() };
-    std::shared_ptr<LinkRedundancy> link = std::make_shared<LinkRedundancy>(io_nominal, io_redundancy, nullptr);
+    std::shared_ptr<Link> link = std::make_shared<Link>(io_nominal, io_redundancy, nullptr);
     Bus bus{ link };
 };
 
@@ -270,7 +276,7 @@ TEST_F(BusTest, logical_cmd)
     auto& slave = bus.slaves().at(0);
     slave.supported_mailbox = eeprom::MailboxProtocol::None; // disable mailbox protocol to use SII PDO mapping
 
-    checkSendFrameSimple(Command::FPWR);
+    checkSendFrameSimple(Command::FPWR, 4);
     io_nominal->handleReply<uint8_t>({2, 3});
 
     uint8_t iomap[64];
@@ -296,7 +302,9 @@ TEST_F(BusTest, logical_cmd)
 
     int64_t logical_write = 0x0706050403020100;
     std::memcpy(slave.output.data, &logical_write, sizeof(int64_t));
-    io_nominal->checkSendFrame(Command::LWR, logical_write);
+    std::vector<DatagramCheck<int64_t>> expecteds(1, {Command::LWR, logical_write});
+    io_nominal->checkSendFrame(expecteds);
+
     io_nominal->handleReply<int64_t>({logical_write});
     bus.processDataWrite([](DatagramState const&){});
 
@@ -308,7 +316,8 @@ TEST_F(BusTest, logical_cmd)
     logical_read  = 0x1011121314151617;
     logical_write = 0x1716151413121110;
     std::memcpy(slave.output.data, &logical_write, sizeof(int64_t));
-    io_nominal->checkSendFrame(Command::LRW, logical_write);
+    std::vector<DatagramCheck<int64_t>> expecteds_2(1, {Command::LRW, logical_write});
+    io_nominal->checkSendFrame(expecteds_2);
     io_nominal->handleReply<int64_t>({logical_read});
     bus.processDataReadWrite([](DatagramState const&){});
 
@@ -401,19 +410,19 @@ TEST_F(BusTest, write_SDO_OK)
     uint32_t data_size = sizeof(data);
     auto& slave = bus.slaves().at(0);
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0x08, 0});// cannot write, nothing to read
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0, 0});   // can write, nothing to read
 
     checkSendFrameSimple(Command::FPWR);  // write to mailbox
     handleReplySimple();
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0, 0});   // can write, nothing to read
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0, 0x08});// can write, somethin to read
 
     SDOAnswer answer;
@@ -438,7 +447,7 @@ TEST_F(BusTest, write_SDO_timeout)
     uint32_t data_size = sizeof(data);
     auto& slave = bus.slaves().at(0);
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0x08, 0});// cannot write, nothing to read
 
     ASSERT_THROW(bus.writeSDO(slave, 0x1018, 1, false, &data, data_size, 0ns), Error);
@@ -452,7 +461,7 @@ TEST_F(BusTest, write_SDO_bad_answer)
     uint32_t data_size = sizeof(data);
     auto& slave = bus.slaves().at(0);
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0, 0});// can write, nothing to read
 
     checkSendFrameSimple(Command::FPWR);  // write to mailbox
@@ -469,13 +478,13 @@ TEST_F(BusTest, read_SDO_OK)
     uint32_t data_size = sizeof(data);
     auto& slave = bus.slaves().at(0);
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0, 0});// can write, nothing to read
 
     checkSendFrameSimple(Command::FPWR);  // write to mailbox
     handleReplySimple();
 
-    checkSendFrameSimple(Command::FPRD);
+    checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0, 0x08});// can write, somethin to read
 
     SDOAnswer answer;
@@ -540,7 +549,7 @@ TEST_F(BusTest, detect_mapping_CoE)
     addReadEmulatedSDO<uint32_t>(0x160B, { 2, 32, 16 });
 
     // SM/FMMU configuration
-    checkSendFrameSimple(Command::FPWR);
+    checkSendFrameSimple(Command::FPWR, 4);
     io_nominal->handleReply<uint8_t>({2, 3});
 
     uint8_t iomap[64];

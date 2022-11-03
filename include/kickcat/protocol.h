@@ -11,11 +11,14 @@
 namespace kickcat
 {
     constexpr int32_t  MAC_SIZE = 6;
+
+    using mac = uint8_t[MAC_SIZE];
+
     // Ethernet description
     struct EthernetHeader
     {
-        uint8_t dst_mac[MAC_SIZE];
-        uint8_t src_mac[MAC_SIZE];
+        mac dst_mac;
+        mac src_mac;
         uint16_t type;
     } __attribute__((__packed__));
 
@@ -439,8 +442,8 @@ namespace kickcat
     }
 
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
-    constexpr uint8_t PRIMARY_IF_MAC[MAC_SIZE]   = { 0xCA, 0xDE, 0xCA, 0xDE, 0xDE, 0xFF };
-    constexpr uint8_t SECONDARY_IF_MAC[MAC_SIZE] = { 0x03, 0x02, 0x02, 0x02, 0xFF, 0xFF };
+    constexpr mac PRIMARY_IF_MAC   = { 0xCA, 0xDE, 0xCA, 0xDE, 0xDE, 0xFF };
+    constexpr mac SECONDARY_IF_MAC = { 0x03, 0x02, 0x02, 0x02, 0xFF, 0xFF };
 
     // helpers
     constexpr uint16_t datagram_size(uint16_t data_size)

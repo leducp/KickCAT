@@ -1,4 +1,5 @@
-#include "LinkRedundancy.h"
+#include "Link.h"
+
 #include "AbstractSocket.h"
 #include "Error.h"
 
@@ -6,11 +7,11 @@
 
 namespace kickcat
 {
-    LinkRedundancy::LinkRedundancy(std::shared_ptr<AbstractSocket> socket_nominal,
+    Link::Link(std::shared_ptr<AbstractSocket> socket_nominal,
                                    std::shared_ptr<AbstractSocket> socket_redundancy,
                                    std::function<void(void)> const& redundancyActivatedCallback,
-                                   uint8_t const src_mac_nominal[MAC_SIZE],
-                                   uint8_t const src_mac_redundancy[MAC_SIZE])
+                                   mac const src_mac_nominal,
+                                   mac const src_mac_redundancy)
         : redundancyActivatedCallback_(redundancyActivatedCallback)
         , socket_nominal_(socket_nominal)
         , socket_redundancy_(socket_redundancy)
@@ -20,7 +21,7 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
+    void Link::addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                                std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                                std::function<void(DatagramState const& state)> const& error)
     {
@@ -48,7 +49,7 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::finalizeDatagrams()
+    void Link::finalizeDatagrams()
     {
         if (frame_nominal_.datagramCounter() != 0)
         {
@@ -57,7 +58,7 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::processDatagrams()
+    void Link::processDatagrams()
     {
         finalizeDatagrams();
 
@@ -110,7 +111,7 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::checkRedundancyNeeded()
+    void Link::checkRedundancyNeeded()
     {
         Frame frame;
         frame.addDatagram(0, Command::BRD, createAddress(0, 0x0000), nullptr, 1);
@@ -135,12 +136,12 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::writeThenRead(Frame& frame)
+    void Link::writeThenRead(Frame& frame)
     {
         int32_t to_write = frame.finalize();
         auto write_read_callback = [&](std::shared_ptr<AbstractSocket> from,
                                        std::shared_ptr<AbstractSocket> to,
-                                       uint8_t const src_mac[MAC_SIZE])
+                                       mac const src_mac)
         {
             int32_t is_faulty = 0;
             frame.setSourceMAC(src_mac);
@@ -190,7 +191,7 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::sendFrame()
+    void Link::sendFrame()
     {
         // save number of datagrams in the frame to handle send error properly if any
         int32_t const datagrams = frame_nominal_.datagramCounter();
@@ -243,7 +244,7 @@ namespace kickcat
         }
     }
 
-    void LinkRedundancy::read()
+    void Link::read()
     {
         if (readFrame(socket_redundancy_, frame_nominal_) < 0)
         {
@@ -257,26 +258,26 @@ namespace kickcat
     }
 
 
-    void LinkRedundancy::addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
+    void Link::addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size)
     {
         frame_nominal_.addDatagram(index, command, address, data, data_size);
     }
 
 
-    void LinkRedundancy::resetFrameContext()
+    void Link::resetFrameContext()
     {
         frame_nominal_.resetContext();
         frame_redundancy_.resetContext();
     }
 
 
-    bool LinkRedundancy::isDatagramAvailable()
+    bool Link::isDatagramAvailable()
     {
         return frame_nominal_.isDatagramAvailable() or frame_redundancy_.isDatagramAvailable();
     }
 
 
-    std::tuple<DatagramHeader const*, uint8_t*, uint16_t> LinkRedundancy::nextDatagram()
+    std::tuple<DatagramHeader const*, uint8_t*, uint16_t> Link::nextDatagram()
     {
         bool nom = frame_nominal_.isDatagramAvailable();
         bool red = frame_redundancy_.isDatagramAvailable();
@@ -337,7 +338,7 @@ namespace kickcat
     }
 
 
-    void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE])
+    void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, mac const src_mac)
     {
         frame.setSourceMAC(src_mac);
         int32_t toWrite = frame.finalize();

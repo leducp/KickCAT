@@ -40,55 +40,35 @@ namespace kickcat
         MOCK_METHOD(int32_t, write, (uint8_t const* frame, int32_t frame_size), (override));
 
         template<typename T>
-        void checkSendFrame(Command cmd, T to_check, bool check_payload = true)
-        {
-            EXPECT_CALL(*this, write(::testing::_, ::testing::_))
-            .WillOnce(::testing::Invoke([this, cmd, to_check, check_payload](uint8_t const* data, int32_t data_size)
-            {
-                // store datagram to forge the answer.
-                Frame frame(data, data_size);
-                context.inflight = std::move(frame);
-                context.datagram = context.inflight.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
-                context.header = reinterpret_cast<DatagramHeader*>(context.datagram);
-                context.payload = context.datagram + sizeof(DatagramHeader);
-
-                if (check_payload)
-                {
-                    EXPECT_EQ(0, std::memcmp(context.payload, &to_check, sizeof(T)));
-                }
-
-                EXPECT_EQ(cmd, context.header->command);
-                return data_size;
-            }));
-        }
-
-
-        template<typename T>
-        void checkSendFrameMultipleDTG(std::vector<DatagramCheck<T>> expected_datagrams)
+        void checkSendFrame(std::vector<DatagramCheck<T>> expected_datagrams)
         {
             EXPECT_CALL(*this, write(::testing::_, ::testing::_))
             .WillOnce(::testing::Invoke([this, expected_datagrams](uint8_t const* data, int32_t data_size)
             {
-                // store datagram to forge the answer.
-                Frame frame(data, data_size);
-                context.inflight = std::move(frame);
+                // store datagram to forge the answer for handle reply.
+                Frame frameContext(data, data_size);
+                context.inflight = std::move(frameContext);
                 context.datagram = context.inflight.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
                 context.header = reinterpret_cast<DatagramHeader*>(context.datagram);
                 context.payload = context.datagram + sizeof(DatagramHeader);
 
+                // Check the content of the sent frame:
+                Frame frameCheck(data, data_size);
+                uint8_t* datagram = frameCheck.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+                DatagramHeader const* header = reinterpret_cast<DatagramHeader*>(datagram);
+                uint8_t* payload = datagram + sizeof(DatagramHeader);
                 int32_t i = 0;
-                while (context.inflight.isDatagramAvailable())
+                while (frameCheck.isDatagramAvailable())
                 {
                     if (expected_datagrams[i].check_payload)
                     {
-                        EXPECT_EQ(0, std::memcmp(context.payload, &expected_datagrams[i].to_check, sizeof(T)));
+                        EXPECT_EQ(0, std::memcmp(payload, &expected_datagrams[i].to_check, sizeof(T)));
                     }
-                    EXPECT_EQ(expected_datagrams[i].cmd, context.header->command);
+                    EXPECT_EQ(expected_datagrams[i].cmd, header->command);
 
-                    std::tie(context.header, context.payload, std::ignore) = context.inflight.nextDatagram();
+                    std::tie(header, payload, std::ignore) = frameCheck.nextDatagram();
                     i++;
                 }
-
                 EXPECT_EQ(expected_datagrams.size(), i);
                 return data_size;
             }));
@@ -109,7 +89,6 @@ namespace kickcat
                 {
                     std::memcpy(context.payload, &(*it), sizeof(T));
                     *wkc = replied_wkc;
-
 
                     current_header = context.header;                                    // save current header
                     ++it;                                                       // next payload

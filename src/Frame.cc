@@ -183,7 +183,7 @@ namespace kickcat
         return std::make_tuple(header, data, wkc);
     }
 
-    void Frame::setSourceMAC(uint8_t const src_mac[MAC_SIZE])
+    void Frame::setSourceMAC(mac const src_mac)
     {
         std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
     }

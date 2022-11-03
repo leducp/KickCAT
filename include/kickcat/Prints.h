@@ -10,9 +10,6 @@
 
 namespace kickcat
 {
-    // Frame utils
-    void printDatagramHeader(DatagramHeader const& header);
-
     // Slaves utils
     void printInfo(Slave const& slave);
     void printPDOs(Slave const& slave);

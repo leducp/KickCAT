@@ -2,13 +2,12 @@
 
 #include "Bus.h"
 #include "AbstractSocket.h"
-#include "Prints.h"
 
 namespace kickcat
 {
-    Bus::Bus(std::shared_ptr<Link> link)
-    : link_(link)
+    Bus::Bus(std::unique_ptr<Link> link)
     {
+        link_ = std::move(link);
     }
 
 
@@ -208,33 +207,28 @@ namespace kickcat
 
     void Bus::setAddresses()
     {
-        // Regular processDatagram can't be used here with redundancy to avoid messing the slave address attribution.
-
-        Frame frame;
-        auto process = [&]()
-        {
-            link_->writeThenRead(frame);
-            auto [header, _, wkc] = frame.nextDatagram();
-            if (wkc != 1)
-            {
-                THROW_ERROR("Invalid working counter");
-            }
-        };
-
         for (size_t i = 0; i < slaves_.size(); ++i)
         {
-            slaves_[i].address = static_cast<uint16_t>(i);
-            frame.addDatagram(0, Command::APWR, createAddress(0 - slaves_[i].address, reg::STATION_ADDR), &slaves_[i].address, sizeof(slaves_[i].address));
-            if (frame.isFull())
+            auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
-                process();
-            }
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+                return DatagramState::OK;
+            };
+
+            auto error = [](DatagramState const&)
+            {
+                THROW_ERROR("Invalid working counter");
+            };
+
+            slaves_[i].address = static_cast<uint16_t>(i);
+            link_->addDatagram(Command::APWR, createAddress(0 - slaves_[i].address, reg::STATION_ADDR),
+                              slaves_[i].address, process, error);
         }
 
-        if (frame.datagramCounter() != 0)
-        {
-            process();
-        }
+        link_->processDatagrams();
     }
 
 
@@ -434,6 +428,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.inputs.size())
                 {
+                    DEBUG_PRINT("Invalid working counter\n");
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -950,8 +945,18 @@ namespace kickcat
             return DatagramState::OK;
         };
 
+<<<<<<< HEAD
+        link_.addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
+        link_.processDatagrams();
+=======
+        auto error = [](DatagramState const&)
+        {
+            THROW_ERROR("Error while trying to get DL Status.");
+        };
+
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
         link_->processDatagrams();
+>>>>>>> Check if cable is broken at init.
     }
 
 }

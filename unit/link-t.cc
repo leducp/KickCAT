@@ -2,8 +2,8 @@
 #include <cstring>
 #include <string.h>
 
+#include "kickcat/Link.h"
 #include "Mocks.h"
-#include "kickcat/LinkRedundancy.h"
 
 using ::testing::Return;
 using ::testing::_;
@@ -34,17 +34,10 @@ public:
     }
 
     template<typename T>
-    void checkSendFrameRedundancy(Command cmd, T to_check, bool check_payload = true)
+    void checkSendFrameRedundancy(std::vector<DatagramCheck<T>> expecteds)
     {
-        io_nominal->checkSendFrame(cmd, to_check, check_payload);
-        io_redundancy->checkSendFrame(cmd, to_check, check_payload);
-    }
-
-    template<typename T>
-    void checkSendFrameRedundancyMultiDTG(std::vector<DatagramCheck<T>> expecteds)
-    {
-        io_nominal->checkSendFrameMultipleDTG(expecteds);
-        io_redundancy->checkSendFrameMultipleDTG(expecteds);
+        io_nominal->checkSendFrame(expecteds);
+        io_redundancy->checkSendFrame(expecteds);
     }
 
     template<typename T, typename U>
@@ -77,7 +70,7 @@ public:
 protected:
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
     std::shared_ptr<MockSocket> io_redundancy{ std::make_shared<MockSocket>() };
-    LinkRedundancy link{ io_nominal, io_redundancy, std::bind(&LinkTest::reportRedundancy, this), PRIMARY_IF_MAC, SECONDARY_IF_MAC};
+    Link link{ io_nominal, io_redundancy, std::bind(&LinkTest::reportRedundancy, this), PRIMARY_IF_MAC, SECONDARY_IF_MAC};
 
     bool is_redundancy_activated{false};
 
@@ -514,8 +507,11 @@ TEST_F(LinkTest, process_datagrams_line_ok)
 
     int64_t skip{0};
     int64_t logical_read = 0x0001020304050607;
-    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
-    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+    addDatagram(cmd, skip, logical_read, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
+
     io_redundancy->handleReply<int64_t>({logical_read}, 2);
     io_nominal->handleReply<int64_t>({skip}, 0);
 
@@ -532,8 +528,10 @@ TEST_F(LinkTest, process_datagrams_nom_cut_red_ok)
 
     int64_t skip{0};
     int64_t logical_read = 0x0001020304050607;
-    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
-    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+    addDatagram(cmd, skip, logical_read, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
     io_redundancy->handleReply<int64_t>({logical_read}, 2);
     io_nominal->readError();
 
@@ -551,8 +549,10 @@ TEST_F(LinkTest, process_datagrams_nom_ok_red_nok)
 
     int64_t skip{0};
     int64_t logical_read = 0x0001020304050607;
-    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
-    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+    addDatagram(Command::LRD, skip, logical_read, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
     io_redundancy->readError();
     io_nominal->handleReply<int64_t>({logical_read}, 2);
 
@@ -570,8 +570,10 @@ TEST_F(LinkTest, process_datagrams_both_interfaces_cut)
 
     int64_t skip{0};
     int64_t logical_read = 0x0001020304050607;
-    addDatagram(Command::LRD, skip, logical_read, 2, false); // no payload for logical read.
-    checkSendFrameRedundancy(Command::LRD, skip, false); // check frame is sent on both interfaces.
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+    addDatagram(cmd, skip, logical_read, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
     io_redundancy->readError();
     io_nominal->readError();
 
@@ -591,8 +593,10 @@ TEST_F(LinkTest, process_datagrams_line_cut_between_slaves)
     int64_t logical_read_1 = 0x0001020300000000;
     int64_t logical_read_2 = 0x0000000004050607;
     int64_t logical_read_full = 0x0001020304050607;
-    addDatagram(Command::LRD, skip, logical_read_full, 2, false);
-    checkSendFrameRedundancy(Command::LRD, skip, false);
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+    addDatagram(cmd, skip, logical_read_full, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
     io_redundancy->handleReply<int64_t>({logical_read_2}, 1);
     io_nominal->handleReply<int64_t>({logical_read_1}, 1);
 
@@ -779,8 +783,8 @@ TEST_F(LinkTest, add_datagram_more_than_15)
     {
         InSequence s;
 
-        checkSendFrameRedundancyMultiDTG(expecteds_15);
-        checkSendFrameRedundancyMultiDTG(expecteds_5);
+        checkSendFrameRedundancy(expecteds_15);
+        checkSendFrameRedundancy(expecteds_5);
     }
 
     for (int32_t i=0; i<20; ++i)
@@ -809,8 +813,8 @@ TEST_F(LinkTest, add_big_datagram)
     {
         InSequence s;
 
-        checkSendFrameRedundancyMultiDTG(expecteds_5);
-        checkSendFrameRedundancyMultiDTG(expecteds_big);
+        checkSendFrameRedundancy(expecteds_5);
+        checkSendFrameRedundancy(expecteds_big);
     }
 
     for (int32_t i=0; i<5; ++i)
@@ -835,7 +839,7 @@ TEST_F(LinkTest, add_too_many_datagrams)
 
         for (int32_t i = 0; i < (SEND_DATAGRAMS_OK / 15); ++i)
         {
-            checkSendFrameRedundancyMultiDTG(expecteds_15);
+            checkSendFrameRedundancy(expecteds_15);
         }
     }
 
@@ -863,7 +867,7 @@ TEST_F(LinkTest, process_datagrams_invalid_frame)
     uint8_t payload = 3;
     Command cmd = Command::BWR;
     std::vector<DatagramCheck<uint8_t>> expecteds_1(1, {cmd, payload});
-    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    checkSendFrameRedundancy(expecteds_1);
 
     addDatagram(cmd, payload, payload, 0);
 
@@ -894,7 +898,7 @@ TEST_F(LinkTest, process_datagrams_invalid_size)
     uint8_t payload = 3;
     Command cmd = Command::BWR;
     std::vector<DatagramCheck<uint8_t>> expecteds_1(1, {cmd, payload});
-    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    checkSendFrameRedundancy(expecteds_1);
 
     addDatagram(cmd, payload, payload, 0);
 
@@ -949,7 +953,7 @@ TEST_F(LinkTest, process_datagrams_error_rethrow)
     Command cmd = Command::BRD;
     std::vector<DatagramCheck<uint8_t>> expecteds_5(5, {cmd, payload, false});
 
-    checkSendFrameRedundancyMultiDTG(expecteds_5);
+    checkSendFrameRedundancy(expecteds_5);
 
     link.addDatagram(Command::BRD, 0, payload,
         [&](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::INVALID_WKC; },
@@ -994,7 +998,7 @@ TEST_F(LinkTest, process_datagrams_old_frame)
     std::vector<DatagramCheck<uint8_t>> expecteds_1(1, {cmd, payload, false});
 
     // first frame - lost
-    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    checkSendFrameRedundancy(expecteds_1);
     addDatagram(cmd, payload, payload, 0);
 
     EXPECT_CALL(*io_nominal, read(_,_))
@@ -1017,7 +1021,7 @@ TEST_F(LinkTest, process_datagrams_old_frame)
     ASSERT_EQ(1, error_callback_counter);
 
     // second frame - the previous one that was not THAT lost
-    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    checkSendFrameRedundancy(expecteds_1);
     addDatagram(cmd, payload, payload, 0);
 
     {
@@ -1060,7 +1064,7 @@ TEST_F(LinkTest, process_datagrams_old_frame)
     ASSERT_EQ(2, error_callback_counter);
 
     // third frame: read wrong frame but read the right one afterward
-    checkSendFrameRedundancyMultiDTG(expecteds_1);
+    checkSendFrameRedundancy(expecteds_1);
     addDatagram(cmd, payload, payload, 0);
 
     {

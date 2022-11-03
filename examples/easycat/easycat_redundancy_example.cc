@@ -1,5 +1,5 @@
+#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
-#include "kickcat/LinkRedundancy.h"
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
 
@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::shared_ptr<LinkRedundancy> link= std::make_shared<LinkRedundancy>(socketNominal, socketRedundancy, reportRedundancy);
+    std::shared_ptr<Link> link= std::make_shared<Link>(socketNominal, socketRedundancy, reportRedundancy);
     link->checkRedundancyNeeded();
 
     Bus bus(link);

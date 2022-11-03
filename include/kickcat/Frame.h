@@ -51,7 +51,7 @@ namespace kickcat
         bool isDatagramAvailable() const { return is_datagram_available_; }
         void setIsDatagramAvailable() { is_datagram_available_ = true; }
 
-        void setSourceMAC(uint8_t const src_mac[MAC_SIZE]);
+        void setSourceMAC(mac const src_mac);
 
         // helper to access raw frame (mostly for unit testing)
         uint8_t* data() { return frame_.data(); }

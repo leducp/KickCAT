@@ -12,17 +12,17 @@ namespace kickcat
 {
     class AbstractSocket;
     int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
-    void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, uint8_t const src_mac[MAC_SIZE]);
+    void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, mac const src_mac);
 
-    class LinkRedundancy
+    class Link
     {
     public:
-        LinkRedundancy(std::shared_ptr<AbstractSocket> socket_nominal,
+        Link(std::shared_ptr<AbstractSocket> socket_nominal,
                        std::shared_ptr<AbstractSocket> socket_redundancy,
                        std::function<void(void)> const& redundancyActivatedCallback,
-                       uint8_t const src_mac_nominal[MAC_SIZE] = PRIMARY_IF_MAC,
-                       uint8_t const src_mac_redundancy[MAC_SIZE] = SECONDARY_IF_MAC);
-        ~LinkRedundancy() = default;
+                       mac const src_mac_nominal = PRIMARY_IF_MAC,
+                       mac const src_mac_redundancy = SECONDARY_IF_MAC);
+        ~Link() = default;
 
         /// \brief   Helper for trivial access (i.e. most of the init bus frames)
         ///
@@ -49,7 +49,7 @@ namespace kickcat
     friend class LinkTest;
 
 
-    protected:
+    private:
         uint8_t index_queue_{0};
         uint8_t index_head_{0};
         uint8_t sent_frame_{0};
@@ -62,10 +62,7 @@ namespace kickcat
         };
         std::array<Callbacks, 256> callbacks_{};
 
-        Frame frame_nominal_{};
-        uint8_t src_mac_nominal_[MAC_SIZE];
 
-    private:
         void read() ;
         void sendFrame() ;
         bool isDatagramAvailable() ;
@@ -78,8 +75,11 @@ namespace kickcat
         std::shared_ptr<AbstractSocket> socket_nominal_;
         std::shared_ptr<AbstractSocket> socket_redundancy_;
 
+        Frame frame_nominal_{};
+        mac src_mac_nominal_;
+
         Frame frame_redundancy_{};
-        uint8_t src_mac_redundancy_[MAC_SIZE];
+        mac src_mac_redundancy_;
 
         bool is_redundancy_activated_{false};
     };
