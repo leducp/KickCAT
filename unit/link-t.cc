@@ -52,6 +52,13 @@ public:
                 return DatagramState::INVALID_WKC;
             }
 
+            int64_t debug_data, debug_expected_data;
+
+            std::memcpy(&debug_data, data, sizeof(int64_t));
+            std::memcpy(&debug_expected_data, &expected_data, sizeof(int64_t));
+
+            printf("data %li expected data %li \n", debug_data, debug_expected_data);
+
             EXPECT_EQ(wkc, expected_wkc);
             EXPECT_EQ(0, std::memcmp(data, &expected_data, sizeof(expected_data)));
             EXPECT_EQ(sizeof(expected_data), header->len);
@@ -614,134 +621,52 @@ TEST_F(LinkTest, process_datagrams_multiple_frames)
     InSequence s;
 
     int64_t skip{0};
-    int64_t logical_read = 0x0001020304050607;
+    int64_t logical_read = 1111;
     Command cmd = Command::LRD;
-    std::vector<DatagramCheck<int64_t>> expecteds_1(2, {cmd, skip, false}); // no payload for logical read.
-    addDatagram(cmd, skip, logical_read, 2, false);
-    addDatagram(cmd, skip, logical_read, 2, false);
-    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
+    int32_t datagram_number = 2;
+    std::vector<DatagramCheck<int64_t>> expecteds_(datagram_number, {cmd, skip, false}); // no payload for logical read.
+    std::vector<int64_t> answers(datagram_number, logical_read);
+    std::vector<int64_t> skips(datagram_number, skip);
 
-    io_redundancy->handleReply<int64_t>({logical_read}, 2);
-    io_nominal->handleReply<int64_t>({skip}, 0);
+    checkSendFrameRedundancy(expecteds_); // check frame is sent on both interfaces.
+//    checkSendFrameRedundancy(expecteds_);
+
+    for (int32_t i = 0; i < datagram_number; i++)
+    {
+        addDatagram(cmd, skip, logical_read, 2, false);
+    }
+
+    io_redundancy->handleReply<int64_t>(answers, 2);
+    io_nominal->handleReply<int64_t>(skips, 0);
 
     link.processDatagrams();
 
-    ASSERT_EQ(2, process_callback_counter);
+    ASSERT_EQ(datagram_number, process_callback_counter);
     ASSERT_EQ(0, error_callback_counter);
     ASSERT_EQ(DatagramState::OK, last_error);
+
+
+
 //    InSequence s;
 //
-//    int64_t skip{2};
-//    int64_t logical_read = 0x0001020304050607;
+//    int64_t skip{0};
+//    int64_t logical_read = 1111;
 //    Command cmd = Command::LRD;
-//    std::vector<DatagramCheck<int64_t>> expecteds_15(1, {cmd, skip}); // no payload for logical read.
+//    std::vector<DatagramCheck<int64_t>> expecteds_1(2, {cmd, skip, false}); // no payload for logical read.
+//    addDatagram(cmd, skip, logical_read, 2, false);
+//    addDatagram(cmd, skip, logical_read, 2, false);
+//    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
 //
-//    // Check two frames are sent
-//    checkSendFrameRedundancy(expecteds_15); // check frame is sent on both interfaces.
-////    checkSendFrameRedundancy(expecteds_15);
-//
-//
-////    for (uint i = 0; i < 15; i++)
-////    {
-//        addDatagram(cmd, skip, logical_read, 2, false);
-////    }
-//
-//    io_redundancy->handleReply<int64_t>({logical_read}, 2);
+//    io_redundancy->handleReply<int64_t>({logical_read, logical_read}, 2);
 //    io_nominal->handleReply<int64_t>({skip}, 0);
-//
-////    io_redundancy->handleReply<int64_t>({logical_read}, 2);
-////    io_nominal->handleReply<int64_t>({skip}, 0);
-//
 //
 //    link.processDatagrams();
 //
-//    ASSERT_EQ(15, process_callback_counter);
+//    ASSERT_EQ(2, process_callback_counter);
 //    ASSERT_EQ(0, error_callback_counter);
 //    ASSERT_EQ(DatagramState::OK, last_error);
+
 }
-
-
-
-        {
-            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
-            EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
-            for (int32_t i = 0; i < 6; ++i)
-            {
-                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src_mac[i]);
-                EXPECT_EQ(0xff, header->dst_mac[i]);
-            }
-        }
-
-        {
-            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
-            EXPECT_EQ(header->len, 3 * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE));
-        }
-
-        for (int32_t i = 0; i < 3; ++i)
-        {
-            uint8_t const* datagram = reinterpret_cast<uint8_t const*>(frame_in + sizeof(EthernetHeader) + sizeof(EthercatHeader)
-                                                                        + i * (sizeof(DatagramHeader) + PAYLOAD_SIZE + ETHERCAT_WKC_SIZE));
-            DatagramHeader const* header = reinterpret_cast<DatagramHeader const*>(datagram);
-            uint8_t const* payload = datagram + sizeof(DatagramHeader);
-            EXPECT_EQ(17 + i, header->index);
-            EXPECT_EQ(20 + i, header->address);
-            EXPECT_EQ(PAYLOAD_SIZE, header->len);
-            EXPECT_EQ(0, header->IRQ);
-
-            switch (i)
-            {
-                case 0:
-                {
-                    EXPECT_EQ(Command::FPRD, header->command);
-                    EXPECT_TRUE(header->multiple);
-                    for (int32_t j = 0; j < PAYLOAD_SIZE; ++j)
-                    {
-                        EXPECT_EQ(0, payload[j]);
-                    }
-                    break;
-                }
-                case 1:
-                {
-                    EXPECT_EQ(Command::BRD, header->command);
-                    EXPECT_TRUE(header->multiple);
-                    for (int32_t j = 0; j < PAYLOAD_SIZE; ++j)
-                    {
-                        EXPECT_EQ(0, payload[j]);
-                    }
-                    break;
-                }
-                case 2:
-                {
-                    EXPECT_EQ(Command::BWR, header->command);
-                    EXPECT_FALSE(header->multiple);
-                    for (int32_t j = 0; j < PAYLOAD_SIZE; ++j)
-                    {
-                        EXPECT_EQ(static_cast<uint8_t>(j*j), payload[j]);
-                    }
-                    break;
-                }
-                default: {}
-            }
-        }
-
-        return EXPECTED_SIZE;
-    }));
-    writeFrame(io_nominal, frame, PRIMARY_IF_MAC);
-}
-
-TEST_F(LinkTest, write_error)
-{
-    Frame frame;
-
-    EXPECT_CALL(*io_nominal, write(_,_))
-        .WillOnce(Return(-1))
-        .WillOnce(Return(0));
-    ASSERT_THROW(writeFrame(io_nominal, frame, PRIMARY_IF_MAC), std::system_error);
-    ASSERT_THROW(writeFrame(io_nominal, frame, PRIMARY_IF_MAC), Error);
-}
-
-///////////////////////////////////////////// END Write/Read Frame tests /////////////////////////////////////////////
-
 
 TEST_F(LinkTest, add_datagram_more_than_15)
 {
