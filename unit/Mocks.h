@@ -5,6 +5,7 @@
 #include "kickcat/protocol.h"
 #include "kickcat/Frame.h"
 
+#include <queue>
 
 namespace kickcat
 {
@@ -46,11 +47,12 @@ namespace kickcat
             .WillOnce(::testing::Invoke([this, expected_datagrams](uint8_t const* data, int32_t data_size)
             {
                 // store datagram to forge the answer for handle reply.
+                contexts_.emplace();
                 Frame frameContext(data, data_size);
-                context.inflight = std::move(frameContext);
-                context.datagram = context.inflight.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
-                context.header = reinterpret_cast<DatagramHeader*>(context.datagram);
-                context.payload = context.datagram + sizeof(DatagramHeader);
+                contexts_.back().inflight = std::move(frameContext);
+                contexts_.back().datagram = contexts_.back().inflight.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+                contexts_.back().header = reinterpret_cast<DatagramHeader*>(contexts_.back().datagram);
+                contexts_.back().payload = contexts_.back().datagram + sizeof(DatagramHeader);
 
                 // Check the content of the sent frame:
                 Frame frameCheck(data, data_size);
@@ -82,25 +84,25 @@ namespace kickcat
             .WillOnce(::testing::Invoke([this, replied_wkc, answers](uint8_t* data, int32_t)
             {
                 auto it = answers.begin();
-                uint16_t* wkc = reinterpret_cast<uint16_t*>(context.payload + context.header->len);
+                uint16_t* wkc = reinterpret_cast<uint16_t*>(contexts_.front().payload + contexts_.front().header->len);
 
-                DatagramHeader const* current_header = context.header;                     // current header to check loop condition
+                DatagramHeader const* current_header = contexts_.front().header;                     // current header to check loop condition
                 do
                 {
-                    std::memcpy(context.payload, &(*it), sizeof(T));
+                    std::memcpy(contexts_.front().payload, &(*it), sizeof(T));
                     *wkc = replied_wkc;
 
-                    current_header = context.header;                                    // save current header
+                    current_header = contexts_.front().header;                                    // save current header
                     ++it;                                                       // next payload
-                    context.datagram = reinterpret_cast<uint8_t*>(wkc) + 2;             // next datagram
-                    context.header = reinterpret_cast<DatagramHeader*>(context.datagram);       // next header
-                    context.payload = context.datagram + sizeof(DatagramHeader);                // next payload
-                    wkc = reinterpret_cast<uint16_t*>(context.payload + context.header->len);   // next wkc
+                    contexts_.front().datagram = reinterpret_cast<uint8_t*>(wkc) + 2;             // next datagram
+                    contexts_.front().header = reinterpret_cast<DatagramHeader*>(contexts_.front().datagram);       // next header
+                    contexts_.front().payload = contexts_.front().datagram + sizeof(DatagramHeader);                // next payload
+                    wkc = reinterpret_cast<uint16_t*>(contexts_.front().payload + contexts_.front().header->len);   // next wkc
                 } while (current_header->multiple == 1);
 
-
-                int32_t answer_size = context.inflight.finalize();
-                std::memcpy(data, context.inflight.data(), answer_size);
+                int32_t answer_size = contexts_.front().inflight.finalize();
+                std::memcpy(data, contexts_.front().inflight.data(), answer_size);
+                contexts_.pop();
                 return answer_size;
             }));
         }
@@ -114,7 +116,6 @@ namespace kickcat
             }));
         }
 
-        // TODO QUEUE of frames
-        FrameContext context;
+        std::queue<FrameContext> contexts_;
     };
 }
