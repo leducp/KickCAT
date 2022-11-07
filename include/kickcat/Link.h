@@ -11,8 +11,6 @@
 namespace kickcat
 {
     class AbstractSocket;
-    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
-    void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, mac const src_mac);
 
     class Link
     {

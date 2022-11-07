@@ -115,7 +115,10 @@ namespace kickcat
     {
         Frame frame;
         frame.addDatagram(0, Command::BRD, createAddress(0, 0x0000), nullptr, 1);
-        writeFrame(socket_redundancy_, frame, SECONDARY_IF_MAC);
+        if (writeFrame(socket_redundancy_, frame, SECONDARY_IF_MAC) < 0)
+        {
+            DEBUG_PRINT("Fail to write on redundancy interface \n");
+        }
 
         if (readFrame(socket_nominal_, frame) < 0)
         {
@@ -300,59 +303,5 @@ namespace kickcat
         std::transform(data_nominal, &data_nominal[header_nominal->len], data_redundancy, data_nominal, std::bit_or<uint8_t>());
         uint16_t wkc = wkc_nominal + wkc_redundancy;
         return std::make_tuple(header_nominal, data_nominal, wkc);
-    }
-
-
-
-
-    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame)
-    {
-        int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
-        if (read < 0)
-        {
-            DEBUG_PRINT("read() failed");
-            return read;
-        }
-
-        // check if the frame is an EtherCAT one. if not, drop it and try again
-        if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
-        {
-            DEBUG_PRINT("Invalid frame type");
-            return -1;
-        }
-
-        int32_t expected = frame.header()->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
-        frame.clear();
-        if (expected < ETH_MIN_SIZE)
-        {
-            expected = ETH_MIN_SIZE;
-        }
-        if (read != expected)
-        {
-            DEBUG_PRINT("Wrong number of bytes read");
-            return -1;
-        }
-
-        frame.setIsDatagramAvailable();
-        return read;
-    }
-
-
-    void writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, mac const src_mac)
-    {
-        frame.setSourceMAC(src_mac);
-        int32_t toWrite = frame.finalize();
-        int32_t written = socket->write(frame.data(), toWrite);
-        frame.clear();
-
-        if (written < 0)
-        {
-            THROW_SYSTEM_ERROR("write()");
-        }
-
-        if (written != toWrite)
-        {
-            THROW_ERROR("Wrong number of bytes written");
-        }
     }
 }

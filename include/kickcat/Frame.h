@@ -11,6 +11,7 @@ namespace kickcat
 {
     // Definition of an Ethernet frame (maximal size)
     using EthernetFrame = std::array<uint8_t, ETH_MAX_SIZE>;
+    class AbstractSocket;
 
     class Frame
     {
@@ -71,6 +72,9 @@ namespace kickcat
         int32_t datagram_counter_{0};       // number of datagram already written
         bool is_datagram_available_{false};
     };
+
+    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
+    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, mac const& src_mac);
 }
 
 #endif

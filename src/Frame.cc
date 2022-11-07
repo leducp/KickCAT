@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "Frame.h"
+#include "AbstractSocket.h"
 
 namespace kickcat
 {
@@ -186,5 +187,60 @@ namespace kickcat
     void Frame::setSourceMAC(mac const src_mac)
     {
         std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
+    }
+
+
+    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame)
+    {
+        int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
+        if (read < 0)
+        {
+            DEBUG_PRINT("read() failed");
+            return read;
+        }
+
+        // check if the frame is an EtherCAT one. if not, drop it and try again
+        if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
+        {
+            DEBUG_PRINT("Invalid frame type");
+            return -1;
+        }
+
+        int32_t expected = frame.header()->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        frame.clear();
+        if (expected < ETH_MIN_SIZE)
+        {
+            expected = ETH_MIN_SIZE;
+        }
+        if (read != expected)
+        {
+            DEBUG_PRINT("Wrong number of bytes read");
+            return -1;
+        }
+
+        frame.setIsDatagramAvailable();
+        return read;
+    }
+
+
+    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, mac const& src_mac)
+    {
+        frame.setSourceMAC(src_mac);
+        int32_t toWrite = frame.finalize();
+        int32_t written = socket->write(frame.data(), toWrite);
+        frame.clear();
+
+        if (written < 0)
+        {
+            return -1;
+        }
+
+        if (written != toWrite)
+        {
+            errno = EIO;
+            return -1;
+        }
+
+        return written;
     }
 }
