@@ -27,21 +27,14 @@ int main(int argc, char* argv[])
     }
 
 
-    auto reportRedundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
-
-    auto socketNominal = std::make_shared<Socket>();
-
     std::shared_ptr<AbstractSocket> socketRedundancy;
-    std::string red_interface_name;
+    std::string red_interface_name = "null";
+    std::string nom_interface_name = argv[1];
 
     if (argc == 2)
     {
         printf("No redundancy mode selected \n");
         socketRedundancy = std::make_shared<SocketNull>();
-        red_interface_name = "null";
     }
     else
     {
@@ -49,9 +42,10 @@ int main(int argc, char* argv[])
         red_interface_name = argv[2];
     }
 
+    auto socketNominal = std::make_shared<Socket>();
     try
     {
-        socketNominal->open(argv[1], 2ms);
+        socketNominal->open(nom_interface_name, 2ms);
         socketRedundancy->open(red_interface_name, 2ms);
     }
     catch (std::exception const& e)
@@ -59,6 +53,11 @@ int main(int argc, char* argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
+
+    auto reportRedundancy = []()
+    {
+        printf("Redundancy has been activated due to loss of a cable \n");
+    };
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socketNominal, socketRedundancy, reportRedundancy);
     link->checkRedundancyNeeded();
@@ -133,6 +132,8 @@ int main(int argc, char* argv[])
     socketRedundancy->setTimeout(nominal_timeout);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
+    FILE* stat_file = fopen("stats.csv", "w");
+    fwrite("latency\n", 1, 8, stat_file);
 
     auto& easycat = bus.slaves().at(0);
     int64_t last_error = 0;
@@ -142,6 +143,7 @@ int main(int argc, char* argv[])
 
         try
         {
+            nanoseconds t1 = since_epoch();
             bus.sendLogicalRead(callback_error);
             bus.sendLogicalWrite(callback_error);
             bus.sendRefreshErrorCounters(callback_error);
@@ -150,10 +152,12 @@ int main(int argc, char* argv[])
             bus.sendReadMessages(callback_error);
             bus.sendWriteMessages(callback_error);
             bus.finalizeDatagrams();
+            nanoseconds t2 = since_epoch();
 
 
+            nanoseconds t3 = since_epoch();
             bus.processAwaitingFrames();
-
+            nanoseconds t4 = since_epoch();
 
             for (int32_t j = 0;  j < easycat.input.bsize; ++j)
             {
@@ -161,10 +165,25 @@ int main(int argc, char* argv[])
             }
             printf("\r");
 
+            // blink a led - EasyCAT example for Arduino
+            if ((i % 50) < 25)
+            {
+                easycat.output.data[0] = 1;
+            }
+            else
+            {
+                easycat.output.data[0] = 0;
+            }
+
             if ((i % 1000) == 0)
             {
                 printErrorCounters(easycat);
             }
+
+            microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);
+            std::string sample_str = std::to_string(sample.count());
+            fwrite(sample_str.data(), 1, sample_str.size(), stat_file);
+            fwrite("\n", 1, 1, stat_file);
         }
         catch (std::exception const& e)
         {
@@ -174,5 +193,6 @@ int main(int argc, char* argv[])
         }
     }
 
+    fclose(stat_file);
     return 0;
 }

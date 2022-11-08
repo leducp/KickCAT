@@ -16,7 +16,7 @@ namespace kickcat
         std::memset(frame_.data(), 0, frame_.size());
 
         // prepare Ethernet header once for the all future communication
-        std::memset(ethernet_->dst_mac, 0xFF,    sizeof(ethernet_->dst_mac));      // broadcast
+        std::memset(ethernet_->dst, 0xFF,    sizeof(ethernet_->dst));      // broadcast
 
         // type is EtherCAT
         ethernet_->type = ETH_ETHERCAT_TYPE;
@@ -184,9 +184,9 @@ namespace kickcat
         return std::make_tuple(header, data, wkc);
     }
 
-    void Frame::setSourceMAC(mac const src_mac)
+    void Frame::setSourceMAC(MAC const& src)
     {
-        std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
+        std::memcpy(ethernet_->src, src, sizeof(ethernet_->src));
     }
 
 
@@ -223,9 +223,9 @@ namespace kickcat
     }
 
 
-    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, mac const& src_mac)
+    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, MAC const& src)
     {
-        frame.setSourceMAC(src_mac);
+        frame.setSourceMAC(src);
         int32_t toWrite = frame.finalize();
         int32_t written = socket->write(frame.data(), toWrite);
         frame.clear();

@@ -187,8 +187,8 @@ TEST(Frame, write_invalid_frame)
             EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
             for (int32_t i = 0; i < 6; ++i)
             {
-                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src_mac[i]);
-                EXPECT_EQ(0xff, header->dst_mac[i]);
+                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src[i]);
+                EXPECT_EQ(0xff, header->dst[i]);
             }
         }
 
@@ -230,8 +230,8 @@ TEST(Frame, write_multiples_datagrams)
             EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
             for (int32_t i = 0; i < 6; ++i)
             {
-                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src_mac[i]);
-                EXPECT_EQ(0xff, header->dst_mac[i]);
+                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src[i]);
+                EXPECT_EQ(0xff, header->dst[i]);
             }
         }
 

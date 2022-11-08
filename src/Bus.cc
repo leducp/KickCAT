@@ -434,6 +434,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.inputs.size())
                 {
+                    DEBUG_PRINT("Invalid working counter\n");
                     return DatagramState::INVALID_WKC;
                 }
 

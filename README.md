@@ -2,7 +2,7 @@
 
 Kick-start your slaves!
 
-Thin EtherCAT stack desgined to be embedded in a more complex software with with efficiency in mind.
+Thin EtherCAT stack desgined to be embedded in a more complex software with efficiency in mind.
 
 ### Current state:
  - Can go to OP state

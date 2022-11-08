@@ -1,5 +1,5 @@
-#ifndef KICKCAT_LINK_REDUNDANCY_H
-#define KICKCAT_LINK_REDUNDANCY_H
+#ifndef KICKCAT_LINK_H
+#define KICKCAT_LINK_H
 
 #include <array>
 #include <memory>
@@ -15,17 +15,21 @@ namespace kickcat
     class Link
     {
     public:
+        /// \brief   Handle link layer
+        /// \details This class is responsible to handle frames and datagrams on the link layers:
+        /// - associate an id to each datagram to call the associate callback later without depending on the read order
+        /// - handle link redundancy
         Link(std::shared_ptr<AbstractSocket> socket_nominal,
                        std::shared_ptr<AbstractSocket> socket_redundancy,
                        std::function<void(void)> const& redundancyActivatedCallback,
-                       mac const src_mac_nominal = PRIMARY_IF_MAC,
-                       mac const src_mac_redundancy = SECONDARY_IF_MAC);
+                       MAC const src_nominal = PRIMARY_IF_MAC,
+                       MAC const src_redundancy = SECONDARY_IF_MAC);
         ~Link() = default;
 
         /// \brief   Helper for trivial access (i.e. most of the init bus frames)
         ///
         /// \details Since this method is only used for non real time operation, the redundancy mechanism used is slower
-        ///          but guaranty slave order access, ie for setAdresses.
+        ///          but guaranty slave order access, ie for setAddresses().
         void writeThenRead(Frame& frame) ;
 
         void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
@@ -74,10 +78,10 @@ namespace kickcat
         std::shared_ptr<AbstractSocket> socket_redundancy_;
 
         Frame frame_nominal_{};
-        mac src_mac_nominal_;
+        MAC src_nominal_;
 
         Frame frame_redundancy_{};
-        mac src_mac_redundancy_;
+        MAC src_redundancy_;
 
         bool is_redundancy_activated_{false};
     };

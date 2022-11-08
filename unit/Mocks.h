@@ -23,11 +23,11 @@ namespace kickcat
         T to_check;
         bool check_payload{true};
         DatagramCheck(Command cmd_, T to_check_, bool check_payload_ = true)
-        : cmd(cmd_)
-        , check_payload(check_payload_)
-        {
-            std::memcpy(&to_check, &to_check_, sizeof(T));
-        }
+            : cmd(cmd_)
+            , check_payload(check_payload_)
+            {
+                std::memcpy(&to_check, &to_check_, sizeof(T));
+            }
     };
 
     class MockSocket : public AbstractSocket

@@ -10,14 +10,14 @@ namespace kickcat
     Link::Link(std::shared_ptr<AbstractSocket> socket_nominal,
                                    std::shared_ptr<AbstractSocket> socket_redundancy,
                                    std::function<void(void)> const& redundancyActivatedCallback,
-                                   mac const src_mac_nominal,
-                                   mac const src_mac_redundancy)
+                                   MAC const src_nominal,
+                                   MAC const src_redundancy)
         : redundancyActivatedCallback_(redundancyActivatedCallback)
         , socket_nominal_(socket_nominal)
         , socket_redundancy_(socket_redundancy)
     {
-        std::copy(src_mac_nominal, src_mac_nominal + MAC_SIZE, src_mac_nominal_);
-        std::copy(src_mac_redundancy, src_mac_redundancy + MAC_SIZE, src_mac_redundancy_);
+        std::copy(src_nominal, src_nominal + MAC_SIZE, src_nominal_);
+        std::copy(src_redundancy, src_redundancy + MAC_SIZE, src_redundancy_);
     }
 
 
@@ -142,12 +142,12 @@ namespace kickcat
     void Link::writeThenRead(Frame& frame)
     {
         int32_t to_write = frame.finalize();
-        auto write_read_callback = [&](std::shared_ptr<AbstractSocket> from,
-                                       std::shared_ptr<AbstractSocket> to,
-                                       mac const src_mac)
+        auto write_read = [&](std::shared_ptr<AbstractSocket> from,
+                              std::shared_ptr<AbstractSocket> to,
+                              MAC const& src)
         {
             int32_t is_faulty = 0;
-            frame.setSourceMAC(src_mac);
+            frame.setSourceMAC(src);
             int32_t written = from->write(frame.data(), to_write);
             if (written < to_write)
             {
@@ -166,8 +166,8 @@ namespace kickcat
         };
 
         int32_t error_count = 0;
-        error_count += write_read_callback(socket_nominal_, socket_redundancy_, PRIMARY_IF_MAC);
-        error_count += write_read_callback(socket_redundancy_, socket_nominal_, SECONDARY_IF_MAC);
+        error_count += write_read(socket_nominal_, socket_redundancy_, PRIMARY_IF_MAC);
+        error_count += write_read(socket_redundancy_, socket_nominal_, SECONDARY_IF_MAC);
 
         if (error_count > 1)
         {
@@ -196,46 +196,34 @@ namespace kickcat
 
     void Link::sendFrame()
     {
+        auto write = [&](std::shared_ptr<AbstractSocket> socket, Frame& frame, MAC const& src, int32_t to_Write)
+        {
+            bool is_frame_sent = true;
+            frame.setSourceMAC(src);
+            int32_t written = socket->write(frame.data(), to_Write);
+            if (written != to_Write)
+            {
+                is_frame_sent = false;
+                DEBUG_PRINT("Nominal: write failed, written %i, to write %i\n", written, to_Write);
+            }
+
+            return is_frame_sent;
+        };
+
         // save number of datagrams in the frame to handle send error properly if any
         int32_t const datagrams = frame_nominal_.datagramCounter();
+        int32_t to_Write = frame_nominal_.finalize();
 
-        bool is_frame_sent_nominal = true;
-        frame_nominal_.setSourceMAC(PRIMARY_IF_MAC);
-        int32_t toWrite = frame_nominal_.finalize();
-        int32_t written = socket_nominal_->write(frame_nominal_.data(), toWrite);
-        if (written < 0)
-        {
-            is_frame_sent_nominal = false;
-            DEBUG_PRINT("Nominal: write failed\n");
-        }
-        else if (written != toWrite)
-        {
-            is_frame_sent_nominal = false;
-            DEBUG_PRINT("Nominal: Wrong number of bytes written");
-        }
+        bool is_frame_sent_nominal = write(socket_nominal_, frame_nominal_, PRIMARY_IF_MAC, to_Write);
+        bool is_frame_sent_redundancy = write(socket_redundancy_, frame_nominal_, SECONDARY_IF_MAC, to_Write);
 
-        bool is_frame_sent_redundancy = true;
-        frame_nominal_.setSourceMAC(SECONDARY_IF_MAC);
-        written = socket_redundancy_->write(frame_nominal_.data(), toWrite);
         frame_nominal_.clear();
         frame_redundancy_.clear();
         frame_redundancy_.resetContext();
 
-        if (written < 0)
-        {
-            is_frame_sent_redundancy = false;
-            DEBUG_PRINT("Redundancy: write failed\n");
-        }
-
-        else if (written != toWrite)
-        {
-            is_frame_sent_redundancy = false;
-            DEBUG_PRINT("Redundancy: Wrong number of bytes written");
-        }
-
         if (is_frame_sent_nominal or is_frame_sent_redundancy)
         {
-            sent_frame_++;
+            ++sent_frame_;
         }
         else
         {
