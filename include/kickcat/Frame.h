@@ -5,18 +5,18 @@
 #include <memory>
 
 #include "protocol.h"
-#include "AbstractSocket.h"
 
 
 namespace kickcat
 {
     // Definition of an Ethernet frame (maximal size)
     using EthernetFrame = std::array<uint8_t, ETH_MAX_SIZE>;
+    class AbstractSocket;
 
     class Frame
     {
     public:
-        Frame(uint8_t const src_mac[6] = PRIMARY_IF_MAC);
+        Frame();
         Frame(Frame&& other);
         Frame(uint8_t const* data, int32_t data_size);
         Frame(Frame const& other) = delete;
@@ -28,7 +28,15 @@ namespace kickcat
         /// \return true if full after adding datagram, false otherwise
         void addDatagram(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size);
 
-        void clear(); // reset frame context
+        /// \brief   Reset the internal datagram pointers to beginning of the frame and be ready to read/write a new frame.
+        /// \details This context is used to iterate through the datagrams in the frame.
+        void resetContext();
+
+        /// \brief   Set the length of the EtherCAT header to 0.
+        /// \details It is used to know the size of data to write and to expect when reading.
+        ///          It shall be cleared when done writing and when done reading, to increment the len properly
+        ///          when reusing the frame to add new datagrams and not expect inconsistent frame size.
+        void clear();
 
         /// \brief finalize the frame to sent it on the network - handle padding and multiple datagram flag
         /// \return the number of bytes to write on the network
@@ -36,7 +44,7 @@ namespace kickcat
 
         /// \brief helper to get access on next datagram
         /// \return a tuple with a pointer on the datagram header, a pointer on the datagram data, the working counter
-        std::tuple<DatagramHeader const*, uint8_t const*, uint16_t> nextDatagram();
+        std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram();
 
         /// \return number of datagram already written in the frame
         int32_t datagramCounter() const { return datagram_counter_; }
@@ -49,13 +57,14 @@ namespace kickcat
 
         /// \return true if datagram can be extracted, false otherwise
         bool isDatagramAvailable() const { return is_datagram_available_; }
+        void setIsDatagramAvailable() { is_datagram_available_ = true; }
 
-        // handle bus access
-        void read(std::shared_ptr<AbstractSocket> socket);
-        void write(std::shared_ptr<AbstractSocket> socket);
+        void setSourceMAC(MAC const& src);
 
         // helper to access raw frame (mostly for unit testing)
         uint8_t* data() { return frame_.data(); }
+        EthercatHeader* header()   { return header_; }
+        EthernetHeader* ethernet() { return ethernet_; }
 
     private:
         EthernetFrame frame_;
@@ -67,6 +76,9 @@ namespace kickcat
         int32_t datagram_counter_{0};       // number of datagram already written
         bool is_datagram_available_{false};
     };
+
+    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
+    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, MAC const& src);
 }
 
 #endif

@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "Slave.h"
+#include "protocol.h"
 
 
 namespace kickcat

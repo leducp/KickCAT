@@ -1,2 +1,6 @@
 build/
 .vscode
+.project
+.cproject
+.settings/
+*.orig

@@ -1,5 +1,7 @@
+#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
 #include "kickcat/Prints.h"
+#include "kickcat/SocketNull.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -17,14 +19,50 @@ using namespace kickcat;
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+    if (argc != 3 and argc != 2)
     {
-        printf("usage: ./test NIC\n");
+        printf("usage redundancy mode : ./test NIC_nominal NIC_redundancy\n");
+        printf("usage no redundancy mode : ./test NIC_nominal\n");
         return 1;
     }
 
-    auto socket = std::make_shared<Socket>();
-    Bus bus(socket);
+
+    std::shared_ptr<AbstractSocket> socketRedundancy;
+    std::string red_interface_name = "null";
+    std::string nom_interface_name = argv[1];
+
+    if (argc == 2)
+    {
+        printf("No redundancy mode selected \n");
+        socketRedundancy = std::make_shared<SocketNull>();
+    }
+    else
+    {
+        socketRedundancy = std::make_shared<Socket>();
+        red_interface_name = argv[2];
+    }
+
+    auto socketNominal = std::make_shared<Socket>();
+    try
+    {
+        socketNominal->open(nom_interface_name, 2ms);
+        socketRedundancy->open(red_interface_name, 2ms);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    auto reportRedundancy = []()
+    {
+        printf("Redundancy has been activated due to loss of a cable \n");
+    };
+
+    std::shared_ptr<Link> link= std::make_shared<Link>(socketNominal, socketRedundancy, reportRedundancy);
+    link->checkRedundancyNeeded();
+
+    Bus bus(link);
 
     auto print_current_state = [&]()
     {
@@ -38,9 +76,9 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
-        socket->open(argv[1], 2ms);
         bus.init();
 
+        printf("Init done \n");
         print_current_state();
 
         bus.createMapping(io_buffer);
@@ -89,7 +127,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    socket->setTimeout(500us);
+    microseconds nominal_timeout = 500us;
+    socketNominal->setTimeout(nominal_timeout);
+    socketRedundancy->setTimeout(nominal_timeout);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
@@ -154,6 +194,5 @@ int main(int argc, char* argv[])
     }
 
     fclose(stat_file);
-
     return 0;
 }

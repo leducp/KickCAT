@@ -77,16 +77,18 @@ if (GTest_FOUND)
     include(CodeCoverage)
     append_coverage_compiler_flags()
     set(GCOVR_ADDITIONAL_ARGS "--exclude-unreachable-branches")
+
+    set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*")
     setup_target_for_coverage_gcovr_html(
         NAME coverage
         EXECUTABLE kickcat_unit
-        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*" "src/Prints.cc"
+        EXCLUDE ${EXCLUDE_FILES}
         )
 
     setup_target_for_coverage_gcovr_xml(
         NAME coverage_xml
         EXECUTABLE kickcat_unit
-        EXCLUDE "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*LinuxSocket*" "src/Prints.cc"
+        EXCLUDE ${EXCLUDE_FILES}
         )
   endif()
 endif()

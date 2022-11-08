@@ -2,9 +2,12 @@
 
 Kick-start your slaves!
 
+Thin EtherCAT stack desgined to be embedded in a more complex software with efficiency in mind.
+
 ### Current state:
  - Can go to OP state
  - Can read and write PI
+ - interface redundancy is supported
  - CoE: read and write SDO - blocking and async call
  - CoE: Emergency message
  - Bus diagnostic: can reset and get errors counters
@@ -16,13 +19,12 @@ Kick-start your slaves!
  - CoE: segmented transfer - partial implementation
  - CoE: diagnosis message - 0x10F3
  - Bus diagnostic: auto discover broken wire (on top of error counters)
- - Link: handle interface redundancy
  - More profiles: FoE, EoE, AoE, SoE
  - Distributed clock
  - AF_XDP Linux socket to improve performance
  - Addressing groups
 
-## Operatings systems
+### Operatings systems:
 ## Linux
 To improve latency on Linux, you have to
  - use Linux RT (PREMPT_RT patches),

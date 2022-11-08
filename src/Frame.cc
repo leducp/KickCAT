@@ -1,22 +1,22 @@
 #include <cstring>
 
 #include "Frame.h"
+#include "AbstractSocket.h"
 
 namespace kickcat
 {
-    Frame::Frame(uint8_t const src_mac[6])
+    Frame::Frame()
         : ethernet_{reinterpret_cast<EthernetHeader*>(frame_.data())}
         , header_  {reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader))}
         , first_datagram_{frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader)}
     {
-        clear();
+        resetContext();
 
         // cleanup memory
         std::memset(frame_.data(), 0, frame_.size());
 
         // prepare Ethernet header once for the all future communication
-        std::memset(ethernet_->dst_mac, 0xFF,    sizeof(ethernet_->dst_mac));      // broadcast
-        std::memcpy(ethernet_->src_mac, src_mac, sizeof(ethernet_->src_mac));
+        std::memset(ethernet_->dst, 0xFF,    sizeof(ethernet_->dst));      // broadcast
 
         // type is EtherCAT
         ethernet_->type = ETH_ETHERCAT_TYPE;
@@ -33,7 +33,7 @@ namespace kickcat
         , first_datagram_{ frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader) }
     {
         std::memcpy(frame_.data(), data, data_size);
-        clear();
+        resetContext();
         is_datagram_available_ = true;
     }
 
@@ -132,13 +132,18 @@ namespace kickcat
     }
 
 
-    void Frame::clear()
+    void Frame::resetContext()
     {
-        // reset context
         next_datagram_ = first_datagram_;
         last_datagram_ = first_datagram_;
         datagram_counter_ = 0;
         is_datagram_available_ = false;
+    }
+
+
+    void Frame::clear()
+    {
+        header_->len = 0;
     }
 
 
@@ -148,7 +153,7 @@ namespace kickcat
         header->multiple = 0;           // no more datagram in this frame -> ready to be sent!
         uint8_t* pos = next_datagram_;  // save current position before resetting context (needed to handle padding)
 
-        clear();
+        resetContext();
 
         int32_t to_write = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
         if (to_write < ETH_MIN_SIZE)
@@ -161,7 +166,7 @@ namespace kickcat
     }
 
 
-    std::tuple<DatagramHeader const*, uint8_t const*, uint16_t> Frame::nextDatagram()
+    std::tuple<DatagramHeader const*, uint8_t*, uint16_t> Frame::nextDatagram()
     {
         DatagramHeader const* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
         uint8_t* data = next_datagram_ + sizeof(DatagramHeader);
@@ -173,56 +178,69 @@ namespace kickcat
         if (header->multiple == 0)
         {
             // This was the last datagram of this frame: clear context for future usage
-            clear();
+            resetContext();
         }
 
         return std::make_tuple(header, data, wkc);
     }
 
-
-    void Frame::read(std::shared_ptr<AbstractSocket> socket)
+    void Frame::setSourceMAC(MAC const& src)
     {
-        int32_t read = socket->read(frame_.data(), static_cast<int32_t>(frame_.size()));
+        std::memcpy(ethernet_->src, src, sizeof(ethernet_->src));
+    }
+
+
+    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame)
+    {
+        int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
         if (read < 0)
         {
-            THROW_SYSTEM_ERROR("read()");
+            DEBUG_PRINT("read() failed");
+            return read;
         }
 
         // check if the frame is an EtherCAT one. if not, drop it and try again
-        if (ethernet_->type != ETH_ETHERCAT_TYPE)
+        if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
         {
-            THROW_ERROR("Invalid frame type");
+            DEBUG_PRINT("Invalid frame type");
+            return -1;
         }
 
-        int32_t expected = header_->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
-        header_->len = 0; // reset len for future usage
+        int32_t expected = frame.header()->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        frame.clear();
         if (expected < ETH_MIN_SIZE)
         {
             expected = ETH_MIN_SIZE;
         }
         if (read != expected)
         {
-            THROW_ERROR("Wrong number of bytes read");
+            DEBUG_PRINT("Wrong number of bytes read");
+            return -1;
         }
 
-        is_datagram_available_ = true;
+        frame.setIsDatagramAvailable();
+        return read;
     }
 
 
-    void Frame::write(std::shared_ptr<AbstractSocket> socket)
+    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, MAC const& src)
     {
-        int32_t toWrite = finalize();
-        int32_t written = socket->write(frame_.data(), toWrite);
-        header_->len = 0; // reset len for future usage
+        frame.setSourceMAC(src);
+        int32_t toWrite = frame.finalize();
+        int32_t written = socket->write(frame.data(), toWrite);
+        frame.clear();
 
         if (written < 0)
         {
-            THROW_SYSTEM_ERROR("write()");
+            return -1;
         }
 
         if (written != toWrite)
         {
-            THROW_ERROR("Wrong number of bytes written");
+            errno = EIO;
+            return -1;
         }
+
+        return written;
     }
 }
