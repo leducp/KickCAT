@@ -44,10 +44,4 @@ TEST(DebugHelpers, sendWriteRegister)
     io_nominal->checkSendFrame(expected);
     io_nominal->handleReply<uint16_t>({0xFF}, 2);
     ASSERT_THROW(sendWriteRegister(*link, 0x00, 0x110, value_write), Error);
-
-    //Closed socket
-    io_nominal->close();
-    io_nominal->checkSendFrame(expected);
-    io_nominal->handleReply<uint16_t>({0xFF}, 2);
-    ASSERT_THROW(sendWriteRegister(*link, 0x00, 0x110, value_write), Error);
 }
