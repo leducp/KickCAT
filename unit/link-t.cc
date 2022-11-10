@@ -607,56 +607,119 @@ TEST_F(LinkTest, process_datagrams_line_cut_between_slaves)
 }
 
 
-TEST_F(LinkTest, add_datagram_more_than_15)
+TEST_F(LinkTest, process_datagrams_multiple_frames)
 {
-    uint8_t data = 12;
-    Command cmd = Command::BWR;
-    std::vector<DatagramCheck<uint8_t>> expecteds_15(15, {cmd, data});
-    std::vector<DatagramCheck<uint8_t>> expecteds_5(5, {cmd, data});
-    {
-        InSequence s;
+    InSequence s;
 
-        checkSendFrameRedundancy(expecteds_15);
-        checkSendFrameRedundancy(expecteds_5);
+    int64_t skip{0};
+    int64_t logical_read = 1111;
+    Command cmd = Command::LRD;
+    int32_t datagram_number = 15;
+    std::vector<DatagramCheck<int64_t>> expecteds(datagram_number, {cmd, skip, false}); // no payload for logical read.
+    std::vector<int64_t> answers(datagram_number, logical_read);
+    std::vector<int64_t> skips(datagram_number, skip);
+
+    int32_t frame_number = 14;
+
+    for (int32_t i = 0; i < frame_number; i++)
+    {
+        checkSendFrameRedundancy(expecteds); // check frame is sent on both interfaces.
     }
 
-    for (int32_t i=0; i<20; ++i)
+    for (int32_t i = 0; i < frame_number; i++)
     {
-        addDatagram(cmd, data, data, 0);
+        for (int32_t j = 0; j < datagram_number; j++)
+        {
+            addDatagram(cmd, skip, logical_read, 2, false);
+        }
+
+        io_redundancy->handleReply<int64_t>(answers, 2);
+        io_nominal->handleReply<int64_t>(skips, 0);
     }
 
-    link.finalizeDatagrams();
+    link.processDatagrams();
 
-    ASSERT_EQ(0, process_callback_counter);
+    ASSERT_EQ(datagram_number * frame_number, process_callback_counter);
     ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
 }
 
 
-TEST_F(LinkTest, add_big_datagram)
+TEST_F(LinkTest, process_datagrams_multiple_frames_split)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 1111;
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_15(15, {cmd, skip, false}); // no payload for logical read.
+    std::vector<int64_t> answers_15(15, logical_read);
+    std::vector<int64_t> skips_15(15, skip);
+
+    std::vector<DatagramCheck<int64_t>> expecteds_4(4, {cmd, skip, false}); // no payload for logical read.
+    std::vector<int64_t> answers_4(4, logical_read);
+    std::vector<int64_t> skips_4(4, skip);
+
+    checkSendFrameRedundancy(expecteds_15);
+    checkSendFrameRedundancy(expecteds_4);
+
+    for (int32_t j = 0; j < 19; j++)
+    {
+        addDatagram(cmd, skip, logical_read, 2, false);
+    }
+
+    io_redundancy->handleReply<int64_t>(answers_15, 2);
+    io_nominal->handleReply<int64_t>(skips_15, 0);
+    io_redundancy->handleReply<int64_t>(answers_4, 2);
+    io_nominal->handleReply<int64_t>(skips_4, 0);
+
+    link.processDatagrams();
+
+    ASSERT_EQ(19, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, process_big_datagram_multiframe)
 {
     uint8_t data = 3;
+    uint8_t skip{0};
     Command cmd = Command::BWR;
     std::vector<DatagramCheck<uint8_t>> expecteds_5(5, {cmd, data});
+    std::vector<uint8_t> answers_5(5, data);
+    std::vector<uint8_t> skips_5(5, skip);
 
     std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE> big_payload;
+    std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE> big_skip;
     std::fill(std::begin(big_payload), std::end(big_payload), 2);
+    std::fill(std::begin(big_skip), std::end(big_skip), 0);
 
     std::vector<DatagramCheck<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>>> expecteds_big(1, {cmd, big_payload});
+    std::vector<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>> answers_big(1, big_payload);
+    std::vector<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>> skips_big(1, big_skip);
 
-    {
-        InSequence s;
+    InSequence s;
 
-        checkSendFrameRedundancy(expecteds_5);
-        checkSendFrameRedundancy(expecteds_big);
-    }
+    checkSendFrameRedundancy(expecteds_5);
+    checkSendFrameRedundancy(expecteds_big);
 
     for (int32_t i=0; i<5; ++i)
     {
-        addDatagram(cmd, data, data, 0);
+        addDatagram(cmd, data, data, 2);
     }
-    addDatagram(cmd, big_payload, big_payload, 0);
+    addDatagram(cmd, big_payload, big_payload, 2);
 
-    link.finalizeDatagrams();
+    io_redundancy->handleReply<uint8_t>(answers_5, 2);
+    io_nominal->handleReply<uint8_t>(skips_5, 0);
+    io_redundancy->handleReply<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>>(answers_big, 2);
+    io_nominal->handleReply<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>>(skips_big, 0);
+
+    link.processDatagrams();
+
+    ASSERT_EQ(6, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
 }
 
 
