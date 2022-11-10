@@ -53,6 +53,7 @@ endif()
 
 if (GTest_FOUND)
   add_executable(kickcat_unit unit/bus-t.cc
+                              unit/debughelpers-t.cc
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
                               unit/link-t.cc
@@ -94,3 +95,4 @@ if (GTest_FOUND)
 endif()
 
 add_subdirectory(examples)
+add_subdirectory(tools)
