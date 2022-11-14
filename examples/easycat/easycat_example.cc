@@ -177,7 +177,7 @@ int main(int argc, char* argv[])
 
             if ((i % 1000) == 0)
             {
-                printErrorCounters(easycat);
+                printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", easycat.address, toString(easycat.error_counters).c_str());
             }
 
             microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);

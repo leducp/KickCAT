@@ -14,10 +14,6 @@ namespace kickcat
     {
         void parseSII();
 
-        std::string getInfo() const;
-
-        std::string getPDOs() const;
-
         ErrorCounters const& errorCounters() const;
         int computeErrorCounters() const;
 

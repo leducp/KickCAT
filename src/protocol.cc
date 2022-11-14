@@ -131,7 +131,7 @@ namespace kickcat
         }
     }
 
-    std::string toString(ErrorCounters error_counters)
+    std::string toString(ErrorCounters const& error_counters)
     {
         std::stringstream os;
         for (int32_t i = 0; i < 4; ++i)
@@ -145,6 +145,75 @@ namespace kickcat
         os << " \n";
         return os.str();
     }
+
+
+    std::string toString(DLStatus const& dl_status)
+    {
+        std::stringstream os;
+
+        os << "Port 0: \n";
+        os << "  Physical Link :  " << std::to_string(dl_status.PL_port0) << " \n";
+        os << "  Communications : " << std::to_string(dl_status.COM_port0) << " \n";
+        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port0) << " \n";
+
+        os << "Port 1: \n";
+        os << "  Physical Link :  " << std::to_string(dl_status.PL_port1) << " \n";
+        os << "  Communications : " << std::to_string(dl_status.COM_port1) << " \n";
+        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port1) << " \n";
+
+        os << "Port 2: \n";
+        os << "  Physical Link :  " << std::to_string(dl_status.PL_port2) << " \n";
+        os << "  Communications : " << std::to_string(dl_status.COM_port2) << " \n";
+        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port2) << " \n";
+
+        os << "Port 3: \n";
+        os << "  Physical Link :  " << std::to_string(dl_status.PL_port3) << " \n";
+        os << "  Communications : " << std::to_string(dl_status.COM_port3) << " \n";
+        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port3) << " \n";
+
+        return os.str();
+    }
+
+
+    std::string toString(eeprom::GeneralEntry const& general_entry)
+    {
+        std::stringstream os;
+        os << "group_info_id: "           << std::to_string(general_entry.group_info_id) << " \n";
+        os << "image_name_id: "           << std::to_string(general_entry.image_name_id) << " \n";
+        os << "device_order_id: "         << std::to_string(general_entry.device_order_id) << " \n";
+        os << "device_name_id: "          << std::to_string(general_entry.device_name_id) << " \n";
+        os << "reserved_A: "              << std::to_string(general_entry.reserved_A) << " \n";
+        os << "FoE_details: "             << std::to_string(general_entry.FoE_details) << " \n";
+        os << "EoE_details: "             << std::to_string(general_entry.EoE_details) << " \n";
+        os << "SoE_channels: "            << std::to_string(general_entry.SoE_channels) << " \n";
+        os << "DS402_channels: "          << std::to_string(general_entry.DS402_channels) << " \n";
+        os << "SysmanClass: "             << std::to_string(general_entry.SysmanClass) << " \n";
+        os << "flags: "                   << std::to_string(general_entry.flags) << " \n";
+        os << "current_on_ebus: "         << std::to_string(general_entry.current_on_ebus) << " \n"; // mA, negative means feeding current
+        os << "group_info_id_dup: "       << std::to_string(general_entry.group_info_id_dup) << " \n";
+        os << "reserved_B: "              << std::to_string(general_entry.reserved_B) << " \n";
+        os << "physical_memory_address: " << std::to_string(general_entry.physical_memory_address) << " \n";
+        os << "port_0: %04x "             << std::to_string(general_entry.port_0) << " \n";
+        os << "port_1: %04x "             << std::to_string(general_entry.port_1) << " \n";
+        os << "port_2: %04x "             << std::to_string(general_entry.port_2) << " \n";
+        os << "port_3: %04x "             << std::to_string(general_entry.port_3) << " \n";
+        return os.str();
+    }
+
+
+    std::string toString(DatagramHeader const& header)
+    {
+        std::stringstream os;
+        os << "Header \n";
+        os << "  Command :   "  << std::to_string(static_cast<uint8_t>(header.command)) << "\n";
+        os << "  index :  "     << std::to_string(header.index) << "\n";
+        os << "  length :  "    << std::to_string(header.len) << "\n";
+        os << "  circulating  " << std::to_string(header.circulating) << "\n";
+        os << "  multiple  "    << std::to_string(header.multiple) << "\n";
+        os << "  IRQ  "         << std::to_string(header.IRQ) << "\n";
+        return os.str();
+    }
+
 
     uint16_t computeWatchdogTime(nanoseconds watchdog, nanoseconds precision)
     {

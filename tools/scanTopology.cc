@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
 
     }
 
-    printTopology(topology);
+    print(topology);
 
     fclose(top_file);
     printf("File written");

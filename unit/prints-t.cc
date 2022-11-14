@@ -17,7 +17,7 @@ TEST(Prints, slave_uninitialized_prints)
     testing::internal::CaptureStdout();
     printInfo(slave);
     std::string output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(300, output.size());
+    ASSERT_LT(280, output.size());
 
     testing::internal::CaptureStdout();
     printPDOs(slave);
@@ -25,22 +25,17 @@ TEST(Prints, slave_uninitialized_prints)
     ASSERT_EQ(0, output.size()); // No PDO to print
 
     testing::internal::CaptureStdout();
-    printErrorCounters(slave);
+    printf("%s", toString(slave.error_counters).c_str());
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(200, output.size());
 
     testing::internal::CaptureStdout();
-    printDLStatus(slave);
+    printf("%s", toString(slave.dl_status).c_str());
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(200, output.size());
 
     testing::internal::CaptureStdout();
-    printGeneralEntry(slave);
-    output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(30, output.size());
-
-    testing::internal::CaptureStdout();
-    printTopology(topology);
+    print(topology);
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(30, output.size());
 
@@ -126,17 +121,17 @@ TEST(Prints, slave_initialized_prints)
     ASSERT_LT(100, output.size()); // No PDO to print
 
     testing::internal::CaptureStdout();
-    printErrorCounters(slave);
+    printf("%s", toString(slave.error_counters).c_str());
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(200, output.size());
 
     testing::internal::CaptureStdout();
-    printDLStatus(slave);
+    printf("%s", toString(slave.dl_status).c_str());
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(200, output.size());
 
     testing::internal::CaptureStdout();
-    printGeneralEntry(slave);
+    printf("%s", toString(*slave.sii.general).c_str());
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(200, output.size());
 }

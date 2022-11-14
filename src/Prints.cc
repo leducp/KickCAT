@@ -1,81 +1,82 @@
 #include "Prints.h"
 
+#include <iomanip>
+
 namespace kickcat
 {
     void printInfo(Slave const& slave)
     {
-        printf("%s", slave.getInfo().c_str());
+        std::stringstream os;
+        os << "\n -*-*-*-*- slave " << std::to_string(slave.address) << " -*-*-*-*-\n";
+        os << "Vendor ID:       " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.vendor_id << "\n";
+        os << "Product code:    " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.product_code << "\n";
+        os << "Revision number: " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.revision_number << "\n";
+        os << "Serial number:   " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.serial_number << "\n";
+        os << "mailbox in:  size " << std::dec << slave.mailbox.recv_size << " - offset " << "0x" << std::setfill('0')
+            << std::setw(4) << std::hex << slave.mailbox.recv_offset << "\n";
+
+        os << "mailbox out: size " << std::dec << slave.mailbox.send_size << " - offset " << "0x" << std::setfill('0')
+            << std::setw(4) << std::hex << slave.mailbox.send_offset << "\n";
+
+        os << "supported mailbox protocol: " << "0x" << std::setfill('0') << std::setw(2)
+            << std::hex << slave.supported_mailbox << "\n";
+
+        os << "EEPROM: size: " << std::dec << slave.eeprom_size << " - version "<< "0x" << std::setfill('0')
+            << std::setw(2) << std::hex << slave.eeprom_version << "\n";
+
+        os << "\nSII size: " << std::dec << slave.sii.buffer.size() * sizeof(uint32_t) << "\n";
+
+        for (size_t i = 0; i < slave.sii.fmmus_.size(); ++i)
+        {
+            os << "FMMU[" << std::to_string(i) << "] " << std::to_string(slave.sii.fmmus_[i]) << "\n";
+        }
+
+        for (size_t i = 0; i < slave.sii.syncManagers_.size(); ++i)
+        {
+            auto const& sm = slave.sii.syncManagers_[i];
+            os << "SM[" << std::dec << i << "] config\n";
+            os << "     physical address: " << "0x" << std::hex << sm->start_adress << "\n";
+            os << "     length:           " << std::dec << sm->length << "\n";
+            os << "     type:             " << std::dec << sm->type << "\n";
+        }
+
+        printf("%s", os.str().c_str());
     }
 
     void printPDOs(Slave const& slave)
     {
-        printf("%s", slave.getPDOs().c_str());
-    }
-
-    void printErrorCounters(Slave const& slave)
-    {
-        printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", slave.address, toString(slave.error_counters).c_str());
-    }
-
-    void printDLStatus(Slave const& slave)
-    {
-        printf("\n -*-*-*-*- slave %u -*-*-*-*-\n", slave.address);
-        printf("Port 0: \n");
-        printf("  Physical Link :  %d \n", slave.dl_status.PL_port0);
-        printf("  Communications : %d \n", slave.dl_status.COM_port0);
-        printf("  Loop Function :  %d \n", slave.dl_status.LOOP_port0);
-
-        printf("Port 1: \n");
-        printf("  Physical Link :  %d \n", slave.dl_status.PL_port1);
-        printf("  Communications : %d \n", slave.dl_status.COM_port1);
-        printf("  Loop Function :  %d \n", slave.dl_status.LOOP_port1);
-
-        printf("Port 2: \n");
-        printf("  Physical Link :  %d \n", slave.dl_status.PL_port2);
-        printf("  Communications : %d \n", slave.dl_status.COM_port2);
-        printf("  Loop Function :  %d \n", slave.dl_status.LOOP_port2);
-
-        printf("Port 3: \n");
-        printf("  Physical Link :  %d \n", slave.dl_status.PL_port3);
-        printf("  Communications : %d \n", slave.dl_status.COM_port3);
-        printf("  Loop Function :  %d \n", slave.dl_status.LOOP_port3);
-    }
-
-    void printGeneralEntry(Slave const& slave) 
-    {
-        eeprom::GeneralEntry const* general_entry = slave.sii.general;
-        
-        if (general_entry == nullptr)
+        std::stringstream os;
+        if (not slave.sii.RxPDO.empty())
         {
-            printf("Uninitialized SII - Nothing to print");
+            os <<"RxPDO\n";
+            for (size_t i = 0; i < slave.sii.RxPDO.size(); ++i)
+            {
+                auto const& pdo = slave.sii.RxPDO[i];
+                auto const& name = slave.sii.strings[pdo->name];
+                os << "    (0x" << std::setfill('0') << std::setw(4) << std::hex << pdo->index <<
+                    " ; 0x" << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint16_t>(pdo->subindex) <<
+                    ") - " << std::to_string(pdo->bitlen) << " bit(s) - " << std::string(name) << "\n";
+            }
         }
-        else
+
+        if (not slave.sii.TxPDO.empty())
         {
-            printf( "group_info_id: %i \n",             general_entry->group_info_id);
-            printf( "image_name_id: %i \n",             general_entry->image_name_id);
-            printf( "device_order_id: %i \n",           general_entry->device_order_id);
-            printf( "device_name_id: %i \n",            general_entry->device_name_id);
-            printf( "reserved_A: %i \n",                general_entry->reserved_A);
-            printf( "FoE_details: %i \n",               general_entry->FoE_details);
-            printf( "EoE_details: %i \n",               general_entry->EoE_details);
-            printf( "SoE_channels: %i \n",              general_entry->SoE_channels);
-            printf( "DS402_channels: %i \n",            general_entry->DS402_channels);
-            printf( "SysmanClass: %i \n",               general_entry->SysmanClass);
-            printf( "flags: %i \n",                     general_entry->flags);
-            printf( "current_on_ebus: %i \n",           general_entry->current_on_ebus); // mA, negative means feeding current
-            printf( "group_info_id_dup: %i \n",         general_entry->group_info_id_dup);
-            printf( "reserved_B: %i \n",                general_entry->reserved_B);
-            printf( "physical_memory_address: %i \n",   general_entry->physical_memory_address);
-            printf( "reserved_C[12]: %i \n",            general_entry->reserved_C[12]);
-            printf( "port_0: %04x \n",                  general_entry->port_0);
-            printf( "port_1: %04x \n",                  general_entry->port_1);
-            printf( "port_2: %04x \n",                  general_entry->port_2);
-            printf( "port_3: %04x \n",                  general_entry->port_3);
+            os << "TxPDO\n";
+            for (size_t i = 0; i < slave.sii.TxPDO.size(); ++i)
+            {
+                auto const& pdo = slave.sii.TxPDO[i];
+                auto const& name = slave.sii.strings[pdo->name];
+                os << "    (0x" << std::setfill('0') << std::setw(4) << std::hex << pdo->index <<
+                    " ; 0x" << std::setfill('0') << std::setw(2) << std::hex << static_cast<uint16_t>(pdo->subindex) <<
+                    ") - " << std::to_string(pdo->bitlen) << " bit(s) - " << std::string(name) << "\n";
+            }
         }
+
+        printf("%s", os.str().c_str());
     }
 
 
-    void printTopology(std::unordered_map<uint16_t, uint16_t> const& topology_mapping)
+    void print(std::unordered_map<uint16_t, uint16_t> const& topology_mapping)
     {  
         printf( "\n -*-*-*-*- Topology -*-*-*-*-\n" );
         for (auto const& it : topology_mapping)
