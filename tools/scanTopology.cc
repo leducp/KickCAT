@@ -77,8 +77,7 @@ int main(int argc, char* argv[])
     {
         bus.sendGetDLStatus(slave, [](DatagramState const& state){THROW_ERROR_DATAGRAM("Error fetching DL Status", state);});
         bus.finalizeDatagrams();
-
-        printDLStatus(slave);
+        printf("%s", toString(slave.dl_status).c_str());
     }
 
     std::unordered_map<uint16_t, uint16_t> topology = getTopology(bus.slaves());
