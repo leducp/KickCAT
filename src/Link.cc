@@ -120,6 +120,8 @@ namespace kickcat
             DEBUG_PRINT("Fail to write on redundancy interface \n");
         }
 
+        socket_nominal_->setTimeout(timeout_);
+        socket_redundancy_->setTimeout(timeout_);
         if (readFrame(socket_nominal_, frame) < 0)
         {
             DEBUG_PRINT("Fail to read nominal interface \n");
@@ -141,6 +143,8 @@ namespace kickcat
 
     void Link::writeThenRead(Frame& frame)
     {
+        socket_nominal_->setTimeout(timeout_);
+        socket_redundancy_->setTimeout(timeout_);
         int32_t to_write = frame.finalize();
         auto write_read = [&](std::shared_ptr<AbstractSocket> from,
                               std::shared_ptr<AbstractSocket> to,
@@ -237,11 +241,19 @@ namespace kickcat
 
     void Link::read()
     {
+        nanoseconds deadline = since_epoch() + timeout_;
+
+        socket_redundancy_->setTimeout(timeout_);
         if (readFrame(socket_redundancy_, frame_nominal_) < 0)
         {
             DEBUG_PRINT("Nominal read fail\n");
         }
 
+        nanoseconds remaining_timeout = deadline - since_epoch();
+        nanoseconds min_timeout = 0us;
+        nanoseconds timeout_second_socket = std::max(remaining_timeout, min_timeout);
+
+        socket_nominal_->setTimeout(timeout_second_socket);
         if (readFrame(socket_nominal_, frame_redundancy_) < 0)
         {
             DEBUG_PRINT("redundancy read fail\n");
