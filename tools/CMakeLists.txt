@@ -5,6 +5,7 @@ set_target_properties(scanTopology PROPERTIES
     CXX_STANDARD_REQUIRED YES
     CXX_EXTENSIONS NO
     POSITION_INDEPENDENT_CODE ON
+    COMPILE_FLAGS ${WARNINGS_FLAGS}
 )
 
 add_executable(debugUseCase debugUseCase.cc)
@@ -14,4 +15,5 @@ set_target_properties(debugUseCase PROPERTIES
     CXX_STANDARD_REQUIRED YES
     CXX_EXTENSIONS NO
     POSITION_INDEPENDENT_CODE ON
+    COMPILE_FLAGS ${WARNINGS_FLAGS}
 )
