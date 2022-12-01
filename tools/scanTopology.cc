@@ -27,8 +27,8 @@ int main(int argc, char* argv[])
     auto socketNominal = std::make_shared<Socket>();
     try
     {
-        socketNominal->open(nom_interface_name, 2ms);
-        socketRedundancy->open(red_interface_name, 2ms);
+        socketNominal->open(nom_interface_name);
+        socketRedundancy->open(red_interface_name);
     }
     catch (std::exception const& e)
     {

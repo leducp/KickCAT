@@ -46,6 +46,7 @@ namespace kickcat
         void finalizeDatagrams();
         void processDatagrams();
 
+        void setTimeout(nanoseconds const& timeout) {timeout_ = timeout;};
 
         void checkRedundancyNeeded();
     friend class LinkTest;
@@ -84,6 +85,8 @@ namespace kickcat
         MAC src_redundancy_;
 
         bool is_redundancy_activated_{false};
+
+        nanoseconds timeout_{2ms};
     };
 }
 

@@ -45,8 +45,8 @@ int main(int argc, char* argv[])
     auto socketNominal = std::make_shared<Socket>();
     try
     {
-        socketNominal->open(nom_interface_name, 2ms);
-        socketRedundancy->open(red_interface_name, 2ms);
+        socketNominal->open(nom_interface_name);
+        socketRedundancy->open(red_interface_name);
     }
     catch (std::exception const& e)
     {
@@ -60,6 +60,7 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socketNominal, socketRedundancy, reportRedundancy);
+    link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
     Bus bus(link);
@@ -127,9 +128,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    microseconds nominal_timeout = 500us;
-    socketNominal->setTimeout(nominal_timeout);
-    socketRedundancy->setTimeout(nominal_timeout);
+    link->setTimeout(500us);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");

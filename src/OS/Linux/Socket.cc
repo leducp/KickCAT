@@ -15,7 +15,7 @@
 
 namespace kickcat
 {
-    Socket::Socket(microseconds rx_coalescing, microseconds polling_period)
+    Socket::Socket(nanoseconds rx_coalescing, nanoseconds polling_period)
         : AbstractSocket()
         , fd_{-1}
         , rx_coalescing_{rx_coalescing}
@@ -24,10 +24,8 @@ namespace kickcat
 
     }
 
-    void Socket::open(std::string const& interface, microseconds timeout)
+    void Socket::open(std::string const& interface)
     {
-        timeout_ = timeout;
-
         // RAW socket with EtherCAT type
         fd_ = socket(PF_PACKET, SOCK_RAW, ETH_ETHERCAT_TYPE);
         if (fd_ < 0)
@@ -115,7 +113,7 @@ namespace kickcat
         }
     }
 
-    void Socket::setTimeout(microseconds timeout)
+    void Socket::setTimeout(nanoseconds timeout)
     {
         timeout_ = timeout;
     }
@@ -139,7 +137,7 @@ namespace kickcat
     {
         nanoseconds deadline = since_epoch() + timeout_;
 
-        while (since_epoch() < deadline)
+        do
         {
             ssize_t read_size = ::recv(fd_, frame, frame_size, MSG_DONTWAIT);
             if (read_size < 0)
@@ -152,7 +150,7 @@ namespace kickcat
             }
 
             return static_cast<int32_t>(read_size);
-        }
+        } while (since_epoch() < deadline);
 
         errno = ETIMEDOUT;
         return -1;
