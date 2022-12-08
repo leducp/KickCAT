@@ -16,7 +16,7 @@
 
 using namespace kickcat;
 
-int main(int argc, char* argv[])
+int main(int , char* argv[])
 {
     std::shared_ptr<AbstractSocket> socketRedundancy;
     std::string red_interface_name = "null";

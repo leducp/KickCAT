@@ -37,7 +37,7 @@ namespace kickcat
             os << "SM[" << std::dec << i << "] config\n";
             os << "     physical address: " << "0x" << std::hex << sm->start_adress << "\n";
             os << "     length:           " << std::dec << sm->length << "\n";
-            os << "     type:             " << std::dec << sm->type << "\n";
+            os << "     type:             " << std::dec << static_cast<uint16_t>(sm->type) << "\n";
         }
 
         printf("%s", os.str().c_str());
