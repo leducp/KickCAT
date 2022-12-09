@@ -31,6 +31,7 @@ namespace kickcat
     class AbstractMessage
     {
     public:
+        /// \param mailbox_size Size of the mailbox the message is targeted to (required to adapt internal buffer)
         AbstractMessage(uint16_t mailbox_size);
         virtual ~AbstractMessage() = default;
 
@@ -43,18 +44,40 @@ namespace kickcat
         /// \return CONTINUE if the message is related and operation requiered another loop (message shall be push again in sending queue)
         virtual ProcessingResult process(uint8_t const* received) = 0;
 
+        /// Handle address field. Address meaning depends on context (0 for local processing, slave address for gateway processing)
+        void setAddress(uint16_t address) { header_->address = address; }
+        uint16_t address() const { return header_->address; }
+
         /// \brief Message status
         /// \return current message status. Value may depend on underlying service.
-        uint32_t status() const { return status_; };
+        uint32_t status() const { return status_; }
 
         uint8_t const* data() const { return data_.data(); }
         size_t size() const         { return data_.size(); }
 
     protected:
-        std::vector<uint8_t> data_;     // data of the message (send only)
+        std::vector<uint8_t> data_;     // data of the message (send and gateway rec)
         mailbox::Header* header_;       // pointer on the mailbox header in data
         uint32_t status_;               // message current status
     };
+
+
+    /// \brief Handle message that are processed through a Mailbox gateway (cf. ETG.8200)
+    /// \details Gateway message are standard mailbox messages that are not processed locally
+    class GatewayMessage : public AbstractMessage
+    {
+    public:
+        GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index);
+        virtual ~GatewayMessage() = default;
+
+        ProcessingResult process(uint8_t const* received) override;
+        uint16_t gatewayIndex() const { return gateway_index_; }
+
+    private:
+        uint16_t address_; // Requested address: store it to set it back after processing because the header field is used to store gateway index
+        uint16_t gateway_index_;
+    };
+
 
     struct Mailbox
     {
@@ -73,6 +96,7 @@ namespace kickcat
 
         // messages factory
         std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size);
+        std::shared_ptr<GatewayMessage>  createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
 
         // helper to get next message to send and transfer it to reception callbacks if required
         std::shared_ptr<AbstractMessage> send();

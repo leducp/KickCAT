@@ -76,7 +76,7 @@ namespace kickcat
         void processDataReadWrite(std::function<void(DatagramState const&)> const& error);
 
         void checkMailboxes( std::function<void(DatagramState const&)> const& error);
-        void processMessages(std::function<void(DatagramState const&)> const& error);     
+        void processMessages(std::function<void(DatagramState const&)> const& error);
 
 
         enum Access
@@ -90,6 +90,13 @@ namespace kickcat
         // global call timeout will be at most N * timeout (with N the number of subindex to reached)
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA,   void* data, uint32_t  data_size, nanoseconds timeout = 1s);
+
+        /// \brief  Add a gateway message to the bus
+        /// \param  raw_message         A raw EtherCAT mailbox message
+        /// \param  raw_message_size    Size of the mailbox message (shall be less or equal of the actual storage size)
+        /// \param  gateway_index       Index to link the request to the client in the gateway mechanism.
+        /// \return nullptr if message cannot be added (malformed, bad address, unsupported protocol, etc.), a handle on the message otherwise
+        std::shared_ptr<GatewayMessage> addGatewayMessage(uint8_t const* raw_message, int32_t raw_message__size, uint16_t gateway_index);
 
         void clearErrorCounters();
 

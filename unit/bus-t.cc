@@ -204,6 +204,7 @@ public:
 
         SDOAnswer answer;
         answer.header.len = 10;
+        answer.header.address = 0;
         answer.header.type = mailbox::Type::CoE;
         answer.sdo.service = CoE::Service::SDO_RESPONSE;
         answer.sdo.command = CoE::SDO::response::UPLOAD;
@@ -427,6 +428,7 @@ TEST_F(BusTest, write_SDO_OK)
 
     SDOAnswer answer;
     answer.header.len = 10;
+    answer.header.address = 0;
     answer.header.type = mailbox::Type::CoE;
     answer.sdo.service = CoE::Service::SDO_RESPONSE;
     answer.sdo.command = CoE::SDO::response::DOWNLOAD;
@@ -489,6 +491,7 @@ TEST_F(BusTest, read_SDO_OK)
 
     SDOAnswer answer;
     answer.header.len = 10;
+    answer.header.address = 0;
     answer.header.type = mailbox::Type::CoE;
     answer.sdo.service = CoE::Service::SDO_RESPONSE;
     answer.sdo.command = CoE::SDO::response::UPLOAD;

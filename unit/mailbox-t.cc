@@ -15,6 +15,9 @@ public:
         emg = reinterpret_cast<mailbox::Emergency*>(raw_message + sizeof(mailbox::Header));
         sdo = reinterpret_cast<mailbox::ServiceData*>(raw_message + sizeof(mailbox::Header));
         payload = reinterpret_cast<mailbox::ServiceData*>(raw_message + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData));
+
+        // Default address is 0 (local processing)
+        header->address = 0;
     }
 
 protected:

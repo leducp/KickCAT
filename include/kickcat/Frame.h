@@ -1,7 +1,6 @@
 #ifndef KICKAT_FRAME_H
 #define KICKAT_FRAME_H
 
-#include <array>
 #include <memory>
 
 #include "protocol.h"
@@ -9,8 +8,6 @@
 
 namespace kickcat
 {
-    // Definition of an Ethernet frame (maximal size)
-    using EthernetFrame = std::array<uint8_t, ETH_MAX_SIZE>;
     class AbstractSocket;
 
     class Frame

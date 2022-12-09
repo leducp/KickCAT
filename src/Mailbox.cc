@@ -49,6 +49,20 @@ namespace kickcat
     }
 
 
+    std::shared_ptr<GatewayMessage> Mailbox::createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index)
+    {
+        if (raw_message_size > recv_size)
+        {
+            DEBUG_PRINT("Message size is bigger than mailbox size\n");
+            return nullptr;
+        }
+        auto msg = std::make_shared<GatewayMessage>(recv_size, raw_message, gateway_index);
+        msg->setCounter(nextCounter());
+        to_send.push(msg);
+        return msg;
+    }
+
+
     std::shared_ptr<AbstractMessage> Mailbox::send()
     {
         auto message = to_send.front();
@@ -102,7 +116,8 @@ namespace kickcat
     {
         data_.resize(mailbox_size);
         header_ = reinterpret_cast<mailbox::Header*>(data_.data());
-        header_->address  = 0; // master
+        header_->address  = 0; // Default: local processing address
+        status_ = MessageStatus::RUNNING; // Default mode is running to send the msg on the bus
     }
 
     SDOMessage::SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size)
@@ -151,8 +166,6 @@ namespace kickcat
                 std::memcpy(payload_ + sizeof(uint32_t), data, size);
             }
         }
-
-        status_ = MessageStatus::RUNNING;
     }
 
 
@@ -161,6 +174,12 @@ namespace kickcat
         mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(received);
         mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(received + sizeof(mailbox::Header));
         uint8_t const* payload = received + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
+
+        // skip gateway message
+        if ((header->address & mailbox::GATEWAY_MESSAGE_MASK) != 0)
+        {
+            return ProcessingResult::NOOP;
+        }
 
         // check if the received message is related to this one
         if (header->type != mailbox::Type::CoE)
@@ -340,9 +359,7 @@ namespace kickcat
     EmergencyMessage::EmergencyMessage(Mailbox& mailbox)
         : AbstractMessage(mailbox.recv_size)
         , mailbox_{mailbox}
-    {
-
-    }
+    { }
 
     ProcessingResult EmergencyMessage::process(uint8_t const* received)
     {
@@ -362,5 +379,45 @@ namespace kickcat
 
         mailbox_.emergencies.push_back(*emg);
         return ProcessingResult::FINALIZE_AND_KEEP;
+    }
+
+
+    GatewayMessage::GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index)
+        : AbstractMessage(mailbox_size)
+    {
+        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(raw_message);
+
+        // Copy raw message in internal data field
+        int32_t size = sizeof(mailbox::Header) + header->len;
+        std::memcpy(data_.data(), raw_message, size);
+
+        // Store gateway index to associate the reply with the request
+        gateway_index_ = gateway_index;
+
+        // Switch address field with gateway index and identifier
+        address_ = header_->address;
+        header_->address = mailbox::GATEWAY_MESSAGE_MASK | gateway_index;
+    }
+
+
+    ProcessingResult GatewayMessage::process(uint8_t const* received)
+    {
+        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(received);
+
+        // Check if the message is associated to our gateway request
+        if (header->address != header_->address)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        // It is the reply to this request: store the result and set back the address field
+        int32_t size = header->len + sizeof(mailbox::Header);
+        data_.resize(size);
+        std::memcpy(data_.data(), received, size);
+
+        header_->address = address_;
+
+        status_ = MessageStatus::SUCCESS;
+        return ProcessingResult::FINALIZE;
     }
 }
