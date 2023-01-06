@@ -246,7 +246,7 @@ namespace kickcat
         socket_redundancy_->setTimeout(timeout_);
         if (readFrame(socket_redundancy_, frame_nominal_) < 0)
         {
-            DEBUG_PRINT("Nominal read fail\n");
+            //DEBUG_PRINT("Nominal read fail\n");
         }
 
         nanoseconds remaining_timeout = deadline - since_epoch();
@@ -256,7 +256,7 @@ namespace kickcat
         socket_nominal_->setTimeout(timeout_second_socket);
         if (readFrame(socket_nominal_, frame_redundancy_) < 0)
         {
-            DEBUG_PRINT("redundancy read fail\n");
+            //DEBUG_PRINT("redundancy read fail\n");
         }
     }
 

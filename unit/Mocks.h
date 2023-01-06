@@ -1,11 +1,11 @@
 #include <gmock/gmock.h>
 #include <cstring>
+#include <queue>
 
-#include "kickcat/AbstractSocket.h"
 #include "kickcat/protocol.h"
 #include "kickcat/Frame.h"
-
-#include <queue>
+#include "kickcat/AbstractSocket.h"
+#include "kickcat/AbstractDiagSocket.h"
 
 namespace kickcat
 {
@@ -117,5 +117,15 @@ namespace kickcat
         }
 
         std::queue<FrameContext> contexts_;
+    };
+
+
+    class MockDiagSocket : public AbstractDiagSocket
+    {
+    public:
+        MOCK_METHOD(void,    open,  (), (override));
+        MOCK_METHOD(void,    close, (), (noexcept));
+        MOCK_METHOD((std::tuple<int32_t, uint16_t>), recv,   (uint8_t* frame, int32_t frame_size), (override));
+        MOCK_METHOD(int32_t, sendTo, (uint8_t const* frame, int32_t frame_size, uint16_t), (override));
     };
 }

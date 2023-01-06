@@ -2,7 +2,7 @@
 
 Kick-start your slaves!
 
-Thin EtherCAT stack desgined to be embedded in a more complex software with efficiency in mind.
+Thin EtherCAT stack designed to be embedded in a more complex software and with efficiency in mind.
 
 ### Current state:
  - Can go to OP state
@@ -14,6 +14,8 @@ Thin EtherCAT stack desgined to be embedded in a more complex software with effi
  - hook to configure non compliant slaves
  - consecutives writes to reduce latency - up to 255 datagrams in flight
  - build for Linux and PikeOS
+
+**NOTE** The current implementation is designed for little endian host only!
 
 ### TODO:
  - CoE: segmented transfer - partial implementation

@@ -21,8 +21,8 @@ namespace kickcat
         // type is EtherCAT
         ethernet_->type = ETH_ETHERCAT_TYPE;
 
-        // EtherCAT type is always 'command'
-        header_->type = 1;
+        // Protocol is always EtherCAT DLPDU (Data Link Protocol Data Unit)
+        header_->type = EthercatType::ETHERCAT;
         header_->len  = 0;
     }
 
@@ -89,7 +89,7 @@ namespace kickcat
         header->index = index;
         header->command = command;
         header->address = address;
-        header->len = data_size;
+        header->len = data_size & 0x7ff;
         header->circulating = 0;
         header->multiple = 1;   // by default, consider that more datagrams will follow
         header->IRQ = 0;        //TODO what's that ?
@@ -125,10 +125,10 @@ namespace kickcat
         // next datagram position
         pos += 2;
 
-        header_->len += sizeof(DatagramHeader) + data_size + 2; // +2 for wkc
-        last_datagram_ = next_datagram_;                        // save last datagram header to finalize frame when ready
-        next_datagram_ = pos;                                   // set next datagram
-        ++datagram_counter_;                                    // one more datagram in the frame to be sent
+        header_->len += (sizeof(DatagramHeader) + data_size + 2) & 0x7ff; // +2 for wkc
+        last_datagram_ = next_datagram_;                                  // save last datagram header to finalize frame when ready
+        next_datagram_ = pos;                                             // set next datagram
+        ++datagram_counter_;                                              // one more datagram in the frame to be sent
     }
 
 
@@ -195,14 +195,14 @@ namespace kickcat
         int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
         if (read < 0)
         {
-            DEBUG_PRINT("read() failed");
+            //DEBUG_PRINT("read() failed\n");
             return read;
         }
 
         // check if the frame is an EtherCAT one. if not, drop it and try again
         if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
         {
-            DEBUG_PRINT("Invalid frame type");
+            DEBUG_PRINT("Invalid frame type\n");
             return -1;
         }
 
@@ -214,7 +214,7 @@ namespace kickcat
         }
         if (read != expected)
         {
-            DEBUG_PRINT("Wrong number of bytes read");
+            //DEBUG_PRINT("Wrong number of bytes read\n");
             return -1;
         }
 

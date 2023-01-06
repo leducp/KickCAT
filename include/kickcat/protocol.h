@@ -5,16 +5,34 @@
 #include <cstdio>
 #include <string_view>
 #include <string>
+#include <array>
 
 #include "Time.h"
 
 namespace kickcat
 {
-    constexpr int32_t  MAC_SIZE = 6;
-
-    using MAC = uint8_t[MAC_SIZE];
+    // Host to Network byte order helper (Reminder: EtherCAT is LE, network is BE)
+    template<typename T>
+    constexpr T hton(T value)
+    {
+        if constexpr(sizeof(T) == 2)
+        {
+            return T((value << 8) | ((value >> 8) & 0xff));
+        }
+        else if constexpr(sizeof(T) == 4)
+        {
+            return T((value << 24) | ((value << 8) & 0x00ff0000) | ((value >> 8) & 0x0000ff00) | ((value >> 24) & 0xff));
+        }
+        else
+        {
+            std::abort();
+        }
+    }
 
     // Ethernet description
+    constexpr int32_t  MAC_SIZE = 6;
+    using MAC = uint8_t[MAC_SIZE];
+
     struct EthernetHeader
     {
         MAC dst;
@@ -29,12 +47,21 @@ namespace kickcat
     constexpr int32_t  ETH_MAX_SIZE = sizeof(EthernetHeader) + ETH_MTU_SIZE + ETH_FCS_SIZE;
     constexpr int32_t  ETH_MIN_SIZE = 60; // Ethernet disallow sending less than 64 bytes (60 + FCS)
 
+    using EthernetFrame = std::array<uint8_t, ETH_MAX_SIZE>; // Definition of an Ethernet frame (maximal size)
 
     // EtherCAT description
-    constexpr uint16_t ETH_ETHERCAT_TYPE = __builtin_bswap16(0x88A4); //TODO: implement constexpr htons
+    constexpr uint16_t ETH_ETHERCAT_TYPE = hton<uint16_t>(0x88A4);
     constexpr int32_t ETHERCAT_WKC_SIZE = 2;
     constexpr int32_t MAX_ETHERCAT_DATAGRAMS = 15;       // max EtherCAT datagrams per Ethernet frame
     constexpr uint16_t MAX_ETHERCAT_PAYLOAD_SIZE = 1486; // max EtherCAT payload size possible
+
+    // EtherCAT subprotocol
+    enum EthercatType : int16_t
+    {
+        ETHERCAT = 0x1,             // EtherCAT Data Link Protocol Data Unit (the real time protocol)
+        NETWORK_VARIABLES = 0x4,
+        MAILBOX  = 0x5              // EtherCAT gateway
+    };
 
     struct EthercatHeader
     {
@@ -392,6 +419,15 @@ namespace kickcat
             uint8_t  error_register;
             uint8_t  data[5];
         } __attribute__((__packed__));
+
+        /// ETG 8200
+
+        // Bitmask to dissociate local message processing from gateway message processing
+        constexpr uint16_t GATEWAY_MESSAGE_MASK = (1 << 15);
+
+        // Maximum simultaneous pending request in the gateway
+        // Shall be a power of two and it shall not override with GATEWAY_MESSAGE_MASK
+        constexpr uint16_t GATEWAY_MAX_REQUEST = 1024;
     }
 
     namespace CoE

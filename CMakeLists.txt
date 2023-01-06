@@ -11,6 +11,7 @@ set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Gateway.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
@@ -23,6 +24,7 @@ if (UNIX)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
   )
 elseif(PIKEOS)
   set(OS_LIB_SOURCES
@@ -56,6 +58,7 @@ if (GTest_FOUND)
                               unit/debughelpers-t.cc
                               unit/diagnostics-t.cc
                               unit/frame-t.cc
+                              unit/gateway-t.cc
                               unit/link-t.cc
                               unit/mailbox-t.cc
                               unit/prints-t.cc
@@ -79,7 +82,7 @@ if (GTest_FOUND)
     append_coverage_compiler_flags()
     set(GCOVR_ADDITIONAL_ARGS "--exclude-unreachable-branches")
 
-    set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*")
+    set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*" "tools/*")
     setup_target_for_coverage_gcovr_html(
         NAME coverage
         EXECUTABLE kickcat_unit
