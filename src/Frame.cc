@@ -195,7 +195,13 @@ namespace kickcat
         int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
         if (read < 0)
         {
-            //DEBUG_PRINT("read() failed\n");
+            DEBUG_PRINT("read() failed\n");
+            return read;
+        }
+
+        if (read == 0)
+        {
+            // Nothing to do : special case for SocketNull. Not possible on raw ethernet.
             return read;
         }
 
@@ -214,7 +220,7 @@ namespace kickcat
         }
         if (read != expected)
         {
-            //DEBUG_PRINT("Wrong number of bytes read\n");
+            DEBUG_PRINT("Wrong number of bytes read\n");
             return -1;
         }
 
