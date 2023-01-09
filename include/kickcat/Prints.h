@@ -16,6 +16,8 @@ namespace kickcat
 
     // Topology utils
     void print(std::unordered_map<uint16_t, uint16_t> const& topology_mapping);
+
+    std::string fmmuTypeToString(uint8_t fmmu_type);
 }
 
 #endif

@@ -28,7 +28,7 @@ namespace kickcat
 
         for (size_t i = 0; i < slave.sii.fmmus_.size(); ++i)
         {
-            os << "FMMU[" << std::to_string(i) << "] " << std::to_string(slave.sii.fmmus_[i]) << "\n";
+            os << "FMMU[" << std::to_string(i) << "] " << fmmuTypeToString(slave.sii.fmmus_[i]) << "\n";
         }
 
         for (size_t i = 0; i < slave.sii.syncManagers_.size(); ++i)
@@ -37,7 +37,7 @@ namespace kickcat
             os << "SM[" << std::dec << i << "] config\n";
             os << "     physical address: " << "0x" << std::hex << sm->start_adress << "\n";
             os << "     length:           " << std::dec << sm->length << "\n";
-            os << "     type:             " << std::dec << static_cast<uint16_t>(sm->type) << "\n";
+            os << "     type:             " << std::dec << toString(static_cast<SyncManagerType>(sm->type)) << "\n";
         }
 
         printf("%s", os.str().c_str());
@@ -73,6 +73,20 @@ namespace kickcat
         }
 
         printf("%s", os.str().c_str());
+    }
+
+
+    std::string fmmuTypeToString(uint8_t fmmu_type)
+    {
+        // see ETG2010_S_R_v1i0i0_EtherCATSIISpecification
+        switch (fmmu_type)
+        {
+            case 0:  {return "Unused";}
+            case 1:  {return "Outputs (Slave to Master)";}
+            case 2:  {return "Inputs  (Master to Slave)";}
+            case 3:  {return "SyncM Status (Read Mailbox)";}
+            default: {return "Unused";}
+        }
     }
 
 
