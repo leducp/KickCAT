@@ -215,6 +215,20 @@ namespace kickcat
     }
 
 
+    std::string toString(SyncManagerType const& type)
+    {
+        switch (type)
+        {
+            case SyncManagerType::Unused:     {return "Unused";    }
+            case SyncManagerType::MailboxOut: {return "MailboxOut";}
+            case SyncManagerType::MailboxInt: {return "MailboxInt";}
+            case SyncManagerType::Output:     {return "Output (Slave to Master)";    }
+            case SyncManagerType::Input:      {return "Input  (Master to Slave)";     }
+            default:                          {return "unknown";   }
+        }
+    }
+
+
     uint16_t computeWatchdogTime(nanoseconds watchdog, nanoseconds precision)
     {
         auto const wdg_time = watchdog / precision;

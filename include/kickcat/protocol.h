@@ -243,6 +243,8 @@ namespace kickcat
         Input      = 4  // slave to master
     };
 
+    std::string toString(SyncManagerType const& type);
+
     struct FMMU
     {
         uint32_t logical_address;
