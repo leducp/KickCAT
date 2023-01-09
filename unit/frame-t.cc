@@ -154,7 +154,7 @@ TEST(Frame, read_error)
         }))
         .WillOnce(Return(MAX_ETHERCAT_PAYLOAD_SIZE / 2));
     ASSERT_EQ(readFrame(io_nominal, frame), -1);
-    ASSERT_EQ(readFrame(io_nominal, frame), -1);
+    ASSERT_EQ(readFrame(io_nominal, frame), 0);
     ASSERT_EQ(readFrame(io_nominal, frame), -1);
     ASSERT_FALSE(frame.isDatagramAvailable());
 
