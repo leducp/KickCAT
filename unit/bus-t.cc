@@ -28,6 +28,8 @@ class BusTest : public testing::Test
 public:
     void SetUp() override
     {
+        EXPECT_CALL(*io_nominal, setTimeout(::testing::_))
+            .WillRepeatedly(Return());
         bus.configureWaitLatency(0ns, 0ns);
         initBus();
     }
@@ -80,7 +82,6 @@ public:
     void detectAndReset()
     {
         InSequence s;
-
         // detect slaves
         checkSendFrameSimple(Command::BRD);
         handleReplyWriteThenRead();
