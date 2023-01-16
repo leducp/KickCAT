@@ -43,7 +43,8 @@ namespace kickcat
         State getCurrentState(Slave& slave);
 
         // wait for all slaves to reached a state
-        void waitForState(State request, nanoseconds timeout);
+        // background_task may be used to keep updated PDO while waiting for a particular state.
+        void waitForState(State request, nanoseconds timeout, std::function<void()> background_task = [](){});
 
         // create the mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state

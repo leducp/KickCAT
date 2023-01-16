@@ -126,7 +126,7 @@ TEST_F(GatewayTest, nominal_loop)
     // Process message - not the good one
     Request answer;
     uint8_t const* raw_answer = reinterpret_cast<uint8_t const*>(&answer.mbx_header);
-    answer.mbx_header.address = mailbox::GATEWAY_MESSAGE_MASK | (GEN_GATEWAY_INDEX-1);
+    answer.mbx_header.address = static_cast<uint16_t>(mailbox::GATEWAY_MESSAGE_MASK | (GEN_GATEWAY_INDEX-1));
     answer.mbx_header.len = 10;
     answer.sdo.index = 0x1018;
     answer.sdo.subindex = 0;
