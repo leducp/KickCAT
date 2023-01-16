@@ -138,12 +138,14 @@ namespace kickcat
     }
 
 
-    void Bus::waitForState(State request, nanoseconds timeout)
+    void Bus::waitForState(State request, nanoseconds timeout, std::function<void()> background_task)
     {
         nanoseconds now = since_epoch();
 
         while (true)
         {
+            background_task();
+
             sleep(big_wait);
 
             bool is_state_reached = true;
@@ -224,7 +226,7 @@ namespace kickcat
         for (size_t i = 0; i < slaves_.size(); ++i)
         {
             slaves_[i].address = static_cast<uint16_t>(i + 1001);
-            frame.addDatagram(0, Command::APWR, createAddress(0 - i, reg::STATION_ADDR), &slaves_[i].address, sizeof(slaves_[i].address));
+            frame.addDatagram(0, Command::APWR, createAddress(0 - static_cast<uint16_t>(i), reg::STATION_ADDR), &slaves_[i].address, sizeof(slaves_[i].address));
             if (frame.isFull())
             {
                 process();
