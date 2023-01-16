@@ -15,6 +15,15 @@ namespace kickcat
 class LinkTest : public testing::Test
 {
 public:
+
+    void SetUp() override
+    {
+        EXPECT_CALL(*io_nominal, setTimeout(::testing::_))
+            .WillRepeatedly(Return());
+        EXPECT_CALL(*io_redundancy, setTimeout(::testing::_))
+                    .WillRepeatedly(Return());
+    }
+
     void reportRedundancy()
     {
         printf("Redundancy has been activated\n");
@@ -84,6 +93,12 @@ TEST_F(LinkTest, writeThenRead_NomOK_RedOK)
     // Case we can read on both interface, either there is no line cut, either the cut is between two slaves.
 
     Frame frame;
+
+    nanoseconds timeout = 10ms;
+    link.setTimeout(timeout);
+
+    EXPECT_CALL(*io_nominal, setTimeout(timeout));
+    EXPECT_CALL(*io_redundancy, setTimeout(timeout));
 
     EXPECT_CALL(*io_redundancy, write(_,_))
     .WillOnce(Invoke([&](uint8_t const*, int32_t)
@@ -1004,5 +1019,48 @@ TEST_F(LinkTest, process_datagrams_old_frame)
 
     ASSERT_EQ(1, process_callback_counter); // datagram lost (invalid frame)
     ASSERT_EQ(2, error_callback_counter);
+}
+
+
+TEST_F(LinkTest, process_datagram_check_timeout_split)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 0x0001020304050607;
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+    addDatagram(cmd, skip, logical_read, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
+
+    nanoseconds timeout = 10ms;
+    link.setTimeout(timeout);
+    EXPECT_CALL(*io_redundancy, setTimeout(timeout));
+    io_redundancy->handleReply<int64_t>({logical_read}, 2);
+    EXPECT_CALL(*io_nominal, setTimeout(timeout - 1ms)); // Diff is due to since_epoch weak symbol override.
+    io_nominal->handleReply<int64_t>({skip}, 0);
+    link.processDatagrams();
+}
+
+
+TEST_F(LinkTest, process_datagram_check_timeout_min)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 0x0001020304050607;
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+    addDatagram(cmd, skip, logical_read, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
+
+    nanoseconds timeout = -15ms;
+    link.setTimeout(timeout);
+    EXPECT_CALL(*io_redundancy, setTimeout(timeout));
+    io_redundancy->handleReply<int64_t>({logical_read}, 2);
+    nanoseconds expected_min_timeout = 0ms;
+    EXPECT_CALL(*io_nominal, setTimeout(expected_min_timeout));
+    io_nominal->handleReply<int64_t>({skip}, 0);
+    link.processDatagrams();
 }
 }
