@@ -98,5 +98,8 @@ if (GTest_FOUND)
   endif()
 endif()
 
-add_subdirectory(examples)
+if (UNIX)
+    add_subdirectory(examples)
+endif()
+
 add_subdirectory(tools)
