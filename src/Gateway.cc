@@ -17,7 +17,7 @@ namespace kickcat
 
         // Check frame validity
         // -> minimal size
-        constexpr ssize_t MIN_EXPECTED = sizeof(EthercatHeader) + sizeof(mailbox::Header);
+        constexpr int32_t MIN_EXPECTED = sizeof(EthercatHeader) + sizeof(mailbox::Header);
         if (frame_size < MIN_EXPECTED)
         {
             // Payload shall contain a valid mailbox EtherCAT frame
@@ -33,7 +33,7 @@ namespace kickcat
         }
 
         // -> Message size coherency (frame size shall be able to contain message size)
-        int32_t raw_message_size = sizeof(mailbox::Header) + mbx_header->len;
+        int32_t raw_message_size = static_cast<int32_t>(sizeof(mailbox::Header) + mbx_header->len);
         int32_t max_message_size = static_cast<int32_t>(frame_size - sizeof(EthercatHeader));
         if (raw_message_size > max_message_size)
         {
