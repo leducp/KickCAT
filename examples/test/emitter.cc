@@ -18,6 +18,8 @@ using namespace kickcat;
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     printf("Start\n");
 
     int fd = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);

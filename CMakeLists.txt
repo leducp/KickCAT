@@ -4,7 +4,7 @@ project(KickCAT)
 # Custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
-set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicated-cond -Wshadow -Wmissing-noreturn")
+include(Config)
 
 set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
@@ -37,13 +37,7 @@ endif()
 add_library(kickcat ${LIB_SOURCES} ${OS_LIB_SOURCES})
 target_include_directories(kickcat PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
-set_target_properties(kickcat PROPERTIES
-  CXX_STANDARD 17
-  CXX_STANDARD_REQUIRED YES
-  CXX_EXTENSIONS NO
-  POSITION_INDEPENDENT_CODE ON
-  COMPILE_FLAGS ${WARNINGS_FLAGS}
-)
+set_kickcat_properties(kickcat)
 
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if (BUILD_UNIT_TESTS)
@@ -68,13 +62,7 @@ if (GTest_FOUND)
   )
 
   target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
-  set_target_properties(kickcat_unit PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED YES
-    CXX_EXTENSIONS NO
-    POSITION_INDEPENDENT_CODE ON
-    COMPILE_FLAGS ${WARNINGS_FLAGS}
-  )
+  set_kickcat_properties(kickcat_unit)
   add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
   option(CODE_COVERAGE "Enable code coverage - gcovr shall be in the PATH" FALSE)
