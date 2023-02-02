@@ -2,7 +2,7 @@
 #include "kickcat/Time.h"
 #include "kickcat/Error.h"
 
-namespace can
+namespace kickcat
 {
     void CANOpenStateMachine::update(uint16_t statusWord)
         {
@@ -16,7 +16,7 @@ namespace can
                     {
                         case CANOpenState::OFF:
                         {
-                            startMotorTimestamp_ = kickcat::since_epoch();
+                            startMotorTimestamp_ = since_epoch();
                             controlWord_ = control::word::FAULT_RESET;
                             motorState_ = CANOpenState::SAFE_RESET;
                             break;
@@ -24,7 +24,7 @@ namespace can
                         case CANOpenState::SAFE_RESET:
                         {
                             controlWord_ = control::word::SHUTDOWN;
-                            if (kickcat::elapsed_time(startMotorTimestamp_) > MOTOR_RESET_DELAY)
+                            if (elapsed_time(startMotorTimestamp_) > MOTOR_RESET_DELAY)
                             {
                                 motorState_ = CANOpenState::PREPARE_TO_SWITCH_ON ;
                             }
@@ -62,7 +62,7 @@ namespace can
                     if (motorState_ != CANOpenState::ON
                         && motorState_ != CANOpenState::FAULT
                         && motorState_ != CANOpenState::OFF
-                        && kickcat::elapsed_time(startMotorTimestamp_) > MOTOR_INIT_TIMEOUT
+                        && elapsed_time(startMotorTimestamp_) > MOTOR_INIT_TIMEOUT
                         )
                     {
                         DEBUG_PRINT("Can't enable motor: timeout, start again from OFF state.\n");

@@ -16,8 +16,6 @@
 #endif
 
 #include <iostream>
-#include <fstream>
-#include <algorithm>
 
 using namespace kickcat;
 
@@ -69,19 +67,18 @@ int main(int argc, char* argv[])
 
     Bus bus(link);
 
-
     uint8_t io_buffer[2048];
     try
     {
         bus.init();
 
         // Prepare mapping for elmo
-        uint32_t Rx_length = sizeof(hal::pdo::elmo::RxMapping);
-        bus.writeSDO(bus.slaves().at(0), hal::sdo::elmo::RxPDO.index, hal::sdo::elmo::RxPDO.subindex, 
-                    Bus::Access::COMPLETE, static_cast<void*>(const_cast<uint8_t*>(hal::pdo::elmo::RxMapping)), Rx_length);
-        uint32_t Tx_length = sizeof(hal::pdo::elmo::TxMapping);
-        bus.writeSDO(bus.slaves().at(0), hal::sdo::elmo::TxPDO.index, hal::sdo::elmo::TxPDO.subindex, 
-                    Bus::Access::COMPLETE, static_cast<void*>(const_cast<uint8_t*>(hal::pdo::elmo::TxMapping)), Tx_length);
+        uint32_t RxLength = sizeof(pdo::RxMapping);
+        bus.writeSDO(bus.slaves().at(0), sdo::RxPDO.index, sdo::RxPDO.subindex, 
+                    Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::RxMapping), RxLength);
+        uint32_t TxLength = sizeof(pdo::TxMapping);
+        bus.writeSDO(bus.slaves().at(0), sdo::TxPDO.index, sdo::TxPDO.subindex, 
+                    Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::TxMapping), TxLength);
         
         bus.createMapping(io_buffer);
 
@@ -100,12 +97,12 @@ int main(int argc, char* argv[])
     }
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    auto itWillBeWrong = [](DatagramState const&){ DEBUG_PRINT("Previous error was a false alarm\n"); };
+    auto false_alarm = [](DatagramState const&){ DEBUG_PRINT("previous error was a false alarm"); };
 
     try
     {
         bus.processDataRead(callback_error);
-        bus.processDataWrite(itWillBeWrong);
+        bus.processDataWrite(false_alarm);
     }
     catch (...)
     {
@@ -130,11 +127,11 @@ int main(int argc, char* argv[])
     link->setTimeout(500us);
 
     Slave& elmo = bus.slaves().at(0);
-    hal::pdo::elmo::Output* outputPDO = reinterpret_cast<hal::pdo::elmo::Output*>(elmo.output.data);
-    hal::pdo::elmo::Input* inputPDO = reinterpret_cast<hal::pdo::elmo::Input*>(elmo.input.data);
-    can::CANOpenStateMachine elmoStateMachine;
+    pdo::Output* outputPDO = reinterpret_cast<pdo::Output*>(elmo.output.data);
+    pdo::Input* inputPDO = reinterpret_cast<pdo::Input*>(elmo.input.data);
+    CANOpenStateMachine elmoStateMachine;
 
-    elmoStateMachine.setCommand(can::CANOpenCommand::ENABLE);
+    elmoStateMachine.setCommand(CANOpenCommand::ENABLE);
 
     // Setting a small torque
     outputPDO->modeOfOperation = 4;
@@ -167,7 +164,7 @@ int main(int argc, char* argv[])
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
 
-        //Update Elmo
+        // Update Elmo at each step to receive emergencies in case of failure
         elmoStateMachine.update(inputPDO->statusWord);
         outputPDO->controlWord = elmoStateMachine.getControlWord();
         if (elmo.mailbox.emergencies.size() > 0)
@@ -175,8 +172,8 @@ int main(int argc, char* argv[])
             for (auto& em : elmo.mailbox.emergencies)
             {
                 std::cerr << "*~~~ Emergency received @ " << i << " ~~~*" << std::endl;
-                std::cerr << can::emergency::errorRegister::registerToError(em.error_register);
-                std::cerr << can::emergency::errorCode::codeToError(em.error_code);
+                std::cerr << registerToError(em.error_register);
+                std::cerr << codeToError(em.error_code);
             }
             elmo.mailbox.emergencies.resize(0);
         }

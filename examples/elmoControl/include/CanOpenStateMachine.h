@@ -1,13 +1,11 @@
 #ifndef CAN_ELMO_STATE_MACHINE_H
 #define CAN_ELMO_STATE_MACHINE_H
 
-#include <cstdint>
-#include <chrono>
+#include "kickcat/Time.h"
 
-
-namespace can
+namespace kickcat
 {
-    /// \enum CANOpenState The different states of a CANOpen motor.
+    /// \enum CANOpenState The different states of a DS402-compliant device.
     enum class CANOpenState
     {
         OFF,
@@ -91,7 +89,7 @@ namespace can
 
     }
 
-    using namespace std::chrono;
+    // Timeouts to prevent blocking the statemachine in case of failure
     constexpr nanoseconds MOTOR_RESET_DELAY = 10ms;
     constexpr nanoseconds MOTOR_INIT_TIMEOUT = 1s;
 
@@ -110,4 +108,4 @@ namespace can
     };
 }
 
-#endif // CAN_ELMO_STATE_MACHINE_H
+#endif
