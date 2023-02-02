@@ -73,12 +73,12 @@ int main(int argc, char* argv[])
         bus.init();
 
         // Prepare mapping for elmo
-        uint32_t RxLength = sizeof(pdo::RxMapping);
+        uint32_t rxLength = sizeof(pdo::RxMapping);
         bus.writeSDO(bus.slaves().at(0), sdo::RxPDO.index, sdo::RxPDO.subindex, 
-                    Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::RxMapping), RxLength);
-        uint32_t TxLength = sizeof(pdo::TxMapping);
+                    Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::RxMapping), rxLength);
+        uint32_t txLength = sizeof(pdo::TxMapping);
         bus.writeSDO(bus.slaves().at(0), sdo::TxPDO.index, sdo::TxPDO.subindex, 
-                    Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::TxMapping), TxLength);
+                    Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::TxMapping), txLength);
         
         bus.createMapping(io_buffer);
 
