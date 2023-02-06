@@ -16,10 +16,8 @@
 
 using namespace kickcat;
 
-int main(int argc, char* argv[])
+int main(int, char**)
 {
-    (void) argc;
-    (void) argv;
     printf("Start\n");
 
     int fd = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -62,17 +60,15 @@ int main(int argc, char* argv[])
         msg->setAddress(1001);
 
         std::memcpy(frame + sizeof(EthercatHeader), msg->data(), msg->size());
-        header->len = msg->size();
+        header->len = static_cast<uint16_t>(msg->size() & 2047); // Ensures that size() won't use more than 11 bits
 
-        int32_t sent = ::sendto(fd, &frame, header->len + sizeof(EthercatHeader), MSG_DONTWAIT, (struct sockaddr*)&addr, sizeof(addr));
-        if (sent < 0)
+        if (::sendto(fd, &frame, header->len + sizeof(EthercatHeader), MSG_DONTWAIT, (struct sockaddr*)&addr, sizeof(addr)) < 0)
         {
             perror("sendto()");
             continue;
         }
 
-        int rec = ::recvfrom(fd, frame, ETH_MTU_SIZE, 0, (struct sockaddr*)&addr, &addr_size);
-        if (rec < 0)
+        if (::recvfrom(fd, frame, ETH_MTU_SIZE, 0, (struct sockaddr*)&addr, &addr_size) < 0)
         {
             continue;
         }
