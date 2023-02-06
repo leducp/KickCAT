@@ -1,4 +1,5 @@
 #include <cstring>
+#include <algorithm>
 
 #include "Mailbox.h"
 #include "Error.h"
@@ -36,27 +37,27 @@ namespace kickcat
     }
 
 
-    std::shared_ptr<AbstractMessage> Mailbox::createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size)
+    std::shared_ptr<AbstractMessage> Mailbox::createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout)
     {
         if (recv_size == 0)
         {
             THROW_ERROR("This mailbox is inactive");
         }
-        auto sdo = std::make_shared<SDOMessage>(recv_size, index, subindex, CA, request, data, data_size);
+        auto sdo = std::make_shared<SDOMessage>(recv_size, index, subindex, CA, request, data, data_size, timeout);
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
         return sdo;
     }
 
 
-    std::shared_ptr<GatewayMessage> Mailbox::createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index)
+    std::shared_ptr<GatewayMessage> Mailbox::createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index, nanoseconds timeout)
     {
         if (raw_message_size > recv_size)
         {
             DEBUG_PRINT("Message size is bigger than mailbox size\n");
             return nullptr;
         }
-        auto msg = std::make_shared<GatewayMessage>(recv_size, raw_message, gateway_index);
+        auto msg = std::make_shared<GatewayMessage>(recv_size, raw_message, gateway_index, timeout);
         msg->setCounter(nextCounter());
         to_send.push(msg);
         return msg;
@@ -67,6 +68,7 @@ namespace kickcat
     {
         auto message = to_send.front();
         to_send.pop();
+        message->prepareForSend();
 
         // add message to processing queue if needed
         if (message->status() == MessageStatus::RUNNING)
@@ -77,8 +79,16 @@ namespace kickcat
     }
 
 
-    bool Mailbox::receive(uint8_t const* raw_message)
+    bool Mailbox::receive(uint8_t const* raw_message, nanoseconds current_time)
     {
+        // remove timedout messages
+        to_process.erase(std::remove_if(to_process.begin(), to_process.end(),
+            [&](auto message)
+            {
+                return (message->status(current_time) == MessageStatus::TIMEDOUT);
+            }
+        ));
+
         for (auto it = to_process.begin(); it != to_process.end(); ++it)
         {
             ProcessingResult state = (*it)->process(raw_message);
@@ -112,7 +122,8 @@ namespace kickcat
     }
 
 
-    AbstractMessage::AbstractMessage(uint16_t mailbox_size)
+    AbstractMessage::AbstractMessage(uint16_t mailbox_size, nanoseconds timeout)
+        : timeout_{timeout}
     {
         data_.resize(mailbox_size);
         header_ = reinterpret_cast<mailbox::Header*>(data_.data());
@@ -120,8 +131,28 @@ namespace kickcat
         status_ = MessageStatus::RUNNING; // Default mode is running to send the msg on the bus
     }
 
-    SDOMessage::SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size)
-        : AbstractMessage(mailbox_size)
+
+    void AbstractMessage::prepareForSend()
+    {
+        if (timeout_ != 0ns)
+        {
+            timeout_ += since_epoch();
+        }
+    }
+
+
+    uint32_t AbstractMessage::status(nanoseconds current_time)
+    {
+        if ((timeout_ != 0ns) and (current_time < timeout_))
+        {
+            status_ = MessageStatus::TIMEDOUT;
+        }
+        return status_;
+    }
+
+
+    SDOMessage::SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout)
+        : AbstractMessage(mailbox_size, timeout)
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
     {
@@ -357,7 +388,7 @@ namespace kickcat
 
 
     EmergencyMessage::EmergencyMessage(Mailbox& mailbox)
-        : AbstractMessage(mailbox.recv_size)
+        : AbstractMessage(mailbox.recv_size, 0ns)
         , mailbox_{mailbox}
     { }
 
@@ -382,8 +413,8 @@ namespace kickcat
     }
 
 
-    GatewayMessage::GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index)
-        : AbstractMessage(mailbox_size)
+    GatewayMessage::GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout)
+        : AbstractMessage(mailbox_size, timeout)
     {
         mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(raw_message);
 
