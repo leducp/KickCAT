@@ -3,12 +3,6 @@
 
 namespace kickcat
 {
-    struct SDOEntry
-    {
-        uint16_t index;         ///< Main index in the SDO dict
-        uint8_t  subindex;      ///< Subindex in the SDO dict
-    };
-
     namespace pdo
     {
         /// \details See CANOpen DS402 document for description of fields.

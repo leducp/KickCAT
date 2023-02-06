@@ -1,5 +1,5 @@
-#ifndef CAN_ELMO_STATE_MACHINE_H
-#define CAN_ELMO_STATE_MACHINE_H
+#ifndef KICKCAT_CAN_ELMO_STATE_MACHINE_H
+#define KICKCAT_CAN_ELMO_STATE_MACHINE_H
 
 #include "kickcat/Time.h"
 
@@ -96,15 +96,16 @@ namespace kickcat
     class CANOpenStateMachine
     {
     public:
+        void update(uint16_t status_word);
+        void setCommand(CANOpenCommand command) { command_ = command; };
+        uint16_t getControlWord() { return control_word_; }
+
+    private:
         CANOpenCommand command_  = CANOpenCommand::NONE;
         CANOpenState motor_state_ = CANOpenState::OFF;
         nanoseconds start_motor_timestamp_ = 0ns;
         uint16_t control_word_ = 0;
         uint16_t status_word_ = 0;
-
-        void update(uint16_t status_word);
-        void setCommand(CANOpenCommand command) { command_ = command; };
-        uint16_t getControlWord() { return control_word_; }
     };
 }
 
