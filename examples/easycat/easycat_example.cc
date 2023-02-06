@@ -27,26 +27,26 @@ int main(int argc, char* argv[])
     }
 
 
-    std::shared_ptr<AbstractSocket> socketRedundancy;
+    std::shared_ptr<AbstractSocket> socket_redundancy;
     std::string red_interface_name = "null";
     std::string nom_interface_name = argv[1];
 
     if (argc == 2)
     {
         printf("No redundancy mode selected \n");
-        socketRedundancy = std::make_shared<SocketNull>();
+        socket_redundancy = std::make_shared<SocketNull>();
     }
     else
     {
-        socketRedundancy = std::make_shared<Socket>();
+        socket_redundancy = std::make_shared<Socket>();
         red_interface_name = argv[2];
     }
 
-    auto socketNominal = std::make_shared<Socket>();
+    auto socket_nominal = std::make_shared<Socket>();
     try
     {
-        socketNominal->open(nom_interface_name);
-        socketRedundancy->open(red_interface_name);
+        socket_nominal->open(nom_interface_name);
+        socket_redundancy->open(red_interface_name);
     }
     catch (std::exception const& e)
     {
@@ -54,12 +54,12 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto reportRedundancy = []()
+    auto report_redundancy = []()
     {
         printf("Redundancy has been activated due to loss of a cable \n");
     };
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socketNominal, socketRedundancy, reportRedundancy);
+    std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
