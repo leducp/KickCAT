@@ -97,14 +97,14 @@ namespace kickcat
     {
     public:
         CANOpenCommand command_  = CANOpenCommand::NONE;
-        CANOpenState motorState_ = CANOpenState::OFF;
-        nanoseconds startMotorTimestamp_ = 0ns;
-        uint16_t controlWord_ = 0;
-        uint16_t statusWord_ = 0;
+        CANOpenState motor_state_ = CANOpenState::OFF;
+        nanoseconds start_motor_timestamp_ = 0ns;
+        uint16_t control_word_ = 0;
+        uint16_t status_word_ = 0;
 
-        void update(uint16_t statusWord);
+        void update(uint16_t status_word);
         void setCommand(CANOpenCommand command) { command_ = command; };
-        uint16_t getControlWord() { return controlWord_; }
+        uint16_t getControlWord() { return control_word_; }
     };
 }
 
