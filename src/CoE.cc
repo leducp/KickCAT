@@ -32,6 +32,10 @@ namespace kickcat
         {
             auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::UPLOAD, data, data_size);
             waitForMessage(sdo, timeout);
+            if (sdo->status() != MessageStatus::SUCCESS)
+            {
+                THROW_ERROR_CODE("Error while reading SDO", sdo->status());
+            }
             return;
         }
 
@@ -57,7 +61,7 @@ namespace kickcat
 
             if (sdo->status() != MessageStatus::SUCCESS)
             {
-                THROW_ERROR("Error while reading SDO - emulated complete access");
+                THROW_ERROR_CODE("Error while reading SDO - emulated complete access", sdo->status());
             }
 
             pos += size;
