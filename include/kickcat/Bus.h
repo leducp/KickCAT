@@ -132,7 +132,7 @@ namespace kickcat
         void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
-        void waitForMessage(std::shared_ptr<AbstractMessage> message, nanoseconds timeout);
+        void waitForMessage(std::shared_ptr<AbstractMessage> message);
 
         std::shared_ptr<Link> link_;
         std::vector<Slave> slaves_;

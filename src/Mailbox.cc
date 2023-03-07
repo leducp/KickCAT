@@ -68,7 +68,6 @@ namespace kickcat
     {
         auto message = to_send.front();
         to_send.pop();
-        message->prepareForSend();
 
         // add message to processing queue if needed
         if (message->status() == MessageStatus::RUNNING)
@@ -87,7 +86,7 @@ namespace kickcat
             {
                 return (message->status(current_time) == MessageStatus::TIMEDOUT);
             }
-        ));
+        ), to_process.end());
 
         for (auto it = to_process.begin(); it != to_process.end(); ++it)
         {
@@ -127,13 +126,9 @@ namespace kickcat
     {
         data_.resize(mailbox_size);
         header_ = reinterpret_cast<mailbox::Header*>(data_.data());
-        header_->address  = 0; // Default: local processing address
+        header_->address  = 0;            // Default: local processing address
         status_ = MessageStatus::RUNNING; // Default mode is running to send the msg on the bus
-    }
 
-
-    void AbstractMessage::prepareForSend()
-    {
         if (timeout_ != 0ns)
         {
             timeout_ += since_epoch();
@@ -143,7 +138,7 @@ namespace kickcat
 
     uint32_t AbstractMessage::status(nanoseconds current_time)
     {
-        if ((timeout_ != 0ns) and (current_time < timeout_))
+        if ((timeout_ != 0ns) and (current_time > timeout_))
         {
             status_ = MessageStatus::TIMEDOUT;
         }

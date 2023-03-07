@@ -45,9 +45,6 @@ namespace kickcat
         /// \return CONTINUE if the message is related and operation requiered another loop (message shall be push again in sending queue)
         virtual ProcessingResult process(uint8_t const* received) = 0;
 
-        /// \brief Prepare the message for sending.
-        void prepareForSend();
-
         /// Handle address field. Address meaning depends on context (0 for local processing, slave address for gateway processing)
         void setAddress(uint16_t address) { header_->address = address; }
         uint16_t address() const { return header_->address; }

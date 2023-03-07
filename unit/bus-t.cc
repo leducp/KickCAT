@@ -453,7 +453,7 @@ TEST_F(BusTest, write_SDO_timeout)
     checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0x08, 0});// cannot write, nothing to read
 
-    ASSERT_THROW(bus.writeSDO(slave, 0x1018, 1, false, &data, data_size, 0ns), Error);
+    ASSERT_THROW(bus.writeSDO(slave, 0x1018, 1, false, &data, data_size, 1ms), Error);
 }
 
 TEST_F(BusTest, write_SDO_bad_answer)
