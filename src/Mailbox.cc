@@ -138,9 +138,12 @@ namespace kickcat
 
     uint32_t AbstractMessage::status(nanoseconds current_time)
     {
-        if ((timeout_ != 0ns) and (current_time > timeout_))
+        if (status_ == MessageStatus::RUNNING)
         {
-            status_ = MessageStatus::TIMEDOUT;
+            if ((timeout_ != 0ns) and (current_time > timeout_))
+            {
+                status_ = MessageStatus::TIMEDOUT;
+            }
         }
         return status_;
     }
