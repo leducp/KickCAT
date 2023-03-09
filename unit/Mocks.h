@@ -128,4 +128,8 @@ namespace kickcat
         MOCK_METHOD((std::tuple<int32_t, uint16_t>), recv,   (uint8_t* frame, int32_t frame_size), (override));
         MOCK_METHOD(int32_t, sendTo, (uint8_t const* frame, int32_t frame_size, uint16_t), (override));
     };
+
+
+    nanoseconds timeIncrement();
+    void setTimeIncrement(nanoseconds increment);
 }

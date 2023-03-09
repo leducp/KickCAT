@@ -21,6 +21,7 @@ namespace kickcat
     {
         constexpr uint32_t SUCCESS                      = 0x000;
         constexpr uint32_t RUNNING                      = 0x001;
+        constexpr uint32_t TIMEDOUT                     = 0x002;
 
         constexpr uint32_t COE_WRONG_SERVICE            = 0x101;
         constexpr uint32_t COE_UNKNOWN_SERVICE          = 0x102;
@@ -32,7 +33,7 @@ namespace kickcat
     {
     public:
         /// \param mailbox_size Size of the mailbox the message is targeted to (required to adapt internal buffer)
-        AbstractMessage(uint16_t mailbox_size);
+        AbstractMessage(uint16_t mailbox_size, nanoseconds timeout);
         virtual ~AbstractMessage() = default;
 
         // set message counter (aka session handle)
@@ -49,8 +50,9 @@ namespace kickcat
         uint16_t address() const { return header_->address; }
 
         /// \brief Message status
+        /// \param current_time     Considered time to compute message status (enable injection for tests)
         /// \return current message status. Value may depend on underlying service.
-        uint32_t status() const { return status_; }
+        uint32_t status(nanoseconds current_time = since_epoch());
 
         uint8_t const* data() const { return data_.data(); }
         size_t size() const         { return data_.size(); }
@@ -59,6 +61,9 @@ namespace kickcat
         std::vector<uint8_t> data_;     // data of the message (send and gateway rec)
         mailbox::Header* header_;       // pointer on the mailbox header in data
         uint32_t status_;               // message current status
+
+    private:
+        nanoseconds timeout_;           // Max time to handle the message. Relative time before sending, absolute time after. 0 means no timeout
     };
 
 
@@ -67,7 +72,7 @@ namespace kickcat
     class GatewayMessage : public AbstractMessage
     {
     public:
-        GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index);
+        GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout);
         virtual ~GatewayMessage() = default;
 
         ProcessingResult process(uint8_t const* received) override;
@@ -95,13 +100,18 @@ namespace kickcat
         void generateSMConfig(SyncManager SM[2]);
 
         // messages factory
-        std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size);
-        std::shared_ptr<GatewayMessage>  createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
+        std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout = 20ms);
+        std::shared_ptr<GatewayMessage>  createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index, nanoseconds timeout = 20ms);
 
         // helper to get next message to send and transfer it to reception callbacks if required
         std::shared_ptr<AbstractMessage> send();
 
-        bool receive(uint8_t const* raw_message);
+        /// \brief Receive a message
+        /// \param raw_message      Raw message read on the bus
+        /// \param current_time     Considered time to process message timeout (enable injection for tests)
+        bool receive(uint8_t const* raw_message, nanoseconds current_time = since_epoch());
+
+
         std::queue<std::shared_ptr<AbstractMessage>> to_send;     // message waiting to be sent
         std::list <std::shared_ptr<AbstractMessage>> to_process;  // message already sent, waiting for an answer
 
@@ -114,7 +124,7 @@ namespace kickcat
     class SDOMessage : public AbstractMessage
     {
     public:
-        SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size);
+        SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout);
         virtual ~SDOMessage() = default;
 
         ProcessingResult process(uint8_t const* received) override;

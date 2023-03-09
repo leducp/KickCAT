@@ -296,3 +296,26 @@ TEST_F(MailboxTest, SDO_download_abort)
 
     ASSERT_EQ(0x06010000, message->status());
 }
+
+TEST_F(MailboxTest, SDO_timedout)
+{
+    nanoseconds const TIMEOUT = 10ms;
+    int32_t data = 0xCAFEDECA;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::DOWNLOAD, &data, &data_size, TIMEOUT);
+
+    auto message = mailbox.send();
+
+    // unrelated reply to process the message
+    header->type = mailbox::Type::VoE;
+
+    nanoseconds now = since_epoch();
+
+    ASSERT_FALSE(mailbox.receive(raw_message, now + 1ms)); // unrelated message -> false
+    ASSERT_EQ(MessageStatus::RUNNING, message->status(now + 1ms));
+    ASSERT_EQ(1, mailbox.to_process.size());
+
+    ASSERT_FALSE(mailbox.receive(raw_message, now + TIMEOUT)); // unrelated message -> false
+    ASSERT_EQ(MessageStatus::TIMEDOUT, message->status(now + TIMEOUT));
+    ASSERT_EQ(0, mailbox.to_process.size());
+}
