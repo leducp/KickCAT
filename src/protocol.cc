@@ -210,7 +210,7 @@ namespace kickcat
         os << "  length :  "    << std::to_string(header.len) << "\n";
         os << "  circulating  " << std::to_string(header.circulating) << "\n";
         os << "  multiple  "    << std::to_string(header.multiple) << "\n";
-        os << "  IRQ  "         << std::to_string(header.IRQ) << "\n";
+        os << "  IRQ  "         << std::to_string(header.irq) << "\n";
         return os.str();
     }
 

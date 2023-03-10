@@ -99,9 +99,27 @@ namespace kickcat
                  reserved : 3,
                  circulating : 1,
                  multiple : 1; // multiple EtherCAT datagram (0 if last, 1 otherwise)
-        uint16_t IRQ;
+        uint16_t irq;
     } __attribute__((__packed__));
     std::string toString(DatagramHeader const& header);
+
+
+    enum EcatEvent : uint16_t
+    {
+        DC_LATCH    = (1 << 0),
+        // Reserved bit
+        DL_STATUS   = (1 << 2),
+        AL_STATUS   = (1 << 3),
+
+        SM0_STATUS  = (1 << 4),
+        SM1_STATUS  = (1 << 5),
+        SM2_STATUS  = (1 << 6),
+        SM3_STATUS  = (1 << 7),
+        SM4_STATUS  = (1 << 8),
+        SM5_STATUS  = (1 << 9),
+        SM6_STATUS  = (1 << 10),
+        SM7_STATUS  = (1 << 11),
+    };
 
 
     // EtherCAT state machine states

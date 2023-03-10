@@ -71,6 +71,7 @@ namespace kickcat
             while (isDatagramAvailable())
             {
                 auto [header, data, wkc] = nextDatagram();
+                checkEcatEvents(header);
                 callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
             }
         }
@@ -107,6 +108,15 @@ namespace kickcat
         if (client_exception)
         {
             std::rethrow_exception(client_exception);
+        }
+
+        for (auto& event : irqs_)
+        {
+            if (event.to_trigger)
+            {
+                event.to_trigger = false;
+                event.callback();
+            }
         }
     }
 
@@ -303,5 +313,48 @@ namespace kickcat
         std::transform(data_nominal, &data_nominal[header_nominal->len], data_redundancy, data_nominal, std::bit_or<uint8_t>());
         uint16_t wkc = wkc_nominal + wkc_redundancy;
         return std::make_tuple(header_nominal, data_nominal, wkc);
+    }
+
+
+    void Link::attachEcatEventCallback(enum EcatEvent ecat_event, std::function<void()> callback)
+    {
+        int32_t index = 0;
+        uint16_t mask = ecat_event;
+        while (mask != 0)
+        {
+            if (mask & 1)
+            {
+                auto& event = irqs_[index];
+                event.callback = callback;
+            }
+
+            ++index;
+            mask = mask >> 1;
+        }
+    }
+
+
+    void Link::checkEcatEvents(DatagramHeader const* header)
+    {
+        uint16_t irq = header->irq;
+        for (uint16_t i = 0; i < irqs_.size(); ++i)
+        {
+            auto& event = irqs_[i];
+            if (irq & 1)
+            {
+                if (event.is_armed)
+                {
+                    event.to_trigger = true;    // Delay call because we are looping in the received datagrams and we want the user to add datagrams if he wants
+                    event.is_armed = false;     // Disable event: we want to trigger on slope
+                }
+            }
+            else
+            {
+                // Rearm event
+                event.is_armed = true;
+            }
+
+            irq = irq >> 1;
+        }
     }
 }

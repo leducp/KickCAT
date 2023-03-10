@@ -249,7 +249,7 @@ TEST(Frame, write_multiples_datagrams)
             EXPECT_EQ(17 + i, header->index);
             EXPECT_EQ(20 + i, header->address);
             EXPECT_EQ(PAYLOAD_SIZE, header->len);
-            EXPECT_EQ(0, header->IRQ);
+            EXPECT_EQ(0, header->irq);
 
             switch (i)
             {
