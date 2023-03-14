@@ -76,12 +76,6 @@ namespace kickcat
     }
 
 
-    void Bus::clearIRQ(enum EcatEvent)
-    {
-        //TODO
-    }
-
-
     void Bus::init(nanoseconds watchdogTimePDIO)
     {
         if (detectSlaves() == 0)

@@ -41,7 +41,6 @@ namespace kickcat
         /// \param callback callback to be called whenever the IRQ trigger (rising edge)
         void enableIRQ(enum EcatEvent event, std::function<void()> callback);
         void disableIRQ(enum EcatEvent);
-        void clearIRQ(enum EcatEvent);
 
         // request a state for all slaves
         void requestState(State request);

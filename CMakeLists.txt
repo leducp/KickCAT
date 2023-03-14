@@ -69,7 +69,7 @@ if (GTest_FOUND)
   if (${CODE_COVERAGE})
     include(CodeCoverage)
     append_coverage_compiler_flags()
-    set(GCOVR_ADDITIONAL_ARGS "--exclude-unreachable-branches")
+    set(GCOVR_ADDITIONAL_ARGS --exclude-unreachable-branches --exclude-throw-branches)
 
     set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*" "tools/*")
     setup_target_for_coverage_gcovr_html(

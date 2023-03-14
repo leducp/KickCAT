@@ -106,10 +106,10 @@ namespace kickcat
 
     enum EcatEvent : uint16_t
     {
-        DC_LATCH    = (1 << 0),
+        DC_LATCH    = (1 << 0), // Clear: read Latch status
         // Reserved bit
-        DL_STATUS   = (1 << 2),
-        AL_STATUS   = (1 << 3),
+        DL_STATUS   = (1 << 2), // Clear: read DL Status
+        AL_STATUS   = (1 << 3), // Clear: read AL Status
 
         SM0_STATUS  = (1 << 4),
         SM1_STATUS  = (1 << 5),
@@ -201,6 +201,8 @@ namespace kickcat
         constexpr uint16_t DC_TIME_FILTER     = 0x934;
         constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
         constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
+
+        constexpr uint16_t LATCH_STATUS = 0x9AE;
     }
 
     struct DLStatus

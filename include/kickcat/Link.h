@@ -81,7 +81,7 @@ namespace kickcat
         std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() ;
         void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) ;
         void resetFrameContext() ;
-        void checkEcatEvents(DatagramHeader const* header);
+        void checkEcatEvents(uint16_t irq);
 
         std::function<void(void)> redundancyActivatedCallback_;
         bool is_redundancy_activated_{false};

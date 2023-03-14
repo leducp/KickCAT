@@ -64,6 +64,7 @@ namespace kickcat
 
         uint8_t waiting_frame = sent_frame_;
         sent_frame_ = 0;
+        uint16_t irq = 0;
 
         for (int32_t i = 0; i < waiting_frame; ++i)
         {
@@ -71,7 +72,7 @@ namespace kickcat
             while (isDatagramAvailable())
             {
                 auto [header, data, wkc] = nextDatagram();
-                checkEcatEvents(header);
+                irq |= header->irq; // aggregate IRQ feedbacks
                 callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
             }
         }
@@ -110,14 +111,7 @@ namespace kickcat
             std::rethrow_exception(client_exception);
         }
 
-        for (auto& event : irqs_)
-        {
-            if (event.to_trigger)
-            {
-                event.to_trigger = false;
-                event.callback();
-            }
-        }
+        checkEcatEvents(irq);
     }
 
 
@@ -334,9 +328,8 @@ namespace kickcat
     }
 
 
-    void Link::checkEcatEvents(DatagramHeader const* header)
+    void Link::checkEcatEvents(uint16_t irq)
     {
-        uint16_t irq = header->irq;
         for (uint16_t i = 0; i < irqs_.size(); ++i)
         {
             auto& event = irqs_[i];
@@ -344,8 +337,8 @@ namespace kickcat
             {
                 if (event.is_armed)
                 {
-                    event.to_trigger = true;    // Delay call because we are looping in the received datagrams and we want the user to add datagrams if he wants
                     event.is_armed = false;     // Disable event: we want to trigger on slope
+                    event.callback();
                 }
             }
             else
