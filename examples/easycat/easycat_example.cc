@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
-    link->setTimeout(20ms);
+    link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
     Bus bus(link);
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
         [&]()
         {
             printf("DL_STATUS IRQ triggered!\n");
-            bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& yolo){ printf("fuck reset dont worked: %s\n", toString(yolo));});
+            bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state){ printf("IRQ reset error: %s\n", toString(state));});
         });
 
         bus.requestState(State::SAFE_OP);
@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    link->setTimeout(20ms);
+    link->setTimeout(500us);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(10ms);
+        sleep(1ms);
 
         try
         {
@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
             nanoseconds t3 = since_epoch();
             bus.processAwaitingFrames();
             nanoseconds t4 = since_epoch();
-/*/
+
             for (int32_t j = 0;  j < easycat.input.bsize; ++j)
             {
                 printf("%02x ", easycat.input.data[j]);
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
             {
                 printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", easycat.address, toString(easycat.error_counters).c_str());
             }
-*/
+
             microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);
             std::string sample_str = std::to_string(sample.count());
             fwrite(sample_str.data(), 1, sample_str.size(), stat_file);
@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
         {
             int64_t delta = i - last_error;
             last_error = i;
-            //std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
     }
 

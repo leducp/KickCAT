@@ -100,6 +100,14 @@ TEST_F(MailboxTest, emergency_callback_not_related_message)
     ASSERT_EQ(0, mailbox.emergencies.size());
 }
 
+TEST_F(MailboxTest, SDO_inactive_mailbox)
+{
+    mailbox.recv_size = 0;
+    int32_t data = 0;
+    uint32_t data_size = sizeof(data);
+    ASSERT_THROW(mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size), kickcat::Error);
+}
+
 TEST_F(MailboxTest, SDO_upload_expedited_OK)
 {
     int32_t data = 0;
@@ -318,4 +326,30 @@ TEST_F(MailboxTest, SDO_timedout)
     ASSERT_FALSE(mailbox.receive(raw_message, now + TIMEOUT)); // unrelated message -> false
     ASSERT_EQ(MessageStatus::TIMEDOUT, message->status(now + TIMEOUT));
     ASSERT_EQ(0, mailbox.to_process.size());
+}
+
+
+TEST_F(MailboxTest, gateway_message)
+{
+    constexpr uint16_t GATEWAY_INDEX = 42;
+    // Create a standard SDO with a non local address
+    int32_t data = 0xCAFEDECA;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size);
+    auto msg = mailbox.send();
+    msg->setAddress(1001);
+
+    // Convert the non local SDO to a local gteway message
+    auto gw_msg = mailbox.createGatewayMessage(msg->data(), msg->size(), GATEWAY_INDEX);
+
+    ASSERT_EQ(GATEWAY_INDEX, gw_msg->gatewayIndex());
+    ASSERT_EQ(GATEWAY_INDEX | mailbox::GATEWAY_MESSAGE_MASK, gw_msg->address());
+
+    // Receive the gateway message - shall not be processed since non local and gw_msg not send for the moment
+    ASSERT_FALSE(mailbox.receive(gw_msg->data()));
+
+    // Receive the gateway message - OK cause send(), address shall be back to 1001
+    mailbox.send();
+    ASSERT_TRUE(mailbox.receive(gw_msg->data()));
+    ASSERT_EQ(1001, gw_msg->address());
 }

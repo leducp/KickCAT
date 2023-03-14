@@ -44,3 +44,18 @@ TEST(Protocol, State_to_string)
         ASSERT_EQ(4, strnlen(text, 4));
     }
 }
+
+
+TEST(Protocol, hton)
+{
+    constexpr uint16_t host_16 = 0xCAFE;
+    constexpr uint32_t host_32 = 0xCAFEDECA;
+    constexpr uint32_t host_64 = 0;
+
+    uint16_t network_16 = hton<uint16_t>(host_16);
+    uint32_t network_32 = hton<uint32_t>(host_32);
+
+    ASSERT_EQ(0xFECA,     network_16);
+    ASSERT_EQ(0xCADEFECA, network_32);
+    ASSERT_THROW(hton<uint64_t>(host_64), kickcat::Error);
+}

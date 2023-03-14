@@ -8,6 +8,7 @@
 #include <array>
 
 #include "Time.h"
+#include "Error.h"
 
 namespace kickcat
 {
@@ -25,7 +26,7 @@ namespace kickcat
         }
         else
         {
-            std::abort();
+            THROW_ERROR("Size unsupported");
         }
     }
 

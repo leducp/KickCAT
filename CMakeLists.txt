@@ -51,13 +51,16 @@ if (GTest_FOUND)
   add_executable(kickcat_unit unit/bus-t.cc
                               unit/debughelpers-t.cc
                               unit/diagnostics-t.cc
+                              unit/error-t.cc
                               unit/frame-t.cc
                               unit/gateway-t.cc
+                              unit/kickcat-t.cc
                               unit/link-t.cc
                               unit/mailbox-t.cc
                               unit/prints-t.cc
                               unit/protocol-t.cc
                               unit/slave-t.cc
+                              unit/socket-t.cc
                               unit/Time.cc
   )
 

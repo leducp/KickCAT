@@ -20,9 +20,10 @@ namespace kickcat
     template<typename T>
     struct DatagramCheck
     {
-        Command cmd;
-        T to_check;
+        Command cmd{};
+        T to_check{};
         bool check_payload{true};
+        DatagramCheck() = default;
         DatagramCheck(Command cmd_, T to_check_, bool check_payload_ = true)
             : cmd(cmd_)
             , check_payload(check_payload_)
@@ -129,6 +130,8 @@ namespace kickcat
         MOCK_METHOD(void,    close, (), (noexcept));
         MOCK_METHOD((std::tuple<int32_t, uint16_t>), recv,   (uint8_t* frame, int32_t frame_size), (override));
         MOCK_METHOD(int32_t, sendTo, (uint8_t const* frame, int32_t frame_size, uint16_t), (override));
+
+        uint16_t nextIndex() { AbstractDiagSocket::nextIndex(); return index_; }
     };
 
 
