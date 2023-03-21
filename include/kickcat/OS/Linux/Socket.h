@@ -8,7 +8,7 @@ namespace kickcat
     class Socket : public AbstractSocket
     {
     public:
-        Socket(nanoseconds rx_coalescing = -1us, nanoseconds polling_period = 20us);
+        Socket(nanoseconds coalescing = -1us, nanoseconds polling_period = 20us);
         virtual ~Socket()
         {
             close();
@@ -22,7 +22,7 @@ namespace kickcat
 
     private:
         int fd_{-1};
-        nanoseconds rx_coalescing_;
+        nanoseconds coalescing_;
         nanoseconds timeout_;
         nanoseconds polling_period_;
     };

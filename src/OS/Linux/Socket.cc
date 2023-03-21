@@ -15,10 +15,10 @@
 
 namespace kickcat
 {
-    Socket::Socket(nanoseconds rx_coalescing, nanoseconds polling_period)
+    Socket::Socket(nanoseconds coalescing, nanoseconds polling_period)
         : AbstractSocket()
         , fd_{-1}
-        , rx_coalescing_{rx_coalescing}
+        , coalescing_{coalescing}
         , polling_period_(polling_period)
     {
 
@@ -79,7 +79,7 @@ namespace kickcat
         }
 
         // apply coalescing if asked
-        if (rx_coalescing_ >= 0us)
+        if (coalescing_ >= 0us)
         {
             struct ethtool_coalesce ecoal;
             ecoal.cmd = ETHTOOL_GCOALESCE;
@@ -92,7 +92,8 @@ namespace kickcat
             DEBUG_PRINT("old rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
 
             ecoal.cmd = ETHTOOL_SCOALESCE;
-            ecoal.rx_coalesce_usecs = static_cast<unsigned int>(rx_coalescing_.count());
+            ecoal.rx_coalesce_usecs = static_cast<unsigned int>(coalescing_.count());
+            ecoal.tx_coalesce_usecs = static_cast<unsigned int>(coalescing_.count());
             rc = ioctl(fd_, SIOCETHTOOL, &ifr);
             if (rc < 0)
             {
