@@ -26,8 +26,8 @@ int main(int argc, char* argv[])
 {
     if (argc != 3 and argc != 2)
     {
-        printf("usage redundancy mode : ./test NIC_nominal NIC_redundancy\n");
-        printf("usage no redundancy mode : ./test NIC_nominal\n");
+        printf("usage redundancy mode : ./server NIC_nominal NIC_redundancy\n");
+        printf("usage no redundancy mode : ./server NIC_nominal\n");
         return 1;
     }
 

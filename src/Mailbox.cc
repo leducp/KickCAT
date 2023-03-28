@@ -43,7 +43,9 @@ namespace kickcat
         {
             THROW_ERROR("This mailbox is inactive");
         }
+        printf("DEBUG 2 recv_size %i  sn size %i  timeout %i \n", recv_size, data_size, timeout.count());
         auto sdo = std::make_shared<SDOMessage>(recv_size, index, subindex, CA, request, data, data_size, timeout);
+        printf("DEBUG 3\n");
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
         return sdo;
@@ -154,6 +156,7 @@ namespace kickcat
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
     {
+        printf("DEBug 2.1\n");
         coe_ = reinterpret_cast<mailbox::ServiceData*>(data_.data() + sizeof(mailbox::Header));
         payload_ = reinterpret_cast<uint8_t*>(data_.data() + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData));
 

@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 
 
     // Serial number storage
-    uint32_t sn;
+    uint32_t sn = 0;
     uint32_t sn_size = 4;
 
     // Local mailbox to generate and process messages
@@ -58,6 +58,7 @@ int main(int argc, char* argv[])
 
         // Target is an Elmo Gold device
         mailbox.createSDO(0x1018, 4, false, CoE::SDO::request::UPLOAD, &sn, &sn_size);
+        printf("YO \n");
         auto msg = mailbox.send();
         msg->setAddress(1001);
 
@@ -86,6 +87,46 @@ int main(int argc, char* argv[])
         printf("Serial number %d\n", sn);
         sn = 0;
     }
+
+    // Try to access to master mailbox data
+
+    //Random SDO, (Target is an Elmo Gold device)
+//    printf("DEBUG 1 sn %i  sn size %i\n", sn, sn_size);
+//    mailbox.createSDO(0x1018, 4, false, CoE::SDO::request::UPLOAD, &sn, &sn_size);
+//    printf("DEBUG 100\n");
+//    auto msg = mailbox.send();
+//    msg->setAddress(0); // target master
+//
+//    std::memcpy(frame + sizeof(EthercatHeader), msg->data(), msg->size());
+//    header->len = msg->size();
+//
+//    int32_t sent = ::sendto(fd, &frame, header->len + sizeof(EthercatHeader), MSG_DONTWAIT, (struct sockaddr*)&addr, sizeof(addr));
+//    if (sent < 0)
+//    {
+//        perror("sendto()");
+//    }
+//
+//    int rec = ::recvfrom(fd, frame, ETH_MTU_SIZE, 0, (struct sockaddr*)&addr, &addr_size);
+//    if (rec < 0)
+//    {
+//        printf("Nothing to read \n");
+//    }
+//
+//    if (mailbox.receive(frame + sizeof(EthercatHeader)) == false)
+//    {
+//        printf("Mailbox didn't process this message\n");
+//    }
+//
+//    mailbox::ServiceData* coe = reinterpret_cast<mailbox::ServiceData*>(frame + sizeof(mailbox::Header));
+//    if (coe->command == CoE::SDO::request::ABORT)
+//    {
+//        printf("SDO REQUEST WAS PROPERLY ABORTED \n");
+//    }
+//
+//    if (coe->service == CoE::Service::SDO_RESPONSE)
+//    {
+//        printf("SDO REQUEST RECEIVED AS RESPONSE \n");
+//    }
 
     return 0;
 }

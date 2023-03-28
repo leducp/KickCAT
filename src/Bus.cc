@@ -950,7 +950,8 @@ namespace kickcat
         {
             // Master is the destination, unsupported for now (ETG 1510)
             DEBUG_PRINT("Master mailbox not implemented");
-            return nullptr;
+
+            return mailbox_gateway_.createGatewayMessage(raw_message, raw_message_size, gateway_index);
         }
 
         auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header->address; });

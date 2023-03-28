@@ -10,6 +10,7 @@
 #include "Error.h"
 #include "Frame.h"
 #include "Link.h"
+#include "MasterMailbox.h"
 #include "Slave.h"
 
 namespace kickcat
@@ -167,6 +168,8 @@ namespace kickcat
         nanoseconds big_wait{10ms};
 
         uint16_t irq_mask_{0};
+
+        MasterMailbox mailbox_gateway_;
     };
 }
 
