@@ -8,6 +8,7 @@
 #include <array>
 
 #include "Time.h"
+#include "Error.h"
 
 namespace kickcat
 {
@@ -25,7 +26,7 @@ namespace kickcat
         }
         else
         {
-            std::abort();
+            THROW_ERROR("Size unsupported");
         }
     }
 
@@ -99,9 +100,27 @@ namespace kickcat
                  reserved : 3,
                  circulating : 1,
                  multiple : 1; // multiple EtherCAT datagram (0 if last, 1 otherwise)
-        uint16_t IRQ;
+        uint16_t irq;
     } __attribute__((__packed__));
     std::string toString(DatagramHeader const& header);
+
+
+    enum EcatEvent : uint16_t
+    {
+        DC_LATCH    = (1 << 0), // Clear: read Latch status
+        // Reserved bit
+        DL_STATUS   = (1 << 2), // Clear: read DL Status
+        AL_STATUS   = (1 << 3), // Clear: read AL Status
+
+        SM0_STATUS  = (1 << 4),
+        SM1_STATUS  = (1 << 5),
+        SM2_STATUS  = (1 << 6),
+        SM3_STATUS  = (1 << 7),
+        SM4_STATUS  = (1 << 8),
+        SM5_STATUS  = (1 << 9),
+        SM6_STATUS  = (1 << 10),
+        SM7_STATUS  = (1 << 11),
+    };
 
 
     // EtherCAT state machine states
@@ -183,6 +202,8 @@ namespace kickcat
         constexpr uint16_t DC_TIME_FILTER     = 0x934;
         constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
         constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
+
+        constexpr uint16_t LATCH_STATUS = 0x9AE;
     }
 
     struct DLStatus

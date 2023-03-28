@@ -64,6 +64,7 @@ namespace kickcat
 
         uint8_t waiting_frame = sent_frame_;
         sent_frame_ = 0;
+        uint16_t irq = 0;
 
         for (int32_t i = 0; i < waiting_frame; ++i)
         {
@@ -71,6 +72,7 @@ namespace kickcat
             while (isDatagramAvailable())
             {
                 auto [header, data, wkc] = nextDatagram();
+                irq |= header->irq; // aggregate IRQ feedbacks
                 callbacks_[header->index].status = callbacks_[header->index].process(header, data, wkc);
             }
         }
@@ -108,6 +110,8 @@ namespace kickcat
         {
             std::rethrow_exception(client_exception);
         }
+
+        checkEcatEvents(irq);
     }
 
 
@@ -303,5 +307,47 @@ namespace kickcat
         std::transform(data_nominal, &data_nominal[header_nominal->len], data_redundancy, data_nominal, std::bit_or<uint8_t>());
         uint16_t wkc = wkc_nominal + wkc_redundancy;
         return std::make_tuple(header_nominal, data_nominal, wkc);
+    }
+
+
+    void Link::attachEcatEventCallback(enum EcatEvent ecat_event, std::function<void()> callback)
+    {
+        int32_t index = 0;
+        uint16_t mask = ecat_event;
+        while (mask != 0)
+        {
+            if (mask & 1)
+            {
+                auto& event = irqs_[index];
+                event.callback = callback;
+            }
+
+            ++index;
+            mask = mask >> 1;
+        }
+    }
+
+
+    void Link::checkEcatEvents(uint16_t irq)
+    {
+        for (uint16_t i = 0; i < irqs_.size(); ++i)
+        {
+            auto& event = irqs_[i];
+            if (irq & 1)
+            {
+                if (event.is_armed)
+                {
+                    event.is_armed = false;     // Disable event: we want to trigger on slope
+                    event.callback();
+                }
+            }
+            else
+            {
+                // Rearm event
+                event.is_armed = true;
+            }
+
+            irq = irq >> 1;
+        }
     }
 }

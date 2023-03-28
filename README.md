@@ -55,11 +55,12 @@ KickCAT project is handled through CMake. To build the project, call CMake to co
   ```
 
 ### Build unit tests (optional)
-In order to build unit tests, you have to enable the option BUILD_UNIT_TESTS (default to ON) and to provide GTest package through CMake find_package mechanism.
+In order to build unit tests, you have to enable the option BUILD_UNIT_TESTS (default to ON) and to provide GTest package through CMake find_package mechanism. You also need gcovr to enable coverage report generation (COVERAGE option).
 Note: you can easily provide GTest via conan package manager:
   1. Install conan and setup PATH variable (more information on https://docs.conan.io/en/latest/installation.html)
   ```
   pip install conan
+  pip install gcovr
   export PATH="$PATH:$HOME/.local/bin"
   ```
   2. Install GTest in your build folder:

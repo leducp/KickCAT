@@ -14,6 +14,7 @@ namespace kickcat
 
     class Link
     {
+        friend class LinkTest;
     public:
         /// \brief   Handle link layer
         /// \details This class is responsible to handle frames and datagrams on the link layers:
@@ -49,8 +50,8 @@ namespace kickcat
         void setTimeout(nanoseconds const& timeout) {timeout_ = timeout;};
 
         void checkRedundancyNeeded();
-    friend class LinkTest;
 
+        void attachEcatEventCallback(enum EcatEvent event, std::function<void()> callback);
 
     private:
         uint8_t index_queue_{0};
@@ -65,6 +66,13 @@ namespace kickcat
         };
         std::array<Callbacks, 256> callbacks_{};
 
+        struct IRQ
+        {
+            std::function<void()> callback{[](){}};
+            bool is_armed{true};
+        };
+        std::array<IRQ, 16> irqs_{};
+
 
         void read() ;
         void sendFrame() ;
@@ -72,8 +80,10 @@ namespace kickcat
         std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() ;
         void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) ;
         void resetFrameContext() ;
+        void checkEcatEvents(uint16_t irq);
 
         std::function<void(void)> redundancyActivatedCallback_;
+        bool is_redundancy_activated_{false};
 
         std::shared_ptr<AbstractSocket> socket_nominal_;
         std::shared_ptr<AbstractSocket> socket_redundancy_;
@@ -83,8 +93,6 @@ namespace kickcat
 
         Frame frame_redundancy_{};
         MAC src_redundancy_;
-
-        bool is_redundancy_activated_{false};
 
         nanoseconds timeout_{2ms};
     };

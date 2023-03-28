@@ -34,14 +34,17 @@ public:
         initBus();
     }
 
-
-    void checkSendFrameSimple(Command cmd, int32_t n=1)
+    template<typename T>
+    void checkSendFrame(Command cmd, T payload, int32_t n = 1)
     {
-        uint8_t skip = 0;
-        std::vector<DatagramCheck<uint8_t>> expecteds(n, {cmd, skip, false});
+        std::vector<DatagramCheck<T>> expecteds(n, {cmd, payload, false});
         io_nominal->checkSendFrame(expecteds);
     }
 
+    void checkSendFrameSimple(Command cmd, int32_t n = 1)
+    {
+        checkSendFrame<uint8_t>(cmd, 0, n);
+    }
 
     void handleReplyWriteThenRead(uint16_t wkc = 1)
     {
@@ -87,7 +90,7 @@ public:
         handleReplyWriteThenRead();
 
         // reset slaves
-        for (int i = 0; i < 8; ++i)
+        for (int i = 0; i < 9; ++i)
         {
             checkSendFrameSimple(Command::BWR);
             handleReplyWriteThenRead();
@@ -245,13 +248,14 @@ TEST_F(BusTest, nop)
     handleReplySimple();
 
     bus.sendNop([](DatagramState const&){});
+    bus.finalizeDatagrams();
     bus.processAwaitingFrames();
 }
 
 
 TEST_F(BusTest, error_counters)
 {
-    // refresh errors counters
+    // Refresh errors counters
     ErrorCounters counters{};
     std::memset(&counters, 0, sizeof(ErrorCounters));
     counters.rx[0].invalid_frame = 17;
@@ -268,6 +272,16 @@ TEST_F(BusTest, error_counters)
     ASSERT_EQ(34, slave.error_counters.rx[0].physical_layer);
     ASSERT_EQ(17, slave.error_counters.rx[0].invalid_frame);
     ASSERT_EQ(3,  slave.error_counters.lost_link[0]);
+
+    // Error handling
+    checkSendFrameSimple(Command::FPRD);
+    handleReplySimple(0);
+
+    DatagramState state = DatagramState::OK;
+    auto error_callback = [&](DatagramState const& s) { state = s; };
+    bus.sendRefreshErrorCounters(error_callback);
+    bus.processAwaitingFrames();
+    ASSERT_EQ(state, DatagramState::INVALID_WKC);
 }
 
 
@@ -610,4 +624,90 @@ TEST_F(BusTest, send_get_DL_status)
     ASSERT_EQ(slave.dl_status.COM_port1, 0);
     ASSERT_EQ(slave.dl_status.LOOP_port0, 1);
     ASSERT_EQ(slave.dl_status.LOOP_port1, 1);
+
+    // Error handling
+    checkSendFrameSimple(Command::FPRD);
+    handleReplySimple(0);
+
+    DatagramState state = DatagramState::OK;
+    auto error_callback = [&](DatagramState const& s) { state = s; };
+    bus.sendGetDLStatus(slave, error_callback);
+    bus.processAwaitingFrames();
+    ASSERT_EQ(state, DatagramState::INVALID_WKC);
+}
+
+
+TEST_F(BusTest, IRQ_OK)
+{
+    InSequence s;
+
+    checkSendFrame(Command::BWR, uint16_t(EcatEvent::DL_STATUS));
+    handleReplyWriteThenRead();
+
+    checkSendFrame(Command::BWR, uint16_t(EcatEvent::DL_STATUS | EcatEvent::AL_STATUS));
+    handleReplyWriteThenRead();
+
+    checkSendFrame(Command::BWR, uint16_t(EcatEvent::AL_STATUS));
+    handleReplyWriteThenRead();
+
+    checkSendFrame(Command::BWR, uint16_t(0));
+    handleReplyWriteThenRead();
+
+    bus.enableIRQ(EcatEvent::DL_STATUS, [](){});
+    bus.enableIRQ(EcatEvent::AL_STATUS, [](){});
+
+    bus.disableIRQ(EcatEvent::DL_STATUS);
+    bus.disableIRQ(EcatEvent::AL_STATUS);
+}
+
+
+TEST_F(BusTest, IRQ_NOK)
+{
+    InSequence s;
+
+    checkSendFrame(Command::BWR, uint16_t(EcatEvent::DL_STATUS));
+    handleReplyWriteThenRead(0);
+
+    checkSendFrame(Command::BWR, uint16_t(0));
+    handleReplyWriteThenRead(0);
+
+    ASSERT_THROW(bus.enableIRQ(EcatEvent::DL_STATUS, [](){}), kickcat::Error);
+    ASSERT_THROW(bus.disableIRQ(EcatEvent::DL_STATUS),        kickcat::Error);
+}
+
+
+TEST_F(BusTest, add_gateway_message)
+{
+    constexpr uint16_t GATEWAY_INDEX = 42;
+    Mailbox mailbox;
+    mailbox.recv_size = 128;
+
+    // Create a standard SDO with a non local address
+    int32_t data = 0xCAFEDECA;
+    uint32_t data_size = sizeof(data);
+    auto msg = mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size);
+
+    // Master mailbox targeted
+    msg->setAddress(0);
+    ASSERT_EQ(nullptr, bus.addGatewayMessage(msg->data(), msg->size(), GATEWAY_INDEX));
+
+    // Unknown slave targeted
+    msg->setAddress(1002);
+    ASSERT_EQ(nullptr, bus.addGatewayMessage(msg->data(), msg->size(), GATEWAY_INDEX));
+
+    // First slave targeted
+    msg->setAddress(1001);
+    auto gw_msg = bus.addGatewayMessage(msg->data(), msg->size(), GATEWAY_INDEX);
+    ASSERT_NE(nullptr, gw_msg);
+    ASSERT_EQ(GATEWAY_INDEX, gw_msg->gatewayIndex());
+}
+
+
+TEST_F(BusTest, clearErrorCounters_wkc_error)
+{
+    InSequence s;
+
+    checkSendFrame(Command::BWR, uint16_t(0));
+    handleReplyWriteThenRead(0);
+    ASSERT_THROW(bus.clearErrorCounters();, kickcat::Error);
 }

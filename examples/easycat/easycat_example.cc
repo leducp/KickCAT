@@ -84,6 +84,13 @@ int main(int argc, char* argv[])
 
         bus.createMapping(io_buffer);
 
+        bus.enableIRQ(EcatEvent::DL_STATUS,
+        [&]()
+        {
+            printf("DL_STATUS IRQ triggered!\n");
+            bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state){ printf("IRQ reset error: %s\n", toString(state));});
+        });
+
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
         print_current_state();

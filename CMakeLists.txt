@@ -51,13 +51,16 @@ if (GTest_FOUND)
   add_executable(kickcat_unit unit/bus-t.cc
                               unit/debughelpers-t.cc
                               unit/diagnostics-t.cc
+                              unit/error-t.cc
                               unit/frame-t.cc
                               unit/gateway-t.cc
+                              unit/kickcat-t.cc
                               unit/link-t.cc
                               unit/mailbox-t.cc
                               unit/prints-t.cc
                               unit/protocol-t.cc
                               unit/slave-t.cc
+                              unit/socket-t.cc
                               unit/Time.cc
   )
 
@@ -69,7 +72,7 @@ if (GTest_FOUND)
   if (${CODE_COVERAGE})
     include(CodeCoverage)
     append_coverage_compiler_flags()
-    set(GCOVR_ADDITIONAL_ARGS "--exclude-unreachable-branches")
+    set(GCOVR_ADDITIONAL_ARGS --exclude-unreachable-branches --exclude-throw-branches)
 
     set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*" "tools/*")
     setup_target_for_coverage_gcovr_html(

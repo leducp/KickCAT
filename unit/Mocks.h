@@ -13,22 +13,23 @@ namespace kickcat
     {
         Frame inflight;
         uint8_t* datagram;
-        DatagramHeader const* header;
+        DatagramHeader* header;
         uint8_t* payload;
     };
 
     template<typename T>
     struct DatagramCheck
     {
-        Command cmd;
-        T to_check;
+        Command cmd{};
+        T to_check{};
         bool check_payload{true};
+        DatagramCheck() = default;
         DatagramCheck(Command cmd_, T to_check_, bool check_payload_ = true)
             : cmd(cmd_)
             , check_payload(check_payload_)
-            {
-                std::memcpy(&to_check, &to_check_, sizeof(T));
-            }
+        {
+            std::memcpy(&to_check, &to_check_, sizeof(T));
+        }
     };
 
     class MockSocket : public AbstractSocket
@@ -78,10 +79,10 @@ namespace kickcat
 
 
         template<typename T>
-        void handleReply(std::vector<T> answers, uint16_t replied_wkc = 1)
+        void handleReply(std::vector<T> answers, uint16_t replied_wkc = 1, uint16_t irq = 0)
         {
             EXPECT_CALL(*this, read(::testing::_, ::testing::_))
-            .WillOnce(::testing::Invoke([this, replied_wkc, answers](uint8_t* data, int32_t)
+            .WillOnce(::testing::Invoke([this, replied_wkc, irq, answers](uint8_t* data, int32_t)
             {
                 auto it = answers.begin();
                 uint16_t* wkc = reinterpret_cast<uint16_t*>(contexts_.front().payload + contexts_.front().header->len);
@@ -91,8 +92,10 @@ namespace kickcat
                 {
                     std::memcpy(contexts_.front().payload, &(*it), sizeof(T));
                     *wkc = replied_wkc;
+                    contexts_.front().header->irq = irq;
 
-                    current_header = contexts_.front().header;                                    // save current header
+                    current_header = contexts_.front().header;                  // save current header
+
                     ++it;                                                       // next payload
                     contexts_.front().datagram = reinterpret_cast<uint8_t*>(wkc) + 2;             // next datagram
                     contexts_.front().header = reinterpret_cast<DatagramHeader*>(contexts_.front().datagram);       // next header
@@ -127,6 +130,8 @@ namespace kickcat
         MOCK_METHOD(void,    close, (), (noexcept));
         MOCK_METHOD((std::tuple<int32_t, uint16_t>), recv,   (uint8_t* frame, int32_t frame_size), (override));
         MOCK_METHOD(int32_t, sendTo, (uint8_t const* frame, int32_t frame_size, uint16_t), (override));
+
+        uint16_t nextIndex() { AbstractDiagSocket::nextIndex(); return index_; }
     };
 
 

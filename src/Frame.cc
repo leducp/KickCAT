@@ -92,7 +92,7 @@ namespace kickcat
         header->len = data_size & 0x7ff;
         header->circulating = 0;
         header->multiple = 1;   // by default, consider that more datagrams will follow
-        header->IRQ = 0;        //TODO what's that ?
+        header->irq = 0;        // Clear IRQ field to ensure correct feedback (slaves OR event bits if not masked)
 
         pos += sizeof(DatagramHeader);
 

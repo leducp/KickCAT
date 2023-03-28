@@ -1063,4 +1063,46 @@ TEST_F(LinkTest, process_datagram_check_timeout_min)
     io_nominal->handleReply<int64_t>({skip}, 0);
     link.processDatagrams();
 }
+
+TEST_F(LinkTest, event_callback)
+{
+    InSequence s;
+
+    // Frame context
+    int64_t skip{0};
+    int64_t logical_read = 0x0001020304050607;
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+
+    // Attach a callback on a IRQ (trigger on rising edge only)
+    bool event_rec = false;
+    link.attachEcatEventCallback(EcatEvent::DL_STATUS, [&](){ event_rec = true; });
+
+    // Function to process frames
+    auto checkIRQ = [&](bool is_callback_triggered, uint16_t irq)
+    {
+        event_rec = false;
+        addDatagram(cmd, skip, logical_read, 2, false);
+        checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
+
+        io_redundancy->handleReply<int64_t>({logical_read}, 2, irq);
+        io_nominal->handleReply<int64_t>({skip}, 0);
+
+        link.processDatagrams();
+
+        ASSERT_EQ(DatagramState::OK, last_error);
+        ASSERT_EQ(is_callback_triggered, event_rec);
+    };
+
+    for (int i = 0; i < 5; ++i)
+    {
+        checkIRQ(false, 0);                         // No IRQ, no trigger
+        checkIRQ(true, EcatEvent::DL_STATUS);       // IRQ, trigger (rising edge)
+        for (int j = 0; j < 10; ++j)
+        {
+            checkIRQ(false, EcatEvent::DL_STATUS);  // IRQ, no trigger, mimic a plate
+        }
+        checkIRQ(false, 0);                         // No IRQ, no trigger (falling edge)
+    }
+}
 }

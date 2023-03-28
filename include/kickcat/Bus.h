@@ -36,6 +36,12 @@ namespace kickcat
         /// \return the number of slaves detected on the bus
         int32_t detectSlaves();
 
+        /// \brief Enable ECAT Interrupt
+        /// \param Event    that trigger the interrupt to enable
+        /// \param callback callback to be called whenever the IRQ trigger (rising edge)
+        void enableIRQ(enum EcatEvent event, std::function<void()> callback);
+        void disableIRQ(enum EcatEvent);
+
         // request a state for all slaves
         void requestState(State request);
 
@@ -159,6 +165,8 @@ namespace kickcat
 
         nanoseconds tiny_wait{200us};
         nanoseconds big_wait{10ms};
+
+        uint16_t irq_mask_{0};
     };
 }
 

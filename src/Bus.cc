@@ -50,6 +50,32 @@ namespace kickcat
     }
 
 
+    void Bus::enableIRQ(enum EcatEvent event, std::function<void()> callback)
+    {
+        link_->attachEcatEventCallback(event, callback);
+
+        irq_mask_ |= event;
+        uint16_t wkc = broadcastWrite(reg::ECAT_EVENT_MASK, &irq_mask_, 2);
+        if (wkc != slaves_.size())
+        {
+            THROW_ERROR("Invalid working counter");
+        }
+    }
+
+
+    void Bus::disableIRQ(enum EcatEvent event)
+    {
+        link_->attachEcatEventCallback(event, {});
+
+        irq_mask_ &= ~event;
+        uint16_t wkc = broadcastWrite(reg::ECAT_EVENT_MASK, &irq_mask_, 2);
+        if (wkc != slaves_.size())
+        {
+            THROW_ERROR("Invalid working counter");
+        }
+    }
+
+
     void Bus::init(nanoseconds watchdogTimePDIO)
     {
         if (detectSlaves() == 0)
@@ -187,6 +213,7 @@ namespace kickcat
         broadcastWrite(reg::SYNC_MANAGER,       param, 128);
         broadcastWrite(reg::DC_SYSTEM_TIME,     param, 8);
         broadcastWrite(reg::DC_SYNC_ACTIVATION, param, 1);
+        broadcastWrite(reg::ECAT_EVENT_MASK,    param, 2);
 
         uint16_t dc_param = 0x1000; // reset value
         broadcastWrite(reg::DC_SPEED_CNT_START, &dc_param, sizeof(dc_param));
