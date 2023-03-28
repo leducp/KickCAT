@@ -3,7 +3,7 @@
 
 using namespace kickcat;
 
-TEST(KickCAT, datagram_state_to_stirng)
+TEST(KickCAT, datagram_state_to_string)
 {
     ASSERT_STREQ("LOST"       , toString(DatagramState::LOST));
     ASSERT_STREQ("SEND_ERROR" , toString(DatagramState::SEND_ERROR));

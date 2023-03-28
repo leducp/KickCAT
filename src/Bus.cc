@@ -1000,7 +1000,6 @@ namespace kickcat
             }
 
             slave.dl_status= *reinterpret_cast<DLStatus const*>(data);
-            printf("yolo: %s\n", toString(slave.dl_status).c_str());
             return DatagramState::OK;
         };
 

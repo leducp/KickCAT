@@ -68,9 +68,8 @@ namespace kickcat
 
         struct IRQ
         {
-            std::function<void()> callback{};
+            std::function<void()> callback{[](){}};
             bool is_armed{true};
-            bool to_trigger{false};
         };
         std::array<IRQ, 16> irqs_{};
 
