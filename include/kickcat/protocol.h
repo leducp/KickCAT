@@ -503,6 +503,26 @@ namespace kickcat
 
             char const* abort_to_str(uint32_t abort_code);
         }
+
+        // ETG1000.6
+        struct IdentityObject
+        {
+            uint8_t number_of_entries = 4;
+            uint32_t vendor_id        = 42;
+            uint32_t product_code     = 43;
+            uint32_t revision_number  = 44;
+            uint32_t serial_number    = 45;
+        };
+
+        struct MasterDeviceDescription
+        {
+            uint32_t device_type = 1;
+            // uint8_t error_register ??
+            // std::string device_name ??
+            // std::string hardware_version ??
+            // std::string software_version ??
+            IdentityObject identity;
+        };
     }
 
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.

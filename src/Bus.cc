@@ -8,6 +8,7 @@ namespace kickcat
 {
     Bus::Bus(std::shared_ptr<Link> link)
     : link_(link)
+    //, mailbox_gateway_(deviceDescription_)
     {
     }
 
@@ -949,8 +950,6 @@ namespace kickcat
         if (mbx_header->address == 0)
         {
             // Master is the destination, unsupported for now (ETG 1510)
-            DEBUG_PRINT("Master mailbox not implemented");
-
             return mailbox_gateway_.createGatewayMessage(raw_message, raw_message_size, gateway_index);
         }
 
@@ -1011,5 +1010,4 @@ namespace kickcat
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
         link_->processDatagrams();
     }
-
 }

@@ -7,16 +7,22 @@
 
 namespace kickcat
 {
+
+    ///< Brief
     class MasterMailbox
     {
     public:
-        MasterMailbox() = default;
+        MasterMailbox(CoE::MasterDeviceDescription& master_description);
         ~MasterMailbox() = default;
 
         std::shared_ptr<GatewayMessage> createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
 
-
         uint16_t recv_size{128};
+
+    private:
+        std::vector<uint8_t> handleSDO(GatewayMessage const& msg);
+
+        CoE::MasterDeviceDescription& master_description_;
     };
 }
 

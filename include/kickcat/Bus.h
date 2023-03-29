@@ -11,6 +11,7 @@
 #include "Frame.h"
 #include "Link.h"
 #include "MasterMailbox.h"
+#include "protocol.h"
 #include "Slave.h"
 
 namespace kickcat
@@ -108,6 +109,7 @@ namespace kickcat
 
         void clearErrorCounters();
 
+        void setMasterDeviceIdentity(CoE::MasterDeviceDescription description);
 
     protected: // for unit testing
 
@@ -169,7 +171,8 @@ namespace kickcat
 
         uint16_t irq_mask_{0};
 
-        MasterMailbox mailbox_gateway_;
+        CoE::MasterDeviceDescription deviceDescription_;
+        MasterMailbox mailbox_gateway_{deviceDescription_};
     };
 }
 
