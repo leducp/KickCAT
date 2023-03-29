@@ -1,18 +1,17 @@
-#include <ctime>
-#include <cstdio>
-#include <cerrno>
-/// \brief OS agnostic time API implementation
-
+// \brief OS agnostic time API implementation
 #include "Time.h"
 
 namespace kickcat
 {
-    nanoseconds since_epoch()
+    extern "C"
     {
-        auto now = time_point_cast<nanoseconds>(system_clock::now());
-        return now.time_since_epoch();
+        static nanoseconds __since_epoch()
+        {
+            auto now = time_point_cast<nanoseconds>(system_clock::now());
+            return now.time_since_epoch();
+        }
     }
-
+    __attribute__((weak,alias("__since_epoch"))) nanoseconds since_epoch();
 
     nanoseconds elapsed_time(nanoseconds start)
     {
