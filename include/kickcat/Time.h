@@ -11,7 +11,7 @@ namespace kickcat
     void sleep(nanoseconds ns);
 
     // return the time in ns since epoch
-    nanoseconds since_epoch() __attribute__((weak));
+    nanoseconds since_epoch();
 
     nanoseconds elapsed_time(nanoseconds start = since_epoch());
 }

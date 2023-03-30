@@ -133,8 +133,4 @@ namespace kickcat
 
         uint16_t nextIndex() { AbstractDiagSocket::nextIndex(); return index_; }
     };
-
-
-    nanoseconds timeIncrement();
-    void setTimeIncrement(nanoseconds increment);
 }

@@ -174,7 +174,7 @@ namespace kickcat
         return sum;
     }
 
-    int Slave::countOpenPorts() 
+    int Slave::countOpenPorts()
     {
         return  dl_status.PL_port0 +
                 dl_status.PL_port1 +
