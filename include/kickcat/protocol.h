@@ -423,8 +423,8 @@ namespace kickcat
                     reserved : 3,
                     service : 4; // i.e. request, response
             uint8_t size_indicator : 1,
-                    transfer_type : 1, // expedited or not
-                    block_size : 2,
+                    transfer_type : 1, // expedited (1) or not (0)
+                    block_size : 2,    // data set size in ETG1000_6
                     complete_access : 1,
                     command : 3; // i.e. upload
             uint16_t index;

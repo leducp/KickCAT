@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
 
     uint32_t device_type = 5;
     uint32_t device_type_size = 4;
-    mailbox.createSDO(0x1000, 0, false, CoE::SDO::request::UPLOAD, &device_type, &device_type_size);
+    mailbox.createSDO(0x1000, 0, false, CoE::SDO::request::UPLOAD_SEGMENTED, &device_type, &device_type_size);
 
     auto msg = mailbox.send();
     msg->setAddress(0); // target master
@@ -114,12 +114,12 @@ int main(int argc, char* argv[])
         printf("Nothing to read \n");
     }
 
-    printf("Mailbox emitter receive before \n");
     if (mailbox.receive(frame + sizeof(EthercatHeader)) == false)
     {
         printf("Mailbox didn't process this message\n");
     }
-    printf("Mailbox emitter receive after \n");
+
+    printf("Status msg received : %x \n", msg->status());
 
     mailbox::ServiceData* coe = reinterpret_cast<mailbox::ServiceData*>(frame + sizeof(EthercatHeader) + sizeof(mailbox::Header));
     if (coe->command == CoE::SDO::request::ABORT)
@@ -132,6 +132,10 @@ int main(int argc, char* argv[])
         printf("SDO REQUEST RECEIVED A RESPONSE \n");
 
         printf("Device type received %i \n", device_type);
+
+        uint32_t debug_type;
+        memcpy(&debug_type, frame + sizeof(EthercatHeader) + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData), 4);
+        printf("Actual received frame device type %i \n", debug_type);
     }
 
     return 0;

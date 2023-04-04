@@ -949,8 +949,14 @@ namespace kickcat
         // Try to associate the request with a destination
         if (mbx_header->address == 0)
         {
-            // Master is the destination, unsupported for now (ETG 1510)
-            return mailbox_gateway_.createGatewayMessage(raw_message, raw_message_size, gateway_index);
+            // handle only CoE SDO otherwise drop.
+            if (mbx_header->type != mailbox::CoE)
+            {
+                printf("ABORT unsupported protocol\n");
+                return nullptr;
+            }
+
+            return mailbox_gateway_.createProcessedGatewayMessage(raw_message, raw_message_size, gateway_index);
         }
 
         auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header->address; });

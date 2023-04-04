@@ -265,6 +265,8 @@ namespace kickcat
             return ProcessingResult::FINALIZE;
         }
 
+        printf("Process upload transfer type %d\n", coe->transfer_type);
+
         if (coe->transfer_type == 1)
         {
             // expedited transfer
@@ -443,6 +445,8 @@ namespace kickcat
         int32_t size = header->len + sizeof(mailbox::Header);
         data_.resize(size);
         std::memcpy(data_.data(), received, size);
+
+        printf("Gateway message process size %i \n", size);
 
         header_->address = address_;
 
