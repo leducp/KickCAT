@@ -243,11 +243,15 @@ namespace kickcat
         auto process = [&]()
         {
             link_->writeThenRead(frame);
-            auto [header, _, wkc] = frame.nextDatagram();
-            if (wkc != 1)
+            while (frame.isDatagramAvailable())
             {
-                THROW_ERROR("Invalid working counter");
+                auto [header, _, wkc] = frame.nextDatagram();
+                if (wkc != 1)
+                {
+                    THROW_ERROR("Invalid working counter");
+                }
             }
+            frame.clear();
         };
 
         for (size_t i = 0; i < slaves_.size(); ++i)
