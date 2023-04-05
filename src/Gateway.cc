@@ -69,6 +69,9 @@ namespace kickcat
                 header->type = EthercatType::MAILBOX;
                 header->len  = msg->size() & 0x7ff;
                 std::memcpy(frame + sizeof(EthercatHeader), msg->data(), msg->size());
+
+                mailbox::Header* debugHeader = reinterpret_cast<mailbox::Header *>(frame + sizeof(EthercatHeader));
+                printf("Gateway sendTo address %x \n", debugHeader->address);
                 socket_->sendTo(frame, static_cast<int32_t>(msg->size() + sizeof(EthercatHeader)), msg->gatewayIndex());
 
                 return true;

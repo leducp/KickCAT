@@ -947,7 +947,7 @@ namespace kickcat
     {
         mailbox::Header const* const mbx_header = reinterpret_cast<mailbox::Header const*>(raw_message);
 
-        // Try to associate the request with a destination
+        // Address 0 is a message for the master.
         if (mbx_header->address == 0)
         {
             // handle only CoE SDO otherwise drop.
@@ -957,9 +957,14 @@ namespace kickcat
                 return nullptr;
             }
 
-            return mailbox_gateway_.createProcessedGatewayMessage(raw_message, raw_message_size, gateway_index);
+            std::shared_ptr<GatewayMessage> msg = mailbox_gateway_.createProcessedGatewayMessage(raw_message, raw_message_size, gateway_index);
+
+            mailbox::Header const* debugHeader = reinterpret_cast<mailbox::Header const *>(msg->data());
+            printf("Bus add gateway msg address %x \n", debugHeader->address);
+            return msg;
         }
 
+        // Non zero address is for a slave.
         auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header->address; });
         if (it == slaves_.end())
         {

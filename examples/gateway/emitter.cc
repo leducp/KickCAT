@@ -114,6 +114,10 @@ int main(int argc, char* argv[])
         printf("Nothing to read \n");
     }
 
+    mailbox::Header* debugHeader = reinterpret_cast<mailbox::Header *>(frame + sizeof(EthercatHeader));
+
+    printf("Debug header address %x \n", debugHeader->address);
+
     if (mailbox.receive(frame + sizeof(EthercatHeader)) == false)
     {
         printf("Mailbox didn't process this message\n");

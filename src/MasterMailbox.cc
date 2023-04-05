@@ -23,7 +23,6 @@ namespace kickcat
         mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(msg->data() + sizeof(mailbox::Header));
 
         std::vector<uint8_t> response; //contains mailbox header + serviceData + data
-        response.resize(msg->size());
 
         if (header->type == mailbox::Type::CoE)
         {
@@ -44,13 +43,13 @@ namespace kickcat
         }
 
 
+        printf("Header len %u  address before %x\n", header->len, header->address);
 
-        uint32_t debug;
-        memcpy(&debug, response.data() + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData), 4);
-        printf("debug %u \n", debug);
-        printf("Header len %u \n", header->len);
+        printf("Response size %i \n", response.size());
 
         msg->process(response.data());
+
+        printf("Header address after %x \n", header->address);
         return msg;
     }
 
@@ -109,8 +108,8 @@ namespace kickcat
 
         SDOData& data = entry->second[subindex];
 
-        SDOFrame sdo(data.size);
-        sdo.header_->len = sizeof(mailbox::ServiceData) + data.size;
+        SDOFrame sdo(data.size + 4);
+        sdo.header_->len = sizeof(mailbox::ServiceData) + data.size + 4;
         sdo.header_->address = address;
         sdo.header_->channel = 0; // unused;
         sdo.header_->priority = 0; // unused;
@@ -130,7 +129,8 @@ namespace kickcat
         sdo.coe_->index = index;
         sdo.coe_->subindex = subindex;
 
-        memcpy(sdo.payload_, data.payload, data.size);
+        memcpy(sdo.payload_, &data.size, 4); // fill complete size
+        memcpy((uint8_t*)sdo.payload_ + 4, &data.payload, data.size); // data
 
         return sdo.data_;
     }
