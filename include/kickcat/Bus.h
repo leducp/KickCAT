@@ -172,7 +172,7 @@ namespace kickcat
         uint16_t irq_mask_{0};
 
         CoE::MasterDeviceDescription deviceDescription_;
-        MasterMailbox mailbox_gateway_{deviceDescription_};
+        MasterMailbox mailbox_gateway_{};
     };
 }
 

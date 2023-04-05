@@ -8,7 +8,6 @@ namespace kickcat
 {
     Bus::Bus(std::shared_ptr<Link> link)
     : link_(link)
-    //, mailbox_gateway_(deviceDescription_)
     {
     }
 
@@ -109,6 +108,8 @@ namespace kickcat
                 slave.mailbox.to_process.push_back(emg);
             }
         }
+
+        mailbox_gateway_.init(deviceDescription_);
     }
 
 

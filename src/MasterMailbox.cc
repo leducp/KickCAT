@@ -2,10 +2,14 @@
 
 namespace kickcat
 {
-    MasterMailbox::MasterMailbox(CoE::MasterDeviceDescription& master_description)
-    : master_description_(master_description)
+    MasterMailbox::MasterMailbox()
     {
-        printf("Master description test %i \n", master_description_.identity.number_of_entries);
+    }
+
+
+    void MasterMailbox::init(CoE::MasterDeviceDescription& master_description)
+    {
+        objectDictionary_.insert({0x1000, {SDOData{&master_description.device_type, sizeof(master_description.device_type)}}});
     }
 
 
@@ -38,6 +42,7 @@ namespace kickcat
             uint32_t abort_code = 0x06010000; //unsupported access
             response = createAbortSDO(header->address, coe->index, coe->subindex, abort_code);
         }
+
 
 
         uint32_t debug;
@@ -86,10 +91,26 @@ namespace kickcat
         // TODO no check in create, make them before hand ?
         // TODO handle complete access
 
-        uint32_t size = 4;
-        SDOFrame sdo(size);
+        auto const& entry =  objectDictionary_.find(index);
 
-        sdo.header_->len = sizeof(mailbox::ServiceData) + size;
+        if (entry == objectDictionary_.end())
+        {
+            uint32_t abort_code = 0x06020000; // object does not exists.
+            return createAbortSDO(address, index, subindex, abort_code);
+        }
+        else
+        {
+            if (entry->second.size() < subindex)
+            {
+                uint32_t abort_code = 0x06090011; // subindex does not exists.
+                return createAbortSDO(address, index, subindex, abort_code);
+            }
+        }
+
+        SDOData& data = entry->second[subindex];
+
+        SDOFrame sdo(data.size);
+        sdo.header_->len = sizeof(mailbox::ServiceData) + data.size;
         sdo.header_->address = address;
         sdo.header_->channel = 0; // unused;
         sdo.header_->priority = 0; // unused;
@@ -109,8 +130,7 @@ namespace kickcat
         sdo.coe_->index = index;
         sdo.coe_->subindex = subindex;
 
-        int32_t payload = 42;
-        memcpy(sdo.payload_, &payload, size);
+        memcpy(sdo.payload_, data.payload, data.size);
 
         return sdo.data_;
     }

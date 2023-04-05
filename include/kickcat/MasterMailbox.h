@@ -4,6 +4,8 @@
 #include "Mailbox.h"
 #include "protocol.h"
 #include <cstring>
+#include <unordered_map>
+#include <vector>
 
 
 namespace kickcat
@@ -25,12 +27,21 @@ namespace kickcat
     };
 
 
+    struct SDOData
+    {
+        void* payload;
+        uint32_t size;
+    };
+    typedef std::unordered_map<uint16_t, std::vector<SDOData>> MasterObjectDictionary; ///< key: index of sdo, value vector which index are the subindex of sdo.
+
     ///< Brief
     class MasterMailbox
     {
     public:
-        MasterMailbox(CoE::MasterDeviceDescription& master_description);
+        MasterMailbox();
         ~MasterMailbox() = default;
+
+        void init(CoE::MasterDeviceDescription& master_description);
 
         /// Brief Process a canOpen message (SDO) aimed at the master. Other protocols are not supported.
         std::shared_ptr<GatewayMessage> createProcessedGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
@@ -40,7 +51,7 @@ namespace kickcat
 
         std::vector<uint8_t> createAbortSDO(uint16_t address, uint16_t index, uint8_t subindex, uint32_t abort_code);
 
-        CoE::MasterDeviceDescription& master_description_;
+        MasterObjectDictionary objectDictionary_;
     };
 }
 
