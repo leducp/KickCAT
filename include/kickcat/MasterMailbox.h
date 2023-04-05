@@ -36,10 +36,7 @@ namespace kickcat
         std::shared_ptr<GatewayMessage> createProcessedGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
 
     private:
-
-        // need to forge SDO
-        std::vector<uint8_t> handleSDO(GatewayMessage const& msg);
-
+        std::vector<uint8_t> replyUploadSDO(uint16_t address, uint16_t index, uint8_t subindex, bool complete_access);
 
         std::vector<uint8_t> createAbortSDO(uint16_t address, uint16_t index, uint8_t subindex, uint32_t abort_code);
 

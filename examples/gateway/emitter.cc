@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
 
     uint32_t device_type = 5;
     uint32_t device_type_size = 4;
-    mailbox.createSDO(0x1000, 0, false, CoE::SDO::request::UPLOAD_SEGMENTED, &device_type, &device_type_size);
+    mailbox.createSDO(0x1000, 0, false, CoE::SDO::request::UPLOAD, &device_type, &device_type_size);
 
     auto msg = mailbox.send();
     msg->setAddress(0); // target master

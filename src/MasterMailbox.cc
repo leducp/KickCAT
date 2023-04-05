@@ -26,12 +26,10 @@ namespace kickcat
             DEBUG_PRINT("VALID message type \n");
         }
 
-        // Default response: ABORT
-
         switch (coe->command)
         {
         case CoE::SDO::request::UPLOAD:
-            //TODO
+            response = replyUploadSDO(header->address, coe->index, coe->subindex, coe->complete_access);
             break;
         case CoE::SDO::request::DOWNLOAD:
         case CoE::SDO::request::DOWNLOAD_SEGMENTED:
@@ -41,10 +39,6 @@ namespace kickcat
             response = createAbortSDO(header->address, coe->index, coe->subindex, abort_code);
         }
 
-
-        // Test handle proper SDO response.
-
-        //response = handleSDO(*msg);
 
         uint32_t debug;
         memcpy(&debug, response.data() + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData), 4);
@@ -87,48 +81,37 @@ namespace kickcat
     }
 
 
-    std::vector<uint8_t> MasterMailbox::handleSDO(GatewayMessage const& msg)
+    std::vector<uint8_t> MasterMailbox::replyUploadSDO(uint16_t address, uint16_t index, uint8_t subindex, bool complete_access)
     {
-        std::vector<uint8_t> response;
-        response.resize(msg.size());
-        std::memcpy(response.data(), msg.data(), msg.size());
-        mailbox::ServiceData* coe = reinterpret_cast<mailbox::ServiceData*>(response.data() + sizeof(mailbox::Header));
-        // todo check coe->service == SDO_REQUEST otherwise ABORT.
-        coe->service = CoE::Service::SDO_RESPONSE;
+        // TODO no check in create, make them before hand ?
+        // TODO handle complete access
 
-        if (coe->command == CoE::SDO::request::UPLOAD)
-        {
-            uint8_t* payload = response.data() + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
+        uint32_t size = 4;
+        SDOFrame sdo(size);
 
-            printf("Ask for sdo upload index %x subindex %x \n", coe->index, coe->subindex);
+        sdo.header_->len = sizeof(mailbox::ServiceData) + size;
+        sdo.header_->address = address;
+        sdo.header_->channel = 0; // unused;
+        sdo.header_->priority = 0; // unused;
+        sdo.header_->type = mailbox::CoE;
+        sdo.header_->count = 0; // unused;
 
-            switch (coe->index)
-            {
-                case 0x1000:
-                {
-                    // todo check subindex
-                    // todo check size ?
+        sdo.coe_->number = 0;
+        sdo.coe_->reserved = 0;
+        sdo.coe_->service = CoE::Service::SDO_RESPONSE;
 
-                        // expedited transfer
-                        coe->transfer_type  = 1;
-                        coe->size_indicator = 1;
-                        coe->block_size = 0;//(4 - size) & 0x3;
+        sdo.coe_->size_indicator = 1;
+        sdo.coe_->transfer_type  = 0;
+        sdo.coe_->block_size     = 0;
+        sdo.coe_->complete_access = uint8_t (complete_access);
+        sdo.coe_->command = CoE::SDO::response::UPLOAD;
 
+        sdo.coe_->index = index;
+        sdo.coe_->subindex = subindex;
 
-                    printf("Response device type %i \n", master_description_.device_type);
-                    printf("SDO type %u\n", coe->transfer_type);
-                    std::memcpy(payload, &master_description_.device_type, sizeof(master_description_.device_type));
-                    break;
-                }
-                default:
-                {
-                    //abort
-                }
-            }
-        }
+        int32_t payload = 42;
+        memcpy(sdo.payload_, &payload, size);
 
-
-        return response;
+        return sdo.data_;
     }
-
 }
