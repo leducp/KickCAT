@@ -82,8 +82,6 @@ int main(int argc, char* argv[])
     try
     {
         bus.init();
-
-        printf("Init done \n");
         print_current_state();
     }
     catch (ErrorCode const& e)

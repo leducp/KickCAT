@@ -90,7 +90,6 @@ namespace kickcat
 
         for (auto it = to_process.begin(); it != to_process.end(); ++it)
         {
-            printf("FOR auto process \n");
             ProcessingResult state = (*it)->process(raw_message);
             switch (state)
             {
@@ -206,31 +205,26 @@ namespace kickcat
         mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(received + sizeof(mailbox::Header));
         uint8_t const* payload = received + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
 
-        printf("PROCESSING SDO address %x \n", header->address);
         // skip gateway message
         if ((header->address & mailbox::GATEWAY_MESSAGE_MASK) != 0)
         {
-            printf("DEUBG 1.1\n");
             return ProcessingResult::NOOP;
         }
 
         // check if the received message is related to this one
         if (header->type != mailbox::Type::CoE)
         {
-            printf("DEUBG 1.2\n");
             return ProcessingResult::NOOP;
         }
 
         if ((coe->service != CoE::Service::SDO_REQUEST) and (coe->service != CoE::Service::SDO_RESPONSE))
         {
-            printf("DEUBG 1.3\n");
             return ProcessingResult::NOOP;
         }
 
         // check index and subindex for non segmented request
         if ((coe_->command == CoE::SDO::request::UPLOAD) or (coe_->command == CoE::SDO::request::DOWNLOAD))
         {
-            printf("DEUBG 1.4\n");
             if ((coe->index != coe_->index) or (coe->subindex != coe_->subindex))
             {
                 return ProcessingResult::NOOP;
@@ -248,7 +242,6 @@ namespace kickcat
             return ProcessingResult::FINALIZE;
         }
 
-        printf("DEUBG 1\n");
         // everything is fine: process the payload
         switch (coe_->command)
         {
@@ -258,7 +251,6 @@ namespace kickcat
             case CoE::SDO::request::DOWNLOAD_SEGMENTED:   { return processDownloadSegmented(header, coe, payload); }
             default:
             {
-                printf("DEUBG 2\n");
                 status_ = MessageStatus::COE_UNKNOWN_SERVICE;
                 return ProcessingResult::FINALIZE;
             }
@@ -273,8 +265,6 @@ namespace kickcat
             status_ = MessageStatus::COE_WRONG_SERVICE;
             return ProcessingResult::FINALIZE;
         }
-
-        printf("Process upload transfer type %d\n", coe->transfer_type);
 
         if (coe->transfer_type == 1)
         {
@@ -296,7 +286,7 @@ namespace kickcat
         uint32_t const complete_size = *reinterpret_cast<uint32_t const*>(payload);
         payload += 4;
 
-        printf("PROCESSING SDO payload size is %u\n", complete_size);
+        printf("Complete size %i client data size %i\n", complete_size, *client_data_size_);
 
         if (*client_data_size_ < complete_size)
         {
@@ -305,14 +295,12 @@ namespace kickcat
         }
 
         uint32_t const data_len = header->len - 10;
-        printf("DATA len %u \n", data_len);
         if (data_len >= complete_size)
         {
             // standard
             std::memcpy(client_data_, payload, complete_size);
             *client_data_size_ = complete_size;
 
-            printf("Success PROCESSING \n");
             status_ = MessageStatus::SUCCESS;
             return ProcessingResult::FINALIZE;
         }
@@ -441,9 +429,7 @@ namespace kickcat
         // Switch address field with gateway index and identifier
         address_ = header_->address;
 
-        printf("Address origin %x \n", address_);
         header_->address = mailbox::GATEWAY_MESSAGE_MASK | gateway_index;
-        printf("Address switched origin %x \n", header_->address);
     }
 
 
@@ -460,16 +446,14 @@ namespace kickcat
         // It is the reply to this request: store the result and set back the address field
         int32_t size = header->len + sizeof(mailbox::Header);
 
-        printf("Size processed Gateway %i data %p\n", size, data_.data());
         data_.resize(size);
-        printf("After resize data %p\n", data_.data());
+        printf("Gateway process size %li \n", size);
         header_ = reinterpret_cast<mailbox::Header*>(data_.data());
         std::memcpy(data_.data(), received, size);
 
 
         header_->address = address_;
 
-        printf("Gateway message process size %i  Final address %x \n", size, header_->address);
         status_ = MessageStatus::SUCCESS;
         return ProcessingResult::FINALIZE;
     }

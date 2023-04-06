@@ -957,11 +957,8 @@ namespace kickcat
                 return nullptr;
             }
 
-            std::shared_ptr<GatewayMessage> msg = mailbox_gateway_.createProcessedGatewayMessage(raw_message, raw_message_size, gateway_index);
-
-            mailbox::Header const* debugHeader = reinterpret_cast<mailbox::Header const *>(msg->data());
-            printf("Bus add gateway msg address %x \n", debugHeader->address);
-            return msg;
+            std::shared_ptr<GatewayMessage> response = mailbox_gateway_.answerGatewayMessage(raw_message, raw_message_size, gateway_index);
+            return response;
         }
 
         // Non zero address is for a slave.

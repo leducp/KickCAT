@@ -8,6 +8,7 @@ namespace kickcat
     {
         switch (abort_code)
         {
+            // TODO constants in protocol.h
             case 0x05030000: { return "Toggle bit not changed";                                                                     }
             case 0x05040000: { return "SDO protocol timeout";                                                                       }
             case 0x05040001: { return "Client/Server command specifier not valid or unknown";                                       }

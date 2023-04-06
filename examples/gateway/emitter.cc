@@ -40,8 +40,8 @@ int main(int argc, char* argv[])
 
 
     // Serial number storage
-    uint32_t sn = 0;
-    uint32_t sn_size = 4;
+//    uint32_t sn = 0;
+//    uint32_t sn_size = 4;
 
     // Local mailbox to generate and process messages
     Mailbox mailbox;
@@ -92,9 +92,22 @@ int main(int argc, char* argv[])
     //Random SDO, (Target is an Elmo Gold device)
     //mailbox.createSDO(0x1018, 4, false, CoE::SDO::request::UPLOAD, &sn, &sn_size);
 
-    uint32_t device_type = 5;
-    uint32_t device_type_size = 4;
-    mailbox.createSDO(0x1000, 0, false, CoE::SDO::request::UPLOAD, &device_type, &device_type_size);
+
+
+
+
+
+
+
+
+//    uint32_t device_type = 5;
+//    uint32_t device_type_size = 4;
+//    mailbox.createSDO(0x1000, 0, false, CoE::SDO::request::UPLOAD, &device_type, &device_type_size);
+
+    CoE::IdentityObject identity;
+    uint32_t identity_size = sizeof(identity);
+    printf("client identity size %i \n", identity_size);
+    mailbox.createSDO(0x1018, 0, true, CoE::SDO::request::UPLOAD, &identity, &identity_size);
 
     auto msg = mailbox.send();
     msg->setAddress(0); // target master
@@ -114,32 +127,21 @@ int main(int argc, char* argv[])
         printf("Nothing to read \n");
     }
 
-    mailbox::Header* debugHeader = reinterpret_cast<mailbox::Header *>(frame + sizeof(EthercatHeader));
-
-    printf("Debug header address %x \n", debugHeader->address);
-
     if (mailbox.receive(frame + sizeof(EthercatHeader)) == false)
     {
         printf("Mailbox didn't process this message\n");
     }
 
-    printf("Status msg received : %x \n", msg->status());
 
     mailbox::ServiceData* coe = reinterpret_cast<mailbox::ServiceData*>(frame + sizeof(EthercatHeader) + sizeof(mailbox::Header));
-    if (coe->command == CoE::SDO::request::ABORT)
-    {
-        printf("SDO REQUEST WAS PROPERLY ABORTED \n");
-    }
 
     if (coe->service == CoE::Service::SDO_RESPONSE)
     {
-        printf("SDO REQUEST RECEIVED A RESPONSE \n");
+        //printf("Device type received %i \n", device_type);
 
-        printf("Device type received %i \n", device_type);
-
-        uint32_t debug_type;
-        memcpy(&debug_type, frame + sizeof(EthercatHeader) + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData), 4);
-        printf("Actual received frame device type %i \n", debug_type);
+        printf("Identity vendor_id %i \n", identity.vendor_id);
+        printf("Identity number_of_entries %i \n", identity.number_of_entries);
+        printf("Identity serial_number %i \n", identity.serial_number);
     }
 
     return 0;

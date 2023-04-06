@@ -512,7 +512,7 @@ namespace kickcat
             uint32_t product_code     = 43;
             uint32_t revision_number  = 44;
             uint32_t serial_number    = 45;
-        };
+        } __attribute__((__packed__));
 
         struct MasterDeviceDescription
         {

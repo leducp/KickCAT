@@ -27,12 +27,15 @@ namespace kickcat
     };
 
 
-    struct SDOData
+    struct SDOData // rename field
     {
         void* payload;
         uint32_t size;
     };
-    typedef std::unordered_map<uint16_t, std::vector<SDOData>> MasterObjectDictionary; ///< key: index of sdo, value vector which index are the subindex of sdo.
+    ///< key: index of sdo, value vector which index are the subindex of sdo.
+    ///
+    /// // TODO custom type for std::vector<SDOData> with metada (complete access short cuts)
+    typedef std::unordered_map<uint16_t, std::vector<SDOData>> MasterObjectDictionary;
 
     ///< Brief
     class MasterMailbox
@@ -44,12 +47,14 @@ namespace kickcat
         void init(CoE::MasterDeviceDescription& master_description);
 
         /// Brief Process a canOpen message (SDO) aimed at the master. Other protocols are not supported.
-        std::shared_ptr<GatewayMessage> createProcessedGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
+        std::shared_ptr<GatewayMessage> answerGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
 
     private:
         std::vector<uint8_t> replyUploadSDO(uint16_t address, uint16_t index, uint8_t subindex, bool complete_access);
 
         std::vector<uint8_t> createAbortSDO(uint16_t address, uint16_t index, uint8_t subindex, uint32_t abort_code);
+
+        std::vector<uint8_t> createCompleteAccessUploadSDO(uint16_t address, uint16_t index, uint8_t subindex);
 
         MasterObjectDictionary objectDictionary_;
     };
