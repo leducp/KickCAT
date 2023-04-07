@@ -71,7 +71,7 @@ namespace kickcat
             THROW_SYSTEM_ERROR("ioctl(SIOCGIFFLAGS)");
         }
 
-        ifr.ifr_flags = ifr.ifr_flags | IFF_PROMISC | IFF_BROADCAST;
+        ifr.ifr_flags = ifr.ifr_flags | IFF_PROMISC | IFF_BROADCAST  | IFF_UP;
         rc = ioctl(fd_, SIOCSIFFLAGS, &ifr);
         if (rc < 0)
         {
@@ -99,7 +99,7 @@ namespace kickcat
             {
                 THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_GCOALESCE)");
             }
-            DEBUG_PRINT("applied rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
+            DEBUG_PRINT("applied tx-usecs rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
         }
 
 

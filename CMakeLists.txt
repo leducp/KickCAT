@@ -22,9 +22,13 @@ set(LIB_SOURCES
 
 if (UNIX)
   set(OS_LIB_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/ConditionVariable.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Mutex.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/SharedMemory.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/VirtualSocket.cc
   )
 elseif(PIKEOS)
   set(OS_LIB_SOURCES
