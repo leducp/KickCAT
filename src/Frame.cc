@@ -184,6 +184,29 @@ namespace kickcat
         return std::make_tuple(header, data, wkc);
     }
 
+
+    std::tuple<DatagramHeader*, uint8_t*, uint16_t*> Frame::peekDatagram()
+    {
+        if (next_datagram_ == nullptr)
+        {
+            return std::make_tuple(nullptr, nullptr, nullptr);
+        }
+
+        DatagramHeader* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
+        uint8_t* data = next_datagram_ + sizeof(DatagramHeader);
+        uint16_t* wkc = reinterpret_cast<uint16_t*>(data + header->len);
+        next_datagram_ = data + header->len + sizeof(uint16_t);
+
+        if (header->multiple == 0)
+        {
+            // This was the last datagram of this frame: cannot extract more
+            next_datagram_ = nullptr;
+        }
+
+        return std::make_tuple(header, data, wkc);
+    }
+
+
     void Frame::setSourceMAC(MAC const& src)
     {
         std::memcpy(ethernet_->src, src, sizeof(ethernet_->src));

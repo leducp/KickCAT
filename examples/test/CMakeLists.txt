@@ -1,6 +1,4 @@
-set(EXAMPLE_SRCS server.cc)
-
-add_executable(server ${EXAMPLE_SRCS})
+add_executable(server server.cc)
 target_link_libraries(server kickcat)
 set_kickcat_properties(server)
 

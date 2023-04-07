@@ -17,4 +17,10 @@ namespace kickcat
     {
         return since_epoch() - start;
     }
+
+    static nanoseconds start_time = since_epoch();
+    nanoseconds since_start()
+    {
+        return since_epoch() - start_time;
+    }
 }

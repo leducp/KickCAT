@@ -143,9 +143,9 @@ namespace kickcat
 
     State Bus::getCurrentState(Slave& slave)
     {
-        auto error = [](DatagramState const&)
+        auto error = [](DatagramState const& state)
         {
-            DEBUG_PRINT("Error while trying to get slave state.");
+            DEBUG_PRINT("Error while trying to get slave state (%s).\n", toString(state));
         };
 
         sendGetALStatus(slave, error);
@@ -533,7 +533,7 @@ namespace kickcat
 
             auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                if (wkc != pi_frame.inputs.size())
+                if (wkc != (pi_frame.inputs.size() + pi_frame.outputs.size() * 2)) //TODO: buggy in master?
                 {
                     DEBUG_PRINT("Invalid working counter\n");
                     return DatagramState::INVALID_WKC;
@@ -709,9 +709,9 @@ namespace kickcat
         }
 
         // Read result
-        auto error = [](DatagramState const&)
+        auto error = [](DatagramState const& state)
         {
-            THROW_ERROR("Invalid working counter");
+            THROW_ERROR_DATAGRAM("Error while fetching eeprom data", state);
         };
 
         for (auto& slave : slaves)

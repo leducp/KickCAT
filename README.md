@@ -74,6 +74,12 @@ Note: you can easily provide GTest via conan package manager:
   cmake ..
   ```
 
+## Simulator
+To start a network simulator, you can either create a virtual ethernet pair (on Linux you can use the helper script 'create_virtual_ethernet.sh') or use a real network interface by using two computer or two interfaces on the same computer.
+Note: the simulator has to be started first
+
+
+
 ## EtherCAT doc
 https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html&id=3196541253205318339
 https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf

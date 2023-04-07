@@ -26,17 +26,20 @@ if (UNIX)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
   )
+  set(OS_LIBRARIES pthread rt)
 elseif(PIKEOS)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/ErrorCategory.cc
   )
+  set(OS_LIBRARIES )
 endif()
 
 add_library(kickcat ${LIB_SOURCES} ${OS_LIB_SOURCES})
 target_include_directories(kickcat PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
+target_link_libraries(kickcat pthread rt)
 set_kickcat_properties(kickcat)
 
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
@@ -91,6 +94,7 @@ endif()
 
 if (UNIX)
     add_subdirectory(examples)
+    add_subdirectory(simulation)
 endif()
 
 add_subdirectory(tools)
