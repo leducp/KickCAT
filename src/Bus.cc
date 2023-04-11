@@ -957,7 +957,7 @@ namespace kickcat
                 return nullptr;
             }
 
-            std::shared_ptr<GatewayMessage> response = mailbox_gateway_.answerGatewayMessage(raw_message, raw_message_size, gateway_index);
+            std::shared_ptr<GatewayMessage> response = mailbox_gateway_.replyGatewayMessage(raw_message, raw_message_size, gateway_index);
             return response;
         }
 

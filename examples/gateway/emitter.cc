@@ -104,10 +104,10 @@ int main(int argc, char* argv[])
 //    uint32_t device_type_size = 4;
 //    mailbox.createSDO(0x1000, 0, false, CoE::SDO::request::UPLOAD, &device_type, &device_type_size);
 
-    CoE::IdentityObject identity;
+    CoE::IdentityObject identity{1,2,3,4,5};
     uint32_t identity_size = sizeof(identity);
     printf("client identity size %i \n", identity_size);
-    mailbox.createSDO(0x1018, 0, true, CoE::SDO::request::UPLOAD, &identity, &identity_size);
+    mailbox.createSDO(0x1018, 1, true, CoE::SDO::request::UPLOAD, &identity.vendor_id, &identity_size);
 
     auto msg = mailbox.send();
     msg->setAddress(0); // target master
@@ -137,10 +137,10 @@ int main(int argc, char* argv[])
 
     if (coe->service == CoE::Service::SDO_RESPONSE)
     {
-        //printf("Device type received %i \n", device_type);
+//        printf("Device type received %i \n", device_type);
 
-        printf("Identity vendor_id %i \n", identity.vendor_id);
         printf("Identity number_of_entries %i \n", identity.number_of_entries);
+        printf("Identity vendor_id %i \n", identity.vendor_id);
         printf("Identity serial_number %i \n", identity.serial_number);
     }
 
