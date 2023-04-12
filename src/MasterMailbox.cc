@@ -9,17 +9,18 @@ namespace kickcat
 
     void MasterMailbox::init(CoE::MasterDeviceDescription& master_description)
     {
-        objectDictionary_.insert({0x1000, {{{0, SDOField{&master_description.device_type, sizeof(master_description.device_type)}}}, false, nullptr, 0}});
+        // Associate pointers to master data to their SDO index / subindex.
+        objectDictionary_.insert({0x1000, CREATE_UNITARY_SDO_OBJECT(master_description.device_type));
         objectDictionary_.insert({0x1018,
                                  {
                                      {
-                                         {0, SDOField{&master_description.identity.number_of_entries, sizeof(master_description.identity.number_of_entries)}},
-                                         {1, SDOField{&master_description.identity.vendor_id, sizeof(master_description.identity.vendor_id)}}
+                                         {0, CREATE_SDO_FIELD(master_description.identity.number_of_entries)},
+                                         {1, CREATE_SDO_FIELD(master_description.identity.vendor_id)},
+                                         {2, CREATE_SDO_FIELD(master_description.identity.product_code)},
+                                         {3, CREATE_SDO_FIELD(master_description.identity.revision_number)},
+                                         {4, CREATE_SDO_FIELD(master_description.identity.serial_number)}
                                      }, true, &master_description.identity.number_of_entries, sizeof(CoE::IdentityObject)
                                  }
-//                                 SDOField{&master_description.identity.product_code, sizeof(master_description.identity.product_code)},
-//                                 SDOField{&master_description.identity.revision_number, sizeof(master_description.identity.revision_number)},
-//                                 SDOField{&master_description.identity.serial_number, sizeof(master_description.identity.serial_number)}
         });
     }
 

@@ -10,6 +10,10 @@
 
 namespace kickcat
 {
+#define CREATE_SDO_FIELD(field) SDOField{&field, sizeof(field)}
+#define CREATE_UNITARY_SDO_OBJECT(field) {{{0, CREATE_SDO_FIELD(master_description.device_type)}}, false, nullptr, 0}}
+
+
     struct SDOFrame
     {
         SDOFrame(int32_t payload_size)
@@ -60,8 +64,6 @@ namespace kickcat
         std::vector<uint8_t> replyUploadSDO(uint16_t address, uint16_t index, uint8_t subindex, bool complete_access);
 
         std::vector<uint8_t> createAbortSDO(uint16_t address, uint16_t index, uint8_t subindex, uint32_t abort_code);
-
-        std::vector<uint8_t> createCompleteAccessUploadSDO(uint16_t address, uint16_t index, uint8_t subindex);
 
         MasterObjectDictionary objectDictionary_;
     };
