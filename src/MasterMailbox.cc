@@ -10,7 +10,8 @@ namespace kickcat
     void MasterMailbox::init(CoE::MasterDeviceDescription& master_description)
     {
         // Associate pointers to master data to their SDO index / subindex.
-        objectDictionary_.insert({0x1000, CREATE_UNITARY_SDO_OBJECT(master_description.device_type));
+        objectDictionary_.insert({0x1000, CREATE_UNITARY_SDO_OBJECT(master_description.device_type)});
+        objectDictionary_.insert({0x1008, CREATE_UNITARY_SDO_OBJECT_STRING(master_description.device_name)});
         objectDictionary_.insert({0x1018,
                                  {
                                      {
@@ -121,7 +122,6 @@ namespace kickcat
 
             if (subindex == 1)
             {
-                printf("SUBINDEX 1 \n");
                 // skip subindex 0
                 uint32_t sizeSubindex0 = entry.fields.at(0).size;
                 data.payload = (uint8_t*)entry.payload_complete_access + sizeSubindex0;
@@ -129,7 +129,6 @@ namespace kickcat
             }
             else
             {
-                printf("SUBINDEX 0 \n");
                 data.payload = entry.payload_complete_access;
                 data.size = entry.size_complete_access;
             }
@@ -161,10 +160,6 @@ namespace kickcat
         sdo.coe_->subindex = subindex;
         memcpy(sdo.payload_, &data.size, 4); // fill complete size
         memcpy((uint8_t*)sdo.payload_ + 4, data.payload, data.size); // data
-
-        CoE::IdentityObject debug{1,1,1,1,1};
-        memcpy(&debug.vendor_id, data.payload, data.size);
-        printf("Debug: %u %u %u %u \n", debug.vendor_id, debug.product_code, debug.revision_number, debug.serial_number);
 
         return sdo.data_;
     }

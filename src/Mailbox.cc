@@ -301,10 +301,6 @@ namespace kickcat
             std::memcpy(client_data_, payload, complete_size);
             *client_data_size_ = complete_size;
 
-            CoE::IdentityObject debug{1,1,1,1,1};
-            memcpy(&debug.vendor_id, client_data_, *client_data_size_);
-            printf("Debug receive SDO: %u %u %u %u \n", debug.vendor_id, debug.product_code, debug.revision_number, debug.serial_number);
-
             status_ = MessageStatus::SUCCESS;
             return ProcessingResult::FINALIZE;
         }
