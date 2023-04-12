@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
     std::string device_name;
     device_name.resize(50);
     uint32_t device_name_size = device_name.size();
-    mailbox.createSDO(0x1008, 0, false, CoE::SDO::request::UPLOAD, device_name.data(), &device_name_size);
+    mailbox.createSDO(0x1008, 1, false, CoE::SDO::request::UPLOAD, device_name.data(), &device_name_size);
 
     auto msg = mailbox.send();
     msg->setAddress(0); // target master

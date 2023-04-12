@@ -54,7 +54,7 @@ namespace kickcat
             case CoE::SDO::request::UPLOAD_SEGMENTED:
             default:
             {
-                uint32_t abort_code = 0x06010000; //unsupported access
+                uint32_t abort_code = CoE::SDO::abortcode::UNSUPPORTED_ACCESS; //unsupported access
                 response = createAbortSDO(header->address, coe->index, coe->subindex, abort_code);
             }
         }
@@ -102,12 +102,13 @@ namespace kickcat
 
         if (entryIt == objectDictionary_.end())
         {
-            uint32_t abort_code = 0x06020000; // object does not exists.
+            uint32_t abort_code = CoE::SDO::abortcode::OBJECT_DOES_NOT_EXIST;
             return createAbortSDO(address, index, subindex, abort_code);
         }
-        if (entry.fields.size() < subindex)
+
+        if (entry.fields.size() <= subindex)
         {
-            uint32_t abort_code = 0x06090011; // subindex does not exists.
+            uint32_t abort_code = CoE::SDO::abortcode::SUBINDEX_DOES_NOT_EXIST;
             return createAbortSDO(address, index, subindex, abort_code);
         }
 
@@ -116,7 +117,7 @@ namespace kickcat
         {
             if (subindex > 1 or not entry.complete_access_enable)
             {
-                uint32_t abort_code = 0x06010000; // Unsupported access to object
+                uint32_t abort_code = CoE::SDO::abortcode::UNSUPPORTED_ACCESS;
                 return createAbortSDO(address, index, subindex, abort_code);
             }
 

@@ -11,9 +11,7 @@
 namespace kickcat
 {
 #define CREATE_SDO_FIELD(field) SDOField{&field, sizeof(field)}
-
 #define CREATE_STRING_FIELD(field) SDOField{field.data(), static_cast<uint32_t>(field.size())}
-
 #define CREATE_UNITARY_SDO_OBJECT(field) {{{0, CREATE_SDO_FIELD(field)}}, false, nullptr, 0}
 #define CREATE_UNITARY_SDO_OBJECT_STRING(field) {{{0, CREATE_STRING_FIELD(field)}}, false, nullptr, 0}
 

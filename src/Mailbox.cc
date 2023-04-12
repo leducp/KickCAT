@@ -237,7 +237,7 @@ namespace kickcat
         {
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
-            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", coe->index, coe->subindex, code, CoE::SDO::abort_to_str(code));
+            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", coe->index, coe->subindex, code, CoE::SDO::abortcode::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }
@@ -447,7 +447,7 @@ namespace kickcat
         int32_t size = header->len + sizeof(mailbox::Header);
 
         data_.resize(size);
-        printf("Gateway process size %li \n", size);
+        printf("Gateway process size %i \n", size);
         header_ = reinterpret_cast<mailbox::Header*>(data_.data());
         std::memcpy(data_.data(), received, size);
 
