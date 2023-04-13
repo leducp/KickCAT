@@ -553,10 +553,9 @@ namespace kickcat
         struct MasterDeviceDescription
         {
             uint32_t device_type = 1;
-            // uint8_t error_register ??
-             std::string device_name;
-            // std::string hardware_version ??
-            // std::string software_version ??
+            std::string device_name;
+            std::string hardware_version;
+            std::string software_version;
             IdentityObject identity;
         };
     }

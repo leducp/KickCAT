@@ -12,6 +12,8 @@ namespace kickcat
         // Associate pointers to master data to their SDO index / subindex.
         objectDictionary_.insert({0x1000, CREATE_UNITARY_SDO_OBJECT(master_description.device_type)});
         objectDictionary_.insert({0x1008, CREATE_UNITARY_SDO_OBJECT_STRING(master_description.device_name)});
+        objectDictionary_.insert({0x1009, CREATE_UNITARY_SDO_OBJECT_STRING(master_description.hardware_version)});
+        objectDictionary_.insert({0x100A, CREATE_UNITARY_SDO_OBJECT_STRING(master_description.software_version)});
         objectDictionary_.insert({0x1018,
                                  {
                                      {
