@@ -558,6 +558,90 @@ namespace kickcat
             std::string software_version;
             IdentityObject identity;
         };
+
+        // ETG1510
+        struct ConfigurationData
+        {
+            uint8_t number_of_entries;
+            uint16_t fixed_station_address;
+            std::string type;                       // CA ?
+            std::string name;
+            uint32_t device_type;
+            uint32_t vendor_id;
+            uint32_t product_code;
+            uint32_t revision_number;
+            uint32_t serial_number;
+            uint16_t mailbox_out_size;
+            uint16_t mailbox_in_size;
+            uint8_t link_status;
+            uint8_t link_preset;
+            uint8_t flags;
+            uint16_t port_physics;
+            uint16_t mailbox_protocol_supported;
+            bool diag_history_object_supported;
+        };
+
+        // ETG1510
+        struct InformationData
+        {
+            uint8_t number_of_entries;
+            uint16_t station_address;
+            uint32_t vendor_id;
+            uint32_t product_code;
+            uint32_t revision_number;
+            uint32_t serial_number;
+            uint16_t dl_status_register;
+        };
+
+        // ETG 1510
+        struct DiagnosisData
+        {
+            uint8_t number_of_entries;
+            uint16_t al_status;
+            uint16_t al_control;                  /// RW / RO ?
+            uint16_t last_al_status_code;
+            uint8_t link_conn_status;
+            uint8_t link_control;                 /// RW / RO ?
+            uint16_t fixed_address_conn_port_0;
+            uint16_t fixed_address_conn_port_1;
+            uint16_t fixed_address_conn_port_2;
+            uint16_t fixed_address_conn_port_3;
+            uint32_t frame_error_counter_port_0;
+            uint32_t frame_error_counter_port_1;
+            uint32_t frame_error_counter_port_2;
+            uint32_t frame_error_counter_port_3;
+            uint32_t cyclic_wc_error_counter;
+            uint32_t slave_not_present_counter;
+            uint32_t abnormal_state_change_counter;
+            bool disable_automatic_link_control;  /// RW /RO ?
+            uint32_t last_coe_soe_protocol_error;
+            bool new_diag_message_available;
+        };
+
+        struct DetectModulesCommand
+        {
+            uint8_t number_of_entries;
+            char scan_command_request[2];     /// RW ?
+            uint8_t scan_command_status;
+            char scan_command_response[6];
+        };
+
+        struct MasterDiagData
+        {
+            uint8_t number_of_entries;
+            uint32_t cyclic_lost_frames;
+            uint32_t acyclic_lost_frames;
+            uint32_t cyclic_frames_per_second;
+            uint32_t acyclic_frame_per_second;
+            uint16_t master_state;
+        };
+
+        struct DiagInterfaceControl
+        {
+            uint8_t number_of_entries;
+            uint16_t reset_diag_info; /// RW
+        };
+
     }
 
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
