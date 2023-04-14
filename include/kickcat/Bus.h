@@ -10,6 +10,8 @@
 #include "Error.h"
 #include "Frame.h"
 #include "Link.h"
+#include "MasterMailbox.h"
+#include "protocol.h"
 #include "Slave.h"
 
 namespace kickcat
@@ -107,6 +109,7 @@ namespace kickcat
 
         void clearErrorCounters();
 
+        void setMasterDeviceIdentity(CoE::MasterDeviceDescription description);
 
     protected: // for unit testing
 
@@ -167,6 +170,9 @@ namespace kickcat
         nanoseconds big_wait{10ms};
 
         uint16_t irq_mask_{0};
+
+        CoE::MasterDeviceDescription deviceDescription_{1, "my_name", "hw version", "soft version", {4, 11, 12, 13, 14}};
+        MasterMailbox mailbox_gateway_{};
     };
 }
 

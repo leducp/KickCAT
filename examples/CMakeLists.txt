@@ -1,5 +1,5 @@
 add_subdirectory(common)
 add_subdirectory(easycat)
-add_subdirectory(test)
+add_subdirectory(gateway)
 add_subdirectory(elmo_control)
 add_subdirectory(ingenia_control)

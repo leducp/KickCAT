@@ -299,10 +299,10 @@ TEST_F(MailboxTest, SDO_download_abort)
     sdo->service = CoE::Service::SDO_RESPONSE;
     sdo->index = 0x1018;
     sdo->subindex = 1;
-    *static_cast<int32_t*>(payload) = 0x06010000;
+    *static_cast<int32_t*>(payload) = CoE::SDO::abortcode::UNSUPPORTED_ACCESS;
     ASSERT_TRUE(mailbox.receive(raw_message));
 
-    ASSERT_EQ(0x06010000, message->status());
+    ASSERT_EQ(CoE::SDO::abortcode::UNSUPPORTED_ACCESS, message->status());
 }
 
 TEST_F(MailboxTest, SDO_timedout)

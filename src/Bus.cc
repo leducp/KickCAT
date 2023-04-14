@@ -108,6 +108,8 @@ namespace kickcat
                 slave.mailbox.to_process.push_back(emg);
             }
         }
+
+        mailbox_gateway_.init(deviceDescription_);
     }
 
 
@@ -945,14 +947,21 @@ namespace kickcat
     {
         mailbox::Header const* const mbx_header = reinterpret_cast<mailbox::Header const*>(raw_message);
 
-        // Try to associate the request with a destination
+        // Address 0 is a message for the master.
         if (mbx_header->address == 0)
         {
-            // Master is the destination, unsupported for now (ETG 1510)
-            DEBUG_PRINT("Master mailbox not implemented");
-            return nullptr;
+            // handle only CoE SDO otherwise drop.
+            if (mbx_header->type != mailbox::CoE)
+            {
+                printf("ABORT unsupported protocol\n");
+                return nullptr;
+            }
+
+            std::shared_ptr<GatewayMessage> response = mailbox_gateway_.replyGatewayMessage(raw_message, raw_message_size, gateway_index);
+            return response;
         }
 
+        // Non zero address is for a slave.
         auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header->address; });
         if (it == slaves_.end())
         {
@@ -1010,5 +1019,4 @@ namespace kickcat
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
         link_->processDatagrams();
     }
-
 }

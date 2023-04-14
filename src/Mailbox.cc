@@ -200,6 +200,7 @@ namespace kickcat
 
     ProcessingResult SDOMessage::process(uint8_t const* received)
     {
+
         mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(received);
         mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(received + sizeof(mailbox::Header));
         uint8_t const* payload = received + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
@@ -236,7 +237,7 @@ namespace kickcat
         {
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
-            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", coe->index, coe->subindex, code, CoE::SDO::abort_to_str(code));
+            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", coe->index, coe->subindex, code, CoE::SDO::abortcode::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }
@@ -284,6 +285,8 @@ namespace kickcat
         // standard or segmented transfer
         uint32_t const complete_size = *reinterpret_cast<uint32_t const*>(payload);
         payload += 4;
+
+        printf("Complete size %i client data size %i\n", complete_size, *client_data_size_);
 
         if (*client_data_size_ < complete_size)
         {
@@ -425,6 +428,7 @@ namespace kickcat
 
         // Switch address field with gateway index and identifier
         address_ = header_->address;
+
         header_->address = mailbox::GATEWAY_MESSAGE_MASK | gateway_index;
     }
 
@@ -441,8 +445,12 @@ namespace kickcat
 
         // It is the reply to this request: store the result and set back the address field
         int32_t size = header->len + sizeof(mailbox::Header);
+
         data_.resize(size);
+        printf("Gateway process size %i \n", size);
+        header_ = reinterpret_cast<mailbox::Header*>(data_.data());
         std::memcpy(data_.data(), received, size);
+
 
         header_->address = address_;
 
