@@ -2,8 +2,8 @@
 #define KICKCAT_INTERNAL_SBUF_QUEUE_H
 
 #include "Ring.h"
-#include "OS/Linux/Mutex.h"
-#include "OS/Linux/ConditionVariable.h"
+#include "kickcat/OS/Linux/Mutex.h"
+#include "kickcat/OS/Linux/ConditionVariable.h"
 
 
 namespace kickcat
@@ -13,18 +13,25 @@ namespace kickcat
     template<typename T, uint32_t N>
     class SBufQueue
     {
-        struct Queue
-        {
-            Mutex lock;
-            ConditionVariable cond;
-            Ring<uint32_t, N> ring;
-        };
-
     public:
         enum Mode
         {
             BLOCKING,
             NON_BLOCKING
+        };
+
+        struct Item
+        {
+            uint32_t index;
+            uint32_t len;
+            T* address;
+        };
+
+        struct Queue
+        {
+            Mutex lock;
+            ConditionVariable cond;
+            Ring<Item, N> ring;
         };
 
         struct Context
@@ -33,20 +40,12 @@ namespace kickcat
             {
                 pthread_mutex_t lock;
                 pthread_cond_t cond;
-                typename Ring<uint32_t, N>::Context ring;
+                typename Ring<Item, N>::Context ring;
             };
 
             Descriptors free;
             Descriptors ready;
             T buffers[N];
-        };
-
-
-        struct Item
-        {
-            uint32_t index;
-            uint32_t len;
-            T* address;
         };
 
         SBufQueue(void* location)
@@ -72,7 +71,7 @@ namespace kickcat
             for (uint32_t i = 0; i < N; ++i)
             {
                 // Fill free buffer ring
-                (void) free_.ring.push(i);
+                (void) free_.ring.push({i, 0, nullptr});
             }
         }
 
@@ -115,7 +114,7 @@ namespace kickcat
         {
             {
                 LockGuard guard(queue.lock);
-                (void) queue.ring.push(item.index);
+                (void) queue.ring.push(item);
             }
             queue.cond.signal();
         }
@@ -132,7 +131,7 @@ namespace kickcat
             }
 
             (void) queue.cond.wait(queue.lock, [&queue](){ return not queue.ring.isEmpty(); } );
-            (void) queue.ring.pop(item.index);
+            (void) queue.ring.pop(item);
 
             // Determine item address (process dependent)
             item.address = &ctx_->buffers[item.index];

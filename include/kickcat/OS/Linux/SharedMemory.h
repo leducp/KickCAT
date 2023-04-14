@@ -22,14 +22,7 @@ namespace kickcat
         /// \return The address of the shm in this process.
         void* address() { return address_; }
 
-        /// \return The size in bytes of the shm.
-        std::size_t size() const { return size_; }
-
-        /// \return The name of the shared memory
-        std::string const& name() const { return name_; }
-
     private:
-        std::string name_{};    ///< Name of the shared memory.
         std::size_t size_{};    ///< Size in bytes of the shared memory.
         void* address_{};       ///< Address of the shared memory in this processus.
         int fd_{-1};            ///< File descriptor of the shared memory.

@@ -10,13 +10,14 @@ namespace kickcat
     void SharedMemory::open(std::string const& name, std::size_t size, void* address)
     {
         // Open the shared memory (R/W), create it if needed.
-        fd_ = shm_open(name_.c_str(), O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
+        fd_ = shm_open(name.c_str(), O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
         if (fd_ < 0)
         {
             THROW_SYSTEM_ERROR("shm_open()");
         }
 
         // Adapt the size
+        size_ = size;
         int rc = ftruncate(fd_, size_);
         if (rc < 0)
         {

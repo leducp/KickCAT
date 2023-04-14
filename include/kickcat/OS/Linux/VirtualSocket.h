@@ -1,14 +1,15 @@
 #ifndef KICKCAT_OS_LINUX_VIRTUAL_SOCKET_H
 #define KICKCAT_OS_LINUX_VIRTUAL_SOCKET_H
 
-#include "protocol.h"
-#include "AbstractSocket.h"
-#include "SharedMemory.h"
-#include "internal/SBufQueue.h"
+#include "kickcat/protocol.h"
+#include "kickcat/AbstractSocket.h"
+#include "kickcat/OS/Linux/SharedMemory.h"
+#include "kickcat/internal/SBufQueue.h"
 
 namespace kickcat
 {
     /// \brief A virtual socket that let two process communicates as if they were on a raw socket (tap like interface, without sudo)
+    ///        useful to do some testing.
     class VirtualSocket : public AbstractSocket
     {
     public:

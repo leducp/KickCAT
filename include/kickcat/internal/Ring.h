@@ -66,7 +66,7 @@ namespace kickcat
         }
 
     private:
-        volatile Context* ctx_;
+        Context* ctx_;
     };
 }
 
