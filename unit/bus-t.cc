@@ -16,7 +16,8 @@ using namespace kickcat;
 struct SDOAnswer
 {
     mailbox::Header header;
-    mailbox::ServiceData sdo;
+    CoE::Header coe;
+    CoE::ServiceData sdo;
     uint8_t payload[4];
 } __attribute__((__packed__));
 
@@ -210,7 +211,7 @@ public:
         answer.header.len = 10;
         answer.header.address = 0;
         answer.header.type = mailbox::Type::CoE;
-        answer.sdo.service = CoE::Service::SDO_RESPONSE;
+        answer.coe.service = CoE::Service::SDO_RESPONSE;
         answer.sdo.command = CoE::SDO::response::UPLOAD;
         answer.sdo.index = index;
         answer.sdo.transfer_type = 1;
@@ -445,7 +446,7 @@ TEST_F(BusTest, write_SDO_OK)
     answer.header.len = 10;
     answer.header.address = 0;
     answer.header.type = mailbox::Type::CoE;
-    answer.sdo.service = CoE::Service::SDO_RESPONSE;
+    answer.coe.service = CoE::Service::SDO_RESPONSE;
     answer.sdo.command = CoE::SDO::response::DOWNLOAD;
     answer.sdo.index = 0x1018;
     answer.sdo.subindex = 1;
@@ -508,7 +509,7 @@ TEST_F(BusTest, read_SDO_OK)
     answer.header.len = 10;
     answer.header.address = 0;
     answer.header.type = mailbox::Type::CoE;
-    answer.sdo.service = CoE::Service::SDO_RESPONSE;
+    answer.coe.service = CoE::Service::SDO_RESPONSE;
     answer.sdo.command = CoE::SDO::response::UPLOAD;
     answer.sdo.index = 0x1018;
     answer.sdo.subindex = 1;
