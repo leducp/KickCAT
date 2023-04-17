@@ -154,8 +154,9 @@ namespace kickcat
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
     {
-        coe_ = reinterpret_cast<mailbox::ServiceData*>(data_.data() + sizeof(mailbox::Header));
-        payload_ = reinterpret_cast<uint8_t*>(data_.data() + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData));
+        coe_ = pointData<CoE::Header>(header_);
+        sdo_ = pointData<CoE::ServiceData>(coe_);
+        payload_ = pointData<uint8_t>(sdo_);
 
         header_->len      = 10;
         header_->priority = 0; // unused
@@ -164,13 +165,13 @@ namespace kickcat
 
         coe_->number = 0;
         coe_->service = CoE::Service::SDO_REQUEST;
-        coe_->complete_access = CA;
-        coe_->command         = request & 0x7;
-        coe_->block_size      = 0;
-        coe_->transfer_type   = 0;
-        coe_->size_indicator  = 0;
-        coe_->index    = index;
-        coe_->subindex = subindex;
+        sdo_->complete_access = CA;
+        sdo_->command         = request & 0x7;
+        sdo_->block_size      = 0;
+        sdo_->transfer_type   = 0;
+        sdo_->size_indicator  = 0;
+        sdo_->index    = index;
+        sdo_->subindex = subindex;
 
         if (request == CoE::SDO::request::DOWNLOAD)
         {
@@ -183,9 +184,9 @@ namespace kickcat
             if (size <= 4)
             {
                 // expedited transfer
-                coe_->transfer_type  = 1;
-                coe_->size_indicator = 1;
-                coe_->block_size = (4 - size) & 0x3;
+                sdo_->transfer_type  = 1;
+                sdo_->size_indicator = 1;
+                sdo_->block_size = (4 - size) & 0x3;
                 std::memcpy(payload_, data, size);
             }
             else
@@ -200,9 +201,10 @@ namespace kickcat
 
     ProcessingResult SDOMessage::process(uint8_t const* received)
     {
-        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(received);
-        mailbox::ServiceData const* coe = reinterpret_cast<mailbox::ServiceData const*>(received + sizeof(mailbox::Header));
-        uint8_t const* payload = received + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData);
+        auto const* header  = pointData<mailbox::Header>(received);
+        auto const* coe     = pointData<CoE::Header>(header);
+        auto const* sdo     = pointData<CoE::ServiceData>(coe);
+        auto const* payload = pointData<uint8_t>(sdo);
 
         // skip gateway message
         if ((header->address & mailbox::GATEWAY_MESSAGE_MASK) != 0)
@@ -222,9 +224,9 @@ namespace kickcat
         }
 
         // check index and subindex for non segmented request
-        if ((coe_->command == CoE::SDO::request::UPLOAD) or (coe_->command == CoE::SDO::request::DOWNLOAD))
+        if ((sdo_->command == CoE::SDO::request::UPLOAD) or (sdo_->command == CoE::SDO::request::DOWNLOAD))
         {
-            if ((coe->index != coe_->index) or (coe->subindex != coe_->subindex))
+            if ((sdo->index != sdo_->index) or (sdo->subindex != sdo_->subindex))
             {
                 return ProcessingResult::NOOP;
             }
@@ -232,22 +234,22 @@ namespace kickcat
 
         // Message IS related: same index/subindex and right mailbox session handle -> low risk of collision
         // => check if message response is coherent
-        if (coe->command == CoE::SDO::request::ABORT)
+        if (sdo->command == CoE::SDO::request::ABORT)
         {
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
-            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", coe->index, coe->subindex, code, CoE::SDO::abort_to_str(code));
+            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", sdo->index, sdo->subindex, code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }
 
         // everything is fine: process the payload
-        switch (coe_->command)
+        switch (sdo_->command)
         {
-            case CoE::SDO::request::UPLOAD:               { return processUpload(header, coe, payload);            }
-            case CoE::SDO::request::UPLOAD_SEGMENTED:     { return processUploadSegmented(header, coe, payload);   }
-            case CoE::SDO::request::DOWNLOAD:             { return processDownload(header, coe, payload);          }
-            case CoE::SDO::request::DOWNLOAD_SEGMENTED:   { return processDownloadSegmented(header, coe, payload); }
+            case CoE::SDO::request::UPLOAD:               { return processUpload(header, sdo, payload);            }
+            case CoE::SDO::request::UPLOAD_SEGMENTED:     { return processUploadSegmented(header, sdo, payload);   }
+            case CoE::SDO::request::DOWNLOAD:             { return processDownload(header, sdo, payload);          }
+            case CoE::SDO::request::DOWNLOAD_SEGMENTED:   { return processDownloadSegmented(header, sdo, payload); }
             default:
             {
                 status_ = MessageStatus::COE_UNKNOWN_SERVICE;
@@ -257,18 +259,18 @@ namespace kickcat
     }
 
 
-    ProcessingResult SDOMessage::processUpload(mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload)
+    ProcessingResult SDOMessage::processUpload(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload)
     {
-        if (coe->command != CoE::SDO::response::UPLOAD)
+        if (sdo->command != CoE::SDO::response::UPLOAD)
         {
             status_ = MessageStatus::COE_WRONG_SERVICE;
             return ProcessingResult::FINALIZE;
         }
 
-        if (coe->transfer_type == 1)
+        if (sdo->transfer_type == 1)
         {
             // expedited transfer
-            uint32_t size = 4 - coe->block_size;
+            uint32_t size = 4 - sdo->block_size;
             if(*client_data_size_ < size)
             {
                 status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
@@ -312,24 +314,24 @@ namespace kickcat
 
         // since transfer is segmented, we need to request the next segment
         coe_->service = CoE::Service::SDO_REQUEST;
-        coe_->command = CoE::SDO::request::UPLOAD_SEGMENTED;
-        coe_->complete_access = false; // use for toggle bit - first segment shall be set to 0
-        coe_->block_size      = 0;
-        coe_->transfer_type   = 0;
-        coe_->size_indicator  = 0;
+        sdo_->command = CoE::SDO::request::UPLOAD_SEGMENTED;
+        sdo_->complete_access = false; // use for toggle bit - first segment shall be set to 0
+        sdo_->block_size      = 0;
+        sdo_->transfer_type   = 0;
+        sdo_->size_indicator  = 0;
         status_ = MessageStatus::RUNNING;
         return ProcessingResult::CONTINUE;
     }
 
-    ProcessingResult SDOMessage::processUploadSegmented(mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload)
+    ProcessingResult SDOMessage::processUploadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload)
     {
-        if (coe->command != CoE::SDO::response::UPLOAD_SEGMENTED)
+        if (sdo->command != CoE::SDO::response::UPLOAD_SEGMENTED)
         {
             status_ = MessageStatus::COE_WRONG_SERVICE;
             return ProcessingResult::FINALIZE;
         }
 
-        if (coe->complete_access != coe_->complete_access)
+        if (sdo->complete_access != sdo_->complete_access)
         {
             status_ = MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT;
             return ProcessingResult::FINALIZE;
@@ -338,7 +340,7 @@ namespace kickcat
         uint32_t size = 0;
         if (header->len == 10)
         {
-            size = 7 - (coe->block_size | (coe->size_indicator << 2));
+            size = 7 - (sdo->block_size | (sdo->size_indicator << 2));
         }
         else
         {
@@ -350,20 +352,20 @@ namespace kickcat
         client_data_ += size;
         *client_data_size_ += size;
 
-        bool more_follow = coe->size_indicator;
+        bool more_follow = sdo->size_indicator;
         if (not more_follow)
         {
             status_ = MessageStatus::SUCCESS;
             return ProcessingResult::FINALIZE;
         }
 
-        coe_->complete_access = not coe_->complete_access;
+        sdo_->complete_access = not sdo_->complete_access;
         return ProcessingResult::CONTINUE;
     }
 
-    ProcessingResult SDOMessage::processDownload(mailbox::Header const*, mailbox::ServiceData const* coe, uint8_t const*)
+    ProcessingResult SDOMessage::processDownload(mailbox::Header const*, CoE::ServiceData const* sdo, uint8_t const*)
     {
-        if (coe->command != CoE::SDO::response::DOWNLOAD)
+        if (sdo->command != CoE::SDO::response::DOWNLOAD)
         {
             status_ = MessageStatus::COE_WRONG_SERVICE;
             return ProcessingResult::FINALIZE;
@@ -373,9 +375,9 @@ namespace kickcat
         return ProcessingResult::FINALIZE;
     }
 
-    ProcessingResult SDOMessage::processDownloadSegmented(mailbox::Header const*, mailbox::ServiceData const* coe, uint8_t const*)
+    ProcessingResult SDOMessage::processDownloadSegmented(mailbox::Header const*, CoE::ServiceData const* sdo, uint8_t const*)
     {
-        if (coe->command != CoE::SDO::response::DOWNLOAD_SEGMENTED)
+        if (sdo->command != CoE::SDO::response::DOWNLOAD_SEGMENTED)
         {
             status_ = MessageStatus::COE_WRONG_SERVICE;
             return ProcessingResult::FINALIZE;
@@ -392,20 +394,20 @@ namespace kickcat
 
     ProcessingResult EmergencyMessage::process(uint8_t const* received)
     {
-        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(received);
-        mailbox::Emergency const* emg = reinterpret_cast<mailbox::Emergency const*>(received + sizeof(mailbox::Header));
-
         // check if the received message is an emergency one
+        auto const* header = pointData<mailbox::Header>(received);
         if (header->type != mailbox::Type::CoE)
         {
             return ProcessingResult::NOOP;
         }
 
-        if (emg->service != CoE::Service::EMERGENCY)
+        auto const* coe = pointData<CoE::Header>(header);
+        if (coe->service != CoE::Service::EMERGENCY)
         {
             return ProcessingResult::NOOP;
         }
 
+        auto const* emg = pointData<CoE::Emergency>(coe);
         mailbox_.emergencies.push_back(*emg);
         return ProcessingResult::FINALIZE_AND_KEEP;
     }
@@ -414,7 +416,7 @@ namespace kickcat
     GatewayMessage::GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout)
         : AbstractMessage(mailbox_size, timeout)
     {
-        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(raw_message);
+        auto const* header = pointData<mailbox::Header>(raw_message);
 
         // Copy raw message in internal data field
         int32_t size = sizeof(mailbox::Header) + header->len;
@@ -431,7 +433,7 @@ namespace kickcat
 
     ProcessingResult GatewayMessage::process(uint8_t const* received)
     {
-        mailbox::Header const* header = reinterpret_cast<mailbox::Header const*>(received);
+        auto const* header = pointData<mailbox::Header>(received);
 
         // Check if the message is associated to our gateway request
         if (header->address != header_->address)

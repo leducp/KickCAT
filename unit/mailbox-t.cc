@@ -11,10 +11,11 @@ public:
         mailbox.recv_size = 256;
         mailbox.send_size = 256;
 
-        header = reinterpret_cast<mailbox::Header*>(raw_message);
-        emg = reinterpret_cast<mailbox::Emergency*>(raw_message + sizeof(mailbox::Header));
-        sdo = reinterpret_cast<mailbox::ServiceData*>(raw_message + sizeof(mailbox::Header));
-        payload = reinterpret_cast<mailbox::ServiceData*>(raw_message + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData));
+        header  = pointData<mailbox::Header>(raw_message);
+        coe     = pointData<CoE::Header>(header);
+        sdo     = pointData<CoE::ServiceData>(coe);
+        emg     = pointData<CoE::Emergency>(coe);
+        payload = pointData<void>(sdo);
 
         // Default address is 0 (local processing)
         header->address = 0;
@@ -26,8 +27,9 @@ protected:
 
     // pointers on raw_message to prepare test payload
     mailbox::Header* header;
-    mailbox::Emergency* emg;
-    mailbox::ServiceData* sdo;
+    CoE::Header* coe;
+    CoE::Emergency* emg;
+    CoE::ServiceData* sdo;
     void* payload;
 };
 
@@ -74,7 +76,7 @@ TEST_F(MailboxTest, received_emergency_message)
 
     // raw data that represent an emergency message
     header->type = mailbox::Type::CoE;
-    emg->service = CoE::Service::EMERGENCY;
+    coe->service = CoE::Service::EMERGENCY;
     emg->error_code = 0x3310;
 
     ASSERT_EQ(0, mailbox.emergencies.size());
@@ -90,12 +92,12 @@ TEST_F(MailboxTest, emergency_callback_not_related_message)
     mailbox.to_process.push_back(emg_callback);
 
     header->type = mailbox::Type::CoE;
-    emg->service = CoE::Service::SDO_INFORMATION;
+    coe->service = CoE::Service::SDO_INFORMATION;
     ASSERT_FALSE(mailbox.receive(raw_message));
     ASSERT_EQ(0, mailbox.emergencies.size());
 
     header->type = mailbox::Type::VoE;
-    emg->service = CoE::Service::EMERGENCY;
+    coe->service = CoE::Service::EMERGENCY;
     ASSERT_FALSE(mailbox.receive(raw_message));
     ASSERT_EQ(0, mailbox.emergencies.size());
 }
@@ -119,21 +121,24 @@ TEST_F(MailboxTest, SDO_upload_expedited_OK)
     ASSERT_EQ(mailbox.recv_size, message->size());
 
     // check message content
-    mailbox::Header const* sdo_header = reinterpret_cast<mailbox::Header const*>(message->data());
-    mailbox::ServiceData const* sdo_section = reinterpret_cast<mailbox::ServiceData const*>(message->data() + sizeof(mailbox::Header));
-    ASSERT_EQ(mailbox::Type::CoE, sdo_header->type);
-    ASSERT_EQ(CoE::Service::SDO_REQUEST,    sdo_section->service);
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);
     ASSERT_EQ(CoE::SDO::request::UPLOAD,    sdo_section->command);
     ASSERT_EQ(0x1018,                       sdo_section->index);
     ASSERT_EQ(1,                            sdo_section->subindex);
     ASSERT_EQ(false,                        sdo_section->complete_access);
 
     // reply
+    header->address = 0;
     header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
     sdo->transfer_type = 1;
     sdo->block_size = 0; // 4 bytes
     sdo->command = CoE::SDO::request::UPLOAD;
-    sdo->service = CoE::Service::SDO_RESPONSE;
     sdo->index = 0x1018;
     sdo->subindex = 1;
     *static_cast<int32_t*>(payload) = 0xCAFEDECA;
@@ -153,10 +158,12 @@ TEST_F(MailboxTest, SDO_upload_standard_OK)
     ASSERT_EQ(mailbox.recv_size, message->size());
 
     // check message content
-    mailbox::Header const* sdo_header = reinterpret_cast<mailbox::Header const*>(message->data());
-    mailbox::ServiceData const* sdo_section = reinterpret_cast<mailbox::ServiceData const*>(message->data() + sizeof(mailbox::Header));
-    ASSERT_EQ(mailbox::Type::CoE, sdo_header->type);
-    ASSERT_EQ(CoE::Service::SDO_REQUEST,    sdo_section->service);
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);
     ASSERT_EQ(CoE::SDO::request::UPLOAD,    sdo_section->command);
     ASSERT_EQ(0x1018,                       sdo_section->index);
     ASSERT_EQ(1,                            sdo_section->subindex);
@@ -164,11 +171,11 @@ TEST_F(MailboxTest, SDO_upload_standard_OK)
 
     // reply
     header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
     header->len = 10 + 8;
     sdo->transfer_type = 0;
     sdo->block_size = 0; // 4 bytes
     sdo->command = CoE::SDO::request::UPLOAD;
-    sdo->service = CoE::Service::SDO_RESPONSE;
     sdo->index = 0x1018;
     sdo->subindex = 1;
     int32_t* reply = static_cast<int32_t*>(payload);
@@ -193,10 +200,12 @@ TEST_F(MailboxTest, SDO_upload_segmented_OK)
     ASSERT_EQ(mailbox.recv_size, message->size());
 
     // check message content
-    mailbox::Header const* sdo_header = reinterpret_cast<mailbox::Header const*>(message->data());
-    mailbox::ServiceData const* sdo_section = reinterpret_cast<mailbox::ServiceData const*>(message->data() + sizeof(mailbox::Header));
-    ASSERT_EQ(mailbox::Type::CoE, sdo_header->type);
-    ASSERT_EQ(CoE::Service::SDO_REQUEST,    sdo_section->service);
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);
     ASSERT_EQ(CoE::SDO::request::UPLOAD,    sdo_section->command);
     ASSERT_EQ(0x1018,                       sdo_section->index);
     ASSERT_EQ(1,                            sdo_section->subindex);
@@ -205,10 +214,10 @@ TEST_F(MailboxTest, SDO_upload_segmented_OK)
     // reply
     header->type = mailbox::Type::CoE;
     header->len = 10 + 8;
+    coe->service = CoE::Service::SDO_RESPONSE;
     sdo->transfer_type = 0;
     sdo->block_size = 0; // 4 bytes
     sdo->command = CoE::SDO::request::UPLOAD;
-    sdo->service = CoE::Service::SDO_RESPONSE;
     sdo->index = 0x1018;
     sdo->subindex = 1;
     int32_t* reply = static_cast<int32_t*>(payload);
@@ -250,11 +259,13 @@ TEST_F(MailboxTest, SDO_download_OK)
     ASSERT_EQ(MessageStatus::RUNNING, message->status());
 
     // check message content
-    mailbox::Header const* sdo_header = reinterpret_cast<mailbox::Header const*>(message->data());
-    mailbox::ServiceData const* sdo_section = reinterpret_cast<mailbox::ServiceData const*>(message->data() + sizeof(mailbox::Header));
-    uint32_t const* sdo_payload =  reinterpret_cast<uint32_t const*>(message->data() + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData));
-    ASSERT_EQ(mailbox::Type::CoE, sdo_header->type);
-    ASSERT_EQ(CoE::Service::SDO_REQUEST,    sdo_section->service);
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+    auto const* sdo_payload = pointData<uint32_t>(sdo_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);
     ASSERT_EQ(CoE::SDO::request::DOWNLOAD,  sdo_section->command);
     ASSERT_EQ(0x1018,                       sdo_section->index);
     ASSERT_EQ(1,                            sdo_section->subindex);
@@ -264,8 +275,8 @@ TEST_F(MailboxTest, SDO_download_OK)
 
     // reply
     header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
     sdo->command = CoE::SDO::request::DOWNLOAD;
-    sdo->service = CoE::Service::SDO_RESPONSE;
     sdo->index = 0x1018;
     sdo->subindex = 1;
     ASSERT_TRUE(mailbox.receive(raw_message));
@@ -281,11 +292,13 @@ TEST_F(MailboxTest, SDO_download_abort)
     ASSERT_EQ(MessageStatus::RUNNING, message->status());
 
     // check message content
-    mailbox::Header const* sdo_header = reinterpret_cast<mailbox::Header const*>(message->data());
-    mailbox::ServiceData const* sdo_section = reinterpret_cast<mailbox::ServiceData const*>(message->data() + sizeof(mailbox::Header));
-    uint32_t const* sdo_payload =  reinterpret_cast<uint32_t const*>(message->data() + sizeof(mailbox::Header) + sizeof(mailbox::ServiceData));
-    ASSERT_EQ(mailbox::Type::CoE, sdo_header->type);
-    ASSERT_EQ(CoE::Service::SDO_REQUEST,    sdo_section->service);
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+    auto const* sdo_payload = pointData<uint32_t>(sdo_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);
     ASSERT_EQ(CoE::SDO::request::DOWNLOAD,  sdo_section->command);
     ASSERT_EQ(0x1018,                       sdo_section->index);
     ASSERT_EQ(1,                            sdo_section->subindex);
@@ -295,8 +308,8 @@ TEST_F(MailboxTest, SDO_download_abort)
 
     // reply
     header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
     sdo->command = CoE::SDO::request::ABORT;
-    sdo->service = CoE::Service::SDO_RESPONSE;
     sdo->index = 0x1018;
     sdo->subindex = 1;
     *static_cast<int32_t*>(payload) = 0x06010000;

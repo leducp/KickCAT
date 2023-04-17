@@ -417,32 +417,6 @@ namespace kickcat
                     reserved : 1;
         } __attribute__((__packed__));
 
-        struct ServiceData // CoE type
-        {
-            uint16_t number : 9,
-                    reserved : 3,
-                    service : 4; // i.e. request, response
-            uint8_t size_indicator : 1,
-                    transfer_type : 1, // expedited or not
-                    block_size : 2,
-                    complete_access : 1,
-                    command : 3; // i.e. upload
-            uint16_t index;
-            uint8_t subindex;
-        } __attribute__((__packed__));
-
-        /// ETG 1000.6
-        struct Emergency
-        {
-            uint16_t number : 9,
-                     reserved : 3,
-                     service : 4; // i.e. request, response
-
-            uint16_t error_code;
-            uint8_t  error_register;
-            uint8_t  data[5];
-        } __attribute__((__packed__));
-
         /// ETG 8200
 
         // Bitmask to dissociate local message processing from gateway message processing
@@ -457,6 +431,39 @@ namespace kickcat
     {
         constexpr uint16_t SM_COM_TYPE       = 0x1C00; // each sub-entry described SM[x] com type (mailbox in/out, PDO in/out, not used)
         constexpr uint16_t SM_CHANNEL        = 0x1C10; // each entry is associated with the mapped PDOs (if in used)
+
+        struct Header
+        {
+            uint16_t number : 9,
+                    reserved : 3,
+                    service : 4; // i.e. request, response
+        } __attribute__((__packed__));
+
+        struct ServiceData      // ETG1000.6 chapter 5.6.2 SDO
+        {
+            uint8_t size_indicator : 1,
+                    transfer_type : 1, // expedited or not
+                    block_size : 2,
+                    complete_access : 1,
+                    command : 3; // i.e. upload
+            uint16_t index;
+            uint8_t subindex;
+        } __attribute__((__packed__));
+
+        struct ServiceDataInfo // ETG1000.6 chapter 5.6.3 SDO Information
+        {
+            uint16_t opcode : 7,
+                    incomplete : 1,
+                    reserved : 8;
+            uint16_t index;
+        } __attribute__((__packed__));
+
+        struct Emergency        // ETG1000.6 chapter 5.6.4 Emergency
+        {
+            uint16_t error_code;
+            uint8_t  error_register;
+            uint8_t  data[5];
+        } __attribute__((__packed__));
 
         enum Service
         {
@@ -532,6 +539,23 @@ namespace kickcat
 
     /// compute the watchdog time from the watchdog precision
     uint16_t computeWatchdogTime(nanoseconds watchdog, nanoseconds precision);
+
+    // Helper to retrieve the header/payload in a frame.
+    template<typename T, typename Previous>
+    T* pointData(Previous* header_address)
+    {
+        return reinterpret_cast<T*>(header_address + 1);
+    }
+    template<> mailbox::Header* pointData<mailbox::Header, uint8_t>(uint8_t* base_address);
+    template<> EthernetHeader*  pointData<EthernetHeader,  uint8_t>(uint8_t* base_address);
+
+    template<typename T, typename Previous>
+    T const* pointData(Previous const* header_address)
+    {
+        return reinterpret_cast<T const*>(header_address + 1);
+    }
+    template<> mailbox::Header const* pointData<mailbox::Header, uint8_t>(uint8_t const* base_address);
+    template<> EthernetHeader const*  pointData<EthernetHeader,  uint8_t>(uint8_t const* base_address);
 }
 
 #endif

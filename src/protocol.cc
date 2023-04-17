@@ -239,4 +239,22 @@ namespace kickcat
 
         return static_cast<uint16_t>(wdg_time);
     }
+
+    template<> mailbox::Header* pointData<mailbox::Header, uint8_t>(uint8_t* base_address)
+    {
+        return reinterpret_cast<mailbox::Header*>(base_address);
+    }
+    template<> mailbox::Header const* pointData<mailbox::Header, uint8_t>(uint8_t const* base_address)
+    {
+        return reinterpret_cast<mailbox::Header const*>(base_address);
+    }
+
+    template<> EthernetHeader* pointData<EthernetHeader, uint8_t>(uint8_t* base_address)
+    {
+        return reinterpret_cast<EthernetHeader*>(base_address);
+    }
+    template<> EthernetHeader const* pointData<EthernetHeader, uint8_t>(uint8_t const* base_address)
+    {
+        return reinterpret_cast<EthernetHeader const*>(base_address);
+    }
 }

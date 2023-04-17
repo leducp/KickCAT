@@ -13,7 +13,8 @@ struct Request
 {
     EthercatHeader  header;
     mailbox::Header mbx_header;
-    mailbox::ServiceData sdo;
+    CoE::Header coe;
+    CoE::ServiceData sdo;
     int32_t data;
 } __attribute__((__packed__));
 

@@ -6,9 +6,9 @@
 namespace kickcat
 {
     Frame::Frame()
-        : ethernet_{reinterpret_cast<EthernetHeader*>(frame_.data())}
-        , header_  {reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader))}
-        , first_datagram_{frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader)}
+        : ethernet_{pointData<EthernetHeader>(frame_.data())}
+        , header_  {pointData<EthercatHeader>(ethernet_)}
+        , first_datagram_{pointData<uint8_t>(header_)}
     {
         resetContext();
 
@@ -28,9 +28,9 @@ namespace kickcat
 
 
     Frame::Frame(uint8_t const* data, int32_t data_size)
-        : ethernet_ { reinterpret_cast<EthernetHeader*>(frame_.data()) }
-        , header_   { reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader)) }
-        , first_datagram_{ frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader) }
+        : ethernet_ { pointData<EthernetHeader>(frame_.data())  }
+        , header_   { pointData<EthercatHeader>(ethernet_)      }
+        , first_datagram_{ pointData<uint8_t>(header_)          }
     {
         std::memcpy(frame_.data(), data, data_size);
         resetContext();
@@ -47,9 +47,9 @@ namespace kickcat
     Frame& Frame::operator=(Frame&& other)
     {
         frame_ = std::move(other.frame_);
-        ethernet_ = reinterpret_cast<EthernetHeader*>(frame_.data());
-        header_   = reinterpret_cast<EthercatHeader*>(frame_.data() + sizeof(EthernetHeader));
-        first_datagram_ = frame_.data() + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+        ethernet_ = pointData<EthernetHeader>(frame_.data());
+        header_   = pointData<EthercatHeader>(ethernet_);
+        first_datagram_ = pointData<uint8_t>(header_);
         next_datagram_  = other.next_datagram_;
         last_datagram_  = other.last_datagram_;
         datagram_counter_ = other.datagram_counter_;

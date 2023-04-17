@@ -117,7 +117,7 @@ namespace kickcat
 
         uint8_t nextCounter();
 
-        std::vector<mailbox::Emergency> emergencies;
+        std::vector<CoE::Emergency> emergencies;
     private:
     };
 
@@ -130,12 +130,13 @@ namespace kickcat
         ProcessingResult process(uint8_t const* received) override;
 
     protected:
-        ProcessingResult processUpload           (mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload);
-        ProcessingResult processUploadSegmented  (mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload);
-        ProcessingResult processDownload         (mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload);
-        ProcessingResult processDownloadSegmented(mailbox::Header const* header, mailbox::ServiceData const* coe, uint8_t const* payload);
+        ProcessingResult processUpload           (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
+        ProcessingResult processUploadSegmented  (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
+        ProcessingResult processDownload         (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
+        ProcessingResult processDownloadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
 
-        mailbox::ServiceData* coe_;
+        CoE::Header* coe_;
+        CoE::ServiceData* sdo_;
         uint8_t* payload_;
         uint8_t* client_data_;
         uint32_t* client_data_size_;
