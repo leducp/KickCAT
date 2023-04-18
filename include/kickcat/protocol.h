@@ -453,9 +453,9 @@ namespace kickcat
         struct ServiceDataInfo // ETG1000.6 chapter 5.6.3 SDO Information
         {
             uint16_t opcode : 7,
-                    incomplete : 1,
-                    reserved : 8;
-            uint16_t index;
+                     incomplete : 1,
+                     reserved : 8;
+            uint16_t fragments_left;
         } __attribute__((__packed__));
 
         struct Emergency        // ETG1000.6 chapter 5.6.4 Emergency
@@ -503,9 +503,58 @@ namespace kickcat
                 constexpr uint8_t GET_OD_LIST_RESP   = 0x02;
                 constexpr uint8_t GET_OD_REQ         = 0x03;
                 constexpr uint8_t GET_OD_RESP        = 0x04;
-                constexpr uint8_t GET_ED_LIST_REQ    = 0x05;
-                constexpr uint8_t GET_ED_LIST_RESP   = 0x06;
+                constexpr uint8_t GET_ED_REQ         = 0x05;
+                constexpr uint8_t GET_ED_RESP        = 0x06;
                 constexpr uint8_t SDO_INFO_ERROR_REQ = 0x07;
+
+                enum ListType : uint16_t
+                {
+                    NumberOfObjects     = 0x00,
+                    AllObjects          = 0x01,
+                    RxPDO               = 0x02,
+                    TxPDO               = 0x03,
+                    DeviceReplacement   = 0x04,
+                    StartupParameters   = 0x05
+                };
+
+                enum ObjectCode : uint8_t
+                {
+                    Variable = 7,
+                    Array    = 8,
+                    Record   = 9
+                };
+
+                struct ObjectAccess
+                {
+                    uint16_t read_pre_operational: 1,
+                             read_safe_operational: 1,
+                             read_operational: 1,
+                             write_pre_operational: 1,
+                             write_safe_operational: 1,
+                             write_operational: 1,
+                             mappable_RxPDO: 1,
+                             mappable_TxPDO: 1,
+                             backup: 1,
+                             settings: 1,
+                             reserved: 6;
+                };
+
+                struct ValueInfo
+                {
+                    uint8_t reserved : 3,
+                            unit_type : 1,
+                            default_value : 1,
+                            minimum_value: 1,
+                            maximum_value: 1,
+                            unused : 1;
+                };
+
+                struct EntryDescriptionRequest
+                {
+                    uint16_t  index;
+                    uint8_t   subindex;
+                    ValueInfo value_info;
+                };
             }
 
             char const* abort_to_str(uint32_t abort_code);

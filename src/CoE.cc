@@ -76,4 +76,45 @@ namespace kickcat
         auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::DOWNLOAD, data, &data_size, timeout);
         waitForMessage(sdo);
     }
+
+
+    void Bus::getObjectDictionnaryList(Slave& slave, CoE::SDO::information::ListType type, void* data, uint32_t* data_size, nanoseconds timeout)
+    {
+        auto sdo = slave.mailbox.createSDOInfoGetODList(type, data, data_size, timeout);
+        waitForMessage(sdo);
+        if (sdo->status() != MessageStatus::SUCCESS)
+        {
+            THROW_ERROR_CODE("Error while get Object Dictionnary List", sdo->status());
+        }
+
+        std::vector<uint16_t> index_list(static_cast<uint16_t*>(data) + sizeof(type), static_cast<uint16_t*>(data) + *data_size - sizeof(type));
+        printf("Object dictionnary list: size: %li\n", index_list.size());
+
+        for (auto const& index : index_list)
+        {
+            printf("index %x \n", index);
+        }
+    }
+
+
+    void Bus::getObjectDescription(Slave& slave, uint16_t index, void* data, uint32_t* data_size, nanoseconds timeout)
+    {
+        auto sdo = slave.mailbox.createSDOInfoGetOD(index, data, data_size, timeout);
+        waitForMessage(sdo);
+        if (sdo->status() != MessageStatus::SUCCESS)
+        {
+            THROW_ERROR_CODE("Error while get Object Description", sdo->status());
+        }
+    }
+
+    void Bus::getEntryDescription(Slave& slave, uint16_t index, uint8_t subindex, CoE::SDO::information::ValueInfo value_info,
+                             void* data, uint32_t* data_size, nanoseconds timeout)
+    {
+        auto sdo = slave.mailbox.createSDOInfoGetED(index, subindex, value_info, data, data_size, timeout);
+        waitForMessage(sdo);
+        if (sdo->status() != MessageStatus::SUCCESS)
+        {
+            THROW_ERROR_CODE("Error while get Entry Description", sdo->status());
+        }
+    }
 }

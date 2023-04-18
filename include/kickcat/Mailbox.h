@@ -103,6 +103,14 @@ namespace kickcat
         std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout = 20ms);
         std::shared_ptr<GatewayMessage>  createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index, nanoseconds timeout = 20ms);
 
+        std::shared_ptr<AbstractMessage> createSDOInfoGetODList(CoE::SDO::information::ListType type, void* data,
+                                                                uint32_t* data_size, nanoseconds timeout = 20ms);
+        std::shared_ptr<AbstractMessage> createSDOInfoGetOD(uint16_t index, void* data, uint32_t* data_size,
+                                                            nanoseconds timeout = 20ms);
+        std::shared_ptr<AbstractMessage> createSDOInfoGetED(uint16_t index, uint8_t subindex,
+                                                            CoE::SDO::information::ValueInfo value_info,
+                                                            void* data, uint32_t* data_size, nanoseconds timeout = 20ms);
+
         // helper to get next message to send and transfer it to reception callbacks if required
         std::shared_ptr<AbstractMessage> send();
 
@@ -140,6 +148,25 @@ namespace kickcat
         uint8_t* payload_;
         uint8_t* client_data_;
         uint32_t* client_data_size_;
+    };
+
+    class SDOInfoMessage : public AbstractMessage
+    {
+        public:
+            SDOInfoMessage(uint16_t mailbox_size, uint8_t request, void* data, uint32_t* data_size, uint32_t request_payload_size, nanoseconds timeout);
+            virtual ~SDOInfoMessage() = default;
+
+            ProcessingResult process(uint8_t const* received) override;
+
+        protected:
+            ProcessingResult processSDOInfoResponse(mailbox::Header const* header, CoE::ServiceDataInfo const* sdo,
+                                                    uint8_t const* payload, uint8_t expected_opcode);
+
+            CoE::Header* coe_;
+            CoE::ServiceDataInfo* sdo_;
+            uint8_t* payload_;
+            uint8_t* client_data_;
+            uint32_t* client_data_size_;
     };
 
     class EmergencyMessage : public AbstractMessage

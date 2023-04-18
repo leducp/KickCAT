@@ -101,6 +101,11 @@ int main(int argc, char *argv[])
         // Map RXPDO
         mapPDO(0, 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
 
+        // Map TXPDO
+        mapPDO(1, 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
+        // Map RXPDO
+        mapPDO(1, 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
+
         bus.createMapping(io_buffer);
 
         bus.requestState(State::SAFE_OP);
@@ -158,9 +163,21 @@ int main(int argc, char *argv[])
 
     // Setting a small torque
     output_pdo->mode_of_operation = 0x5;
-    output_pdo->target_torque = 3;
+    output_pdo->target_torque = 0.01;
     output_pdo->max_current = 3990;
     output_pdo->target_position = 0;
+
+
+    uint32_t size = 4;
+    uint32_t vendorID;
+    bus.readSDO(ingenia, 0x1018, 0x01, Bus::Access::PARTIAL, &vendorID, &size);
+    printf("Direct  vendor id %x \n", vendorID);
+
+
+    uint8_t buffer[4096];
+    uint32_t data_size = 4096;
+
+    bus.getObjectDictionnaryList(ingenia, CoE::SDO::information::ListType::AllObjects, buffer, &data_size);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     int64_t last_error = 0;
