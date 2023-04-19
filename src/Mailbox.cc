@@ -52,16 +52,13 @@ namespace kickcat
 
     std::shared_ptr<AbstractMessage> Mailbox::createSDOInfoGetODList(CoE::SDO::information::ListType type, void* data, uint32_t* data_size, nanoseconds timeout)
     {
-        printf("Debug 1 \n");
         if (recv_size == 0)
         {
-            printf("Debug 1.1 \n");
             THROW_ERROR("This mailbox is inactive");
         }
 
         uint32_t request_payload_size = sizeof(type);
         memcpy(data, &type, request_payload_size);
-        printf("Debug 1.2 \n");
         auto sdo = std::make_shared<SDOInfoMessage>(recv_size, CoE::SDO::information::GET_OD_LIST_REQ, data, data_size, request_payload_size, timeout);
         sdo->setCounter(nextCounter());
         to_send.push(sdo);

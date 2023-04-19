@@ -105,7 +105,13 @@ namespace kickcat
         {
             THROW_ERROR_CODE("Error while get Object Description", sdo->status());
         }
+
+        CoE::SDO::information::ObjectDescription* description = reinterpret_cast<CoE::SDO::information::ObjectDescription*>(data);
+        std::string name(static_cast<char*>(data) + sizeof(CoE::SDO::information::ObjectDescription), *data_size - sizeof(CoE::SDO::information::ObjectDescription));
+
+        printf("Received object desc: %s ", toString(*description, name).c_str());
     }
+
 
     void Bus::getEntryDescription(Slave& slave, uint16_t index, uint8_t subindex, CoE::SDO::information::ValueInfo value_info,
                              void* data, uint32_t* data_size, nanoseconds timeout)
@@ -116,5 +122,7 @@ namespace kickcat
         {
             THROW_ERROR_CODE("Error while get Entry Description", sdo->status());
         }
+
+
     }
 }

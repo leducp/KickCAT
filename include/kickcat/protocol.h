@@ -477,6 +477,54 @@ namespace kickcat
             SDO_INFORMATION      = 0x08
         };
 
+        // ETG 1000.5 chapter 5 Data type ASE (Application Service Element)
+        enum DataType: uint16_t
+        {
+        // Fixed length types
+            Boolean        =  1,
+            BIT2           = 31,
+            BIT3           = 32,
+            BIT4           = 33,
+            BIT5           = 34,
+            BIT6           = 35,
+            BIT7           = 36,
+            BIT8           = 37,
+
+            BITARR8        = 45,
+            BITARR16       = 46,
+            BITARR32       = 47,
+
+            TimeOfDay      = 12,
+            TimeDifference = 13,
+
+            Float32        =  8,
+            Float64        = 17,
+            Integer8       =  2,
+            Integer16      =  3,
+            Integer24      = 16,
+            Integer32      =  4,
+            Integer40      = 18,
+            Integer48      = 19,
+            Integer56      = 20,
+            Integer64      = 21,
+
+            Unsigned8      =  5,
+            Unsigned16     =  6,
+            Unsigned24     = 22,
+            Unsigned32     =  7,
+            Unsigned40     = 24,
+            Unsigned48     = 25,
+            Unsigned56     = 26,
+            Unsigned64     = 27,
+
+        // String types
+            VisibleString  =  9,
+            OctetString    = 10,
+            UnicodeString  = 11,
+            GUID           = 29
+        };
+        std::string toString(DataType data_type);
+
         namespace SDO
         {
             // Command specifiers depending on SDO request type
@@ -523,6 +571,7 @@ namespace kickcat
                     Array    = 8,
                     Record   = 9
                 };
+                std::string toString(ObjectCode object_code);
 
                 struct ObjectAccess
                 {
@@ -555,6 +604,27 @@ namespace kickcat
                     uint8_t   subindex;
                     ValueInfo value_info;
                 };
+
+                struct ObjectDescription
+                {
+                    uint16_t index;
+                    DataType data_type;
+                    uint8_t  max_subindex;
+                    CoE::SDO::information::ObjectCode object_code;
+                };
+                std::string toString(ObjectDescription const& object_description, std::string const& name = "");
+
+
+                struct EntryDescription
+                {
+                    uint16_t     index;
+                    uint8_t      subindex;
+                    ValueInfo    value_info;
+                    DataType     data_type;
+                    uint16_t     bit_length;
+                    ObjectAccess object_access;
+                };
+                // TODO handle data ?
             }
 
             char const* abort_to_str(uint32_t abort_code);

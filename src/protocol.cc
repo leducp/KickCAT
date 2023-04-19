@@ -229,6 +229,73 @@ namespace kickcat
     }
 
 
+    std::string CoE::toString(DataType data_type)
+    {
+        switch (data_type)
+        {
+            case CoE::DataType::Boolean : { return "Boolean";               }
+            case CoE::DataType::BIT2 :    { return "BIT2";                  }
+            case CoE::DataType::BIT3 :    { return "BIT3";                  }
+            case CoE::DataType::BIT4 :    { return "BIT4";                  }
+            case CoE::DataType::BIT5 :    { return "BIT5";                  }
+            case CoE::DataType::BIT6 :    { return "BIT6";                  }
+            case CoE::DataType::BIT7 :    { return "BIT7";                  }
+            case CoE::DataType::BIT8 :    { return "BIT8";                  }
+
+            case CoE::DataType::BITARR8 :  { return "BITARR8";              }
+            case CoE::DataType::BITARR16 : { return "BITARR16";             }
+            case CoE::DataType::BITARR32 : { return "BITARR32";             }
+
+            case CoE::DataType::TimeOfDay :      { return "TimeOfDay";      }
+            case CoE::DataType::TimeDifference : { return "TimeDifference"; }
+
+            case CoE::DataType::Float32 : { return "Float32";               }
+            case CoE::DataType::Float64 : { return "Float64";               }
+
+            case CoE::DataType::Integer8  : { return "Integer8";            }
+            case CoE::DataType::Integer16 : { return "Integer16";           }
+            case CoE::DataType::Integer24 : { return "Integer24";           }
+            case CoE::DataType::Integer32 : { return "Integer32";           }
+            case CoE::DataType::Integer40 : { return "Integer40";           }
+            case CoE::DataType::Integer48 : { return "Integer48";           }
+            case CoE::DataType::Integer56 : { return "Integer56";           }
+            case CoE::DataType::Integer64 : { return "Integer64";           }
+
+            case CoE::DataType::VisibleString : { return "VisibleString";   }
+            case CoE::DataType::OctetString   : { return "OctetString";     }
+            case CoE::DataType::UnicodeString : { return "UnicodeString";   }
+            case CoE::DataType::GUID          : { return "GUID";            }
+
+            default:        { return "Unknown data type"; }
+        }
+    }
+
+
+    std::string CoE::SDO::information::toString(ObjectDescription const& object_description, std::string const& name)
+    {
+        std::stringstream os;
+        os << "ObjectDescription \n";
+        os << "  index :        " << std::to_string(object_description.index)        << "\n";
+        os << "  data type :    " << std::to_string(object_description.data_type)    << " " << CoE::toString(object_description.data_type) << "\n";
+        os << "  max subindex : " << std::to_string(object_description.max_subindex) << "\n";
+        os << "  object code :  " << std::to_string(object_description.object_code)  << "\n" << toString(object_description.object_code) << "\n";
+        os << "  name :         " << name << "\n";
+        return os.str();
+    }
+
+
+    std::string CoE::SDO::information::toString(ObjectCode object_code)
+    {
+        switch (object_code)
+        {
+            case CoE::SDO::information::ObjectCode::Array   : {return "Array";    }
+            case CoE::SDO::information::ObjectCode::Record  : {return "Record";}
+            case CoE::SDO::information::ObjectCode::Variable: {return "Variable";}
+            default:                          {return "unknown";   }
+        }
+    }
+
+
     uint16_t computeWatchdogTime(nanoseconds watchdog, nanoseconds precision)
     {
         auto const wdg_time = watchdog / precision;
