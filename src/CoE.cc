@@ -123,6 +123,8 @@ namespace kickcat
             THROW_ERROR_CODE("Error while get Entry Description", sdo->status());
         }
 
-
+        CoE::SDO::information::EntryDescription* description = reinterpret_cast<CoE::SDO::information::EntryDescription*>(data);
+        printf("Received entry desc: %s \n", toString(*description, static_cast<uint8_t*>(data) + sizeof(CoE::SDO::information::EntryDescription),
+                                                   *data_size - sizeof(CoE::SDO::information::EntryDescription)).c_str());
     }
 }

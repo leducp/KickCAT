@@ -92,10 +92,9 @@ namespace kickcat
         }
 
         memcpy(data, &index, sizeof(index));
-        memcpy(static_cast<int8_t*>(data) + sizeof(index), &subindex, sizeof(subindex));
-        memcpy(static_cast<int8_t*>(data) + sizeof(index) + sizeof(subindex), &value_info, sizeof(value_info));
+        memcpy(static_cast<uint8_t*>(data) + sizeof(index), &subindex, sizeof(subindex));
+        memcpy(static_cast<uint8_t*>(data) + sizeof(index) + sizeof(subindex), &value_info, sizeof(value_info));
         uint32_t request_payload_size = sizeof(index) + sizeof(subindex) + sizeof(value_info);
-
         auto sdo = std::make_shared<SDOInfoMessage>(recv_size, CoE::SDO::information::GET_ED_REQ, data, data_size, request_payload_size, timeout);
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
@@ -475,7 +474,7 @@ namespace kickcat
         sdo_ = pointData<CoE::ServiceDataInfo>(coe_);
         payload_ = pointData<uint8_t>(sdo_);
 
-        header_->len      = 8;
+        header_->len      = 6 + request_payload_size;
         header_->priority = 0; // unused
         header_->channel  = 0;
         header_->type     = mailbox::Type::CoE;

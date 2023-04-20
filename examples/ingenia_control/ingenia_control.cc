@@ -168,17 +168,23 @@ int main(int argc, char *argv[])
     output_pdo->target_position = 0;
 
 
-    uint32_t size = 4;
-    uint32_t vendorID;
-    bus.readSDO(ingenia, 0x1018, 0x01, Bus::Access::PARTIAL, &vendorID, &size);
-    printf("Direct  vendor id %x \n", vendorID);
+//    uint32_t size = 4;
+//    uint32_t vendorID;
+//    bus.readSDO(ingenia, 0x1018, 0x01, Bus::Access::PARTIAL, &vendorID, &size);
+//    printf("Direct  vendor id %x \n", vendorID);
 
 
     uint8_t buffer[4096];
     uint32_t data_size = 4096;
 
-    bus.getObjectDictionnaryList(ingenia, CoE::SDO::information::ListType::AllObjects, buffer, &data_size);
+//    bus.getObjectDictionnaryList(ingenia, CoE::SDO::information::ListType::AllObjects, buffer, &data_size);
+//    bus.getObjectDescription(ingenia, 0x2018, buffer, &data_size);
 
+    CoE::SDO::information::ValueInfo value_info;
+    value_info.default_value = 1;
+    bus.getEntryDescription(ingenia, 0x2018, 0, value_info, buffer, &data_size);
+
+    std::abort();
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)

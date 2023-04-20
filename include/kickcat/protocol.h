@@ -477,51 +477,84 @@ namespace kickcat
             SDO_INFORMATION      = 0x08
         };
 
-        // ETG 1000.5 chapter 5 Data type ASE (Application Service Element)
+        // ETG 1000.5 chapter 5 Data type ASE (Application Service Element) and ETG 1020 Base Data Types
         enum DataType: uint16_t
         {
-        // Fixed length types
-            Boolean        =  1,
-            BIT2           = 31,
-            BIT3           = 32,
-            BIT4           = 33,
-            BIT5           = 34,
-            BIT6           = 35,
-            BIT7           = 36,
-            BIT8           = 37,
+            Boolean        = 0x0001,
 
-            BITARR8        = 45,
-            BITARR16       = 46,
-            BITARR32       = 47,
+            Byte           = 0x001E,
+            Word           = 0x001F,
+            Dword          = 0x0020,
 
-            TimeOfDay      = 12,
-            TimeDifference = 13,
+            BIT2           = 0x0031,
+            BIT3           = 0x0032,
+            BIT4           = 0x0033,
+            BIT5           = 0x0034,
+            BIT6           = 0x0035,
+            BIT7           = 0x0036,
+            BIT8           = 0x0037,
+            BIT9           = 0x0038,
+            BIT10          = 0x0039,
+            BIT11          = 0x003A,
+            BIT12          = 0x003B,
+            BIT13          = 0x003C,
+            BIT14          = 0x003D,
+            BIT15          = 0x003E,
+            BIT16          = 0x003F,
 
-            Float32        =  8,
-            Float64        = 17,
-            Integer8       =  2,
-            Integer16      =  3,
-            Integer24      = 16,
-            Integer32      =  4,
-            Integer40      = 18,
-            Integer48      = 19,
-            Integer56      = 20,
-            Integer64      = 21,
+            BITARR8        = 0x002D,
+            BITARR16       = 0x002E,
+            BITARR32       = 0x002F,
 
-            Unsigned8      =  5,
-            Unsigned16     =  6,
-            Unsigned24     = 22,
-            Unsigned32     =  7,
-            Unsigned40     = 24,
-            Unsigned48     = 25,
-            Unsigned56     = 26,
-            Unsigned64     = 27,
+            TimeOfDay      = 0x000C,
+            TimeDifference = 0x000D,
 
-        // String types
-            VisibleString  =  9,
-            OctetString    = 10,
-            UnicodeString  = 11,
-            GUID           = 29
+            Float32        = 0x0008,
+            Float64        = 0x0011,
+
+            Integer8       = 0x0002,
+            Integer16      = 0x0003,
+            Integer24      = 0x0010,
+            Integer32      = 0x0004,
+            Integer40      = 0x0012,
+            Integer48      = 0x0013,
+            Integer56      = 0x0014,
+            Integer64      = 0x0015,
+
+            Unsigned8      = 0x0005,
+            Unsigned16     = 0x0006,
+            Unsigned24     = 0x0016,
+            Unsigned32     = 0x0007,
+            Unsigned40     = 0x0018,
+            Unsigned48     = 0x0019,
+            Unsigned56     = 0x001A,
+            Unsigned64     = 0x001B,
+
+            VisibleString  = 0x0009,
+            OctetString    = 0x000A,
+            UnicodeString  = 0x000B,
+            GUID           = 0x001D,
+
+            ArrayOfInt     = 0x0260,
+            ArrayOfSInt    = 0x0261,
+            ArrayOfDInt    = 0x0262,
+            ArrayOfUDInt   = 0x0263,
+
+            PDOMapping           = 0x0021,
+            Identity             = 0x0023,
+            CommandPar           = 0x0025,
+            PDOParameter         = 0x0027,
+            Enum                 = 0x0028,
+            SMSynchronisation    = 0x0029,
+            Record               = 0x002A,
+            BackupParameter      = 0x002B,
+            ModularDeviceProfile = 0x002C,
+            ErrorSetting         = 0x0281,
+            DiagnosisHistory     = 0x0282,
+            ExternalSyncStatus   = 0x0283,
+            ExternalSyncSettings = 0x0284,
+            DefTypeFSOEFrame     = 0x0285,
+            DefTypeFSOECommPar   = 0x0286
         };
         std::string toString(DataType data_type);
 
@@ -586,7 +619,8 @@ namespace kickcat
                              backup: 1,
                              settings: 1,
                              reserved: 6;
-                };
+                } __attribute__((__packed__));
+                std::string toString(ObjectAccess object_access);
 
                 struct ValueInfo
                 {
@@ -596,14 +630,15 @@ namespace kickcat
                             minimum_value: 1,
                             maximum_value: 1,
                             unused : 1;
-                };
+                } __attribute__((__packed__));
+                std::string toString(ValueInfo const& value_description);
 
                 struct EntryDescriptionRequest
                 {
                     uint16_t  index;
                     uint8_t   subindex;
                     ValueInfo value_info;
-                };
+                } __attribute__((__packed__));
 
                 struct ObjectDescription
                 {
@@ -611,9 +646,8 @@ namespace kickcat
                     DataType data_type;
                     uint8_t  max_subindex;
                     CoE::SDO::information::ObjectCode object_code;
-                };
+                } __attribute__((__packed__));
                 std::string toString(ObjectDescription const& object_description, std::string const& name = "");
-
 
                 struct EntryDescription
                 {
@@ -623,8 +657,8 @@ namespace kickcat
                     DataType     data_type;
                     uint16_t     bit_length;
                     ObjectAccess object_access;
-                };
-                // TODO handle data ?
+                } __attribute__((__packed__));
+                std::string toString(EntryDescription const& entry_description, uint8_t* data, uint32_t data_size);
             }
 
             char const* abort_to_str(uint32_t abort_code);

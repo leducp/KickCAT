@@ -234,6 +234,10 @@ namespace kickcat
         switch (data_type)
         {
             case CoE::DataType::Boolean : { return "Boolean";               }
+            case CoE::DataType::Byte :    { return "Byte";                  }
+            case CoE::DataType::Word :    { return "Word";                  }
+            case CoE::DataType::Dword :   { return "Dword";                 }
+
             case CoE::DataType::BIT2 :    { return "BIT2";                  }
             case CoE::DataType::BIT3 :    { return "BIT3";                  }
             case CoE::DataType::BIT4 :    { return "BIT4";                  }
@@ -241,10 +245,18 @@ namespace kickcat
             case CoE::DataType::BIT6 :    { return "BIT6";                  }
             case CoE::DataType::BIT7 :    { return "BIT7";                  }
             case CoE::DataType::BIT8 :    { return "BIT8";                  }
+            case CoE::DataType::BIT9 :    { return "BIT9";                  }
+            case CoE::DataType::BIT10 :   { return "BIT10";                 }
+            case CoE::DataType::BIT11 :   { return "BIT11";                 }
+            case CoE::DataType::BIT12 :   { return "BIT12";                 }
+            case CoE::DataType::BIT13 :   { return "BIT13";                 }
+            case CoE::DataType::BIT14 :   { return "BIT14";                 }
+            case CoE::DataType::BIT15 :   { return "BIT15";                 }
+            case CoE::DataType::BIT16 :   { return "BIT16";                 }
 
-            case CoE::DataType::BITARR8 :  { return "BITARR8";              }
-            case CoE::DataType::BITARR16 : { return "BITARR16";             }
-            case CoE::DataType::BITARR32 : { return "BITARR32";             }
+            case CoE::DataType::BITARR8 : { return "BITARR8";              }
+            case CoE::DataType::BITARR16: { return "BITARR16";             }
+            case CoE::DataType::BITARR32: { return "BITARR32";             }
 
             case CoE::DataType::TimeOfDay :      { return "TimeOfDay";      }
             case CoE::DataType::TimeDifference : { return "TimeDifference"; }
@@ -266,6 +278,27 @@ namespace kickcat
             case CoE::DataType::UnicodeString : { return "UnicodeString";   }
             case CoE::DataType::GUID          : { return "GUID";            }
 
+            case CoE::DataType::ArrayOfInt    : { return "Array of Int";     }
+            case CoE::DataType::ArrayOfSInt   : { return "Array of SInt";    }
+            case CoE::DataType::ArrayOfDInt   : { return "Array of DInt";    }
+            case CoE::DataType::ArrayOfUDInt  : { return "Array of UDInt";   }
+
+            case CoE::DataType::PDOMapping           : { return "PDOMapping";          }
+            case CoE::DataType::Identity             : { return "Identity";            }
+            case CoE::DataType::CommandPar           : { return "CommandPar";          }
+            case CoE::DataType::PDOParameter         : { return "PDOParameter";        }
+            case CoE::DataType::Enum                 : { return "Enum";                }
+            case CoE::DataType::SMSynchronisation    : { return "SMSynchronisation";   }
+            case CoE::DataType::Record               : { return "Record";              }
+            case CoE::DataType::BackupParameter      : { return "BackupParameter";     }
+            case CoE::DataType::ModularDeviceProfile : { return "ModularDeviceProfile";}
+            case CoE::DataType::ErrorSetting         : { return "ErrorSetting";        }
+            case CoE::DataType::DiagnosisHistory     : { return "DiagnosisHistory";    }
+            case CoE::DataType::ExternalSyncStatus   : { return "ExternalSyncStatus";  }
+            case CoE::DataType::ExternalSyncSettings : { return "ExternalSyncSettings";}
+            case CoE::DataType::DefTypeFSOEFrame     : { return "DefTypeFSOEFrame";    }
+            case CoE::DataType::DefTypeFSOECommPar   : { return "DefTypeFSOECommPar";  }
+
             default:        { return "Unknown data type"; }
         }
     }
@@ -274,12 +307,113 @@ namespace kickcat
     std::string CoE::SDO::information::toString(ObjectDescription const& object_description, std::string const& name)
     {
         std::stringstream os;
-        os << "ObjectDescription \n";
-        os << "  index :        " << std::to_string(object_description.index)        << "\n";
-        os << "  data type :    " << std::to_string(object_description.data_type)    << " " << CoE::toString(object_description.data_type) << "\n";
-        os << "  max subindex : " << std::to_string(object_description.max_subindex) << "\n";
-        os << "  object code :  " << std::to_string(object_description.object_code)  << "\n" << toString(object_description.object_code) << "\n";
-        os << "  name :         " << name << "\n";
+        os << "Object Description \n";
+        os << "  index:        0x" << std::hex << object_description.index            << "\n";
+        os << "  data type:    0x" << std::hex << object_description.data_type        << " - " << toString(object_description.data_type) << "\n";
+        os << "  max subindex: " << std::to_string(object_description.max_subindex) << "\n";
+        os << "  object code:  " << std::to_string(object_description.object_code)  << " - " << toString(object_description.object_code) << "\n";
+        os << "  name:         " << name << "\n";
+        return os.str();
+    }
+
+
+    std::string CoE::SDO::information::toString(ValueInfo const& value_description)
+    {
+        std::stringstream os;
+        if(value_description.unit_type)
+        {
+            os << "unit_type ";
+        }
+
+        if (value_description.default_value)
+        {
+            os << "default_value ";
+        }
+
+        if (value_description.minimum_value)
+        {
+            os << "minimum_value ";
+        }
+
+        if (value_description.maximum_value)
+        {
+            os << "maximum_value";
+        }
+
+        return os.str();
+    }
+
+    std::string CoE::SDO::information::toString(ObjectAccess object_access)
+    {
+        std::stringstream os;
+
+        if (object_access.read_pre_operational)
+        {
+            os << " R pre op;";
+        }
+
+        if (object_access.read_safe_operational)
+        {
+            os << " R safe op;";
+        }
+
+        if (object_access.read_operational)
+        {
+            os << " R op;";
+        }
+
+        if (object_access.write_pre_operational)
+        {
+            os << " W pre op;";
+        }
+
+        if (object_access.write_safe_operational)
+        {
+            os << " W safe op;";
+        }
+
+        if (object_access.write_operational)
+        {
+            os << " W op;";
+        }
+
+        if (object_access.mappable_RxPDO)
+        {
+            os << " RxPDO;";
+        }
+
+        if (object_access.mappable_TxPDO)
+        {
+            os << " TxPDO;";
+        }
+
+        if (object_access.backup)
+        {
+            os << " backup;";
+        }
+
+        if (object_access.settings)
+        {
+            os << " settings;";
+        }
+
+        return os.str();
+    }
+
+    std::string CoE::SDO::information::toString(EntryDescription const& entry_description, uint8_t* data, uint32_t data_size)
+    {
+
+        uint16_t sub = entry_description.subindex; // if 0 and uint8_t the stringstream stops at this character.
+        std::stringstream os;
+        os << "Entry Description \n";
+        os << "  index:         0x" << std::hex << entry_description.index     << "\n";
+        os << "  subindex:      0x" << std::hex << sub << "\n";
+        os << "  value info:    " << toString(entry_description.value_info)  << "\n";
+        os << "  data type:     0x" << std::hex << entry_description.data_type << " - " << toString(entry_description.data_type) << "\n";
+        os << "  bit length:    " << std::to_string(entry_description.bit_length)  << "\n";
+        os << "  object access: " << toString(entry_description.object_access)  << "\n";
+
+        // TODO data by data
         return os.str();
     }
 
