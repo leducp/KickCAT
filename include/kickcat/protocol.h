@@ -558,6 +558,21 @@ namespace kickcat
         };
         std::string toString(DataType data_type);
 
+
+        /// ETG1004 extension unit_specification
+        /// For the textual description of the unit entry, the entry description shall be a definition in the object area
+        /// 0x0400 … 0x04FF. The entry description itself is defined as a record of the UNIT type (0x2A) which is
+        /// read-only in the object dictionary.
+
+        constexpr uint32_t UNIT_OFFSET = 0x0400;
+        struct UnitType
+        {
+            uint8_t reserved;
+            uint8_t denominator;
+            uint8_t numerator;
+            int8_t prefix;
+        };
+
         namespace SDO
         {
             // Command specifiers depending on SDO request type

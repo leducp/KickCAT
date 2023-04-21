@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cmath>
 
 #include "Bus.h"
 
@@ -126,5 +127,32 @@ namespace kickcat
         CoE::SDO::information::EntryDescription* description = reinterpret_cast<CoE::SDO::information::EntryDescription*>(data);
         printf("Received entry desc: %s \n", toString(*description, static_cast<uint8_t*>(data) + sizeof(CoE::SDO::information::EntryDescription),
                                                    *data_size - sizeof(CoE::SDO::information::EntryDescription)).c_str());
+    }
+
+    void Bus::getUnitDescription(Slave& slave, CoE::UnitType unit)
+    {
+        uint32_t numerator_index = CoE::UNIT_OFFSET + unit.numerator;
+        uint32_t denominator_index = CoE::UNIT_OFFSET + unit.denominator;
+
+        uint8_t subindex_name = 1;
+        uint8_t subindex_symbol = 2;
+
+        char buffer[256];
+        uint32_t size;
+
+        readSDO(slave, numerator_index, subindex_name, Access::PARTIAL, buffer, &size);
+        std::string numerator_name(buffer, size);
+        readSDO(slave, numerator_index, subindex_symbol, Access::PARTIAL, buffer, &size);
+        std::string numerator_symbol(buffer, size);
+
+
+        readSDO(slave, denominator_index, subindex_name, Access::PARTIAL, buffer, &size);
+        std::string denominator_name(buffer, size);
+        readSDO(slave, denominator_index, subindex_symbol, Access::PARTIAL, buffer, &size);
+        std::string denominator_symbol(buffer, size);
+
+        float_t prefix = std::pow(10, unit.prefix);
+        printf("Unit description:\n  Prefix: %e %s / %s \n  name: %s / %s", prefix, numerator_symbol.c_str(), denominator_symbol.c_str(),
+                numerator_name.c_str(), denominator_name.c_str());
     }
 }

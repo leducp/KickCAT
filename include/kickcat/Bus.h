@@ -98,11 +98,13 @@ namespace kickcat
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA,   void* data, uint32_t  data_size, nanoseconds timeout = 1s);
 
-        // TODO display (payload, size)
         void getObjectDictionnaryList(Slave& slave, CoE::SDO::information::ListType type, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
         void getObjectDescription(Slave& slave, uint16_t index, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
         void getEntryDescription(Slave& slave, uint16_t index, uint8_t subindex, CoE::SDO::information::ValueInfo value_info,
                                  void* data, uint32_t* data_size, nanoseconds timeout = 1s);
+
+        // TODO move to helpers.
+        void getUnitDescription(Slave& slave, CoE::UnitType unit);
 
 
         /// \brief  Add a gateway message to the bus
