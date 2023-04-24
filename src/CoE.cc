@@ -88,7 +88,7 @@ namespace kickcat
             THROW_ERROR_CODE("Error while get Object Dictionnary List", sdo->status());
         }
 
-        std::vector<uint16_t> index_list(static_cast<uint16_t*>(data) + sizeof(type), static_cast<uint16_t*>(data) + *data_size - sizeof(type));
+        std::vector<uint16_t> index_list(static_cast<uint16_t*>(data) + sizeof(type), static_cast<uint16_t*>(data) + *data_size/2);
         printf("Object dictionnary list: size: %li\n", index_list.size());
 
         for (auto const& index : index_list)

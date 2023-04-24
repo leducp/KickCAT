@@ -408,12 +408,18 @@ namespace kickcat
         os << "Entry Description \n";
         os << "  index:         0x" << std::hex << entry_description.index     << "\n";
         os << "  subindex:      0x" << std::hex << sub << "\n";
-        os << "  value info:    " << toString(entry_description.value_info)  << "\n";
+        os << "  value info:    " << std::to_string(reinterpret_cast<uint8_t const&>(entry_description.value_info)) << " " << toString(entry_description.value_info)  << "\n";
         os << "  data type:     0x" << std::hex << entry_description.data_type << " - " << toString(entry_description.data_type) << "\n";
         os << "  bit length:    " << std::to_string(entry_description.bit_length)  << "\n";
-        os << "  object access: " << toString(entry_description.object_access)  << "\n";
+        os << "  object access:"  << toString(entry_description.object_access)  << "\n";
 
-        // TODO data by data
+        os << "  raw data:      ";
+
+        for (uint32_t i = 0; i < data_size; i++)
+        {
+            os << std::hex << *(data + i);
+        }
+        os << "\n";
         return os.str();
     }
 

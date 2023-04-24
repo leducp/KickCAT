@@ -298,10 +298,10 @@ namespace kickcat
         // everything is fine: process the payload
         switch (sdo_->command)
         {
-            case CoE::SDO::response::UPLOAD:               { return processUpload(header, sdo, payload);            }
-            case CoE::SDO::response::UPLOAD_SEGMENTED:     { return processUploadSegmented(header, sdo, payload);   }
-            case CoE::SDO::response::DOWNLOAD:             { return processDownload(header, sdo, payload);          }
-            case CoE::SDO::response::DOWNLOAD_SEGMENTED:   { return processDownloadSegmented(header, sdo, payload); }
+            case CoE::SDO::request::UPLOAD:               { return processUpload(header, sdo, payload);            }
+            case CoE::SDO::request::UPLOAD_SEGMENTED:     { return processUploadSegmented(header, sdo, payload);   }
+            case CoE::SDO::request::DOWNLOAD:             { return processDownload(header, sdo, payload);          }
+            case CoE::SDO::request::DOWNLOAD_SEGMENTED:   { return processDownloadSegmented(header, sdo, payload); }
             default:
             {
                 status_ = MessageStatus::COE_UNKNOWN_SERVICE;
@@ -490,8 +490,6 @@ namespace kickcat
         sdo_->fragments_left = 0;
 
         std::memcpy(payload_, data, request_payload_size);
-
-        printf("Debug SDOInfoMessage created \n");
     }
 
 
@@ -502,25 +500,20 @@ namespace kickcat
         auto const* sdo     = pointData<CoE::ServiceDataInfo>(coe);
         auto const* payload = pointData<uint8_t>(sdo);
 
-        printf("DEbug SDOInfoMessage::process 1 \n");
-
         // skip gateway message
         if ((header->address & mailbox::GATEWAY_MESSAGE_MASK) != 0)
         {
-            printf("DEbug SDOInfoMessage::process 2 \n");
             return ProcessingResult::NOOP;
         }
 
         // check if the received message is related to this one
         if (header->type != mailbox::Type::CoE)
         {
-            printf("DEbug SDOInfoMessage::process 3 \n");
             return ProcessingResult::NOOP;
         }
 
         if ((coe->service != CoE::Service::SDO_INFORMATION))
         {
-            printf("DEbug SDOInfoMessage::process 4 \n");
             return ProcessingResult::NOOP;
         }
 
@@ -528,16 +521,12 @@ namespace kickcat
         // => check if message response is coherent
         if (sdo->opcode == CoE::SDO::information::SDO_INFO_ERROR_REQ)
         {
-            printf("DEbug SDOInfoMessage::process 5 \n");
-
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
             DEBUG_PRINT("Abort requested for sdo information ! code %08x - %s\n", code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }
-
-        printf("DEbug SDOInfoMessage::process 6 \n");
 
         // everything is fine: process the payload
         switch (sdo_->opcode)
@@ -547,7 +536,6 @@ namespace kickcat
             case CoE::SDO::information::GET_ED_REQ      : { return processSDOInfoResponse(header, sdo, payload, CoE::SDO::information::GET_ED_RESP);      }
             default:
             {
-                printf("DEbug SDOInfoMessage::process 7 \n");
                 status_ = MessageStatus::COE_UNKNOWN_SERVICE;
                 return ProcessingResult::FINALIZE;
             }
@@ -558,23 +546,18 @@ namespace kickcat
     ProcessingResult SDOInfoMessage::processSDOInfoResponse(mailbox::Header const* header, CoE::ServiceDataInfo const* sdo,
                                                             uint8_t const* payload, uint8_t expected_opcode)
     {
-        printf("Debug 2 \n");
         if (sdo->opcode != expected_opcode)
         {
-            printf("Debug 3 \n");
             status_ = MessageStatus::COE_WRONG_SERVICE;
             return ProcessingResult::FINALIZE;
         }
 
         uint32_t size = header->len - sizeof(CoE::ServiceDataInfo) - sizeof(CoE::Header);
-        printf("Debug 4 needed size %li, current size %li \n", size, *client_data_size_);
         if(*client_data_size_ < size)
         {
             status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
             return ProcessingResult::FINALIZE;
         }
-
-        printf("Debug 5 \n");
 
         std::memcpy(client_data_, payload, size);
         *client_data_size_ = size;
