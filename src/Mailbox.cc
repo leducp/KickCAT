@@ -552,17 +552,37 @@ namespace kickcat
             return ProcessingResult::FINALIZE;
         }
 
-        uint32_t size = header->len - sizeof(CoE::ServiceDataInfo) - sizeof(CoE::Header);
-        if(*client_data_size_ < size)
+        int32_t size = header->len - sizeof(CoE::ServiceDataInfo) - sizeof(CoE::Header);
+
+
+        int32_t remaining_size = *client_data_size_ - already_received_size_;
+
+
+        printf("\nReceived size %i already received %i, remaining_size %i  client_data_ %p \n ", size , already_received_size_, remaining_size, client_data_);
+
+        if(remaining_size < size)
         {
             status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
-            return ProcessingResult::FINALIZE;
+        }
+        else
+        {
+            std::memcpy(client_data_, payload, size);
+            client_data_ += size;
+        }
+        already_received_size_ += size;
+
+
+        if (sdo->fragments_left > 0)
+        {
+            return ProcessingResult::FINALIZE_AND_KEEP;
         }
 
-        std::memcpy(client_data_, payload, size);
-        *client_data_size_ = size;
+        if (already_received_size_ < *client_data_size_)
+        {
+            status_ = MessageStatus::SUCCESS;
+            *client_data_size_ = already_received_size_;
+        }
 
-        status_ = MessageStatus::SUCCESS;
         return ProcessingResult::FINALIZE;
     }
 

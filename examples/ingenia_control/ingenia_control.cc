@@ -180,14 +180,14 @@ int main(int argc, char *argv[])
 //    bus.getObjectDictionnaryList(ingenia, CoE::SDO::information::ListType::AllObjects, buffer, &data_size);
 //    bus.getObjectDescription(ingenia, 0x2018, buffer, &data_size);
 
-//    CoE::SDO::information::ValueInfo value_info{7,1,1,1,1, 1};
-//    bus.getEntryDescription(ingenia, 0x2018, 0, value_info, buffer, &data_size);
+    CoE::SDO::information::ValueInfo value_info{7,1,1,1,1, 1};
+    bus.getEntryDescription(ingenia, 0x2018, 0, value_info, buffer, &data_size);
 
-    CoE::UnitType unit_test;
-    unit_test.denominator = 0x48;
-    unit_test.numerator   = 0x01;
-    unit_test.prefix      = 0x03;
-    bus.getUnitDescription(ingenia, unit_test);
+//    CoE::UnitType unit_test;
+//    unit_test.denominator = 0x48;
+//    unit_test.numerator   = 0x01;
+//    unit_test.prefix      = 0x03;
+//    bus.getUnitDescription(ingenia, unit_test);
 
     std::abort();
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h

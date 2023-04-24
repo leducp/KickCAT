@@ -145,11 +145,27 @@ int main(int argc, char* argv[])
     uint8_t buffer[4096];
     uint32_t data_size = 4096;
 
+//    printf("Elmo mailbox size %u \n", elmo.mailbox.recv_size);
     bus.getObjectDictionnaryList(elmo, CoE::SDO::information::ListType::AllObjects, buffer, &data_size);
-//    bus.getObjectDescription(elmo, 0x2018, buffer, &data_size);
 
+    CoE::SDO::information::ValueInfo value_info{7,1,1,1,1, 1};
+    try
+    {
+        bus.getEntryDescription(elmo, 0x607f, 0, value_info, buffer, &data_size);
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << " " << e.code() << std::endl;
+        return 1;
+    }
 
-    std::abort();
+    CoE::UnitType unit_test;
+    unit_test.denominator = 0x48;
+    unit_test.numerator   = 0x01;
+    unit_test.prefix      = 0x03;
+    bus.getUnitDescription(elmo, unit_test);
+
+    exit(0);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     int64_t last_error = 0;

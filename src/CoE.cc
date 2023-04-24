@@ -1,5 +1,8 @@
 #include <cstring>
+
+
 #include <cmath>
+#include "kickcat/DebugHelpers.h"
 
 #include "Bus.h"
 
@@ -82,12 +85,14 @@ namespace kickcat
     void Bus::getObjectDictionnaryList(Slave& slave, CoE::SDO::information::ListType type, void* data, uint32_t* data_size, nanoseconds timeout)
     {
         auto sdo = slave.mailbox.createSDOInfoGetODList(type, data, data_size, timeout);
+
         waitForMessage(sdo);
         if (sdo->status() != MessageStatus::SUCCESS)
         {
             THROW_ERROR_CODE("Error while get Object Dictionnary List", sdo->status());
         }
 
+        printf("Data size received %u \n", *data_size);
         std::vector<uint16_t> index_list(static_cast<uint16_t*>(data) + sizeof(type), static_cast<uint16_t*>(data) + *data_size/2);
         printf("Object dictionnary list: size: %li\n", index_list.size());
 
@@ -129,6 +134,8 @@ namespace kickcat
                                                    *data_size - sizeof(CoE::SDO::information::EntryDescription)).c_str());
     }
 
+
+    /// Not tested yet because did not find any slave implementing this object in the dictionary.
     void Bus::getUnitDescription(Slave& slave, CoE::UnitType unit)
     {
         uint32_t numerator_index = CoE::UNIT_OFFSET + unit.numerator;
@@ -141,6 +148,7 @@ namespace kickcat
         uint32_t size;
 
         readSDO(slave, numerator_index, subindex_name, Access::PARTIAL, buffer, &size);
+
         std::string numerator_name(buffer, size);
         readSDO(slave, numerator_index, subindex_symbol, Access::PARTIAL, buffer, &size);
         std::string numerator_symbol(buffer, size);

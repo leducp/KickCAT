@@ -259,6 +259,7 @@ namespace kickcat
             case CoE::DataType::BITARR32: { return "BITARR32";             }
 
             case CoE::DataType::TimeOfDay :      { return "TimeOfDay";      }
+
             case CoE::DataType::TimeDifference : { return "TimeDifference"; }
 
             case CoE::DataType::Float32 : { return "Float32";               }
@@ -272,6 +273,15 @@ namespace kickcat
             case CoE::DataType::Integer48 : { return "Integer48";           }
             case CoE::DataType::Integer56 : { return "Integer56";           }
             case CoE::DataType::Integer64 : { return "Integer64";           }
+
+            case CoE::DataType::Unsigned8  : { return "Unsigned8";            }
+            case CoE::DataType::Unsigned16 : { return "Unsigned16";           }
+            case CoE::DataType::Unsigned24 : { return "Unsigned24";           }
+            case CoE::DataType::Unsigned32 : { return "Unsigned32";           }
+            case CoE::DataType::Unsigned40 : { return "Unsigned40";           }
+            case CoE::DataType::Unsigned48 : { return "Unsigned48";           }
+            case CoE::DataType::Unsigned56 : { return "Unsigned56";           }
+            case CoE::DataType::Unsigned64 : { return "Unsigned64";           }
 
             case CoE::DataType::VisibleString : { return "VisibleString";   }
             case CoE::DataType::OctetString   : { return "OctetString";     }
@@ -417,7 +427,7 @@ namespace kickcat
 
         for (uint32_t i = 0; i < data_size; i++)
         {
-            os << std::hex << *(data + i);
+            os << std::hex << data[i];
         }
         os << "\n";
         return os.str();
