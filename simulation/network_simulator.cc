@@ -1,8 +1,8 @@
 #include "kickcat/OS/Linux/VirtualSocket.h"
 #include "kickcat/Frame.h"
+#include "ESC.h"
 
 using namespace kickcat;
-
 
 
 int main(int argc, char* argv[])
@@ -27,6 +27,9 @@ int main(int argc, char* argv[])
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
 
+    std::vector<ESC> slaves;
+    slaves.resize(slave_number);
+
     while (true)
     {
         Frame frame;
@@ -36,7 +39,6 @@ int main(int argc, char* argv[])
             printf("Something wrong happened. Aborting...\n");
             return -1;
         }
-        printf("read frame %d - %d\n", r, frame.header()->len);
 
         while (true)
         {
@@ -45,11 +47,11 @@ int main(int argc, char* argv[])
             {
                 break;
             }
-            printf("ouiiiiii %s @ %x \n", toString(header->command), header->address);
 
-            if ((header->command == Command::BRD) or (header->command == Command::BWR))
+            printf("Process new datagram - %s @ %x \n", toString(header->command), header->address);
+            for (auto& slave : slaves)
             {
-                *wkc += slave_number;
+                slave.processDatagram(header, data, wkc);
             }
         }
 

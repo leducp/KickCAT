@@ -2,7 +2,6 @@
 #define KICKCAT_BUS_H
 
 #include <memory>
-#include <tuple>
 #include <list>
 #include <vector>
 #include <functional>

@@ -5,6 +5,7 @@
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
+    #include "kickcat/OS/Linux/VirtualSocket.h"
 #elif __PikeOS__
     #include "kickcat/OS/PikeOS/Socket.h"
 #else
@@ -38,11 +39,11 @@ int main(int argc, char* argv[])
     }
     else
     {
-        socket_redundancy = std::make_shared<Socket>();
+        socket_redundancy = std::make_shared<VirtualSocket>();
         red_interface_name = argv[2];
     }
 
-    auto socket_nominal = std::make_shared<Socket>();
+    auto socket_nominal = std::make_shared<VirtualSocket>();
     try
     {
         socket_nominal->open(nom_interface_name);
