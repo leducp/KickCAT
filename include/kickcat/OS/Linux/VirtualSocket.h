@@ -12,8 +12,17 @@ namespace kickcat
     ///        useful to do some testing.
     class VirtualSocket : public AbstractSocket
     {
+        using VirtualQueue = SBufQueue<EthernetFrame, 256>;
+        struct Context
+        {
+            pthread_mutex_t lock;
+            bool side;
+            VirtualQueue::Context q1;
+            VirtualQueue::Context q2;
+        };
+
     public:
-        VirtualSocket(nanoseconds polling_period, bool side);
+        VirtualSocket(nanoseconds polling_period = 20us);
         virtual ~VirtualSocket() = default;
 
         void open(std::string const& interface) override;
@@ -26,11 +35,9 @@ namespace kickcat
 
     private:
         SharedMemory shm_;
-        bool side_;
         nanoseconds timeout_;
         nanoseconds polling_period_;
 
-        using VirtualQueue = SBufQueue<EthernetFrame, 256>;
         VirtualQueue tx_;
         VirtualQueue rx_;
     };

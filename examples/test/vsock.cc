@@ -2,7 +2,7 @@
 
 using namespace kickcat;
 
-void produce(AbstractSocket& socket)
+[[noreturn]] void produce(AbstractSocket& socket)
 {
     int i = 0;
     while (true)
@@ -14,7 +14,7 @@ void produce(AbstractSocket& socket)
 }
 
 
-void consumme(AbstractSocket& socket)
+[[noreturn]] void consumme(AbstractSocket& socket)
 {
     socket.setTimeout(2s);
     while (true)
@@ -28,24 +28,18 @@ void consumme(AbstractSocket& socket)
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+    if (argc != 3)
     {
-        printf("Usage: ./binary interface_name");
+        printf("Usage: ./binary interface_name producer/consummer");
         return -1;
     }
 
-#ifdef SIDE_A
-    printf("Side A - init %s\n", argv[1]);
-    VirtualSocket::createInterface(argv[1]);
-    VirtualSocket socket(100us, true);
-    socket.open(argv[1]);
-    produce(socket);
-
-#else
-    printf("Side B\n");
-    VirtualSocket socket(100us, false);
-    socket.open(argv[1]);
-    consumme(socket);
-#endif
-
+    if (std::string(argv[2]) == "producer")
+    {
+        printf("Producer - init %s\n", argv[1]);
+        VirtualSocket::createInterface(argv[1]);
+        VirtualSocket socket(100us);
+        socket.open(argv[1]);
+        produce(socket);
+    }
 }

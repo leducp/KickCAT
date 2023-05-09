@@ -48,8 +48,14 @@ namespace kickcat
             T buffers[N];
         };
 
-        SBufQueue(void* location)
-            : ctx_      { static_cast<Context*>(location) }
+        SBufQueue(Context& location)
+            : SBufQueue(&location)
+        {
+
+        }
+
+        SBufQueue(Context* location)
+            : ctx_      { location }
             , free_     { ctx_->free.lock,  ctx_->free.cond,  ctx_->free.ring    }
             , ready_    { ctx_->ready.lock, ctx_->ready.cond, ctx_->ready.ring   }
         {

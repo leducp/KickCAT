@@ -131,6 +131,30 @@ namespace kickcat
         }
     }
 
+
+    char const* toString(Command cmd)
+    {
+        switch (cmd)
+        {
+            case Command::NOP : { return "No Operation";                                     }
+            case Command::APRD: { return "Auto increment Physical Read";                     }
+            case Command::APWR: { return "Auto increment Physical Write";                    }
+            case Command::APRW: { return "Auto increment Physical Read Write";               }
+            case Command::FPRD: { return "Configured address Physical Read";                 }
+            case Command::FPWR: { return "Configured address Physical Write";                }
+            case Command::FPRW: { return "Configured address Physical Read Write";           }
+            case Command::BRD : { return "Broadcast Read";                                   }
+            case Command::BWR : { return "Broadcast Write";                                  }
+            case Command::BRW : { return "Broadcast Read Write";                             }
+            case Command::LRD : { return "Logical memory Read";                              }
+            case Command::LWR : { return "Logical memory Write";                             }
+            case Command::LRW : { return "Logical memory Read Write";                        }
+            case Command::ARMW: { return "Auto increment physical Read Multiple Write";      }
+            case Command::FRMW: { return "Configured address Physical Read Multiple Write";  }
+            default:            { return "unknown command";                                  }
+        }
+    }
+
     std::string toString(ErrorCounters const& error_counters)
     {
         std::stringstream os;

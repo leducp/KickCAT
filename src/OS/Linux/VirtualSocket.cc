@@ -8,20 +8,26 @@ namespace kickcat
     void VirtualSocket::createInterface(std::string const& interface)
     {
         SharedMemory shm;
-        shm.open(interface, sizeof(VirtualQueue::Context) * 2);
-        uint8_t* pos = reinterpret_cast<uint8_t*>(shm.address());
+        shm.open(interface, sizeof(Context));
+        Context* ctx = reinterpret_cast<Context*>(shm.address());
 
-        VirtualQueue q1(pos);
-        q1.initContext();
+        Mutex mutex(ctx->lock);
+        mutex.init();
 
-        VirtualQueue q2(pos + sizeof(VirtualQueue::Context));
-        q2.initContext();
+        {
+            VirtualQueue q(ctx->q1);
+            q.initContext();
+        }
+
+        {
+            VirtualQueue q(ctx->q2);
+            q.initContext();
+        }
     }
 
 
-    VirtualSocket::VirtualSocket(nanoseconds polling_period, bool side)
+    VirtualSocket::VirtualSocket(nanoseconds polling_period)
         : shm_{}
-        , side_{side}
         , timeout_{2ms}
         , polling_period_{polling_period}
         , tx_{nullptr}
@@ -33,17 +39,22 @@ namespace kickcat
 
     void VirtualSocket::open(std::string const& interface)
     {
-        shm_.open(interface, sizeof(VirtualQueue::Context) * 2);
-        uint8_t* pos = reinterpret_cast<uint8_t*>(shm_.address());
-        if (side_)
+        shm_.open(interface, sizeof(Context));
+        Context* ctx = reinterpret_cast<Context*>(shm_.address());
+        Mutex mutex(ctx->lock);
+
+        LockGuard lock(mutex);
+        if (ctx->side)
         {
-            tx_ = VirtualQueue(pos);
-            rx_ = VirtualQueue(pos + sizeof(VirtualQueue::Context));
+            tx_ = VirtualQueue(ctx->q1);
+            rx_ = VirtualQueue(ctx->q2);
+            ctx->side = false;
         }
         else
         {
-            rx_ = VirtualQueue(pos);
-            tx_ = VirtualQueue(pos + sizeof(VirtualQueue::Context));
+            tx_ = VirtualQueue(ctx->q2);
+            rx_ = VirtualQueue(ctx->q1);
+            ctx->side = true;
         }
     }
 
@@ -62,11 +73,16 @@ namespace kickcat
 
     int32_t VirtualSocket::read(uint8_t* frame, int32_t frame_size)
     {
+        VirtualQueue::Mode mode = VirtualQueue::NON_BLOCKING;
+        if (timeout_ < 0ns)
+        {
+            mode = VirtualQueue::BLOCKING;
+        }
 
         nanoseconds deadline = since_epoch() + timeout_;
         do
         {
-            auto packet = rx_.get(VirtualQueue::NON_BLOCKING);
+            auto packet = rx_.get(mode);
             if (packet.index == SBUF_INVALID_INDEX)
             {
                 sleep(polling_period_);

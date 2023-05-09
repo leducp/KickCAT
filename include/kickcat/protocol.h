@@ -90,6 +90,7 @@ namespace kickcat
         ARMW = 13, // Auto increment physical Read Multiple Write
         FRMW = 14  // Configured address Physical Read Multiple Write
     };
+    char const* toString(Command cmd);
 
     struct DatagramHeader
     {
