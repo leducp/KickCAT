@@ -28,7 +28,11 @@ int main(int argc, char* argv[])
     socket->setTimeout(-1ns);
 
     std::vector<ESC> slaves;
-    slaves.resize(slave_number);
+    slaves.reserve(slave_number); //TODO: current register address pointer is not reliable if the object is moved after construction
+    for (int i = 0; i < slave_number; ++i)
+    {
+        slaves.emplace_back("EasyCAT_32_32_rev_1.bin");
+    }
 
     while (true)
     {
@@ -48,14 +52,14 @@ int main(int argc, char* argv[])
                 break;
             }
 
-            printf("Process new datagram - %s @ %x \n", toString(header->command), header->address);
+            //printf("Process new datagram - %s @ %x \n", toString(header->command), header->address);
             for (auto& slave : slaves)
             {
                 slave.processDatagram(header, data, wkc);
             }
         }
 
-        printf("write back %d\n\n", r);
+        //printf("write back %d\n\n", r);
         int32_t written = socket->write(frame.data(), r);
     }
 

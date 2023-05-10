@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
-    link->setTimeout(2ms);
+    link->setTimeout(20ms);
     link->checkRedundancyNeeded();
 
     Bus bus(link);
@@ -106,6 +106,8 @@ int main(int argc, char* argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
+    printInfo(bus.slaves().at(0));
+    printPDOs(bus.slaves().at(0));
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
 
@@ -136,7 +138,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    link->setTimeout(500us);
+    link->setTimeout(2ms);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
@@ -146,7 +148,7 @@ int main(int argc, char* argv[])
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(1ms);
+        sleep(5ms);
 
         try
         {
