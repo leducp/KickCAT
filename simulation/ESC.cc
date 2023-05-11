@@ -8,18 +8,18 @@ namespace kickcat
 {
     ESC::ESC(std::string const& eeprom)
         : registers_{}
-        , station_address_{reinterpret_cast<uint16_t*>(registers_ + reg::STATION_ADDR)}
     {
         // Device emulation is ON
-        registers_[reg::ESC_CONFIG] = 0x01;
+        registers_.esc_configuration = 0x01;
 
         // Default value is 'Request INIT State'
-        registers_[reg::AL_CONTROL + 0] = 0x01;
-        registers_[reg::AL_CONTROL + 1] = 0x00;
+        registers_.al_control = 0x0001;
 
         // Default value is 'INIT State'
-        registers_[reg::AL_STATUS + 0] = 0x01;
-        registers_[reg::AL_STATUS + 1] = 0x00;
+        registers_.al_status = 0x0001;
+
+        // eeprom never busy because the data are processed in sync with the request.
+        registers_.eeprom_control &= ~0x8000;
 
         std::ifstream eeprom_file;
         eeprom_file.open(eeprom, std::ios::binary | std::ios::ate);
@@ -76,7 +76,7 @@ namespace kickcat
             }
             case Command::FPRD:
             {
-                if (position == *station_address_)
+                if (position == registers_.station_address)
                 {
                     processReadCommand(header, data, wkc, offset);
                 }
@@ -84,7 +84,7 @@ namespace kickcat
             }
             case Command::FPWR:
             {
-                if (position == *station_address_)
+                if (position == registers_.station_address)
                 {
                     processWriteCommand(header, data, wkc, offset);
                 }
@@ -92,7 +92,7 @@ namespace kickcat
             }
             case Command::FPRW:
             {
-                if (position == *station_address_)
+                if (position == registers_.station_address)
                 {
                     processReadWriteCommand(header, data, wkc, offset);
                 }
@@ -135,26 +135,22 @@ namespace kickcat
         // Process registers internal management
 
         // Mirror AL_STATUS - Device Emulation
-        registers_[reg::AL_STATUS] =  registers_[reg::AL_CONTROL];
+        registers_.al_status = registers_.al_control;
 
         // Handle eeprom access
-        uint16_t order = registers_[reg::EEPROM_CONTROL + 1] << 8;
+        uint16_t order = registers_.eeprom_control & 0x0701;
         switch (order)
         {
             case eeprom::Command::READ:
             {
-                int32_t address = registers_[reg::EEPROM_ADDRESS] + (registers_[reg::EEPROM_ADDRESS + 1] << 8);
-                std::memcpy(registers_ + reg::EEPROM_DATA, eeprom_.data() + address, 4);
-                registers_[reg::EEPROM_CONTROL + 1] &= ~7; // clear order - TODO 7 -> mask
-                eeprom_busy_latency = since_epoch() + 2us;
+                std::memcpy((void*)&registers_.eeprom_data, eeprom_.data() + registers_.eeprom_address, 4);
+                registers_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
             case eeprom::Command::WRITE:
             {
-                int32_t address = registers_[reg::EEPROM_ADDRESS] + (registers_[reg::EEPROM_ADDRESS + 1] << 8);
-                std::memcpy(eeprom_.data() + address, data, 4);
-                registers_[reg::EEPROM_CONTROL + 1] &= ~7; // clear order
-                eeprom_busy_latency = since_epoch() + 2us;
+                std::memcpy(eeprom_.data() + registers_.eeprom_address, data, 4);
+                registers_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
             case eeprom::Command::NOP:
@@ -163,29 +159,18 @@ namespace kickcat
                 break;
             }
         }
-
-        // Set/clear eeprom busy bit
-        if (since_epoch() < eeprom_busy_latency)
-        {
-            registers_[reg::EEPROM_CONTROL + 1] |= 0x80;
-        }
-        else
-        {
-            registers_[reg::EEPROM_CONTROL + 1] &= ~0x80;
-            eeprom_busy_latency = 0ns;
-        }
     }
 
 
     void ESC::processReadCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
-        std::memcpy(data, registers_ + offset, header->len);
+        std::memcpy(data, (uint8_t*)&registers_ + offset, header->len);
         *wkc += 1;
     }
 
     void ESC::processWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
-        std::memcpy(registers_ + offset, data, header->len);
+        std::memcpy((uint8_t*)&registers_ + offset, data, header->len);
         *wkc += 1;
     }
 
@@ -193,8 +178,8 @@ namespace kickcat
     {
         uint8_t swap[0x1000];
 
-        std::memcpy(swap, registers_ + offset, header->len);
-        std::memcpy(registers_ + offset, data, header->len);
+        std::memcpy(swap, (uint8_t*)&registers_ + offset, header->len);
+        std::memcpy((uint8_t*)&registers_ + offset, data, header->len);
         std::memcpy(data, swap, header->len);
         *wkc += 3;
     }
