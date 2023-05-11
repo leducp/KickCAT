@@ -3,6 +3,7 @@
 
 #include "kickcat/protocol.h"
 #include <vector>
+#include <functional>
 
 namespace kickcat
 {
@@ -12,6 +13,14 @@ namespace kickcat
         ESC(std::string const& eeprom);
 
         void processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
+
+        // Called when the ESM state change.
+        /// \param before   ESM state before changement
+        /// \param current  current ESM state
+        void setChangeStateCallback(std::function<void(State before, State current)> callback);
+
+        void write(uint16_t address, void const* data, uint16_t size);
+        void read (uint16_t address, void* data,       uint16_t size);
 
     private:
         struct Registers
@@ -113,7 +122,7 @@ namespace kickcat
             uint32_t phy_port_status;
             uint8_t padding23[228];
 
-            uint16_t fmmu[128];
+            FMMU fmmu[16];
             uint8_t padding24[0x100];
 
             uint8_t sync_manager[128];
@@ -153,12 +162,26 @@ namespace kickcat
         }__attribute__((__packed__));
 
         Registers registers_;
+        uint8_t process_data_ram[0xf000];   // 63KB max following documentation
+        std::vector<uint16_t> eeprom_;      // EEPPROM addressing is word/16 bits
 
-        std::vector<uint16_t> eeprom_; // EEPPROM addressing is word/16 bits
+        struct PDO
+        {
+            uint32_t logical_address;
+            uint8_t* physical_address;
+            uint16_t size;
+        };
+        std::vector<PDO> rx_pdos_;
+        std::vector<PDO> tx_pdos_;
+
+        std::function<void(State, State)> changeState_{[](State, State){}};
 
         void processReadCommand     (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
         void processWriteCommand    (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
         void processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
+
+        void configurePDOs();
+        std::tuple<uint8_t*, uint16_t> computeInternalMemoryAccess(uint16_t address, uint16_t size);
     };
 };
 

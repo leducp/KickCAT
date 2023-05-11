@@ -34,6 +34,39 @@ namespace kickcat
         eeprom_file.close();
     }
 
+    std::tuple<uint8_t*, uint16_t> ESC::computeInternalMemoryAccess(uint16_t address, uint16_t size)
+    {
+        uint8_t* pos = nullptr;
+        uint16_t to_copy = 0;
+        if (address < 0x1000)
+        {
+            pos = reinterpret_cast<uint8_t*>(&registers_);
+            pos += address;
+            to_copy = std::min(size, uint16_t(0x1000 - address));
+        }
+        else
+        {
+            pos = reinterpret_cast<uint8_t*>(process_data_ram);
+            pos += (address - 0x1000);
+            to_copy = std::min(size, uint16_t(0x10000 - address));
+        }
+        return std::make_tuple(pos, to_copy);
+    }
+
+    void ESC::write(uint16_t address, void const* data, uint16_t size)
+    {
+        auto[pos, to_copy] = computeInternalMemoryAccess(address, size);
+        std::memcpy(pos, data, to_copy); //TODO change API? return really written?
+        //printf("write to %x %p (%p)\n", address, pos, process_data_ram);
+    }
+
+    void ESC::read(uint16_t address, void* data, uint16_t size)
+    {
+        auto[pos, to_copy] = computeInternalMemoryAccess(address, size);
+        std::memcpy(data, pos, to_copy); //TODO change API? return really written?
+    }
+
+
     void ESC::processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         auto [position, offset] = extractAddress(header->address);
@@ -115,7 +148,27 @@ namespace kickcat
             }
             case Command::LRD:
             {
-                *wkc += 1;
+                uint32_t start_logical_address = header->address;
+                uint32_t end_logical_address = header->address + header->len;
+
+                uint16_t work = 0;
+                for (auto const& pdo : rx_pdos_)
+                {
+                    uint32_t address_min = std::max(start_logical_address, pdo.logical_address);
+                    uint32_t address_max = std::min(end_logical_address, pdo.logical_address + pdo.size);
+                    if (address_max < address_min)
+                    {
+                        continue; // no intersection
+                    }
+                    uint32_t to_copy = address_max - address_min;
+                    uint32_t phys_offset = address_min - pdo.logical_address;
+                    uint32_t frame_offset = address_min - start_logical_address;
+
+                    std::memcpy(data + frame_offset, pdo.physical_address + phys_offset, to_copy);
+                    work = 1;
+                }
+
+                *wkc += work;
                 break;
             }
             case Command::LWR:
@@ -133,6 +186,47 @@ namespace kickcat
         }
 
         // Process registers internal management
+
+        // ESM state change
+        if (registers_.al_control != registers_.al_status)
+        {
+            State before  = static_cast<State>(registers_.al_status  & 0xf);
+            State current = static_cast<State>(registers_.al_control & 0xf);
+            printf("%s -> %s\n", toString(before), toString(current));
+
+            switch (current)
+            {
+                case State::BOOT:
+                {
+                    break;
+                }
+                case State::INIT:
+                {
+                    break;
+                }
+                case State::PRE_OP:
+                {
+                    break;
+                }
+                case State::SAFE_OP:
+                {
+                    if (before == State::PRE_OP)
+                    {
+                        configurePDOs();
+                    }
+                    break;
+                }
+                case State::OPERATIONAL:
+                {
+                    break;
+                }
+                default:
+                {
+
+                }
+            }
+            changeState_(before, current);
+        }
 
         // Mirror AL_STATUS - Device Emulation
         registers_.al_status = registers_.al_control;
@@ -182,5 +276,35 @@ namespace kickcat
         std::memcpy((uint8_t*)&registers_ + offset, data, header->len);
         std::memcpy(data, swap, header->len);
         *wkc += 3;
+    }
+
+    void ESC::configurePDOs()
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            auto const& fmmu = registers_.fmmu[i];
+            if (fmmu.activate == 0)
+            {
+                continue;
+            }
+
+            PDO pdo;
+            pdo.size = fmmu.length;
+            pdo.logical_address = fmmu.logical_address;
+            pdo.physical_address = process_data_ram + (fmmu.physical_address - 0x1000);
+
+            if (fmmu.type == 1)
+            {
+                tx_pdos_.push_back(pdo);
+            }
+            else if (fmmu.type == 2)
+            {
+                rx_pdos_.push_back(pdo);
+            }
+            else
+            {
+                continue;
+            }
+        }
     }
 }

@@ -34,6 +34,7 @@ int main(int argc, char* argv[])
         slaves.emplace_back("EasyCAT_32_32_rev_1.bin");
     }
 
+    int16_t x = 0;
     while (true)
     {
         Frame frame;
@@ -44,6 +45,7 @@ int main(int argc, char* argv[])
             return -1;
         }
 
+        auto t1 = since_epoch();
         while (true)
         {
             auto [header, data, wkc] = frame.peekDatagram();
@@ -57,10 +59,16 @@ int main(int argc, char* argv[])
             {
                 slave.processDatagram(header, data, wkc);
             }
+
+
+            slaves.at(0).write(0x1000, &x, 2);
+            ++x;
         }
 
         //printf("write back %d\n\n", r);
         int32_t written = socket->write(frame.data(), r);
+        auto t2 = since_epoch();
+        //printf("frame processing time: %d\n", (t2 - t1).count());
     }
 
     return 0;
