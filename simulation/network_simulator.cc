@@ -1,4 +1,5 @@
 #include "kickcat/OS/Linux/VirtualSocket.h"
+#include "kickcat/OS/Linux/Socket.h"
 #include "kickcat/Frame.h"
 #include "ESC.h"
 
@@ -22,10 +23,10 @@ int main(int argc, char* argv[])
     }
 
     printf("Start EtherCAT network simulator on %s with %d slaves\n", argv[1], slave_number);
-    VirtualSocket::createInterface(argv[1]);
-    auto socket = std::make_shared<VirtualSocket>(100us);
+    //VirtualSocket::createInterface(argv[1]);
+    auto socket = std::make_shared<Socket>(-1ns, 1us);
     socket->open(argv[1]);
-    socket->setTimeout(-1ns);
+    socket->setTimeout(1h);
 
     std::vector<ESC> slaves;
     slaves.reserve(slave_number); //TODO: current register address pointer is not reliable if the object is moved after construction
@@ -62,6 +63,8 @@ int main(int argc, char* argv[])
 
 
             slaves.at(0).write(0x1000, &x, 2);
+            ++x;
+            slaves.at(0).write(0x1010, &x, 2);
             ++x;
         }
 

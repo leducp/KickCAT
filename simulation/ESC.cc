@@ -7,19 +7,19 @@
 namespace kickcat
 {
     ESC::ESC(std::string const& eeprom)
-        : registers_{}
+        : memory_{}
     {
         // Device emulation is ON
-        registers_.esc_configuration = 0x01;
+        memory_.esc_configuration = 0x01;
 
         // Default value is 'Request INIT State'
-        registers_.al_control = 0x0001;
+        memory_.al_control = 0x0001;
 
         // Default value is 'INIT State'
-        registers_.al_status = 0x0001;
+        memory_.al_status = 0x0001;
 
         // eeprom never busy because the data are processed in sync with the request.
-        registers_.eeprom_control &= ~0x8000;
+        memory_.eeprom_control &= ~0x8000;
 
         std::ifstream eeprom_file;
         eeprom_file.open(eeprom, std::ios::binary | std::ios::ate);
@@ -36,20 +36,8 @@ namespace kickcat
 
     std::tuple<uint8_t*, uint16_t> ESC::computeInternalMemoryAccess(uint16_t address, uint16_t size)
     {
-        uint8_t* pos = nullptr;
-        uint16_t to_copy = 0;
-        if (address < 0x1000)
-        {
-            pos = reinterpret_cast<uint8_t*>(&registers_);
-            pos += address;
-            to_copy = std::min(size, uint16_t(0x1000 - address));
-        }
-        else
-        {
-            pos = reinterpret_cast<uint8_t*>(process_data_ram);
-            pos += (address - 0x1000);
-            to_copy = std::min(size, uint16_t(0x10000 - address));
-        }
+        uint8_t* pos = reinterpret_cast<uint8_t*>(&memory_) + address;
+        uint16_t to_copy = std::min(size, uint16_t(UINT16_MAX - address));
         return std::make_tuple(pos, to_copy);
     }
 
@@ -57,7 +45,7 @@ namespace kickcat
     {
         auto[pos, to_copy] = computeInternalMemoryAccess(address, size);
         std::memcpy(pos, data, to_copy); //TODO change API? return really written?
-        //printf("write to %x %p (%p)\n", address, pos, process_data_ram);
+        //printf("write to %x %p (%p)\n", address, pos, memory_.process_data_ram);
     }
 
     void ESC::read(uint16_t address, void* data, uint16_t size)
@@ -109,7 +97,7 @@ namespace kickcat
             }
             case Command::FPRD:
             {
-                if (position == registers_.station_address)
+                if (position == memory_.station_address)
                 {
                     processReadCommand(header, data, wkc, offset);
                 }
@@ -117,7 +105,7 @@ namespace kickcat
             }
             case Command::FPWR:
             {
-                if (position == registers_.station_address)
+                if (position == memory_.station_address)
                 {
                     processWriteCommand(header, data, wkc, offset);
                 }
@@ -125,7 +113,7 @@ namespace kickcat
             }
             case Command::FPRW:
             {
-                if (position == registers_.station_address)
+                if (position == memory_.station_address)
                 {
                     processReadWriteCommand(header, data, wkc, offset);
                 }
@@ -173,7 +161,27 @@ namespace kickcat
             }
             case Command::LWR:
             {
-                *wkc += 1;
+                uint32_t start_logical_address = header->address;
+                uint32_t end_logical_address = header->address + header->len;
+
+                uint16_t work = 0;
+                for (auto const& pdo : tx_pdos_)
+                {
+                    uint32_t address_min = std::max(start_logical_address, pdo.logical_address);
+                    uint32_t address_max = std::min(end_logical_address, pdo.logical_address + pdo.size);
+                    if (address_max < address_min)
+                    {
+                        continue; // no intersection
+                    }
+                    uint32_t to_copy = address_max - address_min;
+                    uint32_t phys_offset = address_min - pdo.logical_address;
+                    uint32_t frame_offset = address_min - start_logical_address;
+
+                    std::memcpy(pdo.physical_address + phys_offset, data + frame_offset, to_copy);
+                    work = 1;
+                }
+
+                *wkc += work;
                 break;
             }
             case Command::LRW:
@@ -186,13 +194,14 @@ namespace kickcat
         }
 
         // Process registers internal management
+        static nanoseconds const start = since_epoch();
 
         // ESM state change
-        if (registers_.al_control != registers_.al_status)
+        if (memory_.al_control != memory_.al_status)
         {
-            State before  = static_cast<State>(registers_.al_status  & 0xf);
-            State current = static_cast<State>(registers_.al_control & 0xf);
-            printf("%s -> %s\n", toString(before), toString(current));
+            State before  = static_cast<State>(memory_.al_status  & 0xf);
+            State current = static_cast<State>(memory_.al_control & 0xf);
+            printf("%7dus  %s -> %s  \n", duration_cast<microseconds>(since_epoch() - start).count(), toString(before), toString(current));
 
             switch (current)
             {
@@ -206,6 +215,7 @@ namespace kickcat
                 }
                 case State::PRE_OP:
                 {
+                    //TODO record mailbox to call a hook on write
                     break;
                 }
                 case State::SAFE_OP:
@@ -229,22 +239,22 @@ namespace kickcat
         }
 
         // Mirror AL_STATUS - Device Emulation
-        registers_.al_status = registers_.al_control;
+        memory_.al_status = memory_.al_control;
 
         // Handle eeprom access
-        uint16_t order = registers_.eeprom_control & 0x0701;
+        uint16_t order = memory_.eeprom_control & 0x0701;
         switch (order)
         {
             case eeprom::Command::READ:
             {
-                std::memcpy((void*)&registers_.eeprom_data, eeprom_.data() + registers_.eeprom_address, 4);
-                registers_.eeprom_control &= ~0x0700; // clear order
+                std::memcpy((void*)&memory_.eeprom_data, eeprom_.data() + memory_.eeprom_address, 4);
+                memory_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
             case eeprom::Command::WRITE:
             {
-                std::memcpy(eeprom_.data() + registers_.eeprom_address, data, 4);
-                registers_.eeprom_control &= ~0x0700; // clear order
+                std::memcpy(eeprom_.data() + memory_.eeprom_address, data, 4);
+                memory_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
             case eeprom::Command::NOP:
@@ -258,23 +268,26 @@ namespace kickcat
 
     void ESC::processReadCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
-        std::memcpy(data, (uint8_t*)&registers_ + offset, header->len);
+        auto[pos, to_copy] = computeInternalMemoryAccess(offset, header->len);
+        std::memcpy(data, pos, to_copy);
         *wkc += 1;
     }
 
     void ESC::processWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
-        std::memcpy((uint8_t*)&registers_ + offset, data, header->len);
+        auto[pos, to_copy] = computeInternalMemoryAccess(offset, header->len);
+        std::memcpy(pos, data, to_copy);
         *wkc += 1;
     }
 
     void ESC::processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
-        uint8_t swap[0x1000];
+        uint8_t swap[0x800];
+        auto[pos, to_copy] = computeInternalMemoryAccess(offset, header->len);
 
-        std::memcpy(swap, (uint8_t*)&registers_ + offset, header->len);
-        std::memcpy((uint8_t*)&registers_ + offset, data, header->len);
-        std::memcpy(data, swap, header->len);
+        std::memcpy(swap, pos,  to_copy);
+        std::memcpy(pos,  data, to_copy);
+        std::memcpy(data, swap, to_copy);
         *wkc += 3;
     }
 
@@ -282,7 +295,7 @@ namespace kickcat
     {
         for (int i = 0; i < 16; ++i)
         {
-            auto const& fmmu = registers_.fmmu[i];
+            auto const& fmmu = memory_.fmmu[i];
             if (fmmu.activate == 0)
             {
                 continue;
@@ -291,7 +304,7 @@ namespace kickcat
             PDO pdo;
             pdo.size = fmmu.length;
             pdo.logical_address = fmmu.logical_address;
-            pdo.physical_address = process_data_ram + (fmmu.physical_address - 0x1000);
+            pdo.physical_address = memory_.process_data_ram + (fmmu.physical_address - 0x1000);
 
             if (fmmu.type == 1)
             {

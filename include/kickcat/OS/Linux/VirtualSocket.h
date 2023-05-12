@@ -40,6 +40,7 @@ namespace kickcat
 
         VirtualQueue tx_;
         VirtualQueue rx_;
+        VirtualQueue::Mode mode_{VirtualQueue::NON_BLOCKING};
     };
 }
 

@@ -13,6 +13,7 @@ namespace kickcat
 
         Mutex mutex(ctx->lock);
         mutex.init();
+        ctx->side = false;
 
         {
             VirtualQueue q(ctx->q1);
@@ -62,6 +63,14 @@ namespace kickcat
     void VirtualSocket::setTimeout(nanoseconds timeout)
     {
         timeout_ = timeout;
+        if (timeout_ < 0ns)
+        {
+            mode_ = VirtualQueue::BLOCKING;
+        }
+        else
+        {
+            mode_ = VirtualQueue::NON_BLOCKING;
+        }
     }
 
 
@@ -73,16 +82,11 @@ namespace kickcat
 
     int32_t VirtualSocket::read(uint8_t* frame, int32_t frame_size)
     {
-        VirtualQueue::Mode mode = VirtualQueue::NON_BLOCKING;
-        if (timeout_ < 0ns)
-        {
-            mode = VirtualQueue::BLOCKING;
-        }
-
+        auto t1 = since_epoch();
         nanoseconds deadline = since_epoch() + timeout_;
         do
         {
-            auto packet = rx_.get(mode);
+            auto packet = rx_.get(mode_);
             if (packet.index == SBUF_INVALID_INDEX)
             {
                 sleep(polling_period_);
@@ -93,6 +97,9 @@ namespace kickcat
             int32_t to_copy = std::min(frame_size, len);
             std::memcpy(frame, packet.address, to_copy);
             rx_.free(packet);
+
+            auto t2 = since_epoch();
+            //printf("read duration: %dns\n", (t2 - t1).count());
             return to_copy;
         } while (since_epoch() < deadline);
 
@@ -109,11 +116,11 @@ namespace kickcat
             errno = EAGAIN;
             return -1;
         }
-
         // Write data and finalize operation
         std::memcpy(packet.address, frame, frame_size);
         packet.len = frame_size;
         tx_.ready(packet);
+
         return frame_size;
     }
 }

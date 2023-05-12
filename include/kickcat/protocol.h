@@ -88,8 +88,8 @@ namespace kickcat
         LRD  = 10, // Logical memory Read
         LWR  = 11, // Logical memory Write
         LRW  = 12, // Logical memory Read Write
-        ARMW = 13, // Auto increment physical Read Multiple Write
-        FRMW = 14  // Configured address Physical Read Multiple Write
+        ARMW = 13, // Auto increment physical Read Multiple Write - DC use
+        FRMW = 14  // Configured address Physical Read Multiple Write - DC use
     };
     char const* toString(Command cmd);
 

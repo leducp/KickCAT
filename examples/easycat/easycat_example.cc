@@ -39,11 +39,11 @@ int main(int argc, char* argv[])
     }
     else
     {
-        socket_redundancy = std::make_shared<VirtualSocket>();
+        socket_redundancy = std::make_shared<Socket>();
         red_interface_name = argv[2];
     }
 
-    auto socket_nominal = std::make_shared<VirtualSocket>();
+    auto socket_nominal = std::make_shared<Socket>();
     try
     {
         socket_nominal->open(nom_interface_name);

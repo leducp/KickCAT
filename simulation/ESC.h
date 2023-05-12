@@ -23,7 +23,7 @@ namespace kickcat
         void read (uint16_t address, void* data,       uint16_t size);
 
     private:
-        struct Registers
+        struct Memory
         {
             uint8_t type;
             uint8_t revision;
@@ -159,10 +159,10 @@ namespace kickcat
             uint8_t receive_time_latch_mode;
             */
 
+            uint8_t process_data_ram[0xf000];   // 60KB max following documentation
         }__attribute__((__packed__));
 
-        Registers registers_;
-        uint8_t process_data_ram[0xf000];   // 63KB max following documentation
+        Memory memory_;
         std::vector<uint16_t> eeprom_;      // EEPPROM addressing is word/16 bits
 
         struct PDO
