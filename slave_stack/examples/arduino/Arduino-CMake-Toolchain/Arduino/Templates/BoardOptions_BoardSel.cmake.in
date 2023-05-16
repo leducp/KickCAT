@@ -1,0 +1,1 @@
+@_board_sel_comment@set(ARDUINO_BOARD "@_board_name_in_menu@") # @_board_name@

@@ -1,0 +1,1 @@
+@_prog_sel_comment@set(ARDUINO_PROGRAMMER "@_prog_name_in_menu@") # @_prog_name@

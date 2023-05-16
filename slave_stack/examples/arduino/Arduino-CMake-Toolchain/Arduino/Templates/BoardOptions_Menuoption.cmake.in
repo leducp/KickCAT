@@ -1,0 +1,1 @@
+@_menu_opt_sel_comment@set(ARDUINO_@_menu_opt_identifier@ TRUE) # @_menu_opt_name@
