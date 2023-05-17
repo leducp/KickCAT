@@ -106,6 +106,7 @@ int main(int argc, char* argv[])
         return 1;
     }
     printInfo(bus.slaves().at(0));
+    printPDOs(bus.slaves().at(0));
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
 

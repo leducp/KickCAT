@@ -5,3 +5,7 @@ set_kickcat_properties(scanTopology)
 add_executable(debugUseCase debugUseCase.cc)
 target_link_libraries(debugUseCase kickcat)
 set_kickcat_properties(debugUseCase)
+
+add_executable(eeprom eeprom.cc)
+target_link_libraries(eeprom kickcat)
+set_kickcat_properties(eeprom)
