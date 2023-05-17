@@ -1,13 +1,17 @@
-#include <SPI.h>
 
 #include "Arduino.h"
 
-#include "spi.h"
+#include "kickcat/ESC/Lan9252.h"
+
+
+kickcat::Lan9252 esc;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(9600);
+
+  esc.init();
 }
 
 void loop() {
@@ -19,4 +23,5 @@ void loop() {
   int tasty_test = kickcat::test();
   Serial.println(tasty_test);
   Serial.println("HEllo !");
+
 }
