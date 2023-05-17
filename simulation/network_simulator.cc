@@ -7,31 +7,23 @@ using namespace kickcat;
 
 int main(int argc, char* argv[])
 {
-    if (argc != 3)
+    if (argc < 3)
     {
-        printf("Usage: ./network_simulator interface_name slave_number");
+        printf("Usage: ./network_simulator interface_name eeprom_s1.bin ... eeprom_sn.bin");
         return -1;
     }
 
-
-    int32_t const slave_number = strtol(argv[2], nullptr, 10);
-    if ((slave_number < 0) or (slave_number > UINT16_MAX))
+    std::vector<ESC> slaves;
+    for (int i = 2 ; i < argc ; ++i)
     {
-        printf("Slave number shall be comprised between 0 and %d, got %d\nAborting...\n", UINT16_MAX, slave_number);
-        return -1;
+        slaves.emplace_back(argv[i]);
     }
 
-    printf("Start EtherCAT network simulator on %s with %d slaves\n", argv[1], slave_number);
+    printf("Start EtherCAT network simulator on %s with %d slaves\n", argv[1], slaves.size());
     auto socket = std::make_shared<Socket>(-1ns, 1us);
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
 
-    std::vector<ESC> slaves;
-    slaves.reserve(slave_number);
-    for (int i = 0; i < slave_number; ++i)
-    {
-        slaves.emplace_back("EasyCAT_32_32_rev_1.bin");
-    }
 
     int32_t x = 0;
     while (true)
