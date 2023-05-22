@@ -17,8 +17,9 @@ using namespace kickcat;
 
 int main(int argc, char* argv[])
 {
-    if ((argc != 5) or (argc != 6))
+    if ((argc != 5) and (argc != 6))
     {
+        printf("argc: %d\n", argc);
         printf("usage redundancy mode :    ./eeprom [slave_number] [command] [file] NIC_nominal NIC_redundancy\n");
         printf("usage no redundancy mode : ./eeprom [slave_number] [command] [file] NIC_nominal\n");
         return 1;
@@ -26,7 +27,7 @@ int main(int argc, char* argv[])
 
 
     std::shared_ptr<AbstractSocket> socket_redundancy;
-    int slave           = std::stoi(argv[1]);
+    int slave_index     = std::stoi(argv[1]);
     std::string command = argv[2];
     std::string file    = argv[3];
     std::string red_interface_name = "null";
@@ -81,6 +82,18 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    uint8_t const* raw_data = reinterpret_cast<uint8_t const*>(bus.slaves().at(i).sii.buffer.data());
+    auto const& slave = bus.slaves().at(slave_index);
+    auto const& sii = slave.sii.buffer;
+    char const* raw_data = reinterpret_cast<char const*>(sii.data());
+    std::ofstream f(file, std::ofstream::binary);
 
+    // Create an eeprom binary file with the right size of empty data
+    std::vector<char> empty(slave.eeprom_size, -1);
+    f.write(empty.data(), empty.size());
+    f.seekp(0);
+
+    // Write dumped data
+    f.write(raw_data, sii.size() * 4);
+
+    return 0;
 }
