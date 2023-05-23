@@ -265,6 +265,7 @@ namespace kickcat
         Output     = 3,
         Input      = 4  // slave to master
     };
+    constexpr uint8_t MAILBOX_STATUS = (1 << 3);
 
     std::string toString(SyncManagerType const& type);
 

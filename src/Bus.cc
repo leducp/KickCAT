@@ -779,7 +779,7 @@ namespace kickcat
                 DEBUG_PRINT("Invalid working counter\n");
                 return stable_value;
             }
-            return ((state & 0x08) == 0x08);
+            return ((state & MAILBOX_STATUS) == MAILBOX_STATUS);
         };
 
         for (auto& slave : slaves_)

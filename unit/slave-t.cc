@@ -9,6 +9,51 @@ TEST(Slave, parse_SII)
     Slave slave;
     slave.sii.buffer =
     {
+        //
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+
+        // identity
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+
+        // hardware delays
+        0x00000000,
+        0x00000000,
+
+        // bootstrap mailbox
+        0x00000000,
+        0x00000000,
+
+        // standard mailbox
+        0x00000000,
+        0x00000000,
+
+        // reserved
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+
+
         // -- Strings
         0x0014000A,     // Section Strings, 40 bytes
         0x6f4c1f01,     // one string of 31 bytes
@@ -89,7 +134,7 @@ TEST(Slave, countOpenPorts)
     // Testing all combinations of open/closed ports
     // Enumerates all 4-bits combinations of 1's and 0's, and send n-th bit to n-th port by masking and shifting result to 0th postion
     for (uint8_t n = 0; n < 16; ++n)
-    {   
+    {
         slave.dl_status.PL_port0 = (n & mask0);
         slave.dl_status.PL_port1 = (n & mask1) >> 1;
         slave.dl_status.PL_port2 = (n & mask2) >> 2;

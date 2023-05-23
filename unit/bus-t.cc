@@ -134,14 +134,28 @@ public:
         io_nominal->handleReply<uint8_t>({State::INIT});
 
         // fetch eeprom
+        addFetchEepromWord(0);
+        addFetchEepromWord(0);
+        addFetchEepromWord(0);
+        addFetchEepromWord(0);
+
         addFetchEepromWord(0xCAFEDECA);     // vendor id
         addFetchEepromWord(0xA5A5A5A5);     // product code
         addFetchEepromWord(0x5A5A5A5A);     // revision number
         addFetchEepromWord(0x12345678);     // serial number
+        addFetchEepromWord(0);              // hardware delay
+        addFetchEepromWord(0);              // hardware delay
+        addFetchEepromWord(0);              // bootstrap mailbox
+        addFetchEepromWord(0);              // bootstrap mailbox
         addFetchEepromWord(0x01001000);     // mailbox rcv offset + size
         addFetchEepromWord(0x02002000);     // mailbox snd offset + size
         addFetchEepromWord(4);              // mailbox protocol: CoE
         addFetchEepromWord(0);              // eeprom size
+
+        for (int i=0; i<18; ++i)
+        {
+            addFetchEepromWord(0);
+        }
 
         // -- TxPDO
         addFetchEepromWord(0x00080032);     // section TxPDO, 16 bytes
@@ -335,7 +349,7 @@ TEST_F(BusTest, logical_cmd)
     std::memcpy(slave.output.data, &logical_write, sizeof(int64_t));
     std::vector<DatagramCheck<int64_t>> expecteds_2(1, {Command::LRW, logical_write});
     io_nominal->checkSendFrame(expecteds_2);
-    io_nominal->handleReply<int64_t>({logical_read});
+    io_nominal->handleReply<int64_t>({logical_read}, 3);
     bus.processDataReadWrite([](DatagramState const&){});
 
     for (int i = 0; i < 8; ++i)
