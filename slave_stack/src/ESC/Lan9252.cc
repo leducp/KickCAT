@@ -5,7 +5,6 @@ namespace kickcat
 {
     void Lan9252::init()
     {
-
         spi_interface_.init();
         spi_interface_.disableChipSelect();
         pinMode(CS_PIN, OUTPUT);
@@ -63,7 +62,6 @@ namespace kickcat
         {
             return -1; // Invalid param
         }
-
         spi_interface_.enableChipSelect();
 
         spi_interface_.write(CMD_SPI_READ);
@@ -71,14 +69,9 @@ namespace kickcat
         spi_interface_.write(address_byte0);
 
         uint8_t buffer[4] = {0,0,0,0};
-        for (uint8_t i = 0; i++; i < size)
+        for (uint8_t i = 0; i < size; i++)
         {
             buffer[i] = spi_interface_.read();
-            Serial.print(" Buffer: ");
-            Serial.print(i);
-            Serial.print("read: ");
-            Serial.print(buffer[i]);
-            Serial.println("");
         }
 
         memcpy(&data, buffer, sizeof(data));

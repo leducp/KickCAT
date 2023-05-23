@@ -16,14 +16,15 @@ Requirements:
 
 - In the CMakeLists of the arduino-cmake-toolchain, the build of subdirectories 02_arduino_lib and 05_auto_link have been removed because they use the EEPROM lib which was not defaultly installed and unused for ethercat slave stack.
 
-- Follow the examples readme for cmake configuration
-
-- In ccmake choose the board `Arduino Due (Programming Port) [sam.arduino_due_x_dbg]` and makes sure the usb micro is plugged in the port on the right of the board.
-
-
 - Edit in `$HOME/.arduino15/packages/arduino/hardware/sam/1.6.12/platforms.txt` 
 `tools.bossac.upload.pattern="{path}/{cmd}" {upload.verbose} --port={serial.port.file} -U {upload.native_usb} -e -w -b "{build.path}/{build.project_name}.bin" -R`
 Remove `upload.verify` field in the command. Bossac is the tool used to upload to the due board.
+So that the line is `tools.bossac.upload.pattern="{path}/{cmd}" {upload.verbose} --port={serial.port.file} -U {upload.native_usb} -e -w -b "{build.path}/{build.project_name}.bin" -R`
+
+- Follow the arduino-cmake-toolchain Examples folder readme for cmake configuration
+
+- In ccmake choose the board `Arduino Due (Programming Port) [sam.arduino_due_x_dbg]` and makes sure the usb micro is plugged in the port on the right of the board.
+
 
 
 To upload the binary:
