@@ -35,29 +35,115 @@ namespace kickcat
         eeprom_file.close();
     }
 
-    std::tuple<uint8_t*, uint16_t> ESC::computeInternalMemoryAccess(uint16_t address, uint16_t size)
+
+    int32_t ESC::computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access)
     {
         uint8_t* pos = reinterpret_cast<uint8_t*>(&memory_) + address;
         uint16_t to_copy = std::min(size, uint16_t(UINT16_MAX - address));
-        return std::make_tuple(pos, to_copy);
+
+        if (address >= 0x1000)
+        {
+            // ESC RAM access -> check if a syncmanager allow the access
+            for (auto& sm : memory_.sync_manager)
+            {
+                // Check activated / check is one buffered mode
+                if (not sm.activate)
+                {
+                    continue;
+                }
+
+                // Check access rights
+                uint8_t direction = (sm.control & 0x4);
+                if ((direction == 0) and not ((access != ECAT_READ) or (access != PDI_WRITE)))
+                {
+                    continue;
+                }
+
+                if ((direction == 4) and not ((access != ECAT_WRITE) or (access != PDI_READ)))
+                {
+                    continue;
+                }
+
+
+                // Check that the access is contains in the SM space
+                if ((address < sm.start_address) or ((address + to_copy) > (sm.start_address + sm.length)))
+                {
+                    continue;
+                }
+
+                // Everything is fine: do the copy
+                switch (access)
+                {
+                    case PDI_READ:
+                    case ECAT_READ:
+                    {
+                        if (not (sm.status & MAILBOX_STATUS) and (sm.control & 0x3))
+                        {
+                            return -1; // Cannot read mailbox: it is empty
+                        }
+                        std::memcpy(buffer, pos, to_copy);
+                        sm.status &= ~MAILBOX_STATUS;    // Access done: mailbox is now empty
+                        return to_copy;
+                    }
+                    case PDI_WRITE:
+                    case ECAT_WRITE:
+                    {
+                        if (sm.status & MAILBOX_STATUS and (sm.control & 0x3))
+                        {
+                            return -1; // Cannot write mailbox: it is full
+                        }
+                        std::memcpy(pos, buffer, to_copy);
+                        sm.status |= MAILBOX_STATUS;    // Access done: mailbox is now full
+                        return to_copy;
+                    }
+                }
+            }
+
+            // No SM enable this access
+            return -1;
+        }
+
+        // register access
+        switch (access)
+        {
+            case PDI_READ:
+            case ECAT_READ:
+            {
+                std::memcpy(buffer, pos, to_copy);
+                return to_copy;
+            }
+            case PDI_WRITE:
+            case ECAT_WRITE:
+            {
+                std::memcpy(pos, buffer, to_copy);
+                return to_copy;
+            }
+        }
+
+        return -1; // shall not be possible to be reached
     }
 
-    uint16_t ESC::write(uint16_t address, void const* data, uint16_t size)
+
+    int32_t ESC::write(uint16_t address, void const* data, uint16_t size)
     {
-        auto[pos, to_copy] = computeInternalMemoryAccess(address, size);
-        std::memcpy(pos, data, to_copy);
-        return to_copy;
+        return computeInternalMemoryAccess(address, const_cast<void*>(data), size, Access::PDI_WRITE);
     }
 
-    uint16_t ESC::read(uint16_t address, void* data, uint16_t size)
+
+    int32_t ESC::read(uint16_t address, void* data, uint16_t size)
     {
-        auto[pos, to_copy] = computeInternalMemoryAccess(address, size);
-        std::memcpy(data, pos, to_copy);
-        return to_copy;
+        return computeInternalMemoryAccess(address, data, size, Access::PDI_READ);
     }
 
 
     void ESC::processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    {
+        processEcatRequest(header, data, wkc);
+        processInternalLogic();
+    }
+
+
+    void ESC::processEcatRequest(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         auto [position, offset] = extractAddress(header->address);
         switch (header->command)
@@ -191,8 +277,11 @@ namespace kickcat
             case Command::ARMW: { break; }
             case Command::FRMW: { break; }
         }
+    }
 
-        // Process registers internal management
+
+    void ESC::processInternalLogic()
+    {
         static nanoseconds const start = since_epoch();
 
         // ESM state change
@@ -252,7 +341,7 @@ namespace kickcat
             }
             case eeprom::Command::WRITE:
             {
-                std::memcpy(eeprom_.data() + memory_.eeprom_address, data, 4);
+                std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 4);
                 memory_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
@@ -267,28 +356,41 @@ namespace kickcat
 
     void ESC::processReadCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
-        auto[pos, to_copy] = computeInternalMemoryAccess(offset, header->len);
-        std::memcpy(data, pos, to_copy);
-        *wkc += 1;
+        int32_t read = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_READ);
+        if (read > 0)
+        {
+            *wkc += 1;
+        }
     }
+
 
     void ESC::processWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
-        auto[pos, to_copy] = computeInternalMemoryAccess(offset, header->len);
-        std::memcpy(pos, data, to_copy);
-        *wkc += 1;
+        int32_t written = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_WRITE);
+        if (written > 0)
+        {
+            *wkc += 1;
+        }
     }
+
 
     void ESC::processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
-        auto[pos, to_copy] = computeInternalMemoryAccess(offset, header->len);
+        int32_t read    = computeInternalMemoryAccess(offset, swap, header->len, Access::ECAT_READ);
+        int32_t written = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_WRITE);
 
-        std::memcpy(swap, pos,  to_copy);
-        std::memcpy(pos,  data, to_copy);
-        std::memcpy(data, swap, to_copy);
-        *wkc += 3;
+        if (read > 0)
+        {
+            std::memcpy(data, swap, read);
+            *wkc += 1;
+        }
+        if (written > 0)
+        {
+            *wkc += 2;
+        }
     }
+
 
     void ESC::configurePDOs()
     {
@@ -319,6 +421,7 @@ namespace kickcat
             }
         }
     }
+
 
     std::tuple<uint8_t*, uint8_t*, uint16_t> ESC::computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo)
     {

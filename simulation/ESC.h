@@ -19,8 +19,8 @@ namespace kickcat
         /// \param current  current ESM state
         void setChangeStateCallback(std::function<void(State before, State current)> callback);
 
-        uint16_t read (uint16_t address, void* data,       uint16_t size);
-        uint16_t write(uint16_t address, void const* data, uint16_t size);
+        int32_t read (uint16_t address, void* data,       uint16_t size);
+        int32_t write(uint16_t address, void const* data, uint16_t size);
 
     private:
         struct Memory
@@ -125,7 +125,7 @@ namespace kickcat
             FMMU fmmu[16];
             uint8_t padding24[0x100];
 
-            uint8_t sync_manager[128];
+            SyncManager sync_manager[16];
             uint8_t padding25[128];
 
             // DC
@@ -160,13 +160,24 @@ namespace kickcat
 
         std::function<void(State, State)> changeState_{[](State, State){}};
 
+        void processEcatRequest(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
+        void processInternalLogic();
+
         void processReadCommand     (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
         void processWriteCommand    (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
         void processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
 
 
         void configurePDOs();
-        std::tuple<uint8_t*, uint16_t> computeInternalMemoryAccess(uint16_t address, uint16_t size);
+
+        enum Access
+        {
+            PDI_READ,
+            PDI_WRITE,
+            ECAT_READ,
+            ECAT_WRITE
+        };
+        int32_t computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access);
         std::tuple<uint8_t*, uint8_t*, uint16_t> computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo);
     };
 };

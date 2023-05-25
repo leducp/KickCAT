@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
         slaves.emplace_back(argv[i]);
     }
 
-    printf("Start EtherCAT network simulator on %s with %d slaves\n", argv[1], slaves.size());
+    printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], slaves.size());
     auto socket = std::make_shared<Socket>(-1ns, 1us);
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
