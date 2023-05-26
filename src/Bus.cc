@@ -757,7 +757,8 @@ namespace kickcat
             slaves.erase(std::remove_if(slaves.begin(), slaves.end(),
             [](Slave* s)
             {
-                return ((s->sii.buffer.back() >> 16) == eeprom::Category::End);
+                // First section (64 words == 32 double words) may have bytes with the eeprom::Category::End value
+                return (((s->sii.buffer.back() >> 16) == eeprom::Category::End) and (s->sii.buffer.size() > 32));
             }),
             slaves.end());
         }

@@ -39,7 +39,7 @@ namespace kickcat
     int32_t ESC::computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access)
     {
         uint8_t* pos = reinterpret_cast<uint8_t*>(&memory_) + address;
-        uint16_t to_copy = std::min(size, uint16_t(UINT16_MAX - address));
+        uint16_t to_copy = std::min(size, uint16_t(UINT16_MAX - address)); //TODO: to refuse?
 
         if (address >= 0x1000)
         {
@@ -82,6 +82,8 @@ namespace kickcat
                             return -1; // Cannot read mailbox: it is empty
                         }
                         std::memcpy(buffer, pos, to_copy);
+
+                        //TODO: only if last byte is access
                         sm.status &= ~MAILBOX_STATUS;    // Access done: mailbox is now empty
                         return to_copy;
                     }
@@ -93,6 +95,8 @@ namespace kickcat
                             return -1; // Cannot write mailbox: it is full
                         }
                         std::memcpy(pos, buffer, to_copy);
+
+                        //TODO: only if last byte is access
                         sm.status |= MAILBOX_STATUS;    // Access done: mailbox is now full
                         return to_copy;
                     }
