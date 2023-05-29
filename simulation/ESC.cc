@@ -44,32 +44,22 @@ namespace kickcat
         if (address >= 0x1000)
         {
             // ESC RAM access -> check if a syncmanager allow the access
-            for (auto& sm : memory_.sync_manager)
+            for (auto& sync : syncs_)
             {
-                // Check activated / check is one buffered mode
-                if (not sm.activate)
-                {
-                    continue;
-                }
-
+                //printf("%x -> %x\n", sync.access, access);
                 // Check access rights
-                uint8_t direction = (sm.control & 0x4);
-                if ((direction == 0) and not ((access != ECAT_READ) or (access != PDI_WRITE)))
+                if (not (access & sync.access))
                 {
                     continue;
                 }
-
-                if ((direction == 4) and not ((access != ECAT_WRITE) or (access != PDI_READ)))
-                {
-                    continue;
-                }
-
+                //printf("    canard %x %x\n", address, sync.address);
 
                 // Check that the access is contains in the SM space
-                if ((address < sm.start_address) or ((address + to_copy) > (sm.start_address + sm.length)))
+                if ((address < sync.address) or ((address + to_copy) > (sync.address + sync.size)))
                 {
                     continue;
                 }
+                //printf("    --> coincoin\n");
 
                 // Everything is fine: do the copy
                 switch (access)
@@ -77,33 +67,61 @@ namespace kickcat
                     case PDI_READ:
                     case ECAT_READ:
                     {
-                        if (not (sm.status & MAILBOX_STATUS) and (sm.control & 0x3))
+                        if (not (sync.registers->status & MAILBOX_STATUS) and (sync.registers->control & 0x3))
                         {
                             return -1; // Cannot read mailbox: it is empty
                         }
                         std::memcpy(buffer, pos, to_copy);
 
                         //TODO: only if last byte is access
-                        sm.status &= ~MAILBOX_STATUS;    // Access done: mailbox is now empty
+                        sync.registers->status &= ~MAILBOX_STATUS;    // Access done: mailbox is now empty
                         return to_copy;
                     }
                     case PDI_WRITE:
                     case ECAT_WRITE:
                     {
-                        if (sm.status & MAILBOX_STATUS and (sm.control & 0x3))
+                        if ((sync.registers->status & MAILBOX_STATUS) and (sync.registers->control & 0x3))
                         {
                             return -1; // Cannot write mailbox: it is full
                         }
                         std::memcpy(pos, buffer, to_copy);
 
                         //TODO: only if last byte is access
-                        sm.status |= MAILBOX_STATUS;    // Access done: mailbox is now full
+                        sync.registers->status |= MAILBOX_STATUS;    // Access done: mailbox is now full
                         return to_copy;
                     }
                 }
             }
 
-            // No SM enable this access
+
+            if (access & Access::PDI_READ)
+            {
+                for (auto& pdo : tx_pdos_)
+                {
+                    if ((pos < pdo.physical_address) or ((pos + to_copy) > (pdo.physical_address + pdo.size)))
+                    {
+                        continue;
+                    }
+                    std::memcpy(buffer, pos, to_copy);
+                    return to_copy;
+                }
+            }
+
+            if (access & Access::PDI_WRITE)
+            {
+                for (auto& pdo : rx_pdos_)
+                {
+                    if ((pos < pdo.physical_address) or ((pos + to_copy) > (pdo.physical_address + pdo.size)))
+                    {
+                        continue;
+                    }
+                    std::memcpy(pos, buffer, to_copy);
+                    return to_copy;
+                }
+            }
+
+
+            // No SM nor FFMU enable this access
             return -1;
         }
 
@@ -307,7 +325,10 @@ namespace kickcat
                 }
                 case State::PRE_OP:
                 {
-                    //TODO record mailbox to call a hook on write
+                    if (before == State::INIT)
+                    {
+                        configureSMs();
+                    }
                     break;
                 }
                 case State::SAFE_OP:
@@ -396,8 +417,48 @@ namespace kickcat
     }
 
 
+    void ESC::configureSMs()
+    {
+        syncs_.clear();
+        for (auto& sm : memory_.sync_manager)
+        {
+            // Check activated /
+            if (not sm.activate)
+            {
+                continue;
+            }
+
+            // Check mode: keep only one buffered mode  (triple buffered are handled through FMMU)
+            if (not (sm.control & 0x3))
+            {
+                continue;
+            }
+
+            SM sync;
+            sync.registers = &sm;
+            sync.address = sm.start_address;
+            sync.size = sm.length;
+
+            // Save access rights
+            if (sm.control & 0x4)
+            {
+                sync.access = (ECAT_WRITE | PDI_READ);
+            }
+            else
+            {
+                sync.access = (ECAT_READ | PDI_WRITE);
+            }
+
+            syncs_.push_back(sync);
+            printf("add sync: %x - %x (%x)\n", sync.address, sync.access, sm.control);
+        }
+    }
+
+
     void ESC::configurePDOs()
     {
+        tx_pdos_.clear();
+        rx_pdos_.clear();
         for (int i = 0; i < 16; ++i)
         {
             auto const& fmmu = memory_.fmmu[i];

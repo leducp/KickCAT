@@ -9,6 +9,15 @@ namespace kickcat
 {
     class ESC
     {
+        // ESC access type
+        enum Access
+        {
+            PDI_READ   = 0x01,
+            PDI_WRITE  = 0x02,
+            ECAT_READ  = 0x04,
+            ECAT_WRITE = 0x08
+        };
+
     public:
         ESC(std::string const& eeprom);
 
@@ -149,6 +158,15 @@ namespace kickcat
         Memory memory_;
         std::vector<uint16_t> eeprom_;      // EEPPROM addressing is word/16 bits
 
+        struct SM
+        {
+            uint8_t access;
+            uint16_t address;
+            uint16_t size;
+            SyncManager* registers;
+        };
+        std::vector<SM> syncs_;
+
         struct PDO
         {
             uint32_t logical_address;
@@ -167,16 +185,9 @@ namespace kickcat
         void processWriteCommand    (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
         void processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
 
-
+        void configureSMs();
         void configurePDOs();
 
-        enum Access
-        {
-            PDI_READ,
-            PDI_WRITE,
-            ECAT_READ,
-            ECAT_WRITE
-        };
         int32_t computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access);
         std::tuple<uint8_t*, uint8_t*, uint16_t> computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo);
     };

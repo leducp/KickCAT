@@ -81,7 +81,21 @@ int main(int argc, char* argv[])
 
         printf("Init done \n");
         print_current_state();
+        printInfo(bus.slaves().at(0));
+/*
+        auto& ingenia = bus.slaves().at(0);
+        //printInfo(ingenia);
+        while (true)
+        {
+            sleep(1s);
 
+            uint32_t uid = 0;
+            uint32_t size = sizeof(uid);
+            bus.readSDO(ingenia, 0x1018, 4, Bus::Access::PARTIAL, &uid, &size, 0ms);
+
+            printf("SDO -> uid: %d\n", uid);
+        }
+*/
         bus.createMapping(io_buffer);
 
         bus.enableIRQ(EcatEvent::DL_STATUS,
@@ -105,7 +119,6 @@ int main(int argc, char* argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
-    printInfo(bus.slaves().at(0));
     printPDOs(bus.slaves().at(0));
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };

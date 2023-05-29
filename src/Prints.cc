@@ -38,6 +38,7 @@ namespace kickcat
             os << "     physical address: " << "0x" << std::hex << sm->start_adress << "\n";
             os << "     length:           " << std::dec << sm->length << "\n";
             os << "     type:             " << std::dec << toString(static_cast<SyncManagerType>(sm->type)) << "\n";
+            os << "     control:          " << std::hex << (int)sm->control_register << "\n";
         }
 
         printf("%s", os.str().c_str());
@@ -91,7 +92,7 @@ namespace kickcat
 
 
     void print(std::unordered_map<uint16_t, uint16_t> const& topology_mapping)
-    {  
+    {
         printf( "\n -*-*-*-*- Topology -*-*-*-*-\n" );
         for (auto const& it : topology_mapping)
         {
