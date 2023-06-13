@@ -39,27 +39,25 @@ namespace kickcat
     int32_t ESC::computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access)
     {
         uint8_t* pos = reinterpret_cast<uint8_t*>(&memory_) + address;
-        uint16_t to_copy = std::min(size, uint16_t(UINT16_MAX - address)); //TODO: to refuse?
 
         if (address >= 0x1000)
         {
+            uint16_t to_copy = std::min(size, uint16_t(UINT16_MAX - address));
+
             // ESC RAM access -> check if a syncmanager allow the access
             for (auto& sync : syncs_)
             {
-                //printf("%x -> %x\n", sync.access, access);
                 // Check access rights
                 if (not (access & sync.access))
                 {
                     continue;
                 }
-                //printf("    canard %x %x\n", address, sync.address);
 
                 // Check that the access is contains in the SM space
                 if ((address < sync.address) or ((address + to_copy) > (sync.address + sync.size)))
                 {
                     continue;
                 }
-                //printf("    --> coincoin\n");
 
                 // Everything is fine: do the copy
                 switch (access)
@@ -73,8 +71,11 @@ namespace kickcat
                         }
                         std::memcpy(buffer, pos, to_copy);
 
-                        //TODO: only if last byte is access
-                        sync.registers->status &= ~MAILBOX_STATUS;    // Access done: mailbox is now empty
+                        if ((address + size - 1) == (sync.address + sync.size - 1))
+                        {
+                            // Last byte read -> access is done and mailbox is now empty
+                            sync.registers->status &= ~MAILBOX_STATUS;
+                        }
                         return to_copy;
                     }
                     case PDI_WRITE:
@@ -86,13 +87,15 @@ namespace kickcat
                         }
                         std::memcpy(pos, buffer, to_copy);
 
-                        //TODO: only if last byte is access
-                        sync.registers->status |= MAILBOX_STATUS;    // Access done: mailbox is now full
+                        if ((address + size - 1) == (sync.address + sync.size - 1))
+                        {
+                            // Last byte written -> access is done and mailbox is now full
+                            sync.registers->status |= MAILBOX_STATUS;
+                        }
                         return to_copy;
                     }
                 }
             }
-
 
             if (access & Access::PDI_READ)
             {
@@ -120,12 +123,12 @@ namespace kickcat
                 }
             }
 
-
             // No SM nor FFMU enable this access
             return -1;
         }
 
-        // register access
+        // register access: cannot overlap memory after register space in one access
+        uint16_t to_copy = std::min(size, uint16_t(0x1000 - address));
         switch (access)
         {
             case PDI_READ:
@@ -450,7 +453,6 @@ namespace kickcat
             }
 
             syncs_.push_back(sync);
-            printf("add sync: %x - %x (%x)\n", sync.address, sync.access, sm.control);
         }
     }
 

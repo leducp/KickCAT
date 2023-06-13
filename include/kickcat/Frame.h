@@ -43,7 +43,7 @@ namespace kickcat
         /// \return a tuple with a pointer on the datagram header, a pointer on the datagram data, the working counter
         std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram();
 
-        /// \brief helper to peek on a datagram while advacing internal pointer to the next one.
+        /// \brief helper to peek on a datagram while advancing internal pointer to the next one.
         /// \details This API is designed for network simulation.
         /// \return a tuple with a pointer on the datagram header, a pointer on the datagram data, a pointer on the working counter.
         ///         If return values are nullptr, it means that there is no more datagrams in the frame.

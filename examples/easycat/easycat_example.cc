@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
-    link->setTimeout(10ms);
+    link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
     Bus bus(link);
@@ -81,21 +81,7 @@ int main(int argc, char* argv[])
 
         printf("Init done \n");
         print_current_state();
-        printInfo(bus.slaves().at(0));
-/*
-        auto& ingenia = bus.slaves().at(0);
-        //printInfo(ingenia);
-        while (true)
-        {
-            sleep(1s);
 
-            uint32_t uid = 0;
-            uint32_t size = sizeof(uid);
-            bus.readSDO(ingenia, 0x1018, 4, Bus::Access::PARTIAL, &uid, &size, 0ms);
-
-            printf("SDO -> uid: %d\n", uid);
-        }
-*/
         bus.createMapping(io_buffer);
 
         bus.enableIRQ(EcatEvent::DL_STATUS,
@@ -119,7 +105,6 @@ int main(int argc, char* argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
-    printPDOs(bus.slaves().at(0));
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
 
@@ -150,7 +135,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    link->setTimeout(10ms);
+    link->setTimeout(500us);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
@@ -160,7 +145,7 @@ int main(int argc, char* argv[])
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(5ms);
+        sleep(1ms);
 
         try
         {

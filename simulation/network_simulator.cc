@@ -30,8 +30,6 @@ int main(int argc, char* argv[])
     std::vector<nanoseconds> stats;
     stats.reserve(1000);
 
-    int32_t x = 42;
-    //int32_t y = 0;
     while (true)
     {
         Frame frame;
@@ -51,54 +49,12 @@ int main(int argc, char* argv[])
                 break;
             }
 
-            //printf("Process new datagram - %s @ %x \n", toString(header->command), header->address);
             for (auto& slave : slaves)
             {
                 slave.processDatagram(header, data, wkc);
             }
-/*
-            auto& ingenia = slaves.at(0);
-            uint8_t msg[128];
-            int32_t rmsg = ingenia.read(0x1000, msg, sizeof(msg));
-            if (rmsg == sizeof(msg))
-            {
-                auto* h  = pointData<mailbox::Header>(msg);
-                auto* coe     = pointData<CoE::Header>(h);
-                auto* sdo     = pointData<CoE::ServiceData>(coe);
-                auto* payload = pointData<uint8_t>(sdo);
-
-                coe->service = CoE::Service::SDO_RESPONSE;
-                sdo->command = CoE::SDO::response::UPLOAD;
-                sdo->transfer_type = 1;
-                sdo->block_size = 0;
-                std::memcpy(payload, &x, 2);
-                ++x;
-
-                ingenia.write(0x1400, msg, sizeof(msg));
-            }
-*/
-
-            slaves.at(0).write(0x1000, &x, 4);
-            x += 32;
-
-            if (x < 32768)
-            {
-                uint16_t yay = hton<uint16_t>(0xCAFE);
-                slaves.at(0).write(0x1010, &yay, 2);
-            }
-            else if (x < 65535)
-            {
-                uint16_t yay = hton<uint16_t>(0xDECA);
-                slaves.at(0).write(0x1010, &yay, 2);
-            }
-            else
-            {
-                x = 0;
-            }
-
         }
 
-        //printf("write back %d\n\n", r);
         int32_t written = socket->write(frame.data(), r);
         if (written < 0)
         {
