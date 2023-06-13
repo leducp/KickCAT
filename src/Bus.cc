@@ -143,9 +143,9 @@ namespace kickcat
 
     State Bus::getCurrentState(Slave& slave)
     {
-        auto error = [](DatagramState const&)
+        auto error = [](DatagramState const& state)
         {
-            DEBUG_PRINT("Error while trying to get slave state.");
+            DEBUG_PRINT("Error while trying to get slave state (%s).\n", toString(state));
         };
 
         sendGetALStatus(slave, error);
@@ -467,7 +467,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.inputs.size())
                 {
-                    DEBUG_PRINT("Invalid working counter\n");
+                    DEBUG_PRINT("Invalid working counter: expected %d, got %ld\n", wkc, pi_frame.inputs.size());
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -533,7 +533,7 @@ namespace kickcat
 
             auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                if (wkc != pi_frame.inputs.size())
+                if (wkc != (pi_frame.inputs.size() + pi_frame.outputs.size() * 2)) //TODO: buggy in master?
                 {
                     DEBUG_PRINT("Invalid working counter\n");
                     return DatagramState::INVALID_WKC;
@@ -709,9 +709,9 @@ namespace kickcat
         }
 
         // Read result
-        auto error = [](DatagramState const&)
+        auto error = [](DatagramState const& state)
         {
-            THROW_ERROR("Invalid working counter");
+            THROW_ERROR_DATAGRAM("Error while fetching eeprom data", state);
         };
 
         for (auto& slave : slaves)
@@ -742,36 +742,11 @@ namespace kickcat
             slaves.push_back(&slave);
         }
 
-        // General slave info
-        readEeprom(eeprom::VENDOR_ID,       slaves, [](Slave& s, uint32_t word) { s.vendor_id       = word; } );
-        readEeprom(eeprom::PRODUCT_CODE,    slaves, [](Slave& s, uint32_t word) { s.product_code    = word; } );
-        readEeprom(eeprom::REVISION_NUMBER, slaves, [](Slave& s, uint32_t word) { s.revision_number = word; } );
-        readEeprom(eeprom::SERIAL_NUMBER,   slaves, [](Slave& s, uint32_t word) { s.serial_number   = word; } );
-
-        // Mailbox info
-        readEeprom(eeprom::STANDARD_MAILBOX + eeprom::RECV_MBO_OFFSET, slaves,
-        [](Slave& s, uint32_t word) { s.mailbox.recv_offset = static_cast<uint16_t>(word);
-                                      s.mailbox.recv_size   = static_cast<uint16_t>(word >> 16); } );
-        readEeprom(eeprom::STANDARD_MAILBOX + eeprom::SEND_MBO_OFFSET, slaves,
-        [](Slave& s, uint32_t word) { s.mailbox.send_offset = static_cast<uint16_t>(word);
-                                      s.mailbox.send_size   = static_cast<uint16_t>(word >> 16); } );
-
-        readEeprom(eeprom::MAILBOX_PROTOCOL, slaves,
-        [](Slave& s, uint32_t word) { s.supported_mailbox = static_cast<eeprom::MailboxProtocol>(word); });
-
-        readEeprom(eeprom::EEPROM_SIZE, slaves,
-        [](Slave& s, uint32_t word)
-        {
-            s.eeprom_size = (word & 0xFF) + 1;  // 0 means 1024 bits
-            s.eeprom_size *= 128;               // Kibit to bytes
-            s.eeprom_version = static_cast<uint16_t>(word >> 16);
-        });
-
-        // Get SII section
+        // Get SII
         int32_t pos = 0;
         while (not slaves.empty())
         {
-            readEeprom(eeprom::START_CATEGORY + static_cast<uint16_t>(pos), slaves,
+            readEeprom(static_cast<uint16_t>(pos), slaves,
             [](Slave& s, uint32_t word)
             {
                 s.sii.buffer.push_back(word);
@@ -782,7 +757,8 @@ namespace kickcat
             slaves.erase(std::remove_if(slaves.begin(), slaves.end(),
             [](Slave* s)
             {
-                return ((s->sii.buffer.back() >> 16) == eeprom::Category::End);
+                // First section (64 words == 32 double words) may have bytes with the eeprom::Category::End value
+                return (((s->sii.buffer.back() >> 16) == eeprom::Category::End) and (s->sii.buffer.size() > 32));
             }),
             slaves.end());
         }
@@ -804,7 +780,7 @@ namespace kickcat
                 DEBUG_PRINT("Invalid working counter\n");
                 return stable_value;
             }
-            return ((state & 0x08) == 0x08);
+            return ((state & MAILBOX_STATUS) == MAILBOX_STATUS);
         };
 
         for (auto& slave : slaves_)

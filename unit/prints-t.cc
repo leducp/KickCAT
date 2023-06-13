@@ -46,6 +46,50 @@ TEST(Prints, slave_initialized_prints)
     Slave slave;
     slave.sii.buffer =
     {
+        //
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+
+        // identity
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+
+        // hardware delays
+        0x00000000,
+        0x00000000,
+
+        // bootstrap mailbox
+        0x00000000,
+        0x00000000,
+
+        // standard mailbox
+        0x00000000,
+        0x00000000,
+
+        // reserved
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+        0x00000000,
+
         // -- Strings
         0x0014000A,     // Section Strings, 40 bytes
         0x6f4c1f01,     // one string of 31 bytes

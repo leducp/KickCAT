@@ -74,9 +74,43 @@ namespace kickcat
 
     void Slave::parseSII()
     {
-        uint8_t const* pos = reinterpret_cast<uint8_t*>(sii.buffer.data());
-        uint8_t const* const max_pos = reinterpret_cast<uint8_t*>(sii.buffer.data() + sii.buffer.size() - 4);
+        uint32_t temp_word = 0;
 
+        // Identity
+        vendor_id       = sii.buffer.at(eeprom::VENDOR_ID       / sizeof(uint16_t));
+        product_code    = sii.buffer.at(eeprom::PRODUCT_CODE    / sizeof(uint16_t));
+        revision_number = sii.buffer.at(eeprom::REVISION_NUMBER / sizeof(uint16_t));
+        serial_number   = sii.buffer.at(eeprom::SERIAL_NUMBER   / sizeof(uint16_t));
+
+        // Mailbox info
+        temp_word = sii.buffer.at((eeprom::BOOTSTRAP_MAILBOX  + eeprom::RECV_MBO_OFFSET) / sizeof(uint16_t));
+        mailbox_bootstrap.recv_offset = static_cast<uint16_t>(temp_word);
+        mailbox_bootstrap.recv_size   = static_cast<uint16_t>(temp_word >> 16);
+
+        temp_word = sii.buffer.at((eeprom::BOOTSTRAP_MAILBOX  + eeprom::SEND_MBO_OFFSET) / sizeof(uint16_t));
+        mailbox_bootstrap.send_offset = static_cast<uint16_t>(temp_word);
+        mailbox_bootstrap.send_size   = static_cast<uint16_t>(temp_word >> 16);
+
+        temp_word = sii.buffer.at((eeprom::STANDARD_MAILBOX  + eeprom::RECV_MBO_OFFSET) / sizeof(uint16_t));
+        mailbox.recv_offset = static_cast<uint16_t>(temp_word);
+        mailbox.recv_size   = static_cast<uint16_t>(temp_word >> 16);
+
+        temp_word = sii.buffer.at((eeprom::STANDARD_MAILBOX  + eeprom::SEND_MBO_OFFSET) / sizeof(uint16_t));
+        mailbox.send_offset = static_cast<uint16_t>(temp_word);
+        mailbox.send_size   = static_cast<uint16_t>(temp_word >> 16);
+
+        temp_word = sii.buffer.at(eeprom::MAILBOX_PROTOCOL / sizeof(uint16_t));
+        supported_mailbox = static_cast<eeprom::MailboxProtocol>(temp_word);
+
+        // EEPROM
+        temp_word = sii.buffer.at(eeprom::EEPROM_SIZE / sizeof(uint16_t));
+        eeprom_size = (temp_word & 0xFF) + 1;   // 0 means 1024 bits
+        eeprom_size *= 128;                     // Kibit to bytes
+        eeprom_version = static_cast<uint16_t>(temp_word >> 16);
+
+        // Categories
+        uint8_t const* pos = reinterpret_cast<uint8_t*>(sii.buffer.data()) + eeprom::START_CATEGORY * 2;
+        uint8_t const* const max_pos = reinterpret_cast<uint8_t*>(sii.buffer.data() + sii.buffer.size() - 4);
         while (pos < max_pos)
         {
             uint16_t const* category = reinterpret_cast<uint16_t const*>(pos);

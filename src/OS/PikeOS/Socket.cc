@@ -68,6 +68,12 @@ namespace kickcat
     void Socket::setTimeout(nanoseconds timeout)
     {
         timeout_ = timeout;
+
+        flags_ = 1; // non block
+        if (timeout_ < 0ns)
+        {
+            flags_ = 0;
+        }
     }
 
     void Socket::close() noexcept
@@ -80,7 +86,7 @@ namespace kickcat
         nanoseconds deadline = since_epoch() + timeout_;
         do
         {
-            vm_io_buf_id_t rx = vm_io_sbuf_rx_get(&sbuf_, 1); // 1 = non block
+            vm_io_buf_id_t rx = vm_io_sbuf_rx_get(&sbuf_, flags_); // 1 = non block
             if (rx == VM_IO_BUF_ID_INVALID)
             {
                 sleep(polling_period_);

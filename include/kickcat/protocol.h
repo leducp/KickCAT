@@ -6,6 +6,7 @@
 #include <string_view>
 #include <string>
 #include <array>
+#include <tuple>
 
 #include "Time.h"
 #include "Error.h"
@@ -87,9 +88,10 @@ namespace kickcat
         LRD  = 10, // Logical memory Read
         LWR  = 11, // Logical memory Write
         LRW  = 12, // Logical memory Read Write
-        ARMW = 13, // Auto increment physical Read Multiple Write
-        FRMW = 14  // Configured address Physical Read Multiple Write
+        ARMW = 13, // Auto increment physical Read Multiple Write - DC use
+        FRMW = 14  // Configured address Physical Read Multiple Write - DC use
     };
+    char const* toString(Command cmd);
 
     struct DatagramHeader
     {
@@ -263,6 +265,7 @@ namespace kickcat
         Output     = 3,
         Input      = 4  // slave to master
     };
+    constexpr uint8_t MAILBOX_STATUS = (1 << 3);
 
     std::string toString(SyncManagerType const& type);
 
@@ -526,6 +529,14 @@ namespace kickcat
     constexpr uint32_t createAddress(uint16_t position, uint16_t offset)
     {
         return ((offset << 16) | position);
+    }
+
+    /// extract a position or node address
+    constexpr std::tuple<uint16_t, uint16_t> extractAddress(uint32_t address)
+    {
+        uint16_t offset   = address >> 16;
+        uint16_t position = address & 0xFFFF;
+        return std::make_tuple(position, offset);
     }
 
     /// compute the watchdog divider to set from the required watchdog increment step

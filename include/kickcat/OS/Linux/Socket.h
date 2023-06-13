@@ -25,6 +25,8 @@ namespace kickcat
         nanoseconds coalescing_;
         nanoseconds timeout_;
         nanoseconds polling_period_;
+
+        int flags_{0};
     };
 }
 

@@ -71,7 +71,7 @@ namespace kickcat
             THROW_SYSTEM_ERROR("ioctl(SIOCGIFFLAGS)");
         }
 
-        ifr.ifr_flags = ifr.ifr_flags | IFF_PROMISC | IFF_BROADCAST;
+        ifr.ifr_flags = ifr.ifr_flags | IFF_PROMISC | IFF_BROADCAST  | IFF_UP;
         rc = ioctl(fd_, SIOCSIFFLAGS, &ifr);
         if (rc < 0)
         {
@@ -99,7 +99,7 @@ namespace kickcat
             {
                 THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_GCOALESCE)");
             }
-            DEBUG_PRINT("applied rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
+            DEBUG_PRINT("applied tx-usecs rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
         }
 
 
@@ -117,6 +117,12 @@ namespace kickcat
     void Socket::setTimeout(nanoseconds timeout)
     {
         timeout_ = timeout;
+
+        flags_ = MSG_DONTWAIT;
+        if (timeout_ < 0ns)
+        {
+            flags_ = 0;
+        }
     }
 
     void Socket::close() noexcept
@@ -137,10 +143,9 @@ namespace kickcat
     int32_t Socket::read(uint8_t* frame, int32_t frame_size)
     {
         nanoseconds deadline = since_epoch() + timeout_;
-
         do
         {
-            ssize_t read_size = ::recv(fd_, frame, frame_size, MSG_DONTWAIT);
+            ssize_t read_size = ::recv(fd_, frame, frame_size, flags_);
             if (read_size < 0)
             {
                 if (errno == EAGAIN)
