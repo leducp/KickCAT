@@ -15,11 +15,13 @@ namespace kickcat
         virtual int32_t readRegister(uint16_t address, uint32_t& data, uint8_t size) = 0;
         virtual int32_t writeRegister(uint16_t address, uint32_t data, uint8_t size) = 0;
 
-        virtual void readPDO(uint8_t* data, uint32_t size) = 0;
-        virtual void writePDO(uint8_t* data, uint32_t size) = 0;
 
-        virtual int32_t readEEPROM(uint8_t* data, uint32_t size) = 0;
-        virtual int32_t writeEEPROM(uint8_t* data, uint32_t size) = 0;
+        // TODO move to slave abstraction
+//        virtual void readPDO(uint8_t* data, uint32_t size) = 0;
+//        virtual void writePDO(uint8_t* data, uint32_t size) = 0;
+//
+//        virtual int32_t readEEPROM(uint8_t* data, uint32_t size) = 0;
+//        virtual int32_t writeEEPROM(uint8_t* data, uint32_t size) = 0;
 
         // TODO mailbox
     };

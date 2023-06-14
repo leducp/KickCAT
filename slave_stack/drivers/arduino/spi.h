@@ -10,7 +10,7 @@ namespace kickcat
 {
     const uint32_t CS_PIN = 9; //default pin for chip select.
 
-    const uint32_t DUMMY_BYTE = 0xFF;
+    const uint8_t DUMMY_BYTE = 0xFF;
 
     const uint32_t SPI_SPEED = 8000000; // Hz
     const SPISettings SETTINGS(SPI_SPEED, MSBFIRST, SPI_MODE0);
@@ -21,8 +21,6 @@ namespace kickcat
         uint8_t byte1;
     };
 
-    int test();
-
     class spi : public AbstractSPI
     {
     public:
@@ -30,8 +28,12 @@ namespace kickcat
         ~spi();
 
         void init() override;
-        uint8_t read() override;
-        void write(uint8_t data) override;
+        void transfer(uint8_t const* data_write, uint8_t* data_read, uint32_t size) override;
+
+
+//        uint8_t read() override;
+//        void write(uint8_t data) override;
+
 
         void enableChipSelect() {digitalWrite(CS_PIN, LOW);};
         void disableChipSelect() {digitalWrite(CS_PIN, HIGH);};
