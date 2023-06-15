@@ -12,8 +12,8 @@ namespace kickcat
 
         virtual void init() = 0;
 
-        virtual int32_t readRegister(uint16_t address, uint32_t& data, uint8_t size) = 0;
-        virtual int32_t writeRegister(uint16_t address, uint32_t data, uint8_t size) = 0;
+        virtual int32_t readRegister(uint16_t address, void* data, uint32_t size) = 0;
+        virtual int32_t writeRegister(uint16_t address, void const* data, uint32_t size) = 0;
 
 
         // TODO move to slave abstraction

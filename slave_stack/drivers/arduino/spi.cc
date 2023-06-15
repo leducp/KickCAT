@@ -14,6 +14,8 @@ namespace kickcat
 
     void spi::transfer(uint8_t const* data_write, uint8_t* data_read, uint32_t size)
     {
+//        Serial.print("transfer size: ");
+//        Serial.println(size);
         if (data_write == nullptr and data_read == nullptr)
         {
             return;
@@ -24,6 +26,10 @@ namespace kickcat
             for (uint32_t i = 0; i<size; i++)
             {
                 data_read[i] = SPI.transfer(DUMMY_BYTE);
+//                Serial.print("i: ");
+//                Serial.print(i);
+//                Serial.print(" data read ");
+//                Serial.println(data_read[i], HEX);
             }
         }
 
@@ -32,6 +38,10 @@ namespace kickcat
             for (uint32_t i = 0; i<size; i++)
             {
                 SPI.transfer(data_write[i]);
+//                Serial.print("i: ");
+//                Serial.print(i);
+//                Serial.print(" data write ");
+//                Serial.println(data_write[i], HEX);
             }
         }
     }

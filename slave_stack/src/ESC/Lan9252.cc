@@ -14,13 +14,9 @@ namespace kickcat
 
         spi_interface_.beginTransaction();
 
-//        CSR_CMD reset_ctl{WRITE, hton(RESET_CTL), {DIGITAL_RST}};
-//        uint8_t* to_send = &reset_ctl;
-//        spi_interface_.write(to_send, 5);  // possible reduce with void*, possible helper write/read command.
 
         writeCommand(RESET_CTL, DIGITAL_RST);
 
-//        writeRegisterDirect(RESET_CTL, DIGITAL_RST);
 
         // Check SPI interface is ready thanks to BYTE_TEST
         uint16_t counter = 0;
@@ -31,15 +27,7 @@ namespace kickcat
         while (counter < timeout and  byte_test_result != BYTE_TEST_DEFAULT)
         {
             counter++;
-//            CSR_CMD read_byte_test{READ, hton(BYTE_TEST), {}};
-//            uint8_t* to_send_read = &read_byte_test;
-//            spi_interface_.write(to_send_read, 4);
-//
-//            spi_interface_.read(reinterpret_cast<void*>(byte_test_result), sizeof(byte_test_result));
             readCommand(BYTE_TEST, byte_test_result);
-
-
-//            readRegisterDirect(BYTE_TEST, byte_test_result, sizeof(byte_test_result));
         }
 
         if (counter == timeout)
@@ -51,18 +39,6 @@ namespace kickcat
         Serial.println(byte_test_result, HEX);
 
         spi_interface_.endTransaction();
-    }
-
-
-    int32_t Lan9252::readRegister(uint16_t address, uint32_t& data, uint8_t size)
-    {
-        return 0;
-    }
-
-
-    int32_t Lan9252::writeRegister(uint16_t address, uint32_t data, uint8_t size)
-    {
-        return 0;
     }
 
 
@@ -138,44 +114,86 @@ namespace kickcat
 
     int32_t Lan9252::waitCSRReady()
     {
+        Serial.println(" wait csr");
         uint32_t esc_status;
         do
         {
             readCommand(ECAT_CSR_CMD, esc_status);
         }
-        while(esc_status && ECAT_CSR_BUSY);
+        while(esc_status & ECAT_CSR_BUSY);
         return 0;
     }
 
 
-    int32_t Lan9252::writeRegisterIndirect(uint16_t address, uint32_t data, uint8_t size)
+    void Lan9252::readCommand(uint16_t address, void* payload, uint32_t size)
     {
+        CSR_CMD cmd{READ, hton(address), {}};
 
+        spi_interface_.enableChipSelect();
+        spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE);
+
+        spi_interface_.read(payload, size);
+        spi_interface_.disableChipSelect();
+    }
+
+
+    int32_t Lan9252::readRegister(uint16_t address, void* data, uint32_t size)
+    {
+        spi_interface_.beginTransaction();
+
+        uint32_t rev;
+        readCommand(0x050, &rev, 4);
+        Serial.print("rev ");
+        Serial.println(rev);
+
+
+        waitCSRReady();
+
+        // TODO based on address handle process data ram vs registers (< 0X1000)
+
+        writeCommand(ECAT_CSR_CMD, address);
+
+        waitCSRReady();
+
+        readCommand(ECAT_CSR_DATA, data, size);
+        spi_interface_.endTransaction();
+        return 0;
+    };
+
+    int32_t Lan9252::writeRegister(uint16_t address, void const* data, uint32_t size)
+    {
         return 0;
     }
 
 
-    void Lan9252::readPDO(uint8_t* data, uint32_t size)
-    {
-
-    }
-
-
-    void Lan9252::writePDO(uint8_t* data, uint32_t size)
-    {
-
-    }
-
-
-    int32_t Lan9252::readEEPROM(uint8_t* data, uint32_t size)
-    {
-        return 0;
-    }
-
-
-    int32_t Lan9252::writeEEPROM(uint8_t* data, uint32_t size)
-    {
-        return 0;
-    }
+//    int32_t Lan9252::writeRegisterIndirect(uint16_t address, uint32_t data, uint8_t size)
+//    {
+//
+//        return 0;
+//    }
+//
+//
+//    void Lan9252::readPDO(uint8_t* data, uint32_t size)
+//    {
+//
+//    }
+//
+//
+//    void Lan9252::writePDO(uint8_t* data, uint32_t size)
+//    {
+//
+//    }
+//
+//
+//    int32_t Lan9252::readEEPROM(uint8_t* data, uint32_t size)
+//    {
+//        return 0;
+//    }
+//
+//
+//    int32_t Lan9252::writeEEPROM(uint8_t* data, uint32_t size)
+//    {
+//        return 0;
+//    }
 
 }

@@ -779,6 +779,8 @@ unsigned char EasyCAT::MainTask()                    // must be called cyclicall
     WatchDog = 1;                                           //
     
   TempLong.Long = SPIReadRegisterIndirect (AL_STATUS, 1);   // read the EtherCAT State Machine status
+//  Serial.print("Al status ");
+//  Serial.println(TempLong.Long, HEX);
   Status = TempLong.Byte[0] & 0x0F;                         // to see if we are in operational state
   if (Status == ESM_OP)                                     // 
     Operational = 1;                                        //

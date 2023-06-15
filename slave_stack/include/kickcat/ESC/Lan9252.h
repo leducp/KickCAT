@@ -12,14 +12,15 @@ namespace kickcat
     // Host to Network byte order helper (Reminder: EtherCAT is LE, network is BE)
 
     // TODO do not duplicate, used it from protocol.h
+// modify because arduino does not support C++ 17 by default
     template<typename T>
-    constexpr T hton(T value)
+    T hton(T value)
     {
-        if constexpr(sizeof(T) == 2)
+        if (sizeof(T) == 2)
         {
             return T((value << 8) | ((value >> 8) & 0xff));
         }
-        else if constexpr(sizeof(T) == 4)
+        else if (sizeof(T) == 4)
         {
             return T((value << 24) | ((value << 8) & 0x00ff0000) | ((value >> 8) & 0x0000ff00) | ((value >> 24) & 0xff));
         }
@@ -34,30 +35,28 @@ namespace kickcat
     const uint8_t READ  = 0x03;
     const uint8_t WRITE = 0x02;
 
-//    const uint8_t CMD_SPI_READ = 0x03;
-//    const uint8_t CMD_SPI_WRITE = 0x02;
-
-
     const uint8_t BYTE_TEST = 0x64;
 
     // Registers
-    const uint8_t PRAM_READ_LEN = 0x308;
-    const uint8_t RESET_CTL     = 0x01F8;      // reset register
-    const uint8_t ECAT_CSR_DATA = 0x0300;      // EtherCAT CSR Interface Data Register
-    const uint8_t ECAT_CSR_CMD  = 0x0304;      // EtherCAT CSR Interface Command Register
+    const uint16_t PRAM_READ_LEN = 0x308;
+    const uint16_t RESET_CTL     = 0x01F8;      // reset register
+    const uint16_t ECAT_CSR_DATA = 0x0300;      // EtherCAT CSR Interface Data Register
+    const uint16_t ECAT_CSR_CMD  = 0x0304;      // EtherCAT CSR Interface Command Register
 
     // Ethercat registers missing from protocol.h TODO check where put them.
-    const uint8_t AL_EVENT            =   0x0220;      // AL event request
-    const uint8_t AL_EVENT_MASK       =   0x0204;      // AL event interrupt mask
+    const uint16_t AL_EVENT            =   0x0220;      // AL event request
+    const uint16_t AL_EVENT_MASK       =   0x0204;      // AL event interrupt mask
 
-    const uint8_t WDOG_STATUS         =   0x0440;      // watch dog status
+    // In protocol but can't access to it now
+    const uint16_t WDOG_STATUS         =   0x0440;      // watch dog status
+    const uint16_t AL_STATUS           =   0x0130;      // AL status
 
     //--- ESC commands --------------------------------------------------------------------------------
     const uint8_t ESC_WRITE = 0x80;
     const uint8_t ESC_READ  = 0xC0;
 
     // Flags
-    const uint32_t  ECAT_CSR_BUSY = 0x1 << 30;
+    const uint32_t  ECAT_CSR_BUSY = 0x1 << 31;
     const uint16_t  PRAM_ABORT    = 0x40000000;
     const uint8_t   PRAM_BUSY     = 0x80;
     const uint8_t   PRAM_AVAIL    = 0x01;
@@ -76,7 +75,7 @@ namespace kickcat
         uint8_t  instruction;               // Read / write // TODO enum full.
         uint16_t LAN9252_register_address;  // address of SYSTEM CONTROL AND STATUS REGISTERS
         uint8_t  payload[0x1C];             // Max payload size is 1C bytes.
-    }; __attribute__((__packed__));
+    } __attribute__((__packed__));
 
 
     class Lan9252 : public AbstractESC
@@ -88,8 +87,10 @@ namespace kickcat
         void init() override;
 
         // Return error code based on availability of the requested register
-        virtual int32_t readRegister(uint16_t address, uint32_t& data, uint8_t size) override;
-        virtual int32_t writeRegister(uint16_t address, uint32_t data, uint8_t size) override;
+        virtual int32_t readRegister(uint16_t address, void* data, uint32_t size) override;
+
+
+        virtual int32_t writeRegister(uint16_t address, void const* data, uint32_t size) override;
 
 //        virtual void readPDO(uint8_t* data, uint32_t size) override;
 //        virtual void writePDO(uint8_t* data, uint32_t size) override;
@@ -118,14 +119,10 @@ namespace kickcat
         template <typename T>
         void readCommand(uint16_t address, T& payload)
         {
-            CSR_CMD cmd{READ, hton(address), {}};
-
-            spi_interface_.enableChipSelect();
-            spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE);
-
-            spi_interface_.read(&payload, sizeof(payload));
-            spi_interface_.disableChipSelect();
+            readCommand(address, &payload, sizeof(payload));
         };
+
+        void readCommand(uint16_t address, void* payload, uint32_t size);
 
         template <typename T>
         void writeCommand(uint16_t address, T const& payload)

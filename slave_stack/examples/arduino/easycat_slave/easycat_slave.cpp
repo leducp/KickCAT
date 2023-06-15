@@ -18,11 +18,22 @@ void setup() {
 
 void esc_routine()
 {
-    bool watchdog = false;
-    bool operational = false;
-    uint8_t i = 0;
+//    bool watchdog = false;
+//    bool operational = false;
+//    uint8_t i = 0;
+//
+//    uint8_t fmmu;
+//    esc.readRegister(WDOG_STATUS, &watchdog, 1);
+//    esc.readRegister(0x0004, &fmmu, 1);
+//    Serial.print("watchdog: ");
+//    Serial.println(watchdog, HEX);
+//    Serial.print("fmmu: ");
+//    Serial.println(fmmu, HEX);
 
-    esc.readRegisterIndirect(WDOG_STATUS, 1);
+    uint16_t al_status;
+    esc.readRegister(AL_STATUS, &al_status, sizeof(al_status));
+    Serial.print("Al status ");
+    Serial.println(al_status, HEX);
 }
 
 void loop() {
@@ -32,5 +43,6 @@ void loop() {
   delay(1000);                       // wait for a second
 
   Serial.println("HEllo !");
+  esc_routine();
 
 }
