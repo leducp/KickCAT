@@ -14,6 +14,23 @@ void setup() {
   Serial.begin(9600);
 
   esc.init();
+
+  uint16_t al_status;
+  esc.readRegister(AL_STATUS, &al_status, sizeof(al_status));
+  Serial.print("Al status ");
+  Serial.println(al_status, HEX);
+
+  uint16_t station_alias;
+  esc.readRegister(0x0012, &station_alias, sizeof(station_alias));
+  Serial.print("before write station_alias ");
+  Serial.println(station_alias, HEX);
+
+  station_alias = 0xAABB;
+  esc.writeRegister(0x0012, &station_alias, sizeof(station_alias));
+  Serial.println("Between read station alias");
+  esc.readRegister(0x0012, &station_alias, sizeof(station_alias));
+  Serial.print("after station_alias ");
+  Serial.println(station_alias, HEX);
 }
 
 void esc_routine()
@@ -30,10 +47,7 @@ void esc_routine()
 //    Serial.print("fmmu: ");
 //    Serial.println(fmmu, HEX);
 
-    uint16_t al_status;
-    esc.readRegister(AL_STATUS, &al_status, sizeof(al_status));
-    Serial.print("Al status ");
-    Serial.println(al_status, HEX);
+
 }
 
 void loop() {

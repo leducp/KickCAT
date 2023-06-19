@@ -312,19 +312,20 @@
 #define DUMMY_BYTE       0xFF
 
 
-#if defined(ARDUINO_ARCH_AVR)  
-  #define SpiSpeed         8000000
-  
-#elif defined (ARDUINO_ARCH_SAM)
-  #define SpiSpeed        14000000 
-  
-#elif defined (ARDUINO_ARCH_SAMD)
-  #define SpiSpeed        12000000   
-  
-#else  
-  #define SpiSpeed        8000000    
-#endif
+//#if defined(ARDUINO_ARCH_AVR)
+//  #define SpiSpeed         8000000
+//
+//#elif defined (ARDUINO_ARCH_SAM)
+//  #define SpiSpeed        14000000
+//
+//#elif defined (ARDUINO_ARCH_SAMD)
+//  #define SpiSpeed        12000000
+//
+//#else
+//  #define SpiSpeed        8000000
+//#endif
 
+#define SpiSpeed        100000
 
 //---- typedef ------------------------------------------------------------------------------------
 
@@ -634,6 +635,8 @@ bool EasyCAT::Init()
   {                                                       //
     i++;                                                  //
     TempLong.Long = SPIReadRegisterDirect (RESET_CTL, 4); //
+    Serial.print("Wait reset: ");
+    Serial.println(i);
   }while (((TempLong.Byte[0] & 0x01) != 0x00) && (i != Tout));    
                                                           //                                                       
   if (i == Tout)                                          // time out expired      
@@ -648,6 +651,8 @@ bool EasyCAT::Init()
   {                                                       //
     i++;                                                  //      
     TempLong.Long = SPIReadRegisterDirect (BYTE_TEST, 4); //
+    Serial.print("Wait BYTE_TEST: ");
+    Serial.println(i);
   }while ((TempLong.Long != 0x87654321) && (i != Tout));  //    
                                                           //                                                            
   if (i == Tout)                                          // time out expired      
@@ -662,6 +667,8 @@ bool EasyCAT::Init()
   {                                                       //
     i++;                                                  //    
     TempLong.Long = SPIReadRegisterDirect (HW_CFG, 4);    //
+    Serial.print("Wait HW_CFG: ");
+    Serial.println(i);
   }while (((TempLong.Byte[3] & READY) == 0) && (i != Tout));//
                                                           //
   if (i == Tout)                                          // time out expired      
@@ -720,11 +727,11 @@ bool EasyCAT::Init()
     Serial.println(F("ASYNC"));
   }
   
-  TempLong.Long = SPIReadRegisterDirect (ID_REV, 4);      // read the chip identification 
-  Serial.print (F("Detected chip "));                     // and revision, and print it
-  Serial.print (TempLong.Word[1], HEX);                   // out on the serial line
-  Serial.print (F("  Rev "));                             //    
-  Serial.println (TempLong.Word[0]);                      //  
+//  TempLong.Long = SPIReadRegisterDirect (ID_REV, 4);      // read the chip identification
+//  Serial.print (F("Detected chip "));                     // and revision, and print it
+//  Serial.print (TempLong.Word[1], HEX);                   // out on the serial line
+//  Serial.print (F("  Rev "));                             //
+//  Serial.println (TempLong.Word[0]);                      //
   
   #ifdef DEB                                              // debug     
     Serial.println (F("\nBytes in OUT "));  
@@ -754,6 +761,25 @@ bool EasyCAT::Init()
     Serial.println ();                                
   #endif
     
+
+    uint16_t al_status = SPIReadRegisterIndirect(AL_STATUS, sizeof(al_status));
+    Serial.print("Al status ");
+    Serial.println(al_status, HEX);
+
+    uint16_t station_alias;
+    station_alias = SPIReadRegisterIndirect(0x0012, sizeof(station_alias));
+
+    Serial.print("before station_alias ");
+    Serial.println(station_alias, HEX);
+
+    station_alias = 0xCAFE;
+    SPIWriteRegisterIndirect(station_alias, 0x0012, sizeof(station_alias));
+    station_alias = SPIReadRegisterIndirect(0x0012, sizeof(station_alias));
+    Serial.print("after station_alias ");
+    Serial.println(station_alias, HEX);
+
+
+
   SPI.endTransaction();                               //
   return true;                                        // initalization completed   
 }  

@@ -9,34 +9,65 @@ namespace kickcat
         pinMode(CS_PIN, OUTPUT);
         delay(100);
 
-        delay(1000);
         Serial.println("init lan");
 
         spi_interface_.beginTransaction();
 
 
-        writeCommand(RESET_CTL, DIGITAL_RST);
+        writeInternalRegister(RESET_CTL, DIGITAL_RST);
 
 
-        // Check SPI interface is ready thanks to BYTE_TEST
+
+
         uint16_t counter = 0;
         uint16_t timeout = 10000;
 
-        uint32_t byte_test_result = 0;
+        // wait for reset to complete
+        uint32_t reset_ctl_value = 1;
 
+        while (counter < timeout and (reset_ctl_value & 0x1))
+        {
+            counter++;
+            readInternalRegister(RESET_CTL, reset_ctl_value);
+            Serial.print("wait reset: ");
+            Serial.println(counter);
+        }
+
+        if (counter == timeout)
+        {
+          Serial.println("Timeout reset");
+        }
+
+        // Check SPI interface is ready thanks to BYTE_TEST to test byte order
+        uint32_t byte_test_result = 0;
+        counter = 0;
         while (counter < timeout and  byte_test_result != BYTE_TEST_DEFAULT)
         {
             counter++;
-            readCommand(BYTE_TEST, byte_test_result);
+            readInternalRegister(BYTE_TEST, byte_test_result);
         }
 
         if (counter == timeout)
         {
           Serial.println("Timeout get byte test");
         }
-
         Serial.print("Byte test read: ");
         Serial.println(byte_test_result, HEX);
+
+
+        uint32_t hw_cfg_ready = 0;
+        counter = 0;
+        while (counter < timeout and not (hw_cfg_ready & DEVICE_READY))
+        {
+            counter++;
+            readInternalRegister(HW_CFG, hw_cfg_ready);
+        }
+
+        if (counter == timeout)
+        {
+          Serial.println("Timeout hw cfg ready");
+        }
+
 
         spi_interface_.endTransaction();
     }
@@ -114,20 +145,21 @@ namespace kickcat
 
     int32_t Lan9252::waitCSRReady()
     {
-        Serial.println(" wait csr");
+//        Serial.println("  Begin wait CSR");
         uint32_t esc_status;
         do
         {
-            readCommand(ECAT_CSR_CMD, esc_status);
+            readInternalRegister(ECAT_CSR_CMD, esc_status);
         }
         while(esc_status & ECAT_CSR_BUSY);
+//        Serial.println("  End wait CSR");
         return 0;
     }
 
 
-    void Lan9252::readCommand(uint16_t address, void* payload, uint32_t size)
+    void Lan9252::readInternalRegister(uint16_t address, void* payload, uint32_t size)
     {
-        CSR_CMD cmd{READ, hton(address), {}};
+        InternalRegisterControl cmd{READ, hton(address), {}};
 
         spi_interface_.enableChipSelect();
         spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE);
@@ -137,31 +169,52 @@ namespace kickcat
     }
 
 
+    void Lan9252::writeInternalRegister(uint16_t address, void const* payload, uint32_t size)
+    {
+        // TODO check payload size, return code too big ?
+        InternalRegisterControl cmd{WRITE, hton(address), {}};
+        memcpy(cmd.payload, payload, size);
+        spi_interface_.enableChipSelect();
+        spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE + size);
+        spi_interface_.disableChipSelect();
+    }
+
+
     int32_t Lan9252::readRegister(uint16_t address, void* data, uint32_t size)
     {
         spi_interface_.beginTransaction();
 
-        uint32_t rev;
-        readCommand(0x050, &rev, 4);
-        Serial.print("rev ");
-        Serial.println(rev);
-
-
-        waitCSRReady();
+//        waitCSRReady();
 
         // TODO based on address handle process data ram vs registers (< 0X1000)
 
-        writeCommand(ECAT_CSR_CMD, address);
+        writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_READ});
 
         waitCSRReady();
 
-        readCommand(ECAT_CSR_DATA, data, size);
+        readInternalRegister(ECAT_CSR_DATA, data, size);
         spi_interface_.endTransaction();
         return 0;
     };
 
     int32_t Lan9252::writeRegister(uint16_t address, void const* data, uint32_t size)
     {
+        spi_interface_.beginTransaction();
+
+//        waitCSRReady();
+        writeInternalRegister(ECAT_CSR_DATA, data, size);
+
+//        waitCSRReady();
+        writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_WRITE});
+
+        uint16_t dummy = 0x0000;
+        spi_interface_.enableChipSelect();
+        spi_interface_.write(&dummy, sizeof(dummy));
+        spi_interface_.disableChipSelect();
+        // wait for command execution
+        waitCSRReady();
+
+        spi_interface_.endTransaction();
         return 0;
     }
 

@@ -23,10 +23,11 @@ namespace kickcat
 
         if (data_write == nullptr)
         {
+//            Serial.println("READ spi");
             for (uint32_t i = 0; i<size; i++)
             {
                 data_read[i] = SPI.transfer(DUMMY_BYTE);
-//                Serial.print("i: ");
+//                Serial.print("    i: ");
 //                Serial.print(i);
 //                Serial.print(" data read ");
 //                Serial.println(data_read[i], HEX);
@@ -35,10 +36,11 @@ namespace kickcat
 
         if (data_read == nullptr)
         {
+//            Serial.println("WRITE spi");
             for (uint32_t i = 0; i<size; i++)
             {
                 SPI.transfer(data_write[i]);
-//                Serial.print("i: ");
+//                Serial.print("    i: ");
 //                Serial.print(i);
 //                Serial.print(" data write ");
 //                Serial.println(data_write[i], HEX);

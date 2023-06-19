@@ -12,7 +12,8 @@ namespace kickcat
 
     const uint8_t DUMMY_BYTE = 0xFF;
 
-    const uint32_t SPI_SPEED = 8000000; // Hz
+//    const uint32_t SPI_SPEED = 8000000; // Hz
+    const uint32_t SPI_SPEED = 100000; // Hz
     const SPISettings SETTINGS(SPI_SPEED, MSBFIRST, SPI_MODE0);
 
     struct Address

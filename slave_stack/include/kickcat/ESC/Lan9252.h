@@ -42,6 +42,7 @@ namespace kickcat
     const uint16_t RESET_CTL     = 0x01F8;      // reset register
     const uint16_t ECAT_CSR_DATA = 0x0300;      // EtherCAT CSR Interface Data Register
     const uint16_t ECAT_CSR_CMD  = 0x0304;      // EtherCAT CSR Interface Command Register
+    const uint16_t HW_CFG        = 0x0074;      // Is device ready
 
     // Ethercat registers missing from protocol.h TODO check where put them.
     const uint16_t AL_EVENT            =   0x0220;      // AL event request
@@ -52,17 +53,17 @@ namespace kickcat
     const uint16_t AL_STATUS           =   0x0130;      // AL status
 
     //--- ESC commands --------------------------------------------------------------------------------
-    const uint8_t ESC_WRITE = 0x80;
-    const uint8_t ESC_READ  = 0xC0;
+
 
     // Flags
     const uint32_t  ECAT_CSR_BUSY = 0x1 << 31;
+    const uint32_t  DEVICE_READY =  0x1 << 27;
     const uint16_t  PRAM_ABORT    = 0x40000000;
     const uint8_t   PRAM_BUSY     = 0x80;
     const uint8_t   PRAM_AVAIL    = 0x01;
     const uint8_t   READY         = 0x08;
 
-    const uint8_t  DIGITAL_RST   = 0x01;
+    const uint32_t  DIGITAL_RST   = 0x01;
 
 
     const uint32_t BYTE_TEST_DEFAULT = 0x87654321;
@@ -70,11 +71,22 @@ namespace kickcat
 
 
     const uint8_t CSR_CMD_HEADER_SIZE = 3;
-    struct CSR_CMD
+    struct InternalRegisterControl
     {
         uint8_t  instruction;               // Read / write // TODO enum full.
         uint16_t LAN9252_register_address;  // address of SYSTEM CONTROL AND STATUS REGISTERS
         uint8_t  payload[0x1C];             // Max payload size is 1C bytes.
+    } __attribute__((__packed__));
+
+
+    struct CSR_CMD
+    {
+        static constexpr uint8_t ESC_WRITE = 0x80;
+        static constexpr uint8_t ESC_READ  = 0xC0;
+
+        uint16_t ethercat_register_address;
+        uint8_t  ethercat_register_size; //1,2,4
+        uint8_t  ethercat_register_operation; // read / write
     } __attribute__((__packed__));
 
 
@@ -117,23 +129,20 @@ namespace kickcat
 
     private:
         template <typename T>
-        void readCommand(uint16_t address, T& payload)
+        void readInternalRegister(uint16_t address, T& payload)
         {
-            readCommand(address, &payload, sizeof(payload));
+            readInternalRegister(address, &payload, sizeof(payload));
         };
 
-        void readCommand(uint16_t address, void* payload, uint32_t size);
+        void readInternalRegister(uint16_t address, void* payload, uint32_t size);
 
         template <typename T>
-        void writeCommand(uint16_t address, T const& payload)
+        void writeInternalRegister(uint16_t address, T const& payload)
         {
-            // TODO check payload size, return code too big ?
-            CSR_CMD cmd{WRITE, hton(address), {}};
-            memcpy(cmd.payload, &payload, sizeof(payload));
-            spi_interface_.enableChipSelect();
-            spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE + sizeof(payload));
-            spi_interface_.disableChipSelect();
+            writeInternalRegister(address, &payload, sizeof(payload));
         };
+
+        void writeInternalRegister(uint16_t address, void const* payload, uint32_t size);
 
         int32_t waitCSRReady();
 
