@@ -369,22 +369,31 @@ namespace kickcat
             else
             {
                 // unsupported mailbox: use SII to get the mapping size
-                Slave::PIMapping* mapping = &slave.output;
-                mapping->sync_manager = 0;
-                mapping->size = 0;
-                for (auto const& pdo : slave.sii.RxPDO)
+                auto siiMapping = [&](Slave::PIMapping* mapping, std::vector<eeprom::PDOEntry const*>& PDOs, SyncManagerType type)
                 {
-                    mapping->size += pdo->bitlen;
-                }
-                mapping->bsize = bits_to_bytes(mapping->size);
+                    mapping->sync_manager = -1;
+                    mapping->size = 0;
+                    for (auto const& pdo : PDOs)
+                    {
+                        mapping->size += pdo->bitlen;
+                    }
+                    mapping->bsize = bits_to_bytes(mapping->size);
+                    for (uint32_t i = 0; i < slave.sii.syncManagers_.size(); ++i)
+                    {
+                        auto sm = slave.sii.syncManagers_[i];
+                        if (sm->type == type)
+                        {
+                            mapping->sync_manager = i;
+                        }
+                    }
+                    if (mapping->sync_manager == -1 and mapping->size != 0)
+                    {
+                        THROW_ERROR("Invalid SyncManager configuration");
+                    }
+                };
 
-                mapping = &slave.input;
-                mapping->sync_manager = 1;
-                for (auto const& pdo : slave.sii.TxPDO)
-                {
-                    mapping->size += pdo->bitlen;
-                }
-                mapping->bsize = bits_to_bytes(mapping->size);
+                siiMapping(&slave.output, slave.sii.RxPDO, SyncManagerType::Output);
+                siiMapping(&slave.input,  slave.sii.TxPDO, SyncManagerType::Input);
             }
         }
     }
@@ -418,8 +427,15 @@ namespace kickcat
             }
 
             // create block IO entries
-            pi_frames_.back().inputs.push_back ({nullptr, address - pi_frames_.back().address, slave.input.bsize,  &slave});
-            pi_frames_.back().outputs.push_back({nullptr, address - pi_frames_.back().address, slave.output.bsize, &slave});
+            if (slave.input.bsize > 0)
+            {
+                pi_frames_.back().inputs.push_back ({nullptr, address - pi_frames_.back().address, slave.input.bsize,  &slave});
+            }
+
+            if (slave.output.bsize > 0)
+            {
+                pi_frames_.back().outputs.push_back({nullptr, address - pi_frames_.back().address, slave.output.bsize, &slave});
+            }
 
             // save mapping offset (need to configure slave FMMU)
             slave.input.address  = address;
@@ -467,7 +483,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.inputs.size())
                 {
-                    DEBUG_PRINT("Invalid working counter: expected %d, got %ld\n", wkc, pi_frame.inputs.size());
+                    DEBUG_PRINT("Invalid working counter: expected %ld, got %d\n", pi_frame.inputs.size(), wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -504,7 +520,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.outputs.size())
                 {
-                    DEBUG_PRINT("Invalid working counter\n");
+                    DEBUG_PRINT("Invalid working counter: expected %ld, got %d\n", pi_frame.outputs.size(), wkc);
                     return DatagramState::INVALID_WKC;
                 }
                 return DatagramState::OK;
@@ -533,9 +549,10 @@ namespace kickcat
 
             auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                if (wkc != (pi_frame.inputs.size() + pi_frame.outputs.size() * 2)) //TODO: buggy in master?
+                uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2);
+                if (wkc != expected_wkc) //TODO: buggy in master?
                 {
-                    DEBUG_PRINT("Invalid working counter\n");
+                    DEBUG_PRINT("Invalid working counter: expected %d, got %d\n", expected_wkc, wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -561,6 +578,7 @@ namespace kickcat
     {
         auto prepareDatagrams = [this](Slave& slave, Slave::PIMapping& mapping, SyncManagerType type)
         {
+
             if (mapping.bsize == 0)
             {
                 // there is nothing to do for this mapping
