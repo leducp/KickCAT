@@ -175,10 +175,10 @@ public:
 
         // -- SyncManagers
         addFetchEepromWord(0x00080029);     // section SM, 16 bytes
-        addFetchEepromWord(0x00000000);     //
-        addFetchEepromWord(0x00000000);     //
-        addFetchEepromWord(0x00000000);     //
-        addFetchEepromWord(0x00000000);     //
+        addFetchEepromWord(0x00001000);     //
+        addFetchEepromWord(0x03010064);     //
+        addFetchEepromWord(0x00001200);     //
+        addFetchEepromWord(0x04010020);     //
 
         addFetchEepromWord(0xFFFFFFFF);     // end of eeprom
 
