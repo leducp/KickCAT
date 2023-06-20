@@ -109,23 +109,6 @@ namespace kickcat
 //
 //        virtual int32_t readEEPROM(uint8_t* data, uint32_t size) override;
 //        virtual int32_t writeEEPROM(uint8_t* data, uint32_t size) override;
-//
-//
-//        /// \brief Read given register.
-//        /// \param address of the register, will be split into two bytes
-//        /// \param data to be read
-//        /// \param size number of bytes to read, max 4.
-//        /// \return error code
-//        int32_t readRegisterDirect(uint16_t address, uint32_t& data, uint8_t size);
-//        int32_t writeRegisterDirect(uint16_t address, uint32_t data);
-//
-//        /// \brief Read given register.
-//        /// \param address of the register, will be split into two bytes
-//        /// \param data to be read
-//        /// \param size number of bytes to read, allowed values: 1, 2, 4.
-//        /// \return error code
-//        int32_t readRegisterIndirect(uint16_t address, uint32_t& data, uint8_t size);
-//        int32_t writeRegisterIndirect(uint16_t address, uint32_t data, uint8_t size);
 
     private:
         template <typename T>
