@@ -31,6 +31,23 @@ void setup() {
   esc.readRegister(0x0012, &station_alias, sizeof(station_alias));
   Serial.print("after station_alias ");
   Serial.println(station_alias, HEX);
+
+  uint32_t nb_bytes = 8;
+  uint8_t test[nb_bytes];
+  for (uint32_t i=0; i < nb_bytes; i++)
+  {
+      test[i] = i;
+  }
+
+  esc.writeRegister(0x1200, &test, nb_bytes);
+
+  uint8_t result[nb_bytes];
+  esc.readRegister(0x1200, &result, nb_bytes);
+  for (uint32_t i = 0; i < nb_bytes; i++)
+  {
+      Serial.print("result ");
+      Serial.println(result[i], HEX);
+  }
 }
 
 void esc_routine()
@@ -38,13 +55,13 @@ void esc_routine()
     bool watchdog = false;
     bool operational = false;
 
-    uint8_t fmmu;
-    esc.readRegister(WDOG_STATUS, &watchdog, 1);
-    esc.readRegister(0x0004, &fmmu, 1);
-    Serial.print("watchdog: ");
-    Serial.println(watchdog, HEX);
-    Serial.print("fmmu: ");
-    Serial.println(fmmu, HEX);
+//    uint8_t fmmu;
+//    esc.readRegister(WDOG_STATUS, &watchdog, 1);
+//    esc.readRegister(0x0004, &fmmu, 1);
+//    Serial.print("watchdog: ");
+//    Serial.println(watchdog, HEX);
+//    Serial.print("fmmu: ");
+//    Serial.println(fmmu, HEX);
 
 
 }

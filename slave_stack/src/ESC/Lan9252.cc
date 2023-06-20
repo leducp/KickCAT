@@ -120,21 +120,55 @@ namespace kickcat
 
     int32_t Lan9252::writeRegister(uint16_t address, void const* data, uint32_t size)
     {
-        // TODO based on address change destination.
+        Serial.println(address, HEX);
+        if (address < 0x1000)
+        {
+            Serial.print(address, HEX);
+            Serial.println(" -> Write register");
+            spi_interface_.beginTransaction();
+            // CSR_DATA is 4 bytes
+            uint32_t padding = 0;
+            memcpy(&padding, data, size);
+            writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
+            writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_WRITE});
+            // wait for command execution
+            waitCSRReady();
+            spi_interface_.endTransaction();
+        }
+        else if (address < 0x1200)
+        {
+            // outputs read
+            Serial.print(address, HEX);
+            Serial.println(" -> Not implement output read");
+        }
+        else if (address < 0x2000)
+        {
+            //inputs write
+            writeInternalRegister(ECAT_PRAM_WR_CMD, PRAM_ABORT);
+            uint32_t addr_len = address | (size << 16);             // check size alignment and max value.
+            writeInternalRegister(ECAT_PRAM_WR_ADDR_LEN, addr_len);
+            writeInternalRegister(ECAT_PRAM_WR_CMD, PRAM_BUSY);  // order start
 
-        spi_interface_.beginTransaction();
+            uint16_t fifo_slot_available; // slot of 4 bytes
+            do
+            {
+                readInternalRegister(ECAT_PRAM_WR_CMD, fifo_slot_available);
+                Serial.print("Fifo available: ");
+                Serial.println(fifo_slot_available, HEX);
+                fifo_slot_available = fifo_slot_available >> 8;
+                Serial.print("Fifo available: ");
+                Serial.println(fifo_slot_available, HEX);
+                Serial.print("Size / 4 : ");
+                Serial.println(size / 4, HEX);
+            } while(fifo_slot_available < size / 4);  // TODO beware assumption all the data fit in the the 64 bytes fifo.
 
-        // CSR_DATA is 4 bytes
-        uint32_t padding = 0;
-        memcpy(&padding, data, size);
-        writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
+            writeInternalRegister(ECAT_PRAM_WR_DATA, data, size);
+        }
+        else
+        {
+            // Out of ram range
+        }
 
-        writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_WRITE});
-
-        // wait for command execution
-        waitCSRReady();
-
-        spi_interface_.endTransaction();
         return 0;
     }
 

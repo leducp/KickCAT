@@ -38,11 +38,21 @@ namespace kickcat
     const uint8_t BYTE_TEST = 0x64;
 
     // Registers
-    const uint16_t PRAM_READ_LEN = 0x308;
+    const uint16_t HW_CFG        = 0x0074;      // Is device ready
     const uint16_t RESET_CTL     = 0x01F8;      // reset register
     const uint16_t ECAT_CSR_DATA = 0x0300;      // EtherCAT CSR Interface Data Register
     const uint16_t ECAT_CSR_CMD  = 0x0304;      // EtherCAT CSR Interface Command Register
-    const uint16_t HW_CFG        = 0x0074;      // Is device ready
+
+    const uint16_t ECAT_PRAM_RD_ADDR_LEN = 0X0308;
+    const uint16_t ECAT_PRAM_RD_CMD      = 0X030C;
+    const uint16_t ECAT_PRAM_WR_ADDR_LEN = 0X0310;
+    const uint16_t ECAT_PRAM_WR_CMD      = 0X0314;
+
+    const uint16_t ECAT_PRAM_RD_DATA     = 0x000;  // until 0x01C
+    const uint16_t ECAT_PRAM_WR_DATA     = 0x020;  // until 0x03C
+
+    const uint16_t NUM_BYTE_INPUT  = 32;
+    const uint16_t NUM_BYTE_OUTPUT = 32;
 
     // Ethercat registers missing from protocol.h TODO check where put them.
     const uint16_t AL_EVENT            =   0x0220;      // AL event request
@@ -57,11 +67,10 @@ namespace kickcat
 
     // Flags
     const uint32_t  ECAT_CSR_BUSY = 0x1 << 31;
-    const uint32_t  DEVICE_READY =  0x1 << 27;
-    const uint16_t  PRAM_ABORT    = 0x40000000;
-    const uint8_t   PRAM_BUSY     = 0x80;
-    const uint8_t   PRAM_AVAIL    = 0x01;
-    const uint8_t   READY         = 0x08;
+    const uint32_t  DEVICE_READY  = 0x1 << 27;
+    const uint32_t  PRAM_ABORT    = 0x1 << 30;
+    const uint32_t  PRAM_BUSY     = 0x1 << 31;
+    const uint32_t  PRAM_AVAIL    = 0x01;
 
     const uint32_t  DIGITAL_RST   = 0x01;
 
@@ -75,7 +84,7 @@ namespace kickcat
     {
         uint8_t  instruction;               // Read / write // TODO enum full.
         uint16_t LAN9252_register_address;  // address of SYSTEM CONTROL AND STATUS REGISTERS
-        uint8_t  payload[0x1C];             // Max payload size is 1C bytes.
+        uint8_t  payload[64];             // Max payload size is 64 bytes (fifo).
     } __attribute__((__packed__));
 
 
