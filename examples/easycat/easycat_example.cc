@@ -142,6 +142,12 @@ int main(int argc, char* argv[])
     fwrite("latency\n", 1, 8, stat_file);
 
     auto& easycat = bus.slaves().at(0);
+
+    for (int32_t i = 0; i < easycat.output.bsize; ++i)
+    {
+        easycat.output.data[i] = 0xAA;
+    }
+
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {

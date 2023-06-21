@@ -66,13 +66,19 @@ namespace kickcat
 
 
     // Flags
-    const uint32_t  ECAT_CSR_BUSY = 0x1 << 31;
-    const uint32_t  DEVICE_READY  = 0x1 << 27;
-    const uint32_t  PRAM_ABORT    = 0x1 << 30;
-    const uint32_t  PRAM_BUSY     = 0x1 << 31;
-    const uint32_t  PRAM_AVAIL    = 0x01;
+    const uint32_t ECAT_CSR_BUSY = 0x1 << 31;
+    const uint32_t DEVICE_READY  = 0x1 << 27;
+    const uint32_t PRAM_ABORT    = 0x1 << 30;
+    const uint32_t PRAM_BUSY     = 0x1 << 31;
+    const uint32_t PRAM_AVAIL    = 0x01;
 
-    const uint32_t  DIGITAL_RST   = 0x01;
+    const uint32_t DIGITAL_RST   = 0x01;
+
+    const uint32_t ESM_INIT        = 0x1;
+    const uint32_t ESM_BOOTSTRAP   = 0x3;
+    const uint32_t ESM_PRE_OP      = 0x2;
+    const uint32_t ESM_SAFE_OP     = 0x4;
+    const uint32_t ESM_OP          = 0x8;
 
 
     const uint32_t BYTE_TEST_DEFAULT = 0x87654321;

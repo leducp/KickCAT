@@ -105,27 +105,40 @@ namespace kickcat
 
     int32_t Lan9252::readRegister(uint16_t address, void* data, uint32_t size)
     {
-        spi_interface_.beginTransaction();
+        if (address < 0x1000)
+        {
+            writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_READ});
+            waitCSRReady();
+            readInternalRegister(ECAT_CSR_DATA, data, size);
+        }
+        else if (address < 0x2000)
+        {
+            writeInternalRegister(ECAT_PRAM_RD_CMD, PRAM_ABORT);
+            uint32_t addr_len = address | (size << 16);             // check size alignment and max value.
+            writeInternalRegister(ECAT_PRAM_RD_ADDR_LEN, addr_len);
+            writeInternalRegister(ECAT_PRAM_RD_CMD, PRAM_BUSY);  // order start read
 
-        // TODO based on address handle process data ram vs registers (< 0X1000)
+            uint16_t fifo_slot_available; // slot of 4 bytes
+            do
+            {
+                readInternalRegister(ECAT_PRAM_RD_CMD, fifo_slot_available);
+                fifo_slot_available = fifo_slot_available >> 8;
+                Serial.print("Fifo read available: ");
+                Serial.println(fifo_slot_available);
+            } while(fifo_slot_available != size / 4);  // TODO beware assumption ESC will transfer 32 bytes.
 
-        writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_READ});
+            readInternalRegister(ECAT_PRAM_RD_DATA, data, size);
+        }
 
-        waitCSRReady();
-
-        readInternalRegister(ECAT_CSR_DATA, data, size);
-        spi_interface_.endTransaction();
         return 0;
     };
 
     int32_t Lan9252::writeRegister(uint16_t address, void const* data, uint32_t size)
     {
-        Serial.println(address, HEX);
         if (address < 0x1000)
         {
             Serial.print(address, HEX);
             Serial.println(" -> Write register");
-            spi_interface_.beginTransaction();
             // CSR_DATA is 4 bytes
             uint32_t padding = 0;
             memcpy(&padding, data, size);
@@ -133,38 +146,22 @@ namespace kickcat
             writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_WRITE});
             // wait for command execution
             waitCSRReady();
-            spi_interface_.endTransaction();
-        }
-        else if (address < 0x1200)
-        {
-            // outputs read
-            Serial.print(address, HEX);
-            Serial.println(" -> Not implement output read");
         }
         else if (address < 0x2000)
         {
-            //inputs write
             writeInternalRegister(ECAT_PRAM_WR_CMD, PRAM_ABORT);
             uint32_t addr_len = address | (size << 16);             // check size alignment and max value.
             writeInternalRegister(ECAT_PRAM_WR_ADDR_LEN, addr_len);
-            writeInternalRegister(ECAT_PRAM_WR_CMD, PRAM_BUSY);  // order start
+            writeInternalRegister(ECAT_PRAM_WR_CMD, PRAM_BUSY);  // order start write
 
             uint16_t fifo_slot_available; // slot of 4 bytes
             do
             {
                 readInternalRegister(ECAT_PRAM_WR_CMD, fifo_slot_available);
-                Serial.print("Fifo available: ");
-                Serial.println(fifo_slot_available, HEX);
                 fifo_slot_available = fifo_slot_available >> 8;
-                Serial.print("Fifo available: ");
-                Serial.println(fifo_slot_available, HEX);
-                Serial.print("Size / 4 : ");
-                Serial.println(size / 4, HEX);
             } while(fifo_slot_available < size / 4);  // TODO beware assumption all the data fit in the the 64 bytes fifo.
 
-            Serial.println("Start write PRAM WR data");
             writeInternalRegister(ECAT_PRAM_WR_DATA, data, size);
-            Serial.println("End write PRAM WR data");
         }
         else
         {
