@@ -32,7 +32,7 @@ void setup() {
   Serial.print("after station_alias ");
   Serial.println(station_alias, HEX);
 
-  uint32_t nb_bytes = 8;
+  uint32_t nb_bytes = 32;
   uint8_t test[nb_bytes];
   for (uint32_t i=0; i < nb_bytes; i++)
   {
@@ -41,9 +41,16 @@ void setup() {
 
   esc.writeRegister(0x1200, &test, nb_bytes);
 
-  uint8_t result[nb_bytes];
-  esc.readRegister(0x1200, &result, nb_bytes);
-  for (uint32_t i = 0; i < nb_bytes; i++)
+  uint32_t nb_bytes_read = 4;
+  uint8_t result[nb_bytes_read];
+  esc.readRegister(0x1200, &result, nb_bytes_read);
+  for (uint32_t i = 0; i < nb_bytes_read; i++)
+  {
+      Serial.print("result ");
+      Serial.println(result[i], HEX);
+  }
+  esc.readRegister(0x1208, &result, nb_bytes_read);
+  for (uint32_t i = 0; i < nb_bytes_read; i++)
   {
       Serial.print("result ");
       Serial.println(result[i], HEX);

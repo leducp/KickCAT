@@ -162,7 +162,9 @@ namespace kickcat
                 Serial.println(size / 4, HEX);
             } while(fifo_slot_available < size / 4);  // TODO beware assumption all the data fit in the the 64 bytes fifo.
 
+            Serial.println("Start write PRAM WR data");
             writeInternalRegister(ECAT_PRAM_WR_DATA, data, size);
+            Serial.println("End write PRAM WR data");
         }
         else
         {
