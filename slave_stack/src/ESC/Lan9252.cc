@@ -123,8 +123,6 @@ namespace kickcat
             {
                 readInternalRegister(ECAT_PRAM_RD_CMD, fifo_slot_available);
                 fifo_slot_available = fifo_slot_available >> 8;
-                Serial.print("Fifo read available: ");
-                Serial.println(fifo_slot_available);
             } while(fifo_slot_available != size / 4);  // TODO beware assumption ESC will transfer 32 bytes.
 
             readInternalRegister(ECAT_PRAM_RD_DATA, data, size);
@@ -171,18 +169,6 @@ namespace kickcat
         return 0;
     }
 
-//    void Lan9252::readPDO(uint8_t* data, uint32_t size)
-//    {
-//
-//    }
-//
-//
-//    void Lan9252::writePDO(uint8_t* data, uint32_t size)
-//    {
-//
-//    }
-//
-//
 //    int32_t Lan9252::readEEPROM(uint8_t* data, uint32_t size)
 //    {
 //        return 0;

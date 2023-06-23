@@ -119,9 +119,6 @@ namespace kickcat
 
         virtual int32_t writeRegister(uint16_t address, void const* data, uint32_t size) override;
 
-//        virtual void readPDO(uint8_t* data, uint32_t size) override;
-//        virtual void writePDO(uint8_t* data, uint32_t size) override;
-//
 //        virtual int32_t readEEPROM(uint8_t* data, uint32_t size) override;
 //        virtual int32_t writeEEPROM(uint8_t* data, uint32_t size) override;
 

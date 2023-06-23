@@ -35,15 +35,6 @@ void setup() {
 
 void esc_routine()
 {
-//    uint8_t fmmu;
-//    esc.readRegister(WDOG_STATUS, &watchdog, 1);
-//    esc.readRegister(0x0004, &fmmu, 1);
-//    Serial.print("watchdog: ");
-//    Serial.println(watchdog, HEX);
-//    Serial.print("fmmu: ");
-//    Serial.println(fmmu, HEX);
-
-
     uint32_t nb_bytes = 32;
     uint8_t test_write[nb_bytes];
     for (uint32_t i=0; i < nb_bytes; ++i)
@@ -56,10 +47,7 @@ void esc_routine()
     esc.readRegister(AL_STATUS, &al_status, sizeof(al_status));
     bool watchdog = false;
     esc.readRegister(WDOG_STATUS, &watchdog, 1);
-    Serial.print("AL status: ");
-    Serial.print(al_status & ESM_OP, HEX);
-    Serial.print(" WDG status: ");
-    Serial.println(watchdog, HEX);
+
     if ((al_status & ESM_OP) and watchdog)
     {
         uint8_t test_read[nb_bytes];
@@ -74,11 +62,6 @@ void esc_routine()
 }
 
 void loop() {
-//  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-//  delay(1000);                       // wait for a second
-//  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-//  delay(1000);                       // wait for a second
-
     delay(1);
     esc_routine();
 }
