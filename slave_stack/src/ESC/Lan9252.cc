@@ -2,7 +2,7 @@
 
 namespace kickcat
 {
-    void Lan9252::init()
+    ErrorCode Lan9252::init()
     {
         spi_interface_.init();
         spi_interface_.disableChipSelect();
@@ -31,6 +31,7 @@ namespace kickcat
         if (counter == timeout)
         {
           Serial.println("Timeout reset");
+          return ErrorCode::ETIMEDOUT;
         }
 
         // Check SPI interface is ready thanks to BYTE_TEST to test byte order
@@ -45,6 +46,7 @@ namespace kickcat
         if (counter == timeout)
         {
           Serial.println("Timeout get byte test");
+          return ErrorCode::ETIMEDOUT;
         }
         Serial.print("Byte test read: ");
         Serial.println(byte_test_result, HEX);
@@ -61,22 +63,29 @@ namespace kickcat
         if (counter == timeout)
         {
           Serial.println("Timeout hw cfg ready");
+          return ErrorCode::ETIMEDOUT;
         }
 
-
         spi_interface_.endTransaction();
+
+        return ErrorCode::OK;
     }
 
 
-    int32_t Lan9252::waitCSRReady()
+    ErrorCode Lan9252::waitCSRReady()
     {
         uint32_t esc_status;
+        nanoseconds start_time = since_epoch();
         do
         {
             readInternalRegister(ECAT_CSR_CMD, esc_status);
+            if (elapsed_time(start_time) > TIMEOUT)
+            {
+                return ErrorCode::ETIMEDOUT;
+            }
         }
         while(esc_status & ECAT_CSR_BUSY);
-        return 0;
+        return ErrorCode::OK;
     }
 
 
@@ -94,7 +103,6 @@ namespace kickcat
 
     void Lan9252::writeInternalRegister(uint16_t address, void const* payload, uint32_t size)
     {
-        // TODO check payload size, return code too big ?
         InternalRegisterControl cmd{WRITE, hton(address), {}};
         memcpy(cmd.payload, payload, size);
         spi_interface_.enableChipSelect();
@@ -103,12 +111,17 @@ namespace kickcat
     }
 
 
-    int32_t Lan9252::readRegister(uint16_t address, void* data, uint32_t size)
+    ErrorCode Lan9252::readRegister(uint16_t address, void* data, uint32_t size)
     {
         if (address < 0x1000)
         {
+            if (size > 4 or size == 3)
+            {
+                return ErrorCode::ERANGE;
+            }
+
             writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_READ});
-            waitCSRReady();
+            waitCSRReady(); //TODO timeout
             readInternalRegister(ECAT_CSR_DATA, data, size);
         }
         else if (address < 0x2000)
@@ -119,24 +132,31 @@ namespace kickcat
             writeInternalRegister(ECAT_PRAM_RD_CMD, PRAM_BUSY);  // order start read
 
             uint16_t fifo_slot_available; // slot of 4 bytes
+            nanoseconds start_time = since_epoch();
             do
             {
                 readInternalRegister(ECAT_PRAM_RD_CMD, fifo_slot_available);
                 fifo_slot_available = fifo_slot_available >> 8;
+                if (elapsed_time(start_time) > TIMEOUT)
+                {
+                    return ErrorCode::ETIMEDOUT;
+                }
             } while(fifo_slot_available != size / 4);  // TODO beware assumption ESC will transfer 32 bytes.
 
             readInternalRegister(ECAT_PRAM_RD_DATA, data, size);
         }
 
-        return 0;
+        return ErrorCode::OK;
     };
 
-    int32_t Lan9252::writeRegister(uint16_t address, void const* data, uint32_t size)
+    ErrorCode Lan9252::writeRegister(uint16_t address, void const* data, uint32_t size)
     {
         if (address < 0x1000)
         {
-            Serial.print(address, HEX);
-            Serial.println(" -> Write register");
+            if (size > 4 or size == 3)
+            {
+                return ErrorCode::ERANGE;
+            }
             // CSR_DATA is 4 bytes
             uint32_t padding = 0;
             memcpy(&padding, data, size);
@@ -166,7 +186,7 @@ namespace kickcat
             // Out of ram range
         }
 
-        return 0;
+        return ErrorCode::OK;
     }
 
 //    int32_t Lan9252::readEEPROM(uint8_t* data, uint32_t size)

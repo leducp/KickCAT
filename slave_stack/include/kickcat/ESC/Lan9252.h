@@ -3,6 +3,7 @@
 
 #include "kickcat/AbstractESC.h"
 #include "kickcat/AbstractSPI.h"
+#include "kickcat/Time.h"
 
 #include "spi.h"
 
@@ -83,6 +84,7 @@ namespace kickcat
 
     const uint32_t BYTE_TEST_DEFAULT = 0x87654321;
 
+    const milliseconds TIMEOUT{10};
 
 
     const uint8_t CSR_CMD_HEADER_SIZE = 3;
@@ -111,16 +113,13 @@ namespace kickcat
         Lan9252() = default;
         ~Lan9252() = default;
 
-        void init() override;
+        ErrorCode init() override;
 
         // Return error code based on availability of the requested register
-        virtual int32_t readRegister(uint16_t address, void* data, uint32_t size) override;
+        virtual ErrorCode readRegister(uint16_t address, void* data, uint32_t size) override;
 
 
-        virtual int32_t writeRegister(uint16_t address, void const* data, uint32_t size) override;
-
-//        virtual int32_t readEEPROM(uint8_t* data, uint32_t size) override;
-//        virtual int32_t writeEEPROM(uint8_t* data, uint32_t size) override;
+        virtual ErrorCode writeRegister(uint16_t address, void const* data, uint32_t size) override;
 
     private:
         template <typename T>
@@ -139,7 +138,7 @@ namespace kickcat
 
         void writeInternalRegister(uint16_t address, void const* payload, uint32_t size);
 
-        int32_t waitCSRReady();
+        ErrorCode waitCSRReady();
 
 
         spi spi_interface_; // TODO injection ? AbstractInterface at abstractESC constructor ? AbstractPDI ?

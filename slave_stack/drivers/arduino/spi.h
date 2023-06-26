@@ -31,11 +31,6 @@ namespace kickcat
         void init() override;
         void transfer(uint8_t const* data_write, uint8_t* data_read, uint32_t size) override;
 
-
-//        uint8_t read() override;
-//        void write(uint8_t data) override;
-
-
         void enableChipSelect() {digitalWrite(CS_PIN, LOW);};
         void disableChipSelect() {digitalWrite(CS_PIN, HIGH);};
 
