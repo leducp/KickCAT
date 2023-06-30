@@ -77,7 +77,7 @@ if (GTest_FOUND)
     append_coverage_compiler_flags()
     set(GCOVR_ADDITIONAL_ARGS --exclude-unreachable-branches --exclude-throw-branches)
 
-    set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*" "tools/*")
+    set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*" "tools/*" "conan/*")
     setup_target_for_coverage_gcovr_html(
         NAME coverage
         EXECUTABLE kickcat_unit
@@ -92,9 +92,21 @@ if (GTest_FOUND)
   endif()
 endif()
 
-if (UNIX)
-    add_subdirectory(examples)
-    add_subdirectory(simulation)
+option(BUILD_EXAMPLES "Build examples" ON)
+if (BUILD_EXAMPLES)
+  if (UNIX)
+      add_subdirectory(examples)
+  endif()
 endif()
 
-add_subdirectory(tools)
+option(BUILD_SIMULATION "Build simulation" ON)
+if (BUILD_SIMULATION)
+  if (UNIX)
+      add_subdirectory(simulation)
+  endif()
+endif()
+
+option(BUILD_TOOLS "Build tools" ON)
+if (BUILD_TOOLS)
+  add_subdirectory(tools)
+endif()
