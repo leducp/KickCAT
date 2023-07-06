@@ -15,6 +15,9 @@ namespace kickcat
         void read( void* data, uint32_t size);
         void write(void const* data, uint32_t size);
         virtual void transfer(uint8_t const* data_write, uint8_t* data_read, uint32_t size) = 0;
+
+        virtual void enableChipSelect() = 0;
+        virtual void disableChipSelect() = 0;
     };
 
 }

@@ -2,11 +2,14 @@
 #include "Arduino.h"
 
 #include "kickcat/ESC/Lan9252.h"
-
 #include <sys/time.h>
 
+#include "arduino/spi.h"
+
 using namespace kickcat;
-Lan9252 esc;
+
+std::unique_ptr<AbstractSPI> spi_driver(new spi());
+Lan9252 esc(*spi_driver);
 
 extern "C"
 {
@@ -37,19 +40,19 @@ void setup() {
 
 
   uint16_t al_status;
-  reportError(esc.readRegister(AL_STATUS, &al_status, sizeof(al_status)));
+  reportError(esc.read(AL_STATUS, &al_status, sizeof(al_status)));
   Serial.print("Al status ");
   Serial.println(al_status, HEX);
 
   uint16_t station_alias;
-  reportError(esc.readRegister(0x0012, &station_alias, sizeof(station_alias)));
+  reportError(esc.read(0x0012, &station_alias, sizeof(station_alias)));
   Serial.print("before write station_alias ");
   Serial.println(station_alias, HEX);
 
   station_alias = 0xCAFE;
-  reportError(esc.writeRegister(0x0012, &station_alias, sizeof(station_alias)));
+  reportError(esc.write(0x0012, &station_alias, sizeof(station_alias)));
   Serial.println("Between read station alias");
-  reportError(esc.readRegister(0x0012, &station_alias, sizeof(station_alias)));
+  reportError(esc.read(0x0012, &station_alias, sizeof(station_alias)));
   Serial.print("after station_alias ");
   Serial.println(station_alias, HEX);
 }
@@ -62,23 +65,23 @@ void esc_routine()
     {
         test_write[i] = i;
     }
-    reportError(esc.writeRegister(0x1200, &test_write, nb_bytes));
+    reportError(esc.write(0x1200, &test_write, nb_bytes));
 
     uint16_t al_status;
-    reportError(esc.readRegister(AL_STATUS, &al_status, sizeof(al_status)));
+    reportError(esc.read(AL_STATUS, &al_status, sizeof(al_status)));
     bool watchdog = false;
-    reportError(esc.readRegister(WDOG_STATUS, &watchdog, 1));
+    reportError(esc.read(WDOG_STATUS, &watchdog, 1));
 
     if ((al_status & ESM_OP) and watchdog)
     {
         uint8_t test_read[nb_bytes];
-        reportError(esc.readRegister(0x1000, &test_read, nb_bytes));
-        for (uint32_t i=0; i < nb_bytes; i++)
-        {
-            Serial.print(test_read[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println(" received");
+        reportError(esc.read(0x1000, &test_read, nb_bytes));
+//        for (uint32_t i=0; i < nb_bytes; i++)
+//        {
+//            Serial.print(test_read[i], HEX);
+//            Serial.print(" ");
+//        }
+//        Serial.println(" received");
     }
 }
 

@@ -10,6 +10,9 @@ namespace kickcat
     void spi::init()
     {
         SPI.begin();
+        SPI.beginTransaction(SETTINGS);
+        SPI.endTransaction();
+        pinMode(CS_PIN, OUTPUT);
     }
 
     void spi::transfer(uint8_t const* data_write, uint8_t* data_read, uint32_t size)
@@ -34,16 +37,5 @@ namespace kickcat
                 SPI.transfer(data_write[i]);
             }
         }
-    }
-
-    void spi::beginTransaction()
-    {
-        SPI.beginTransaction(SETTINGS);
-    }
-
-
-    void spi::endTransaction()
-    {
-        SPI.endTransaction();
     }
 }

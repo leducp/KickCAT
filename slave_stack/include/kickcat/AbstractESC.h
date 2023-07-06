@@ -14,18 +14,8 @@ namespace kickcat
 
         virtual ErrorCode init() = 0;
 
-        virtual ErrorCode readRegister(uint16_t address, void* data, uint32_t size) = 0;
-        virtual ErrorCode writeRegister(uint16_t address, void const* data, uint32_t size) = 0;
-
-
-        // TODO move to slave abstraction
-//        virtual void readPDO(uint8_t* data, uint32_t size) = 0;
-//        virtual void writePDO(uint8_t* data, uint32_t size) = 0;
-//
-//        virtual int32_t readEEPROM(uint8_t* data, uint32_t size) = 0;
-//        virtual int32_t writeEEPROM(uint8_t* data, uint32_t size) = 0;
-
-        // TODO mailbox
+        virtual ErrorCode read(uint16_t address, void* data, uint16_t size) = 0;
+        virtual ErrorCode write(uint16_t address, void const* data, uint16_t size) = 0;
     };
 
 }

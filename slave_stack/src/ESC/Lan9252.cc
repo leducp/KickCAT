@@ -2,17 +2,18 @@
 
 namespace kickcat
 {
+    Lan9252::Lan9252(AbstractSPI& spi_interface)
+    : spi_interface_(spi_interface)
+    {
+    }
+
     ErrorCode Lan9252::init()
     {
         spi_interface_.init();
         spi_interface_.disableChipSelect();
-        pinMode(CS_PIN, OUTPUT);
         delay(100);
 
         Serial.println("init lan");
-
-        spi_interface_.beginTransaction();
-
 
         writeInternalRegister(RESET_CTL, DIGITAL_RST);
 
@@ -66,13 +67,11 @@ namespace kickcat
           return ErrorCode::ETIMEDOUT;
         }
 
-        spi_interface_.endTransaction();
-
         return ErrorCode::OK;
     }
 
 
-    ErrorCode Lan9252::waitCSRReady()
+    ErrorCode Lan9252::waitCSR()
     {
         uint32_t esc_status;
         nanoseconds start_time = since_epoch();
@@ -89,7 +88,7 @@ namespace kickcat
     }
 
 
-    void Lan9252::readInternalRegister(uint16_t address, void* payload, uint32_t size)
+    void Lan9252::readInternalRegister(uint16_t address, void* payload, uint16_t size)
     {
         InternalRegisterControl cmd{READ, hton(address), {}};
 
@@ -101,7 +100,7 @@ namespace kickcat
     }
 
 
-    void Lan9252::writeInternalRegister(uint16_t address, void const* payload, uint32_t size)
+    void Lan9252::writeInternalRegister(uint16_t address, void const* payload, uint16_t size)
     {
         InternalRegisterControl cmd{WRITE, hton(address), {}};
         memcpy(cmd.payload, payload, size);
@@ -111,7 +110,7 @@ namespace kickcat
     }
 
 
-    ErrorCode Lan9252::readRegister(uint16_t address, void* data, uint32_t size)
+    ErrorCode Lan9252::read(uint16_t address, void* data, uint16_t size)
     {
         if (address < 0x1000)
         {
@@ -121,10 +120,14 @@ namespace kickcat
             }
 
             writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_READ});
-            waitCSRReady(); //TODO timeout
+            ErrorCode rc = waitCSR();
+            if (rc != ErrorCode::OK)
+            {
+                return rc;
+            }
             readInternalRegister(ECAT_CSR_DATA, data, size);
         }
-        else if (address < 0x2000)
+        else if (address + size < 0x2000)
         {
             writeInternalRegister(ECAT_PRAM_RD_CMD, PRAM_ABORT);
             uint32_t addr_len = address | (size << 16);             // check size alignment and max value.
@@ -141,15 +144,18 @@ namespace kickcat
                 {
                     return ErrorCode::ETIMEDOUT;
                 }
-            } while(fifo_slot_available != size / 4);  // TODO beware assumption ESC will transfer 32 bytes.
+            } while(fifo_slot_available != size / 4);  // beware assumption ESC will transfer 32 bytes.
 
             readInternalRegister(ECAT_PRAM_RD_DATA, data, size);
         }
-
+        else
+        {
+            return ErrorCode::ERANGE;
+        }
         return ErrorCode::OK;
     };
 
-    ErrorCode Lan9252::writeRegister(uint16_t address, void const* data, uint32_t size)
+    ErrorCode Lan9252::write(uint16_t address, void const* data, uint16_t size)
     {
         if (address < 0x1000)
         {
@@ -163,9 +169,13 @@ namespace kickcat
             writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
             writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_WRITE});
             // wait for command execution
-            waitCSRReady();
+            ErrorCode rc = waitCSR();
+            if (rc != ErrorCode::OK)
+            {
+                return rc;
+            }
         }
-        else if (address < 0x2000)
+        else if (address + size < 0x2000)
         {
             writeInternalRegister(ECAT_PRAM_WR_CMD, PRAM_ABORT);
             uint32_t addr_len = address | (size << 16);             // check size alignment and max value.
@@ -177,27 +187,15 @@ namespace kickcat
             {
                 readInternalRegister(ECAT_PRAM_WR_CMD, fifo_slot_available);
                 fifo_slot_available = fifo_slot_available >> 8;
-            } while(fifo_slot_available < size / 4);  // TODO beware assumption all the data fit in the the 64 bytes fifo.
+            } while(fifo_slot_available < size / 4);  // beware assumption all the data fit in the the 64 bytes fifo.
 
             writeInternalRegister(ECAT_PRAM_WR_DATA, data, size);
         }
         else
         {
-            // Out of ram range
+            return ErrorCode::ERANGE;
         }
 
         return ErrorCode::OK;
     }
-
-//    int32_t Lan9252::readEEPROM(uint8_t* data, uint32_t size)
-//    {
-//        return 0;
-//    }
-//
-//
-//    int32_t Lan9252::writeEEPROM(uint8_t* data, uint32_t size)
-//    {
-//        return 0;
-//    }
-
 }

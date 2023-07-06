@@ -1,4 +1,4 @@
-### How to build and upload on an arduino due
+### How to build and upload on an arduino due with an easyCAT shield
 
 The arduino due uses an arm processor (most of the arduino boards are based on avr processors) so most of the cmake arduino projects don't handle it.
 

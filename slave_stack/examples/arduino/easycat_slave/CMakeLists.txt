@@ -14,7 +14,7 @@ set(STACK_LIB_SOURCES
 add_executable(easycat_slave easycat_slave.cpp ${STACK_LIB_SOURCES})
 
 
-target_include_directories(easycat_slave PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/../../../drivers/arduino
+target_include_directories(easycat_slave PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/../../../drivers/
                                                  ${CMAKE_CURRENT_SOURCE_DIR}/../../../include)
 
 # Arduino.h is included in hello_world.cpp, so link with Arduino core

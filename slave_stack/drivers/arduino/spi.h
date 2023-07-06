@@ -12,8 +12,8 @@ namespace kickcat
 
     const uint8_t DUMMY_BYTE = 0xFF;
 
-//    const uint32_t SPI_SPEED = 8000000; // Hz
-    const uint32_t SPI_SPEED = 100000; // Hz
+    const uint32_t SPI_SPEED = 8000000; // Hz
+//    const uint32_t SPI_SPEED = 100000; // Hz, for scope investigation
     const SPISettings SETTINGS(SPI_SPEED, MSBFIRST, SPI_MODE0);
 
     struct Address
@@ -31,11 +31,8 @@ namespace kickcat
         void init() override;
         void transfer(uint8_t const* data_write, uint8_t* data_read, uint32_t size) override;
 
-        void enableChipSelect() {digitalWrite(CS_PIN, LOW);};
-        void disableChipSelect() {digitalWrite(CS_PIN, HIGH);};
-
-        void beginTransaction();
-        void endTransaction();
+        void enableChipSelect() override {digitalWrite(CS_PIN, LOW);};
+        void disableChipSelect() override {digitalWrite(CS_PIN, HIGH);};
     };
 
 

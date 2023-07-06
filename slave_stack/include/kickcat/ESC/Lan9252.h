@@ -5,8 +5,8 @@
 #include "kickcat/AbstractSPI.h"
 #include "kickcat/Time.h"
 
-#include "spi.h"
-
+#include <memory>
+#include "Arduino.h"
 
 namespace kickcat
 {
@@ -110,16 +110,13 @@ namespace kickcat
     class Lan9252 : public AbstractESC
     {
     public:
-        Lan9252() = default;
+        Lan9252(AbstractSPI& spi_interface);
         ~Lan9252() = default;
 
         ErrorCode init() override;
 
-        // Return error code based on availability of the requested register
-        virtual ErrorCode readRegister(uint16_t address, void* data, uint32_t size) override;
-
-
-        virtual ErrorCode writeRegister(uint16_t address, void const* data, uint32_t size) override;
+        virtual ErrorCode read(uint16_t address, void* data, uint16_t size) override;
+        virtual ErrorCode write(uint16_t address, void const* data, uint16_t size) override;
 
     private:
         template <typename T>
@@ -128,7 +125,7 @@ namespace kickcat
             readInternalRegister(address, &payload, sizeof(payload));
         };
 
-        void readInternalRegister(uint16_t address, void* payload, uint32_t size);
+        void readInternalRegister(uint16_t address, void* payload, uint16_t size);
 
         template <typename T>
         void writeInternalRegister(uint16_t address, T const& payload)
@@ -136,12 +133,11 @@ namespace kickcat
             writeInternalRegister(address, &payload, sizeof(payload));
         };
 
-        void writeInternalRegister(uint16_t address, void const* payload, uint32_t size);
+        void writeInternalRegister(uint16_t address, void const* payload, uint16_t size);
 
-        ErrorCode waitCSRReady();
+        ErrorCode waitCSR();
 
-
-        spi spi_interface_; // TODO injection ? AbstractInterface at abstractESC constructor ? AbstractPDI ?
+        AbstractSPI& spi_interface_;
     };
 
 
