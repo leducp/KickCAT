@@ -7,7 +7,7 @@ namespace kickcat
     {
     }
 
-    ErrorCode Lan9252::init()
+    hresult Lan9252::init()
     {
         spi_interface_.init();
         spi_interface_.disableChipSelect();
@@ -32,7 +32,7 @@ namespace kickcat
         if (counter == timeout)
         {
           Serial.println("Timeout reset");
-          return ErrorCode::ETIMEDOUT;
+          return hresult::ETIMEDOUT;
         }
 
         // Check SPI interface is ready thanks to BYTE_TEST to test byte order
@@ -47,7 +47,7 @@ namespace kickcat
         if (counter == timeout)
         {
           Serial.println("Timeout get byte test");
-          return ErrorCode::ETIMEDOUT;
+          return hresult::ETIMEDOUT;
         }
         Serial.print("Byte test read: ");
         Serial.println(byte_test_result, HEX);
@@ -64,14 +64,14 @@ namespace kickcat
         if (counter == timeout)
         {
           Serial.println("Timeout hw cfg ready");
-          return ErrorCode::ETIMEDOUT;
+          return hresult::ETIMEDOUT;
         }
 
-        return ErrorCode::OK;
+        return hresult::OK;
     }
 
 
-    ErrorCode Lan9252::waitCSR()
+    hresult Lan9252::waitCSR()
     {
         uint32_t esc_status;
         nanoseconds start_time = since_epoch();
@@ -80,11 +80,11 @@ namespace kickcat
             readInternalRegister(ECAT_CSR_CMD, esc_status);
             if (elapsed_time(start_time) > TIMEOUT)
             {
-                return ErrorCode::ETIMEDOUT;
+                return hresult::ETIMEDOUT;
             }
         }
         while(esc_status & ECAT_CSR_BUSY);
-        return ErrorCode::OK;
+        return hresult::OK;
     }
 
 
@@ -110,18 +110,18 @@ namespace kickcat
     }
 
 
-    ErrorCode Lan9252::read(uint16_t address, void* data, uint16_t size)
+    hresult Lan9252::read(uint16_t address, void* data, uint16_t size)
     {
         if (address < 0x1000)
         {
             if (size > 4 or size == 3)
             {
-                return ErrorCode::ERANGE;
+                return hresult::ERANGE;
             }
 
             writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_READ});
-            ErrorCode rc = waitCSR();
-            if (rc != ErrorCode::OK)
+            hresult rc = waitCSR();
+            if (rc != hresult::OK)
             {
                 return rc;
             }
@@ -142,7 +142,7 @@ namespace kickcat
                 fifo_slot_available = fifo_slot_available >> 8;
                 if (elapsed_time(start_time) > TIMEOUT)
                 {
-                    return ErrorCode::ETIMEDOUT;
+                    return hresult::ETIMEDOUT;
                 }
             } while(fifo_slot_available != size / 4);  // beware assumption ESC will transfer 32 bytes.
 
@@ -150,18 +150,18 @@ namespace kickcat
         }
         else
         {
-            return ErrorCode::ERANGE;
+            return hresult::ERANGE;
         }
-        return ErrorCode::OK;
+        return hresult::OK;
     };
 
-    ErrorCode Lan9252::write(uint16_t address, void const* data, uint16_t size)
+    hresult Lan9252::write(uint16_t address, void const* data, uint16_t size)
     {
         if (address < 0x1000)
         {
             if (size > 4 or size == 3)
             {
-                return ErrorCode::ERANGE;
+                return hresult::ERANGE;
             }
             // CSR_DATA is 4 bytes
             uint32_t padding = 0;
@@ -169,8 +169,8 @@ namespace kickcat
             writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
             writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_WRITE});
             // wait for command execution
-            ErrorCode rc = waitCSR();
-            if (rc != ErrorCode::OK)
+            hresult rc = waitCSR();
+            if (rc != hresult::OK)
             {
                 return rc;
             }
@@ -193,9 +193,9 @@ namespace kickcat
         }
         else
         {
-            return ErrorCode::ERANGE;
+            return hresult::ERANGE;
         }
 
-        return ErrorCode::OK;
+        return hresult::OK;
     }
 }

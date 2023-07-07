@@ -261,6 +261,7 @@ namespace kickcat
         if (readFrame(socket_nominal_, frame_redundancy_) < 0)
         {
             DEBUG_PRINT("redundancy read fail\n");
+            std::abort();
         }
     }
 

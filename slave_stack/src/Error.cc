@@ -2,73 +2,73 @@
 
 namespace kickcat
 {
-    char* toString(ErrorCode error)
+    char* toString(hresult error)
     {
         switch (error)
         {
-        case ErrorCode::UNKNOWN_ERRNO: {return "Unknown errno";}
-        case ErrorCode::EACCES:        {return "Permission denied";}
-        case ErrorCode::EAGAIN:        {return "Operation would block";}
-        case ErrorCode::EBADF:         {return "Bad file descriptor";}
-        case ErrorCode::EBUSY:         {return "Device or resource busy";}
-        case ErrorCode::ECANCELED:     {return "Operation canceled";}
-        case ErrorCode::EDEADLK:       {return "Resource deadlock avoided";}
-        case ErrorCode::EINTR:         {return "Interrupted function call";}
-        case ErrorCode::EINVAL:        {return "Invalid argument";}
-        case ErrorCode::EMSGSIZE:      {return "Message too long";}
-        case ErrorCode::ENODEV:        {return "No such device";}
-        case ErrorCode::ENOENT:        {return "No such file or directory";}
-        case ErrorCode::ENOMEM:        {return "Not enough space/cannot allocate memory";}
-        case ErrorCode::ENOMSG:        {return "No message of the desired type";}
-        case ErrorCode::ENOSYS:        {return "Function not implemented";}
-        case ErrorCode::ENOTDIR:       {return "Not a directory";}
-        case ErrorCode::ENOTSOCK:      {return "Not a socket";}
-        case ErrorCode::ENOTSUP:       {return "Operation not supported";}
-        case ErrorCode::EOVERFLOW:     {return "Value too large to be stored in data type";}
-        case ErrorCode::EPROTO:        {return "Protocol error";}
-        case ErrorCode::EIO:           {return "Input/output error";}
-        case ErrorCode::ETIME:         {return "Timer expired";}
-        case ErrorCode::ETIMEDOUT:     {return "Timeout";}
-        case ErrorCode::ELOOP:         {return "Too many levels of symbolic links";}
-        case ErrorCode::EFAULT:        {return "Bad address";}
-        case ErrorCode::ENAMETOOLONG:  {return "Name too long";}
-        case ErrorCode::ESRCH:         {return "No such process";}
-        case ErrorCode::EPERM:         {return "Operation not permitted";}
-        case ErrorCode::ENXIO:         {return "No such device or address";}
-        case ErrorCode::E2BIG:         {return "Argument list too long";}
-        case ErrorCode::ECHILD:        {return "No child processes";}
-        case ErrorCode::EEXIST:        {return "File exists";}
-        case ErrorCode::EXDEV:         {return "Improper link";}
-        case ErrorCode::EISDIR:        {return "Is a directory";}
-        case ErrorCode::ENFILE:        {return "Too many open files in the system";}
-        case ErrorCode::EMFILE:        {return "Too many open files";}
-        case ErrorCode::ENOTTY:        {return "Inappropriate I/O control operation";}
-        case ErrorCode::ETXTBSY:       {return "Text file busy";}
-        case ErrorCode::EFBIG:         {return "File too large";}
-        case ErrorCode::ENOSPC:        {return "No space left on device";}
-        case ErrorCode::ESPIPE:        {return "Invalid seek";}
-        case ErrorCode::EROFS:         {return "Read-only filesystem";}
-        case ErrorCode::EMLINK:        {return "Too many links";}
-        case ErrorCode::EDOM:          {return "Mathematics argument out of domain of function";}
-        case ErrorCode::ERANGE:        {return "Out of bounds";}
-        case ErrorCode::ENOTEMPTY:     {return "Directory not empty";}
-        case ErrorCode::ENODATA:       {return "No message is available";}
-        case ErrorCode::EALREADY:      {return "Already in progress";}
-        case ErrorCode::EBADR:         {return "Invalid request descriptor";}
-        case ErrorCode::EBADE:         {return "Invalid exchange";}
-        case ErrorCode::EADDRINUSE:    {return "Address already in use";}
-        case ErrorCode::EOPNOTSUPP:    {return "Operation not supported";}
-        case ErrorCode::ENOTCONN:      {return "Not connected";}
-        case ErrorCode::ECONNRESET:    {return "Connection reset";}
-        case ErrorCode::ECONNREFUSED:  {return "Connection refused";}
-        case ErrorCode::EIDRM:         {return "Identifier removed";}
-        case ErrorCode::ENOSR:         {return "No stream resources";}
-        case ErrorCode::ENOSTR:        {return "Not a stream";}
-        case ErrorCode::EBADMSG:       {return "Bad message";}
-        case ErrorCode::EPIPE:         {return "Broken pipe";}
-        case ErrorCode::ECONNABORTED:  {return "Software caused connection abort";}
-        case ErrorCode::ENOBUFS:       {return "No buffer space available";}
-        case ErrorCode::EINPROGRESS:   {return "Operation in progress";}
+        case hresult::UNKNOWN_ERRNO: {return "Unknown errno";}
+        case hresult::EACCES:        {return "Permission denied";}
+        case hresult::EAGAIN:        {return "Operation would block";}
+        case hresult::EBADF:         {return "Bad file descriptor";}
+        case hresult::EBUSY:         {return "Device or resource busy";}
+        case hresult::ECANCELED:     {return "Operation canceled";}
+        case hresult::EDEADLK:       {return "Resource deadlock avoided";}
+        case hresult::EINTR:         {return "Interrupted function call";}
+        case hresult::EINVAL:        {return "Invalid argument";}
+        case hresult::EMSGSIZE:      {return "Message too long";}
+        case hresult::ENODEV:        {return "No such device";}
+        case hresult::ENOENT:        {return "No such file or directory";}
+        case hresult::ENOMEM:        {return "Not enough space/cannot allocate memory";}
+        case hresult::ENOMSG:        {return "No message of the desired type";}
+        case hresult::ENOSYS:        {return "Function not implemented";}
+        case hresult::ENOTDIR:       {return "Not a directory";}
+        case hresult::ENOTSOCK:      {return "Not a socket";}
+        case hresult::ENOTSUP:       {return "Operation not supported";}
+        case hresult::EOVERFLOW:     {return "Value too large to be stored in data type";}
+        case hresult::EPROTO:        {return "Protocol error";}
+        case hresult::EIO:           {return "Input/output error";}
+        case hresult::ETIME:         {return "Timer expired";}
+        case hresult::ETIMEDOUT:     {return "Timeout";}
+        case hresult::ELOOP:         {return "Too many levels of symbolic links";}
+        case hresult::EFAULT:        {return "Bad address";}
+        case hresult::ENAMETOOLONG:  {return "Name too long";}
+        case hresult::ESRCH:         {return "No such process";}
+        case hresult::EPERM:         {return "Operation not permitted";}
+        case hresult::ENXIO:         {return "No such device or address";}
+        case hresult::E2BIG:         {return "Argument list too long";}
+        case hresult::ECHILD:        {return "No child processes";}
+        case hresult::EEXIST:        {return "File exists";}
+        case hresult::EXDEV:         {return "Improper link";}
+        case hresult::EISDIR:        {return "Is a directory";}
+        case hresult::ENFILE:        {return "Too many open files in the system";}
+        case hresult::EMFILE:        {return "Too many open files";}
+        case hresult::ENOTTY:        {return "Inappropriate I/O control operation";}
+        case hresult::ETXTBSY:       {return "Text file busy";}
+        case hresult::EFBIG:         {return "File too large";}
+        case hresult::ENOSPC:        {return "No space left on device";}
+        case hresult::ESPIPE:        {return "Invalid seek";}
+        case hresult::EROFS:         {return "Read-only filesystem";}
+        case hresult::EMLINK:        {return "Too many links";}
+        case hresult::EDOM:          {return "Mathematics argument out of domain of function";}
+        case hresult::ERANGE:        {return "Out of bounds";}
+        case hresult::ENOTEMPTY:     {return "Directory not empty";}
+        case hresult::ENODATA:       {return "No message is available";}
+        case hresult::EALREADY:      {return "Already in progress";}
+        case hresult::EBADR:         {return "Invalid request descriptor";}
+        case hresult::EBADE:         {return "Invalid exchange";}
+        case hresult::EADDRINUSE:    {return "Address already in use";}
+        case hresult::EOPNOTSUPP:    {return "Operation not supported";}
+        case hresult::ENOTCONN:      {return "Not connected";}
+        case hresult::ECONNRESET:    {return "Connection reset";}
+        case hresult::ECONNREFUSED:  {return "Connection refused";}
+        case hresult::EIDRM:         {return "Identifier removed";}
+        case hresult::ENOSR:         {return "No stream resources";}
+        case hresult::ENOSTR:        {return "Not a stream";}
+        case hresult::EBADMSG:       {return "Bad message";}
+        case hresult::EPIPE:         {return "Broken pipe";}
+        case hresult::ECONNABORTED:  {return "Software caused connection abort";}
+        case hresult::ENOBUFS:       {return "No buffer space available";}
+        case hresult::EINPROGRESS:   {return "Operation in progress";}
         default: {return "Unknown Error";}
         }
     }

@@ -22,15 +22,16 @@ extern "C"
     }
 }
 
-void reportError(ErrorCode const& rc)
+void reportError(hresult const& rc)
 {
-    if (rc != ErrorCode::OK)
+    if (rc != hresult::OK)
     {
         Serial.println(toString(rc));
     }
 }
 
-void setup() {
+void setup()
+{
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(9600);
@@ -85,7 +86,8 @@ void esc_routine()
     }
 }
 
-void loop() {
+void loop()
+{
     delay(1);
     esc_routine();
 }

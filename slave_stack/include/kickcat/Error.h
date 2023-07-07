@@ -6,7 +6,7 @@
 namespace kickcat
 {
     // Errno codes:
-    enum ErrorCode: uint32_t
+    enum hresult: uint32_t
     {
         OK = 0,
         UNKNOWN_ERRNO = 1,  // "Unknown errno"
@@ -74,7 +74,7 @@ namespace kickcat
         EINPROGRESS   = 63, // "Operation in progress"
     };
 
-    char* toString(ErrorCode error);
+    char* toString(hresult error);
 }
 
 

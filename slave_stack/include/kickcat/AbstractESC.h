@@ -12,10 +12,10 @@ namespace kickcat
     public:
         virtual ~AbstractESC() = default;
 
-        virtual ErrorCode init() = 0;
+        virtual hresult init() = 0;
 
-        virtual ErrorCode read(uint16_t address, void* data, uint16_t size) = 0;
-        virtual ErrorCode write(uint16_t address, void const* data, uint16_t size) = 0;
+        virtual hresult read(uint16_t address, void* data, uint16_t size) = 0;
+        virtual hresult write(uint16_t address, void const* data, uint16_t size) = 0;
     };
 
 }

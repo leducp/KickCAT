@@ -33,61 +33,61 @@ namespace kickcat
 
 
     // SPI INSTRUCTIONS
-    const uint8_t READ  = 0x03;
-    const uint8_t WRITE = 0x02;
+    constexpr uint8_t READ  = 0x03;
+    constexpr uint8_t WRITE = 0x02;
 
-    const uint8_t BYTE_TEST = 0x64;
+    constexpr uint8_t BYTE_TEST = 0x64;
 
     // Registers
-    const uint16_t HW_CFG        = 0x0074;      // Is device ready
-    const uint16_t RESET_CTL     = 0x01F8;      // reset register
-    const uint16_t ECAT_CSR_DATA = 0x0300;      // EtherCAT CSR Interface Data Register
-    const uint16_t ECAT_CSR_CMD  = 0x0304;      // EtherCAT CSR Interface Command Register
+    constexpr uint16_t HW_CFG        = 0x0074;      // Is device ready
+    constexpr uint16_t RESET_CTL     = 0x01F8;      // reset register
+    constexpr uint16_t ECAT_CSR_DATA = 0x0300;      // EtherCAT CSR Interface Data Register
+    constexpr uint16_t ECAT_CSR_CMD  = 0x0304;      // EtherCAT CSR Interface Command Register
 
-    const uint16_t ECAT_PRAM_RD_ADDR_LEN = 0X0308;
-    const uint16_t ECAT_PRAM_RD_CMD      = 0X030C;
-    const uint16_t ECAT_PRAM_WR_ADDR_LEN = 0X0310;
-    const uint16_t ECAT_PRAM_WR_CMD      = 0X0314;
+    constexpr uint16_t ECAT_PRAM_RD_ADDR_LEN = 0X0308;
+    constexpr uint16_t ECAT_PRAM_RD_CMD      = 0X030C;
+    constexpr uint16_t ECAT_PRAM_WR_ADDR_LEN = 0X0310;
+    constexpr uint16_t ECAT_PRAM_WR_CMD      = 0X0314;
 
-    const uint16_t ECAT_PRAM_RD_DATA     = 0x000;  // until 0x01C
-    const uint16_t ECAT_PRAM_WR_DATA     = 0x020;  // until 0x03C
+    constexpr uint16_t ECAT_PRAM_RD_DATA     = 0x000;  // until 0x01C
+    constexpr uint16_t ECAT_PRAM_WR_DATA     = 0x020;  // until 0x03C
 
-    const uint16_t NUM_BYTE_INPUT  = 32;
-    const uint16_t NUM_BYTE_OUTPUT = 32;
+    constexpr uint16_t NUM_BYTE_INPUT  = 32;
+    constexpr uint16_t NUM_BYTE_OUTPUT = 32;
 
     // Ethercat registers missing from protocol.h TODO check where put them.
-    const uint16_t AL_EVENT            =   0x0220;      // AL event request
-    const uint16_t AL_EVENT_MASK       =   0x0204;      // AL event interrupt mask
+    constexpr uint16_t AL_EVENT            =   0x0220;      // AL event request
+    constexpr uint16_t AL_EVENT_MASK       =   0x0204;      // AL event interrupt mask
 
     // In protocol but can't access to it now
-    const uint16_t WDOG_STATUS         =   0x0440;      // watch dog status
-    const uint16_t AL_STATUS           =   0x0130;      // AL status
+    constexpr uint16_t WDOG_STATUS         =   0x0440;      // watch dog status
+    constexpr uint16_t AL_STATUS           =   0x0130;      // AL status
 
     //--- ESC commands --------------------------------------------------------------------------------
 
 
     // Flags
-    const uint32_t ECAT_CSR_BUSY = 0x1 << 31;
-    const uint32_t DEVICE_READY  = 0x1 << 27;
-    const uint32_t PRAM_ABORT    = 0x1 << 30;
-    const uint32_t PRAM_BUSY     = 0x1 << 31;
-    const uint32_t PRAM_AVAIL    = 0x01;
+    constexpr uint32_t ECAT_CSR_BUSY = 0x1 << 31;
+    constexpr uint32_t DEVICE_READY  = 0x1 << 27;
+    constexpr uint32_t PRAM_ABORT    = 0x1 << 30;
+    constexpr uint32_t PRAM_BUSY     = 0x1 << 31;
+    constexpr uint32_t PRAM_AVAIL    = 0x01;
 
-    const uint32_t DIGITAL_RST   = 0x01;
+    constexpr uint32_t DIGITAL_RST   = 0x01;
 
-    const uint32_t ESM_INIT        = 0x1;
-    const uint32_t ESM_BOOTSTRAP   = 0x3;
-    const uint32_t ESM_PRE_OP      = 0x2;
-    const uint32_t ESM_SAFE_OP     = 0x4;
-    const uint32_t ESM_OP          = 0x8;
-
-
-    const uint32_t BYTE_TEST_DEFAULT = 0x87654321;
-
-    const milliseconds TIMEOUT{10};
+    constexpr uint32_t ESM_INIT        = 0x1;
+    constexpr uint32_t ESM_BOOTSTRAP   = 0x3;
+    constexpr uint32_t ESM_PRE_OP      = 0x2;
+    constexpr uint32_t ESM_SAFE_OP     = 0x4;
+    constexpr uint32_t ESM_OP          = 0x8;
 
 
-    const uint8_t CSR_CMD_HEADER_SIZE = 3;
+    constexpr uint32_t BYTE_TEST_DEFAULT = 0x87654321;
+
+    constexpr milliseconds TIMEOUT{10};
+
+
+    constexpr uint8_t CSR_CMD_HEADER_SIZE = 3;
     struct InternalRegisterControl
     {
         uint8_t  instruction;               // Read / write // TODO enum full.
@@ -113,10 +113,10 @@ namespace kickcat
         Lan9252(AbstractSPI& spi_interface);
         ~Lan9252() = default;
 
-        ErrorCode init() override;
+        hresult init() override;
 
-        virtual ErrorCode read(uint16_t address, void* data, uint16_t size) override;
-        virtual ErrorCode write(uint16_t address, void const* data, uint16_t size) override;
+        hresult read(uint16_t address, void* data, uint16_t size) override;
+        hresult write(uint16_t address, void const* data, uint16_t size) override;
 
     private:
         template <typename T>
@@ -135,9 +135,9 @@ namespace kickcat
 
         void writeInternalRegister(uint16_t address, void const* payload, uint16_t size);
 
-        ErrorCode waitCSR();
+        hresult waitCSR();
 
-        AbstractSPI& spi_interface_;
+        AbstractSPI& spi_interface_; // TODO shared ptr like link in bus.h
     };
 
 
