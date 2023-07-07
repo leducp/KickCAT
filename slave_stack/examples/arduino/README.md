@@ -1,3 +1,12 @@
+Currently the direct arduino support is deactivated.
+
+To compile it you need to
+
+- uncomment the CMakeLists
+- Dowloand in the arduino folder the project https://github.com/a9183756-gh/Arduino-CMake-Toolchain
+- follow this readme.
+
+
 ### How to build and upload on an arduino due with an easyCAT shield
 
 The arduino due uses an arm processor (most of the arduino boards are based on avr processors) so most of the cmake arduino projects don't handle it.
