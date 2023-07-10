@@ -6,7 +6,6 @@
 namespace kickcat
 {
     using namespace std::chrono;
-    using seconds_f = std::chrono::duration<float>;
 
     void sleep(nanoseconds ns);
 

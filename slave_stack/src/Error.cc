@@ -2,7 +2,7 @@
 
 namespace kickcat
 {
-    char* toString(hresult error)
+    char const* toString(hresult error)
     {
         switch (error)
         {
