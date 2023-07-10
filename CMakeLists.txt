@@ -110,3 +110,8 @@ option(BUILD_TOOLS "Build tools" ON)
 if (BUILD_TOOLS)
   add_subdirectory(tools)
 endif()
+
+option(DEBUG "Debug option" ON)
+if (DEBUG)
+  add_compile_definitions(DEBUG)
+endif()
