@@ -74,7 +74,7 @@ namespace kickcat
         EINPROGRESS   = 63, // "Operation in progress"
     };
 
-    char* toString(hresult error);
+    char const* toString(hresult error);
 }
 
 
