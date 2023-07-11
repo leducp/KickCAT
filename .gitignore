@@ -1,4 +1,5 @@
 build/
+build_slave_stack/
 .vscode
 .project
 .cproject

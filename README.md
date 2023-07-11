@@ -79,6 +79,11 @@ To start a network simulator, you can either create a virtual ethernet pair (on 
 Note: the simulator has to be started first
 
 
+## Slave stack
+The slave counterpart of the stack is currently under development. For now it is in a POC state with a running example on the arduino due board with the easycat shield.
+Follow the readme in the `slave_stack/examples/arduino` folder for the building and uploading information.
+
+
 
 ## EtherCAT doc
 https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html&id=3196541253205318339
