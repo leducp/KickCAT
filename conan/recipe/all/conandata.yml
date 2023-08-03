@@ -1,5 +1,4 @@
 sources:
-  "v2-alpha2":
-    url: "https://github.com/Siviuze/KickCAT/archive/refs/tags/v2-alpha2.zip"
-    sha256: "73270eb7bec040540b1e83563a60f6771385678b478475ab2d68c163d5ad7bf7"
-    strip_root: true
+  "v2-alpha3":
+    url: "https://github.com/Siviuze/KickCAT/archive/refs/tags/v2-alpha3.zip"
+    sha256: "dadd8518c3232162b7455fdcd837578120ece5a42c3bc2701147a68cbee60da4"
