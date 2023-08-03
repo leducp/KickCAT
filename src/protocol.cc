@@ -175,30 +175,30 @@ namespace kickcat
     {
         std::stringstream os;
 
-        os << "PDI Operational:  " << std::to_string(dl_status.PDI_op) << " \n";
-        os << "PDI Watchdog Status : " << std::to_string(dl_status.PDI_watchdog) << " \n";
+        os << "PDI Operational:  "          << std::to_string(dl_status.PDI_op) << " \n";
+        os << "PDI Watchdog Status : "      << std::to_string(dl_status.PDI_watchdog) << " \n";
         os << "Enhanced Link Detection :  " << std::to_string(dl_status.EL_detection) << " \n";
-        os << "Reserved :  " << std::to_string(dl_status.reserved) << " \n";
+        os << "Reserved :  "                << std::to_string(dl_status.reserved) << " \n";
 
         os << "Port 0: \n";
-        os << "  Physical Link :  " << std::to_string(dl_status.PL_port0) << " \n";
-        os << "  Communications : " << std::to_string(dl_status.COM_port0) << " \n";
-        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port0) << " \n";
+        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port0) << " \n";
+        os << "  Communications : "         << std::to_string(dl_status.COM_port0) << " \n";
+        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port0) << " \n";
 
         os << "Port 1: \n";
-        os << "  Physical Link :  " << std::to_string(dl_status.PL_port1) << " \n";
-        os << "  Communications : " << std::to_string(dl_status.COM_port1) << " \n";
-        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port1) << " \n";
+        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port1) << " \n";
+        os << "  Communications : "         << std::to_string(dl_status.COM_port1) << " \n";
+        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port1) << " \n";
 
         os << "Port 2: \n";
-        os << "  Physical Link :  " << std::to_string(dl_status.PL_port2) << " \n";
-        os << "  Communications : " << std::to_string(dl_status.COM_port2) << " \n";
-        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port2) << " \n";
+        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port2) << " \n";
+        os << "  Communications : "         << std::to_string(dl_status.COM_port2) << " \n";
+        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port2) << " \n";
 
         os << "Port 3: \n";
-        os << "  Physical Link :  " << std::to_string(dl_status.PL_port3) << " \n";
-        os << "  Communications : " << std::to_string(dl_status.COM_port3) << " \n";
-        os << "  Loop Function :  " << std::to_string(dl_status.LOOP_port3) << " \n";
+        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port3) << " \n";
+        os << "  Communications : "         << std::to_string(dl_status.COM_port3) << " \n";
+        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port3) << " \n";
 
         return os.str();
     }
