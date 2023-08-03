@@ -3,7 +3,7 @@ project(KickCAT)
 
 # Custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
+list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_BINARY_DIR})
 include(Config)
 
 set(LIB_SOURCES
@@ -44,7 +44,7 @@ set_kickcat_properties(kickcat)
 
 option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if (BUILD_UNIT_TESTS)
-  find_package(GTest QUIET)
+  find_package(GTest QUIET CONFIG)
   if (NOT GTest_FOUND)
     message(STATUS "GTest not found: Unit tests will NOT be built")
   endif()
