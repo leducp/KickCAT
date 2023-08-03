@@ -210,7 +210,10 @@ namespace kickcat
 
     struct DLStatus
     {
-        uint16_t unknown : 4,
+        uint16_t  PDI_op : 1,
+            PDI_watchdog : 1,
+            EL_detection : 1,
+            reserved : 1,
             PL_port0 : 1,
             PL_port1 : 1,
             PL_port2 : 1,

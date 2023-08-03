@@ -89,6 +89,8 @@ int main(int argc, char* argv[])
         {
             printf("DL_STATUS IRQ triggered!\n");
             bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state){ printf("IRQ reset error: %s\n", toString(state));});
+
+            printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
         });
 
         bus.requestState(State::SAFE_OP);
