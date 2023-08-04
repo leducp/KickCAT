@@ -1002,7 +1002,6 @@ namespace kickcat
         };
 
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
-        link_->processDatagrams();
     }
 
 }
