@@ -22,13 +22,13 @@ jobs:
     - uses: actions/checkout@v2
     - uses: turtlebrowser/get-conan@v1.2
       with:
-        version: 1.55.0
+        version: 2.0.9
 
     - name: GTest
       run: |
         mkdir -p ${{github.workspace}}/build
         cd ${{github.workspace}}/build
-        conan install ../conan/conanfile.txt -pr ../conan/profile_linux_x86_64.txt --build=missing
+        conan install ../conan/conanfile.txt -of=./ -pr:b ../conan/profile_linux_x86_64.txt -pr:h ../conan/profile_linux_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
 
     - name: Install Gcovr
       run: sudo apt install gcovr
