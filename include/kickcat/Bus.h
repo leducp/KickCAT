@@ -106,12 +106,12 @@ namespace kickcat
 
         void clearErrorCounters();
 
-
-    protected: // for unit testing
-
         // Helpers for broadcast commands, mainly for init purpose
         /// \return working counter
         uint16_t broadcastRead(uint16_t ADO, uint16_t data_size);
+
+    protected: // for unit testing
+
         /// \return working counter
         uint16_t broadcastWrite(uint16_t ADO, void const* data, uint16_t data_size);
 
