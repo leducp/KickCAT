@@ -135,7 +135,7 @@ namespace kickcat
         int rc = ::close(fd_);
         if (rc < 0)
         {
-            perror(LOCATION ": close()"); // we cannot throw here - at least trace the error
+            perror(LOCATION(": close()")); // we cannot throw here - at least trace the error
         }
         fd_ = -1;
     }
