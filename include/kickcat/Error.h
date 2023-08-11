@@ -27,7 +27,7 @@ namespace kickcat
 
     #define STR1(x) #x
     #define STR2(x) STR1(x)
-    #define LOCATION(suffix) strip_path(__FILE__ ":" STR2(__LINE__) suffix)
+    #define LOCATION(suffix) kickcat::strip_path(__FILE__ ":" STR2(__LINE__) suffix)
     #define THROW_ERROR(msg)                    (throw kickcat::Error{LOCATION(": " msg)})
     #define THROW_ERROR_CODE(msg, code)         (throw kickcat::ErrorCode{LOCATION(": " msg), static_cast<int32_t>(code)})
     #define THROW_ERROR_DATAGRAM(msg, state)    (throw kickcat::ErrorDatagram{LOCATION(": " msg), state})
