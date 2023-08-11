@@ -19,7 +19,7 @@ namespace kickcat
     };
     std::error_category const& pikeos_category();
 
-    #define THROW_PIKEOS_ERROR(code, msg)     (throw std::system_error(code, pikeos_category(), LOCATION ": " msg))
+    #define THROW_PIKEOS_ERROR(code, msg)     (throw std::system_error(code, kickcat::pikeos_category(), LOCATION(": " msg)))
 }
 
 #endif
