@@ -221,6 +221,11 @@ namespace kickcat
         dc_param = 0x0c00;          // reset value
         broadcastWrite(reg::DC_TIME_FILTER, &dc_param, sizeof(dc_param));
 
+        // reset ECAT Event registers
+        broadcastRead(reg::LATCH_STATUS, 1);
+        broadcastRead(reg::ESC_DL_STATUS, 1);
+        broadcastRead(reg::AL_STATUS, 1);
+
         // PDIO watchdogs
         nanoseconds const precision = 100us;
         uint16_t const wdg_divider = computeWatchdogDivider(precision);

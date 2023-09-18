@@ -67,8 +67,10 @@ Note: you can easily provide GTest via conan package manager:
   ```
   mkdir -p build
   cd build
-  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_linux_x86_64.txt --build=missing
+  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_linux_x86_64.txt --build=missing -s build_type=Debug
   ```
+  Beware `-s build_type` must be consistent with `CMAKE_BUILD_TYPE` otherwise gtest will not be found.
+
   3. Configure the project (can be done on an already configured project)
   ```
   cmake .. -DCMAKE_BUILD_TYPE=Release
