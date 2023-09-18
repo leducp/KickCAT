@@ -96,6 +96,11 @@ public:
             checkSendFrameSimple(Command::BWR);
             handleReplyWriteThenRead();
         }
+        for (int i = 0; i < 3; ++i)
+        {
+            checkSendFrameSimple(Command::BRD);
+            handleReplyWriteThenRead();
+        }
     }
 
     void initBus(milliseconds watchdog = 100ms)

@@ -46,7 +46,7 @@ option(BUILD_UNIT_TESTS "Build unit tests" ON)
 if (BUILD_UNIT_TESTS)
   find_package(GTest QUIET CONFIG)
   if (NOT GTest_FOUND)
-    message(STATUS "GTest not found: Unit tests will NOT be built")
+    message(FATAL_ERROR "GTest not found: Unit tests will can NOT be built")
   endif()
 endif()
 
