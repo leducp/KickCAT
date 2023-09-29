@@ -10,8 +10,7 @@ namespace kickcat
     hresult Lan9252::init()
     {
         spi_interface_.init();
-//        spi_interface_.disableChipSelect();
-//        delay(100);
+        spi_interface_.disableChipSelect();
 
         printf("init lan \n");
 
