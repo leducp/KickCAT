@@ -6,7 +6,6 @@
 #include "kickcat/Time.h"
 
 #include <memory>
-#include "Arduino.h"
 
 namespace kickcat
 {
@@ -30,7 +29,6 @@ namespace kickcat
             printf("hton size unsupported \n");
         }
     }
-
 
     // SPI INSTRUCTIONS
     constexpr uint8_t READ  = 0x03;

@@ -10,10 +10,10 @@ namespace kickcat
     hresult Lan9252::init()
     {
         spi_interface_.init();
-        spi_interface_.disableChipSelect();
-        delay(100);
+//        spi_interface_.disableChipSelect();
+//        delay(100);
 
-        Serial.println("init lan");
+        printf("init lan \n");
 
         writeInternalRegister(RESET_CTL, DIGITAL_RST);
 
@@ -31,8 +31,8 @@ namespace kickcat
 
         if (counter == timeout)
         {
-          Serial.println("Timeout reset");
-          return hresult::ETIMEDOUT;
+          printf("Timeout reset \n");
+          return hresult::E_ETIMEDOUT;
         }
 
         // Check SPI interface is ready thanks to BYTE_TEST to test byte order
@@ -46,11 +46,10 @@ namespace kickcat
 
         if (counter == timeout)
         {
-          Serial.println("Timeout get byte test");
-          return hresult::ETIMEDOUT;
+          printf("Timeout get byte test \n");
+          return hresult::E_ETIMEDOUT;
         }
-        Serial.print("Byte test read: ");
-        Serial.println(byte_test_result, HEX);
+        printf("Byte test read: %x \n", byte_test_result);
 
 
         uint32_t hw_cfg_ready = 0;
@@ -63,8 +62,8 @@ namespace kickcat
 
         if (counter == timeout)
         {
-          Serial.println("Timeout hw cfg ready");
-          return hresult::ETIMEDOUT;
+          printf("Timeout hw cfg ready \n");
+          return hresult::E_ETIMEDOUT;
         }
 
         return hresult::OK;
@@ -80,7 +79,7 @@ namespace kickcat
             readInternalRegister(ECAT_CSR_CMD, esc_status);
             if (elapsed_time(start_time) > TIMEOUT)
             {
-                return hresult::ETIMEDOUT;
+                return hresult::E_ETIMEDOUT;
             }
         }
         while(esc_status & ECAT_CSR_BUSY);
@@ -90,7 +89,7 @@ namespace kickcat
 
     void Lan9252::readInternalRegister(uint16_t address, void* payload, uint16_t size)
     {
-        InternalRegisterControl cmd{READ, hton(address), {}};
+        InternalRegisterControl cmd{READ, hton<uint16_t>(address), {}};
 
         spi_interface_.enableChipSelect();
         spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE);
@@ -102,7 +101,7 @@ namespace kickcat
 
     void Lan9252::writeInternalRegister(uint16_t address, void const* payload, uint16_t size)
     {
-        InternalRegisterControl cmd{WRITE, hton(address), {}};
+        InternalRegisterControl cmd{WRITE, hton<uint16_t>(address), {}};
         memcpy(cmd.payload, payload, size);
         spi_interface_.enableChipSelect();
         spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE + size);
@@ -116,7 +115,7 @@ namespace kickcat
         {
             if (size > 4 or size == 3)
             {
-                return hresult::ERANGE;
+                return hresult::E_ERANGE;
             }
 
             writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, size, CSR_CMD::ESC_READ});
@@ -142,7 +141,7 @@ namespace kickcat
                 fifo_slot_available = fifo_slot_available >> 8;
                 if (elapsed_time(start_time) > TIMEOUT)
                 {
-                    return hresult::ETIMEDOUT;
+                    return hresult::E_ETIMEDOUT;
                 }
             } while(fifo_slot_available != size / 4);  // beware assumption ESC will transfer 32 bytes.
 
@@ -150,7 +149,7 @@ namespace kickcat
         }
         else
         {
-            return hresult::ERANGE;
+            return hresult::E_ERANGE;
         }
         return hresult::OK;
     };
@@ -161,7 +160,7 @@ namespace kickcat
         {
             if (size > 4 or size == 3)
             {
-                return hresult::ERANGE;
+                return hresult::E_ERANGE;
             }
             // CSR_DATA is 4 bytes
             uint32_t padding = 0;
@@ -193,7 +192,7 @@ namespace kickcat
         }
         else
         {
-            return hresult::ERANGE;
+            return hresult::E_ERANGE;
         }
 
         return hresult::OK;

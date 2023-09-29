@@ -2,7 +2,7 @@
 #define SLAVE_STACK_INCLUDE_ABSTRACTESC_H_
 
 #include <cstdint>
-#include "Error.h"
+#include "kickcat/Error.h"
 
 
 namespace kickcat
