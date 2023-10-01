@@ -107,3 +107,8 @@ diag:
 https://www.automation.com/en-us/articles/2014-2/diagnostics-with-ethercat-part-4
 https://infosys.beckhoff.com/english.php?content=../content/1033/ethercatsystem/1072509067.html&id=
 https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z000000kHwESAU
+
+## Update Conan Recipe on conan center
+Kickcat is available on **conan-io**. Whenever there is a new tag:
+1. Create a new PR on https://github.com/conan-io/conan-center-index 
+2. Follow PR: https://github.com/conan-io/conan-center-index/pull/19482 to add new versions to the recipe
