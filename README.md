@@ -85,7 +85,19 @@ Note: the simulator has to be started first
 The slave counterpart of the stack is currently under development. For now it is in a POC state with a running example on the arduino due board with the easycat shield.
 Follow the readme in the `slave_stack/examples/arduino` folder for the building and uploading information.
 
+## Release procedure
 
+KickCAT versions follow the rules of semantic versioning https://semver.org/
+
+On major version update, a process of testing starts. The version is in alpha phase until API stabilization. Then we 
+switch to release candidate (-rcx). To leave a release candidate state, it is required that:
+
+- the software is tested intensivly (at least 5 continuous days - 24*5 hours) without detecting a bug (realtime loss, crash, memory leak...).
+- the code coverage is sufficient (80% line and 50% branch) for master/slave stack (tools and simulation can be less).
+
+For each tag, Conan center has to be updated (https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat).
+
+When a version leaves the release canditate state a github release shall be generated on the corresponding tag.
 
 ## EtherCAT doc
 https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html&id=3196541253205318339
