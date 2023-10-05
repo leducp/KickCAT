@@ -1,5 +1,4 @@
 #include "kickcat/Time.h"
-#include "Arduino.h"
 
 namespace kickcat
 {
