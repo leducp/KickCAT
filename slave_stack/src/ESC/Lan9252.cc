@@ -112,7 +112,7 @@ namespace kickcat
     {
         if (address < 0x1000)
         {
-            if (size > 4 or size == 3)
+            if (size > 2)
             {
                 return hresult::E_ERANGE;
             }
@@ -157,7 +157,7 @@ namespace kickcat
     {
         if (address < 0x1000)
         {
-            if (size > 4 or size == 3)
+            if (size > 2)
             {
                 return hresult::E_ERANGE;
             }
