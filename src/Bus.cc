@@ -705,15 +705,7 @@ namespace kickcat
 
     void Bus::readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply)
     {
-        // eeprom request
-        struct Request
-        {
-            uint16_t command;
-            uint16_t addressLow;
-            uint16_t addressHigh;
-        } __attribute__((__packed__));
-
-        Request req;
+        eeprom::Request req;
 
         // Request specific address
         {
