@@ -114,6 +114,7 @@ namespace kickcat
                 default:
                 {
                     // commands that require to write something: copy data
+//                    printf("Add data %x \n", *static_cast<uint32_t const *>(data));
                     std::memcpy(pos, data, data_size);
                 }
             }
