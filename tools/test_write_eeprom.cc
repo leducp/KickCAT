@@ -85,10 +85,7 @@ void writeEeprom(Link& link, Slave& slave, uint16_t address, void* data, uint16_
         return DatagramState::OK;
     };
 
-    // Request specific address
-    req = {eeprom::Command::WRITE, address, 0};
-
-    link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_CONTROL), &req, sizeof(req), process, error);
+    link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_DATA), data, size, process, error);
     link.processDatagrams();
 
     // wait for eeprom to be ready
@@ -97,8 +94,10 @@ void writeEeprom(Link& link, Slave& slave, uint16_t address, void* data, uint16_
         THROW_ERROR("Timeout");
     }
 
+    // Request specific address
+    req = {eeprom::Command::WRITE, address, 0};
 
-    link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_DATA), data, size, process, error);
+    link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_CONTROL), &req, sizeof(req), process, error);
     link.processDatagrams();
 }
 
