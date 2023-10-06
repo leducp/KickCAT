@@ -92,6 +92,21 @@ if (GTest_FOUND)
   endif()
 endif()
 
+option(BUILD_LUA_BINDINGS "Build Lua bindings" OFF)
+if (BUILD_LUA_BINDINGS)
+  find_package(Lua QUIET CONFIG)
+  if (NOT Lua_FOUND)
+    message(FATAL_ERROR "Lua not found: Lua bindings can NOT be built")
+  endif()
+endif()
+
+if (Lua_FOUND)
+  add_library(kickcat_lua SHARED
+    Lua/bindings.cc
+    Lua/socket.cc)
+  target_link_libraries(kickcat_lua lua::lua kickcat)
+endif()
+
 option(BUILD_EXAMPLES "Build examples" ON)
 if (BUILD_EXAMPLES)
   if (UNIX)
