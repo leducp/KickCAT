@@ -389,6 +389,8 @@ namespace kickcat
                 break;
             }
         }
+
+        printf("memory_.eeprom_control %x \n", memory_.eeprom_control);
     }
 
 
