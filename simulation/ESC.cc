@@ -373,7 +373,7 @@ namespace kickcat
             case eeprom::Command::WRITE:
             {
                 printf("Write eeprom %x address %x \n", memory_.eeprom_data, memory_.eeprom_address);
-                std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 4);
+                std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 2);
                 memory_.eeprom_control &= ~0x0700; // clear order
 
                 // dump new eeprom
