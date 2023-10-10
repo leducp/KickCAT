@@ -84,6 +84,8 @@ namespace kickcat
         {
             THROW_ERROR("No slave detected");
         }
+        uint16_t param = 0x0;
+        broadcastWrite(reg::EEPROM_CONFIG, &param, 2);
         resetSlaves(watchdogTimePDIO);
         setAddresses();
 
@@ -837,7 +839,6 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                bus_error("Process INVALID WKC \n");
                 return DatagramState::INVALID_WKC;
             }
             return DatagramState::OK;
@@ -845,7 +846,6 @@ namespace kickcat
 
         if (not areEepromReady())
         {
-            THROW_ERROR("Timeout eeprom busy");
         }
 
         link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_DATA), data, size, process, error);
@@ -873,7 +873,6 @@ namespace kickcat
 
         if (not areEepromReady())
         {
-            THROW_ERROR("Timeout eeprom busy");
         }
     }
 
