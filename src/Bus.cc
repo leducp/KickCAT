@@ -82,6 +82,8 @@ namespace kickcat
         {
             THROW_ERROR("No slave detected");
         }
+        uint16_t param = 0x0;
+        broadcastWrite(reg::EEPROM_CONFIG, &param, 2);
         resetSlaves(watchdogTimePDIO);
         setAddresses();
 
@@ -782,6 +784,95 @@ namespace kickcat
         for (auto& slave : slaves_)
         {
             slave.parseSII();
+        }
+    }
+
+
+    bool Bus::isEepromAcknowledged(Slave& slave)
+    {
+        bool acknowleded = true;
+        auto process = [&acknowleded](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+            uint16_t answer = *reinterpret_cast<uint16_t const*>(data);
+            if (answer & 0x2000) // Missing EEPROM acknowledge or invalid command
+            {
+                acknowleded = false;
+            }
+            return DatagramState::OK;
+        };
+
+        auto error = [](DatagramState const&)
+        {
+            THROW_ERROR("Error while fetching eeprom state");
+        };
+
+        link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2, process, error);
+        link_->processDatagrams();
+
+        return acknowleded;
+    }
+
+
+    void Bus::writeEeprom(Slave& slave, uint16_t address, void* data, uint16_t size)
+    {
+        if (size > 2)
+        {
+            THROW_ERROR("Can't write more than 2 bytes to eeprom data");
+        }
+
+        // Read result
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error while writing eeprom data", state);
+        };
+
+        auto process = [](DatagramHeader const*, void const*, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                printf("Process INVALID WKC \n");
+                return DatagramState::INVALID_WKC;
+            }
+            return DatagramState::OK;
+        };
+
+        // wait for eeprom to be ready
+        if (not areEepromReady())
+        {
+            THROW_ERROR("Timeout");
+        }
+
+        link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_DATA), data, size, process, error);
+        link_->processDatagrams();
+
+        // Request specific address
+        eeprom::Request req;
+        req = {eeprom::Command::WRITE, address, 0};
+
+        bool acknowledged = false;
+
+        nanoseconds start_time = since_epoch();
+        while (not acknowledged)
+        {
+            link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_CONTROL), &req, sizeof(req), process, error);
+            link_->processDatagrams();
+            acknowledged = isEepromAcknowledged(slave);
+            sleep(2ms);
+
+            if (elapsed_time(start_time) > 10ms)
+            {
+                THROW_ERROR("Timeout acknowledge write eeprom");
+            }
+        }
+
+        // wait for eeprom to be ready
+        if (not areEepromReady())
+        {
+            THROW_ERROR("Timeout");
         }
     }
 

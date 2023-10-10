@@ -29,7 +29,8 @@ bool isEepromReady(Link& link, Slave& slave)
             return DatagramState::INVALID_WKC;
         }
         uint16_t answer = *reinterpret_cast<uint16_t const*>(data);
-        if (answer & 0x8000)
+        printf("Eeprom status %x \n", answer);
+        if (answer & 0xA000) // EEPROM busy or Missing EEPROM acknowledge or invalid command
         {
             ready = false;
         }
@@ -65,7 +66,38 @@ bool isEepromReady(Link& link, Slave& slave)
     return false;
 }
 
+bool isEepromAcknowleded(Link& link, Slave& slave)
+{
+    bool acknowleded = true;
+    auto process = [&acknowleded](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+    {
+        if (wkc != 1)
+        {
+            return DatagramState::INVALID_WKC;
+        }
+        uint16_t answer = *reinterpret_cast<uint16_t const*>(data);
+        printf("Eeprom status %x \n", answer);
+        if (answer & 0x2000) // EEPROM busy or Missing EEPROM acknowledge or invalid command
+        {
+            acknowleded = false;
+        }
+        return DatagramState::OK;
+    };
 
+    auto error = [](DatagramState const&)
+    {
+        THROW_ERROR("Error while fetching eeprom state");
+    };
+
+    link.addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2, process, error);
+    link.processDatagrams();
+
+    return acknowleded;
+}
+
+
+// TODO check size <= 2 ?
+// TODO speed up write by grouping datagrams in frame ?
 void writeEeprom(Link& link, Slave& slave, uint16_t address, void* data, uint16_t size)
 {
     eeprom::Request req;
@@ -73,32 +105,53 @@ void writeEeprom(Link& link, Slave& slave, uint16_t address, void* data, uint16_
     // Read result
     auto error = [](DatagramState const& state)
     {
-        THROW_ERROR_DATAGRAM("Error while fetching eeprom data", state);
+        printf("State %s \n", toString(state));
+        THROW_ERROR_DATAGRAM("Error while writing eeprom data", state);
     };
 
     auto process = [](DatagramHeader const*, void const*, uint16_t wkc)
     {
         if (wkc != 1)
         {
+            printf("Process INVALID WKC \n");
             return DatagramState::INVALID_WKC;
         }
         return DatagramState::OK;
     };
-
-    link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_DATA), data, size, process, error);
-    link.processDatagrams();
-
     // wait for eeprom to be ready
     if (not isEepromReady(link, slave))
     {
         THROW_ERROR("Timeout");
     }
 
+    printf("Chunk %x, address %x \n", *static_cast<uint16_t*>(data), address);
+    link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_DATA), data, size, process, error);
+    link.processDatagrams();
+
     // Request specific address
     req = {eeprom::Command::WRITE, address, 0};
 
-    link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_CONTROL), &req, sizeof(req), process, error);
-    link.processDatagrams();
+    bool acknowledged = false;
+
+    nanoseconds start_time = since_epoch();
+    while (not acknowledged)
+    {
+        link.addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_CONTROL), &req, sizeof(req), process, error);
+        link.processDatagrams();
+        acknowledged = isEepromAcknowleded(link, slave);
+        sleep(1ms);
+
+        if (elapsed_time(start_time) > 10ms)
+        {
+            THROW_ERROR("Timeout acknowledge write eeprom");
+        }
+    }
+
+    // wait for eeprom to be ready
+    if (not isEepromReady(link, slave))
+    {
+        THROW_ERROR("Timeout");
+    }
 }
 
 
@@ -167,10 +220,54 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    uint32_t data = 0x1234;
-    writeEeprom(*link, bus.slaves()[0], 2, static_cast<void*>(&data), 4);
+//    uint16_t test = 0x6070;
+//    writeEeprom(*link, bus.slaves()[0], 0x44, static_cast<void*>(&test), 2);
+//    writeEeprom(*link, bus.slaves()[0], 0x45, static_cast<void*>(&test), 2);
+//    writeEeprom(*link, bus.slaves()[0], 0x46, static_cast<void*>(&test), 2);
+//    writeEeprom(*link, bus.slaves()[0], 0x47, static_cast<void*>(&test), 2);
 
+    // Load eeprom data
+    std::vector<uint16_t> buffer;
+    std::ifstream eeprom_file;
+    eeprom_file.open(file, std::ios::binary | std::ios::ate);
+    if (not eeprom_file.is_open())
+    {
+        THROW_ERROR("Cannot load EEPROM");
+    }
+    int size = eeprom_file.tellg();
+    eeprom_file.seekg (0, std::ios::beg);
+    buffer.resize(size / 2); // vector of uint16_t so / 2 since the size is in byte
+    eeprom_file.read((char*)buffer.data(), size);
+    eeprom_file.close();
 
+    uint32_t pos = 0;
+    for (auto& chunk : buffer)
+    {
+        writeEeprom(*link, bus.slaves()[0], pos, static_cast<void*>(&chunk), 2);
+        pos++;
+    }
+
+    // Read result
+    auto error = [](DatagramState const& state)
+    {
+        printf("State %s \n", toString(state));
+        THROW_ERROR_DATAGRAM("Error while writing eeprom data", state);
+    };
+
+    auto process = [](DatagramHeader const*, void const*, uint16_t wkc)
+    {
+        if (wkc != 1)
+        {
+            printf("Process INVALID WKC \n");
+            return DatagramState::INVALID_WKC;
+        }
+        return DatagramState::OK;
+    };
+
+//    uint16_t cmd = eeprom::Command::RELOAD;
+//    // Request specific address
+//    link->addDatagram(Command::FPWR, createAddress(bus.slaves()[0].address, reg::EEPROM_CONTROL), &cmd, sizeof(eeprom::Command), process, error);
+//    link->processDatagrams();
 
     return 0;
 }

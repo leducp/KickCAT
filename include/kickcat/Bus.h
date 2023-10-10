@@ -110,11 +110,20 @@ namespace kickcat
         /// \return working counter
         uint16_t broadcastRead(uint16_t ADO, uint16_t data_size);
 
-    protected: // for unit testing
-
         /// \return working counter
         uint16_t broadcastWrite(uint16_t ADO, void const* data, uint16_t data_size);
+        void setAddresses();
 
+        // Slave SII eeprom helpers
+        void fetchEeprom();
+        bool areEepromReady();
+        void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
+
+        bool isEepromAcknowledged(Slave& slave);
+
+        void writeEeprom(Slave& slave, uint16_t address, void* data, uint16_t size);
+
+    protected: // for unit testing
         // helper with trivial bus management (write then read)
         void processFrames();
 
@@ -123,18 +132,12 @@ namespace kickcat
 
         // INIT state methods
         void resetSlaves(nanoseconds watchdog);
-        void setAddresses();
         void configureMailboxes();
 
         // mapping helpers
         void detectMapping();
         void readMappedPDO(Slave& slave, uint16_t index);
         void configureFMMUs();
-
-        // Slave SII eeprom helpers
-        void fetchEeprom();
-        bool areEepromReady();
-        void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         // mailbox helpers
         void waitForMessage(std::shared_ptr<AbstractMessage> message);
