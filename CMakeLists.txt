@@ -101,10 +101,7 @@ if (BUILD_LUA_BINDINGS)
 endif()
 
 if (Lua_FOUND)
-  add_library(kickcat_lua SHARED
-    Lua/bindings.cc
-    Lua/socket.cc)
-  target_link_libraries(kickcat_lua lua::lua kickcat)
+  add_subdirectory(Lua)
 endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)

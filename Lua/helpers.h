@@ -27,7 +27,15 @@ namespace kickcat
 
         auto destructor = [](lua_State* sL) -> int
         {
-            delete *static_cast<T**>(lua_touserdata(sL, 1));
+            if constexpr (is_shared_ptr<T>{})
+            {
+                auto socket = *static_cast<T*>(lua_touserdata(sL, 1));
+                socket.reset();
+            }
+            else
+            {
+                delete *static_cast<T**>(lua_touserdata(sL, 1));
+            }
             return 0;
         };
 

@@ -21,17 +21,17 @@ namespace kickcat
         /// - associate an id to each datagram to call the associate callback later without depending on the read order
         /// - handle link redundancy
         Link(std::shared_ptr<AbstractSocket> socket_nominal,
-                       std::shared_ptr<AbstractSocket> socket_redundancy,
-                       std::function<void(void)> const& redundancyActivatedCallback,
-                       MAC const src_nominal = PRIMARY_IF_MAC,
-                       MAC const src_redundancy = SECONDARY_IF_MAC);
+             std::shared_ptr<AbstractSocket> socket_redundancy,
+             std::function<void(void)> const& redundancyActivatedCallback,
+             MAC const src_nominal = PRIMARY_IF_MAC,
+             MAC const src_redundancy = SECONDARY_IF_MAC);
         ~Link() = default;
 
         /// \brief   Helper for trivial access (i.e. most of the init bus frames)
         ///
         /// \details Since this method is only used for non real time operation, the redundancy mechanism used is slower
         ///          but guaranty slave order access, ie for setAddresses().
-        void writeThenRead(Frame& frame) ;
+        void writeThenRead(Frame& frame);
 
         void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                          std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,

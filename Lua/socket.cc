@@ -1,8 +1,6 @@
-#include <memory>
-
-#include "helpers.h"
 #include "bindings.h"
 #include "kickcat/AbstractSocket.h"
+#include "kickcat/SocketNull.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -53,7 +51,13 @@ namespace kickcat
         return 1;
     }
 
-    int luaload_socket(lua_State* L)
+    static int socket_null_constructor(lua_State* L)
+    {
+        createClassForLua<std::shared_ptr<SocketNull>>(L, "kickcat::socket");
+        return 1;
+    }
+
+    void luaload_socket(lua_State* L)
     {
         registerClass<std::shared_ptr<AbstractSocket>>(L, "kickcat::socket",
         {
@@ -63,6 +67,9 @@ namespace kickcat
         });
 
         lua_pushcfunction(L, socket_constructor);
-        return 1;
+        lua_setfield(L, -2, "socket");
+
+        lua_pushcfunction(L, socket_null_constructor);
+        lua_setfield(L, -2, "socket_null");
     }
 }
