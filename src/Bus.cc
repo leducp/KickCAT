@@ -84,8 +84,6 @@ namespace kickcat
         {
             THROW_ERROR("No slave detected");
         }
-        uint16_t param = 0x0;
-        broadcastWrite(reg::EEPROM_CONFIG, &param, 2);
         resetSlaves(watchdogTimePDIO);
         setAddresses();
 
