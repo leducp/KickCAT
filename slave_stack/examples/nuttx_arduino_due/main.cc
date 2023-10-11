@@ -63,9 +63,9 @@ int main(int argc, char *argv[])
 //    reportError(esc.read(0x0012, &station_alias, sizeof(station_alias)));
 //    printf("after station_alias %x \n", station_alias);
 
-    uint8_t ecs_conf;
-    reportError(esc.read(ESC_CONFIGURATION, &ecs_conf, sizeof(ecs_conf)));
-    printf("ecs_conf %x \n", ecs_conf);
+    uint8_t esc_conf;
+    reportError(esc.read(ESC_CONFIGURATION, &esc_conf, sizeof(esc_conf)));
+    printf("esc_conf %x \n", esc_conf);
 
     while(true)
     {
