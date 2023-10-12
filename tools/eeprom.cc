@@ -147,35 +147,13 @@ int main(int argc, char* argv[])
         eeprom_file.read((char*)buffer.data(), size);
         eeprom_file.close();
 
-        uint32_t pos = 0;
         for (uint32_t i = 0; i < buffer.size(); i++)
         {
-            bus.writeEeprom(slave, pos, static_cast<void*>(&buffer[i]), 2);
+            bus.writeEeprom(slave, i, static_cast<void*>(&buffer[i]), 2);
             printf("\r Updating: %d/%lu", i+1, buffer.size());
             fflush(stdout);
         }
         printf("\n");
-
-        // Read result
-        auto error = [](DatagramState const& state)
-        {
-            THROW_ERROR_DATAGRAM("Error while writing eeprom data", state);
-        };
-
-        auto process = [](DatagramHeader const*, void const*, uint16_t wkc)
-        {
-            if (wkc != 1)
-            {
-                printf("Process INVALID WKC \n");
-                return DatagramState::INVALID_WKC;
-            }
-            return DatagramState::OK;
-        };
-
-        uint16_t cmd = eeprom::Command::RELOAD;
-        link->addDatagram(Command::FPWR, createAddress(bus.slaves()[0].address, reg::EEPROM_CONTROL), &cmd, sizeof(eeprom::Command), process, error);
-        link->processDatagrams();
     }
-
     return 0;
 }

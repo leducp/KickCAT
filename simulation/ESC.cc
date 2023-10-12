@@ -141,10 +141,7 @@ namespace kickcat
             case PDI_WRITE:
             case ECAT_WRITE:
             {
-                printf("Before eeprom %x address %x \n", memory_.eeprom_data, memory_.eeprom_address);
-                printf("Compute internal Mem access address %x, data %x to copy %i\n", address, *static_cast<uint32_t*>(buffer), to_copy);
                 std::memcpy(pos, buffer, to_copy);
-                printf("After eeprom %x address %x \n", memory_.eeprom_data, memory_.eeprom_address);
                 return to_copy;
             }
         }

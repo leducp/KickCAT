@@ -57,8 +57,6 @@ namespace kickcat
     constexpr uint16_t AL_EVENT            =   0x0220;      // AL event request
     constexpr uint16_t AL_EVENT_MASK       =   0x0204;      // AL event interrupt mask
 
-    constexpr uint16_t ESC_CONFIGURATION   =   0x0141;
-
     // In protocol but can't access to it now
     constexpr uint16_t WDOG_STATUS         =   0x0440;      // watch dog status
     constexpr uint16_t AL_STATUS           =   0x0130;      // AL status

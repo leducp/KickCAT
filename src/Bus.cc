@@ -837,6 +837,7 @@ namespace kickcat
         {
             if (wkc != 1)
             {
+                DEBUG_PRINT("Process INVALID WKC \n");
                 return DatagramState::INVALID_WKC;
             }
             return DatagramState::OK;
@@ -844,6 +845,7 @@ namespace kickcat
 
         if (not areEepromReady())
         {
+            THROW_ERROR("Timeout eeprom busy");
         }
 
         link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_DATA), data, size, process, error);
@@ -871,6 +873,7 @@ namespace kickcat
 
         if (not areEepromReady())
         {
+            THROW_ERROR("Timeout eeprom busy");
         }
     }
 
