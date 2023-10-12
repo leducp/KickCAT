@@ -140,10 +140,7 @@ namespace kickcat
             case PDI_WRITE:
             case ECAT_WRITE:
             {
-                printf("Before eeprom %x address %x \n", memory_.eeprom_data, memory_.eeprom_address);
-                printf("Compute internal Mem access address %x, data %x to copy %i\n", address, *static_cast<uint32_t*>(buffer), to_copy);
                 std::memcpy(pos, buffer, to_copy);
-                printf("After eeprom %x address %x \n", memory_.eeprom_data, memory_.eeprom_address);
                 return to_copy;
             }
         }
@@ -372,15 +369,23 @@ namespace kickcat
             }
             case eeprom::Command::WRITE:
             {
-                printf("Write eeprom %x address %x \n", memory_.eeprom_data, memory_.eeprom_address);
-                std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 2);
                 memory_.eeprom_control &= ~0x0700; // clear order
+                if (elapsed_time(last_write_eeprom_) < 2ms)
+                {
+                    memory_.eeprom_control |= 0x8000; // esc EEPROM interface busy
+                }
 
-                // dump new eeprom
-                std::ofstream f("simu_EEPROM_Dump", std::ofstream::binary);
-                char const* raw_data = reinterpret_cast<char const*>(eeprom_.data());
-                f.write(raw_data, eeprom_.size() * 2);
-                f.close();
+                if (elapsed_time(last_write_eeprom_) < 4ms)
+                {
+                    memory_.eeprom_control |= 0x2000;// wait EEPROM acknowledge
+                }
+                else
+                {
+                    last_write_eeprom_ = since_epoch();
+                    std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 2);
+                    memory_.eeprom_control &= ~0x0700; // clear order
+                }
+
                 break;
             }
             case eeprom::Command::NOP:
@@ -389,8 +394,6 @@ namespace kickcat
                 break;
             }
         }
-
-        printf("memory_.eeprom_control %x \n", memory_.eeprom_control);
     }
 
 

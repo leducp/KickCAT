@@ -190,7 +190,9 @@ namespace kickcat
 
         int32_t computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access);
         std::tuple<uint8_t*, uint8_t*, uint16_t> computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo);
+
+        nanoseconds last_write_eeprom_{since_epoch()};
     };
-};
+}
 
 #endif

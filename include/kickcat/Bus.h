@@ -120,7 +120,6 @@ namespace kickcat
         void readEeprom(uint16_t address, std::vector<Slave*> const& slaves, std::function<void(Slave&, uint32_t word)> apply);
 
         bool isEepromAcknowledged(Slave& slave);
-
         void writeEeprom(Slave& slave, uint16_t address, void* data, uint16_t size);
 
     protected: // for unit testing
