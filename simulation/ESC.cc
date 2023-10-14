@@ -369,8 +369,23 @@ namespace kickcat
             }
             case eeprom::Command::WRITE:
             {
-                std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 4);
                 memory_.eeprom_control &= ~0x0700; // clear order
+                if (elapsed_time(last_write_eeprom_) < 2ms)
+                {
+                    memory_.eeprom_control |= 0x8000; // esc EEPROM interface busy
+                }
+
+                if (elapsed_time(last_write_eeprom_) < 4ms)
+                {
+                    memory_.eeprom_control |= 0x2000;// wait EEPROM acknowledge
+                }
+                else
+                {
+                    last_write_eeprom_ = since_epoch();
+                    std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 2);
+                    memory_.eeprom_control &= ~0x0700; // clear order
+                }
+
                 break;
             }
             case eeprom::Command::NOP:

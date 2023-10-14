@@ -287,6 +287,14 @@ namespace kickcat
 
     namespace eeprom // addresses are in words!
     {
+        // eeprom request
+        struct Request
+        {
+            uint16_t command;
+            uint16_t addressLow;
+            uint16_t addressHigh;
+        } __attribute__((__packed__));
+
         constexpr uint16_t ESC_INFO            = 0x00;
         constexpr uint16_t ESC_PDI_CONTROL     = 0;
         constexpr uint16_t ESC_PDI_CONFIG      = 1;
