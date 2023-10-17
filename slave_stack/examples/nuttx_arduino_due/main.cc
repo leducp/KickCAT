@@ -23,9 +23,33 @@ void esc_routine(Lan9252& esc)
     reportError(esc.write(0x1200, &test_write, nb_bytes));
 
     uint16_t al_status;
+    uint16_t al_control = 0;
+    reportError(esc.read(AL_CONTROL, &al_control, sizeof(al_control)));
     reportError(esc.read(AL_STATUS, &al_status, sizeof(al_status)));
     bool watchdog = false;
     reportError(esc.read(WDOG_STATUS, &watchdog, 1));
+
+
+
+    if (al_control & ESM_INIT)
+    {
+        al_status = ESM_INIT;
+    }
+    else if (al_control & ESM_PRE_OP)
+    {
+        al_status = ESM_PRE_OP;
+    }
+    else if (al_control & ESM_SAFE_OP)
+    {
+        al_status = ESM_SAFE_OP;
+    }
+    else if (al_control & ESM_OP)
+    {
+        al_status = ESM_OP;
+    }
+
+    reportError(esc.write(AL_STATUS, &al_status, sizeof(al_status)));
+    printf("al_status %x, al_control %x \n", al_status, al_control);
 
 //    // Print received data (slow down the execution)
 //    if ((al_status & ESM_OP) and watchdog)

@@ -59,6 +59,7 @@ namespace kickcat
 
     // In protocol but can't access to it now
     constexpr uint16_t WDOG_STATUS         =   0x0440;      // watch dog status
+    constexpr uint16_t AL_CONTROL          =   0x0120;
     constexpr uint16_t AL_STATUS           =   0x0130;      // AL status
 
     //--- ESC commands --------------------------------------------------------------------------------
