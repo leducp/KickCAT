@@ -2,6 +2,7 @@
 
 #include "Frame.h"
 #include "AbstractSocket.h"
+#include "debug.h"
 
 namespace kickcat
 {
@@ -218,7 +219,7 @@ namespace kickcat
         int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
         if (read < 0)
         {
-            DEBUG_PRINT("read() failed\n");
+            link_error("read() failed\n");
             return read;
         }
 
@@ -231,7 +232,7 @@ namespace kickcat
         // check if the frame is an EtherCAT one. if not, drop it and try again
         if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
         {
-            DEBUG_PRINT("Invalid frame type\n");
+            link_error("Invalid frame type\n");
             return -1;
         }
 
@@ -243,7 +244,7 @@ namespace kickcat
         }
         if (read != expected)
         {
-            DEBUG_PRINT("Wrong number of bytes read\n");
+            link_error("Wrong number of bytes read\n");
             return -1;
         }
 

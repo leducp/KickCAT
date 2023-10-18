@@ -2,7 +2,7 @@
 #include <algorithm>
 
 #include "Mailbox.h"
-#include "Error.h"
+#include "debug.h"
 
 namespace kickcat
 {
@@ -54,7 +54,7 @@ namespace kickcat
     {
         if (raw_message_size > recv_size)
         {
-            DEBUG_PRINT("Message size is bigger than mailbox size\n");
+            gateway_error("Message size is bigger than mailbox size\n");
             return nullptr;
         }
         auto msg = std::make_shared<GatewayMessage>(recv_size, raw_message, gateway_index, timeout);
@@ -238,7 +238,7 @@ namespace kickcat
         {
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
-            DEBUG_PRINT("Abort requested for %x:%d ! code %08x - %s\n", sdo->index, sdo->subindex, code, CoE::SDO::abort_to_str(code));
+            coe_info("Abort requested for %x:%d ! code %08x - %s\n", sdo->index, sdo->subindex, code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }

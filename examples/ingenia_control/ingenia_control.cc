@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
     auto callback_error = [](DatagramState const &)
     { THROW_ERROR("something bad happened"); };
     auto false_alarm = [](DatagramState const &)
-    { DEBUG_PRINT("previous error was a false alarm"); };
+    { printf("previous error was a false alarm"); };
 
     try
     {

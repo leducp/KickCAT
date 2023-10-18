@@ -2,6 +2,7 @@
 
 #include "AbstractSocket.h"
 #include "Error.h"
+#include "debug.h"
 
 #include <functional>
 
@@ -29,6 +30,7 @@ namespace kickcat
         {
             THROW_ERROR("Too many datagrams in flight. Max is 255");
         }
+        link_info("Addind a datagram (already %d pending)\n", index_queue_);
 
         uint16_t const needed_space = datagram_size(data_size);
         if (frame_nominal_.freeSpace() < needed_space)
@@ -121,17 +123,17 @@ namespace kickcat
         frame.addDatagram(0, Command::BRD, createAddress(0, 0x0000), nullptr, 1);
         if (writeFrame(socket_redundancy_, frame, SECONDARY_IF_MAC) < 0)
         {
-            DEBUG_PRINT("Fail to write on redundancy interface \n");
+            link_error("Fail to write on redundancy interface \n");
         }
 
         socket_nominal_->setTimeout(timeout_);
         socket_redundancy_->setTimeout(timeout_);
         if (readFrame(socket_nominal_, frame) < 0)
         {
-            DEBUG_PRINT("Fail to read nominal interface \n");
+            link_error("Fail to read nominal interface \n");
             if (readFrame(socket_redundancy_, frame) < 0)
             {
-                DEBUG_PRINT("Fail to read redundancy interface, master redundancy interface is not connected \n");
+                link_error("Fail to read redundancy interface, master redundancy interface is not connected \n");
                 return;
             }
         }
@@ -212,7 +214,7 @@ namespace kickcat
             if (written != to_Write)
             {
                 is_frame_sent = false;
-                DEBUG_PRINT("Nominal: write failed, written %i, to write %i\n", written, to_Write);
+                link_error("Nominal: write failed, written %i, to write %i\n", written, to_Write);
             }
 
             return is_frame_sent;
@@ -250,7 +252,7 @@ namespace kickcat
         socket_redundancy_->setTimeout(timeout_);
         if (readFrame(socket_redundancy_, frame_nominal_) < 0)
         {
-            DEBUG_PRINT("Nominal read fail\n");
+            link_warning("Nominal read fail\n");
         }
 
         nanoseconds remaining_timeout = deadline - since_epoch();
@@ -260,7 +262,7 @@ namespace kickcat
         socket_nominal_->setTimeout(timeout_second_socket);
         if (readFrame(socket_nominal_, frame_redundancy_) < 0)
         {
-            DEBUG_PRINT("redundancy read fail\n");
+            link_warning("redundancy read fail\n");
         }
     }
 

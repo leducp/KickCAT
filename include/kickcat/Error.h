@@ -34,11 +34,6 @@ namespace kickcat
     #define THROW_SYSTEM_ERROR_CODE(msg, code)  (throw std::system_error(code, std::generic_category(), LOCATION(": " msg)))
     #define THROW_SYSTEM_ERROR(msg)             THROW_SYSTEM_ERROR_CODE(msg, errno)
 
-#ifdef DEBUG
-    #define DEBUG_PRINT(...) do { fprintf(stderr, "DEBUG: %s ", LOCATION()); fprintf(stderr, ##__VA_ARGS__); } while(0);
-#else
-    #define DEBUG_PRINT(...)
-#endif
 
     struct Error : public std::exception
     {

@@ -1,5 +1,6 @@
 #include <cstring>
 #include "Gateway.h"
+#include "debug.h"
 
 namespace kickcat
 {
@@ -21,14 +22,14 @@ namespace kickcat
         if (frame_size < MIN_EXPECTED)
         {
             // Payload shall contain a valid mailbox EtherCAT frame
-            DEBUG_PRINT("Frame size is too small\n");
+            gateway_error("Frame size is too small\n");
             return;
         }
 
         // -> Frame command type
         if (header->type != EthercatType::MAILBOX)
         {
-            DEBUG_PRINT("Frame command is not MAILBOX but %d\n", header->type);
+            gateway_error("Frame command is not MAILBOX but %d\n", header->type);
             return;
         }
 
@@ -37,7 +38,7 @@ namespace kickcat
         int32_t max_message_size = static_cast<int32_t>(frame_size - sizeof(EthercatHeader));
         if (raw_message_size > max_message_size)
         {
-            DEBUG_PRINT("Message size is bigger than frame size\n");
+            gateway_error("Message size is bigger than frame size\n");
             return;
         }
 
@@ -48,7 +49,7 @@ namespace kickcat
             return;
         }
 
-        DEBUG_PRINT("New request (%d - %d)\n", frame_size, index);
+        gateway_info("New request (%d - %d)\n", frame_size, index);
         pendingRequests_.push_back(msg);
     }
 
