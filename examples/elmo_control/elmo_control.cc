@@ -78,6 +78,9 @@ int main(int argc, char* argv[])
         uint32_t tx_length = sizeof(pdo::tx_mapping);
         bus.writeSDO(bus.slaves().at(0), 0x1C13, 0, Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::tx_mapping), tx_length); // 0x1C13 refers to CoE::SM_CHANNEL + 3, subindex 0
         
+        bus.writeSDO(bus.slaves().at(1), 0x1C12, 0, Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::rx_mapping), rx_length);
+        bus.writeSDO(bus.slaves().at(1), 0x1C13, 0, Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::tx_mapping), tx_length);
+
         bus.createMapping(io_buffer);
 
         bus.requestState(State::SAFE_OP);
@@ -124,7 +127,7 @@ int main(int argc, char* argv[])
 
     link->setTimeout(500us);
 
-    Slave& elmo = bus.slaves().at(0);
+    Slave& elmo = bus.slaves().at(1);
     pdo::Output* output_pdo = reinterpret_cast<pdo::Output*>(elmo.output.data);
     pdo::Input* input_pdo = reinterpret_cast<pdo::Input*>(elmo.input.data);
     CANOpenStateMachine elmo_state_machine;
@@ -133,11 +136,36 @@ int main(int argc, char* argv[])
 
     // Setting a small torque
     output_pdo->mode_of_operation = 4;
-    output_pdo->target_torque = 30;
+    output_pdo->target_torque = 3;
     output_pdo->max_torque = 3990;
     output_pdo->target_position = 0;
     output_pdo->velocity_offset = 0;
     output_pdo->digital_output = 0;
+
+    uint8_t buffer[4096];
+    uint32_t data_size = 4096;
+
+//    printf("Elmo mailbox size %u \n", elmo.mailbox.recv_size);
+    bus.getObjectDictionnaryList(elmo, CoE::SDO::information::ListType::AllObjects, buffer, &data_size);
+
+    CoE::SDO::information::ValueInfo value_info{7,1,1,1,1, 1};
+    try
+    {
+        bus.getEntryDescription(elmo, 0x607f, 0, value_info, buffer, &data_size);
+    }
+    catch (ErrorCode const& e)
+    {
+        std::cerr << e.what() << " " << e.code() << std::endl;
+        return 1;
+    }
+
+    CoE::UnitType unit_test;
+    unit_test.denominator = 0x48;
+    unit_test.numerator   = 0x01;
+    unit_test.prefix      = 0x03;
+    bus.getUnitDescription(elmo, unit_test);
+
+    exit(0);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     int64_t last_error = 0;

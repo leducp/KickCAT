@@ -467,9 +467,9 @@ namespace kickcat
         struct ServiceDataInfo // ETG1000.6 chapter 5.6.3 SDO Information
         {
             uint16_t opcode : 7,
-                    incomplete : 1,
-                    reserved : 8;
-            uint16_t index;
+                     incomplete : 1,
+                     reserved : 8;
+            uint16_t fragments_left;
         } __attribute__((__packed__));
 
         struct Emergency        // ETG1000.6 chapter 5.6.4 Emergency
@@ -489,6 +489,102 @@ namespace kickcat
             TxPDO_REMOTE_REQUEST = 0x06,
             RxPDO_REMOTE_REQUEST = 0x07,
             SDO_INFORMATION      = 0x08
+        };
+
+        // ETG 1000.5 chapter 5 Data type ASE (Application Service Element) and ETG 1020 Base Data Types
+        enum DataType: uint16_t
+        {
+            Boolean        = 0x0001,
+
+            Byte           = 0x001E,
+            Word           = 0x001F,
+            Dword          = 0x0020,
+
+            BIT2           = 0x0031,
+            BIT3           = 0x0032,
+            BIT4           = 0x0033,
+            BIT5           = 0x0034,
+            BIT6           = 0x0035,
+            BIT7           = 0x0036,
+            BIT8           = 0x0037,
+            BIT9           = 0x0038,
+            BIT10          = 0x0039,
+            BIT11          = 0x003A,
+            BIT12          = 0x003B,
+            BIT13          = 0x003C,
+            BIT14          = 0x003D,
+            BIT15          = 0x003E,
+            BIT16          = 0x003F,
+
+            BITARR8        = 0x002D,
+            BITARR16       = 0x002E,
+            BITARR32       = 0x002F,
+
+            TimeOfDay      = 0x000C,
+            TimeDifference = 0x000D,
+
+            Float32        = 0x0008,
+            Float64        = 0x0011,
+
+            Integer8       = 0x0002,
+            Integer16      = 0x0003,
+            Integer24      = 0x0010,
+            Integer32      = 0x0004,
+            Integer40      = 0x0012,
+            Integer48      = 0x0013,
+            Integer56      = 0x0014,
+            Integer64      = 0x0015,
+
+            Unsigned8      = 0x0005,
+            Unsigned16     = 0x0006,
+            Unsigned24     = 0x0016,
+            Unsigned32     = 0x0007,
+            Unsigned40     = 0x0018,
+            Unsigned48     = 0x0019,
+            Unsigned56     = 0x001A,
+            Unsigned64     = 0x001B,
+
+            VisibleString  = 0x0009,
+            OctetString    = 0x000A,
+            UnicodeString  = 0x000B,
+            GUID           = 0x001D,
+
+            ArrayOfInt     = 0x0260,
+            ArrayOfSInt    = 0x0261,
+            ArrayOfDInt    = 0x0262,
+            ArrayOfUDInt   = 0x0263,
+
+            PDOMapping           = 0x0021,
+            Identity             = 0x0023,
+            CommandPar           = 0x0025,
+            PDOParameter         = 0x0027,
+            Enum                 = 0x0028,
+            SMSynchronisation    = 0x0029,
+            Record               = 0x002A,
+            BackupParameter      = 0x002B,
+            ModularDeviceProfile = 0x002C,
+            ErrorSetting         = 0x0281,
+            DiagnosisHistory     = 0x0282,
+            ExternalSyncStatus   = 0x0283,
+            ExternalSyncSettings = 0x0284,
+            DefTypeFSOEFrame     = 0x0285,
+            DefTypeFSOECommPar   = 0x0286
+        };
+        std::string toString(DataType data_type);
+
+
+        /// ETG1004 extension unit_specification
+        /// For the textual description of the unit entry, the entry description shall be a definition in the object area
+        /// 0x0400 … 0x04FF. The entry description itself is defined as a record of the UNIT type (0x2A) which is
+        /// read-only in the object dictionary.
+
+        constexpr uint32_t UNIT_OFFSET = 0x0400;
+        struct UnitType
+        {
+            uint8_t reserved;
+            uint8_t denominator;
+            uint8_t numerator;
+            int8_t prefix;
         };
 
         namespace SDO
@@ -517,9 +613,81 @@ namespace kickcat
                 constexpr uint8_t GET_OD_LIST_RESP   = 0x02;
                 constexpr uint8_t GET_OD_REQ         = 0x03;
                 constexpr uint8_t GET_OD_RESP        = 0x04;
-                constexpr uint8_t GET_ED_LIST_REQ    = 0x05;
-                constexpr uint8_t GET_ED_LIST_RESP   = 0x06;
+                constexpr uint8_t GET_ED_REQ         = 0x05;
+                constexpr uint8_t GET_ED_RESP        = 0x06;
                 constexpr uint8_t SDO_INFO_ERROR_REQ = 0x07;
+
+                enum ListType : uint16_t
+                {
+                    NumberOfObjects     = 0x00,
+                    AllObjects          = 0x01,
+                    RxPDO               = 0x02,
+                    TxPDO               = 0x03,
+                    DeviceReplacement   = 0x04,
+                    StartupParameters   = 0x05
+                };
+
+                enum ObjectCode : uint8_t
+                {
+                    Variable = 7,
+                    Array    = 8,
+                    Record   = 9
+                };
+                std::string toString(ObjectCode object_code);
+
+                struct ObjectAccess
+                {
+                    uint16_t read_pre_operational: 1,
+                             read_safe_operational: 1,
+                             read_operational: 1,
+                             write_pre_operational: 1,
+                             write_safe_operational: 1,
+                             write_operational: 1,
+                             mappable_RxPDO: 1,
+                             mappable_TxPDO: 1,
+                             backup: 1,
+                             settings: 1,
+                             reserved: 6;
+                } __attribute__((__packed__));
+                std::string toString(ObjectAccess object_access);
+
+                struct ValueInfo
+                {
+                    uint8_t reserved : 3,
+                            unit_type : 1,
+                            default_value : 1,
+                            minimum_value: 1,
+                            maximum_value: 1,
+                            unused : 1;
+                } __attribute__((__packed__));
+                std::string toString(ValueInfo const& value_description);
+
+                struct EntryDescriptionRequest
+                {
+                    uint16_t  index;
+                    uint8_t   subindex;
+                    ValueInfo value_info;
+                } __attribute__((__packed__));
+
+                struct ObjectDescription
+                {
+                    uint16_t index;
+                    DataType data_type;
+                    uint8_t  max_subindex;
+                    CoE::SDO::information::ObjectCode object_code;
+                } __attribute__((__packed__));
+                std::string toString(ObjectDescription const& object_description, std::string const& name = "");
+
+                struct EntryDescription
+                {
+                    uint16_t     index;
+                    uint8_t      subindex;
+                    ValueInfo    value_info;
+                    DataType     data_type;
+                    uint16_t     bit_length;
+                    ObjectAccess object_access;
+                } __attribute__((__packed__));
+                std::string toString(EntryDescription const& entry_description, uint8_t* data, uint32_t data_size);
             }
 
             char const* abort_to_str(uint32_t abort_code);
