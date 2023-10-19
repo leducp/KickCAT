@@ -109,6 +109,11 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    for (auto& slave: bus.slaves())
+    {
+        printInfo(slave);
+    }
+
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
 
     try

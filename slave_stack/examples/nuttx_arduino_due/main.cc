@@ -8,9 +8,33 @@ void reportError(hresult const& rc)
 {
     if (rc != hresult::OK)
     {
-        printf("%s\n", toString(rc));
+        printf("\nERROR: %s code %u\n", toString(rc), rc);
     }
 }
+
+
+SyncManager sm_configs[2];
+
+
+
+bool is_valid_sm(AbstractESC& esc, SyncManager const& sm_ref, uint8_t sm_index)
+{
+    auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
+    {
+        return reg + sm_index * 8;
+    };
+
+    SyncManager sm_read;
+
+    reportError(esc.read(create_sm_address(0x0800, sm_index), &sm_read, sizeof(sm_read)));
+
+
+    printf("SM %i: start address %x, length %u, control %x status %x, activate %x \n", sm_index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
+
+
+    return true;
+}
+
 
 void esc_routine(Lan9252& esc)
 {
@@ -29,24 +53,57 @@ void esc_routine(Lan9252& esc)
     bool watchdog = false;
     reportError(esc.read(WDOG_STATUS, &watchdog, 1));
 
-
-
     if (al_control & ESM_INIT)
     {
         al_status = ESM_INIT;
     }
-    else if (al_control & ESM_PRE_OP)
+
+    // TODO better filter AL status based on error, id and reserved bits.
+    switch (al_status)
     {
-        al_status = ESM_PRE_OP;
+        case ESM_INIT:
+        {
+            if (al_control & ESM_PRE_OP)
+            {
+                al_status = ESM_PRE_OP;
+            }
+
+
+            break;
+        }
+
+        case ESM_PRE_OP:
+        {
+            if (al_control & ESM_SAFE_OP)
+            {
+                al_status = ESM_SAFE_OP;
+            }
+            break;
+        }
+
+        case ESM_SAFE_OP:
+        {
+            if (al_control & ESM_OP)
+            {
+                al_status = ESM_OP;
+            }
+            break;
+        }
+
+        case ESM_OP:
+        {
+
+            break;
+        }
+        default:
+        {
+            printf("Unknown or error al_status %x \n", al_status);
+        }
     }
-    else if (al_control & ESM_SAFE_OP)
-    {
-        al_status = ESM_SAFE_OP;
-    }
-    else if (al_control & ESM_OP)
-    {
-        al_status = ESM_OP;
-    }
+
+    is_valid_sm(esc, sm_configs[0], 0);
+
+
 
     reportError(esc.write(AL_STATUS, &al_status, sizeof(al_status)));
     printf("al_status %x, al_control %x \n", al_status, al_control);
@@ -70,6 +127,19 @@ int main(int argc, char *argv[])
     Lan9252 esc(spi_driver);
 
     reportError(esc.init());
+
+    uint16_t mailbox_protocol;
+    reportError(esc.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
+    printf("Mailbox protocol %x \n", mailbox_protocol);
+
+    sm_configs[0].start_address = 0x1000;
+    sm_configs[0].length = 0; // min is 1 in ETG 1000.6 ???
+    sm_configs[0].control = 0x64;
+
+
+    sm_configs[1].start_address = 0x1200;
+    sm_configs[1].length = 0; // min is 1 in ETG 1000.6 ???
+    sm_configs[1].control = 0x20;
 
 //    // How to test esc accesses.
 

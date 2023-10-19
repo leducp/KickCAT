@@ -62,6 +62,38 @@ namespace kickcat
     constexpr uint16_t AL_CONTROL          =   0x0120;
     constexpr uint16_t AL_STATUS           =   0x0130;      // AL status
 
+    constexpr uint16_t MAILBOX_PROTOCOL    = 0x1C;
+
+
+    enum MailboxProtocol // get from EEPROM
+    {
+        None = 0x0,
+        AoE  = 0x01,
+        EoE  = 0x02,
+        CoE  = 0x04,
+        FoE  = 0x08,
+        SoE  = 0x10
+    };
+
+    struct SyncManager
+    {
+        uint16_t start_address;
+        uint16_t length;
+        uint8_t  control;
+        uint8_t  status;
+        uint8_t  activate;
+        uint8_t  pdi_control;
+    } __attribute__((__packed__));
+
+    enum SyncManagerType
+    {
+        Unused     = 0,
+        MailboxOut = 1,
+        MailboxInt = 2,
+        Output     = 3,
+        Input      = 4  // slave to master
+    };
+
     //--- ESC commands --------------------------------------------------------------------------------
 
 
@@ -101,7 +133,7 @@ namespace kickcat
         static constexpr uint8_t ESC_READ  = 0xC0;
 
         uint16_t ethercat_register_address;
-        uint8_t  ethercat_register_size; //1,2,4
+        uint8_t  ethercat_register_size; // only size 1,2,4 allowed (ECAT_CSR_CMD specification)
         uint8_t  ethercat_register_operation; // read / write
     } __attribute__((__packed__));
 
@@ -135,6 +167,10 @@ namespace kickcat
         void writeInternalRegister(uint16_t address, void const* payload, uint16_t size);
 
         hresult waitCSR();
+
+        int32_t readData(uint16_t address, void* data, uint16_t to_read);
+
+        int32_t writeData(uint16_t address, void const* data, uint16_t to_write);
 
         AbstractSPI& spi_interface_; // TODO shared ptr like link in bus.h
     };
