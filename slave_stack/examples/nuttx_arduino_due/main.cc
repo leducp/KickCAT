@@ -28,11 +28,15 @@ bool is_valid_sm(AbstractESC& esc, SyncManager const& sm_ref, uint8_t sm_index)
 
     reportError(esc.read(create_sm_address(0x0800, sm_index), &sm_read, sizeof(sm_read)));
 
+    bool is_valid = (sm_read.start_address == sm_ref.start_address) and
+                    (sm_read.length == sm_ref.length) and
+                    (sm_read.control == sm_ref.control);
+
 
     printf("SM %i: start address %x, length %u, control %x status %x, activate %x \n", sm_index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
 
 
-    return true;
+    return is_valid;
 }
 
 
@@ -63,20 +67,37 @@ void esc_routine(Lan9252& esc)
     {
         case ESM_INIT:
         {
+            uint16_t mailbox_protocol;
+            reportError(esc.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
+            printf("Mailbox protocol %x \n", mailbox_protocol);
+
+            if (mailbox_protocol != MailboxProtocol::None)
+            {
+                // TODO check mailbox conf SM
+            }
+
             if (al_control & ESM_PRE_OP)
             {
                 al_status = ESM_PRE_OP;
             }
-
 
             break;
         }
 
         case ESM_PRE_OP:
         {
+            // check process data SM
+
             if (al_control & ESM_SAFE_OP)
             {
-                al_status = ESM_SAFE_OP;
+                if (is_valid_sm(esc, sm_configs[0], 0) and is_valid_sm(esc, sm_configs[1], 1))
+                {
+                    al_status = ESM_SAFE_OP;
+                }
+                else
+                {
+                    // set error flag ?
+                }
             }
             break;
         }
@@ -93,6 +114,8 @@ void esc_routine(Lan9252& esc)
         case ESM_OP:
         {
 
+            is_valid_sm(esc, sm_configs[0], 0);
+            is_valid_sm(esc, sm_configs[1], 1);
             break;
         }
         default:
@@ -100,9 +123,6 @@ void esc_routine(Lan9252& esc)
             printf("Unknown or error al_status %x \n", al_status);
         }
     }
-
-    is_valid_sm(esc, sm_configs[0], 0);
-
 
 
     reportError(esc.write(AL_STATUS, &al_status, sizeof(al_status)));
@@ -128,17 +148,13 @@ int main(int argc, char *argv[])
 
     reportError(esc.init());
 
-    uint16_t mailbox_protocol;
-    reportError(esc.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
-    printf("Mailbox protocol %x \n", mailbox_protocol);
-
     sm_configs[0].start_address = 0x1000;
-    sm_configs[0].length = 0; // min is 1 in ETG 1000.6 ???
+    sm_configs[0].length = 32;
     sm_configs[0].control = 0x64;
 
 
     sm_configs[1].start_address = 0x1200;
-    sm_configs[1].length = 0; // min is 1 in ETG 1000.6 ???
+    sm_configs[1].length = 32;
     sm_configs[1].control = 0x20;
 
 //    // How to test esc accesses.
