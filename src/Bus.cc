@@ -1,5 +1,7 @@
 #include <cstring>
 
+#include "debug.h"
+
 #include "Bus.h"
 #include "AbstractSocket.h"
 #include "Prints.h"
@@ -7,7 +9,7 @@
 namespace kickcat
 {
     Bus::Bus(std::shared_ptr<Link> link)
-    : link_(link)
+        : link_(link)
     {
     }
 
@@ -45,7 +47,7 @@ namespace kickcat
         uint16_t wkc = 0;
         wkc = broadcastRead(reg::TYPE, 1);
         slaves_.resize(wkc);
-        DEBUG_PRINT("%lu slave detected on the network\n", slaves_.size());
+        bus_info("%lu slave detected on the network\n", slaves_.size());
         return detectedSlaves();
     }
 
@@ -145,7 +147,7 @@ namespace kickcat
     {
         auto error = [](DatagramState const& state)
         {
-            DEBUG_PRINT("Error while trying to get slave state (%s).\n", toString(state));
+            bus_error("Error while trying to get slave state (%s).\n", toString(state));
         };
 
         sendGetALStatus(slave, error);
@@ -488,7 +490,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.inputs.size())
                 {
-                    DEBUG_PRINT("Invalid working counter: expected %ld, got %d\n", pi_frame.inputs.size(), wkc);
+                    bus_error("Invalid working counter: expected %ld, got %d\n", pi_frame.inputs.size(), wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -525,7 +527,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.outputs.size())
                 {
-                    DEBUG_PRINT("Invalid working counter: expected %ld, got %d\n", pi_frame.outputs.size(), wkc);
+                    bus_error("Invalid working counter: expected %ld, got %d\n", pi_frame.outputs.size(), wkc);
                     return DatagramState::INVALID_WKC;
                 }
                 return DatagramState::OK;
@@ -557,7 +559,7 @@ namespace kickcat
                 uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2);
                 if (wkc != expected_wkc) //TODO: buggy in master?
                 {
-                    DEBUG_PRINT("Invalid working counter: expected %d, got %d\n", expected_wkc, wkc);
+                    bus_error("Invalid working counter: expected %d, got %d\n", expected_wkc, wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -630,7 +632,7 @@ namespace kickcat
             link_->addDatagram(Command::FPWR,
                               createAddress(slave.address, reg::SYNC_MANAGER + static_cast<uint16_t>(mapping.sync_manager * 8)),
                               sm, process, error);
-            DEBUG_PRINT("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
+            bus_info("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
 
             fmmu.logical_address    = mapping.address;
             fmmu.length             = static_cast<uint16_t>(mapping.bsize);
@@ -640,7 +642,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             link_->addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu, process, error);
-            DEBUG_PRINT("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
+            bus_info("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
         };
 
         for (auto& slave : slaves_)
@@ -832,7 +834,7 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                DEBUG_PRINT("Process INVALID WKC \n");
+                bus_error("Process INVALID WKC \n");
                 return DatagramState::INVALID_WKC;
             }
             return DatagramState::OK;
@@ -879,7 +881,7 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                DEBUG_PRINT("Invalid working counter\n");
+                bus_error("Invalid working counter\n");
                 return stable_value;
             }
             return ((state & MAILBOX_STATUS) == MAILBOX_STATUS);
@@ -907,7 +909,7 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                DEBUG_PRINT("Invalid working counter\n");
+                bus_error("Invalid working counter\n");
                 return stable_value;
             }
             return ((state & 0x08) == 0x08);
@@ -943,7 +945,7 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                DEBUG_PRINT("Invalid working counter\n");
+                bus_error("Invalid working counter\n");
                 return DatagramState::INVALID_WKC;
             }
             return DatagramState::OK;
@@ -970,13 +972,13 @@ namespace kickcat
             {
                 if (wkc != 1)
                 {
-                    DEBUG_PRINT("Invalid working counter for slave %d\n", slave.address);
+                    bus_error("Invalid working counter for slave %d\n", slave.address);
                     return DatagramState::INVALID_WKC;
                 }
 
                 if (not slave.mailbox.receive(data))
                 {
-                    DEBUG_PRINT("Slave %d: receive a message but didn't process it\n", slave.address);
+                    bus_warning("Slave %d: receive a message but didn't process it\n", slave.address);
                     return DatagramState::NO_HANDLER;
                 }
 
@@ -1027,14 +1029,14 @@ namespace kickcat
         if (mbx_header->address == 0)
         {
             // Master is the destination, unsupported for now (ETG 1510)
-            DEBUG_PRINT("Master mailbox not implemented");
+            bus_error("Master mailbox not implemented");
             return nullptr;
         }
 
         auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header->address; });
         if (it == slaves_.end())
         {
-            DEBUG_PRINT("No slave with address %d on the bus", mbx_header->address);
+            bus_error("No slave with address %d on the bus", mbx_header->address);
             return nullptr;
         }
 
@@ -1060,7 +1062,7 @@ namespace kickcat
             {
                 if (wkc != 1)
                 {
-                    DEBUG_PRINT("Invalid working counter for slave %d\n", slave.address);
+                    bus_error("Invalid working counter for slave %d\n", slave.address);
                     return DatagramState::INVALID_WKC;
                 }
 

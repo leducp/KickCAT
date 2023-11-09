@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
         bus.writeSDO(bus.slaves().at(0), 0x1C12, 0, Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::rx_mapping), rx_length); // 0x1C12 refers to CoE::SM_CHANNEL + 2, subindex 0
         uint32_t tx_length = sizeof(pdo::tx_mapping);
         bus.writeSDO(bus.slaves().at(0), 0x1C13, 0, Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::tx_mapping), tx_length); // 0x1C13 refers to CoE::SM_CHANNEL + 3, subindex 0
-        
+
         bus.createMapping(io_buffer);
 
         bus.requestState(State::SAFE_OP);
@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
     }
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    auto false_alarm = [](DatagramState const&){ DEBUG_PRINT("previous error was a false alarm"); };
+    auto false_alarm = [](DatagramState const&){ printf("previous error was a false alarm"); };
 
     try
     {

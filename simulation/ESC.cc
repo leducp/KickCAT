@@ -1,5 +1,6 @@
 #include "ESC.h"
 #include "kickcat/Time.h"
+#include "kickcat/debug.h"
 
 #include <cstring>
 #include <fstream>
@@ -314,7 +315,7 @@ namespace kickcat
         {
             State before  = static_cast<State>(memory_.al_status  & 0xf);
             State current = static_cast<State>(memory_.al_control & 0xf);
-            printf("%f  %s -> %s  \n", seconds_f(since_epoch() - start).count(), toString(before), toString(current));
+            simu_info("%f  %s -> %s  \n", seconds_f(since_epoch() - start).count(), toString(before), toString(current));
 
             switch (current)
             {

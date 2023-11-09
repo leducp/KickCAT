@@ -5,6 +5,7 @@ project(KickCAT)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_BINARY_DIR})
 include(Config)
+include(debug)
 
 set(LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
@@ -42,7 +43,7 @@ target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/k
 target_link_libraries(kickcat pthread rt)
 set_kickcat_properties(kickcat)
 
-option(BUILD_UNIT_TESTS "Build unit tests" ON)
+option(BUILD_UNIT_TESTS "Build unit tests" OFF)
 if (BUILD_UNIT_TESTS)
   find_package(GTest QUIET CONFIG)
   if (NOT GTest_FOUND)
@@ -109,9 +110,4 @@ endif()
 option(BUILD_TOOLS "Build tools" ON)
 if (BUILD_TOOLS)
   add_subdirectory(tools)
-endif()
-
-option(DEBUG "Debug option" ON)
-if (DEBUG)
-  add_compile_definitions(DEBUG)
 endif()

@@ -1,6 +1,6 @@
 #include "CanOpenStateMachine.h"
 #include "kickcat/Time.h"
-#include "kickcat/Error.h"
+#include "kickcat/debug.h"
 
 namespace kickcat
 {
@@ -52,7 +52,7 @@ namespace kickcat
                         break;
                     }
                     default:
-                    case CANOpenState::ON: DEBUG_PRINT("ON status achieved\n"); break;
+                    case CANOpenState::ON: coe_info("ON status achieved\n"); break;
                     case CANOpenState::FAULT:
                         // Do nothing
                         break;
@@ -65,7 +65,7 @@ namespace kickcat
                     and (elapsed_time(start_motor_timestamp_) > MOTOR_INIT_TIMEOUT)
                     )
                 {
-                    DEBUG_PRINT("Can't enable motor: timeout, start again from OFF state.\n");
+                    coe_error("Can't enable motor: timeout, start again from OFF state.\n");
                     motor_state_ = CANOpenState::OFF;
                 }
                 break;

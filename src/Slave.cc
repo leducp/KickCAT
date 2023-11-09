@@ -1,7 +1,8 @@
-#include "Slave.h"
-#include "Error.h"
-
 #include <iomanip>
+
+#include "Slave.h"
+#include "debug.h"
+
 
 namespace kickcat
 {
@@ -127,7 +128,7 @@ namespace kickcat
                 }
                 case eeprom::Category::DataTypes:
                 {
-                    DEBUG_PRINT("DataTypes!\n");
+                    slave_warning("DataTypes section: parsing not implemented\n");
                     break;
                 }
                 case eeprom::Category::General:
@@ -157,7 +158,7 @@ namespace kickcat
                 }
                 case eeprom::Category::DC:
                 {
-                    DEBUG_PRINT("DC!\n");
+                    slave_warning("DC section: parsing not implemented\n");
                     break;
                 }
                 case eeprom::Category::End:

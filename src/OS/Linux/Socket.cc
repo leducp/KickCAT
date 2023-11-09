@@ -12,6 +12,7 @@
 #include "OS/Linux/Socket.h"
 #include "protocol.h"
 #include "Time.h"
+#include "debug.h"
 
 namespace kickcat
 {
@@ -89,7 +90,7 @@ namespace kickcat
             {
                 THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_GCOALESCE)");
             }
-            DEBUG_PRINT("old rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
+            socket_info("old rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
 
             ecoal.cmd = ETHTOOL_SCOALESCE;
             ecoal.rx_coalesce_usecs = static_cast<unsigned int>(coalescing_.count());
@@ -99,7 +100,7 @@ namespace kickcat
             {
                 THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_GCOALESCE)");
             }
-            DEBUG_PRINT("applied tx-usecs rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
+            socket_info("applied tx-usecs rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
         }
 
 
@@ -135,7 +136,7 @@ namespace kickcat
         int rc = ::close(fd_);
         if (rc < 0)
         {
-            perror(LOCATION(": close()")); // we cannot throw here - at least trace the error
+            socket_error("close(): %s", strerror(errno)); // we cannot throw here - at least trace the error
         }
         fd_ = -1;
     }
