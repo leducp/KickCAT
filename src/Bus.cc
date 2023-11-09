@@ -488,16 +488,18 @@ namespace kickcat
         {
             auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
+
+                for (auto& input : pi_frame.inputs)
+                {
+                    std::memcpy(input.iomap, data + input.offset, input.size);
+                }
+
                 if (wkc != pi_frame.inputs.size())
                 {
                     bus_error("Invalid working counter: expected %ld, got %d\n", pi_frame.inputs.size(), wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
-                for (auto& input : pi_frame.inputs)
-                {
-                    std::memcpy(input.iomap, data + input.offset, input.size);
-                }
                 return DatagramState::OK;
             };
 
@@ -573,6 +575,7 @@ namespace kickcat
             link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
         }
     }
+
 
     void Bus::processDataReadWrite(std::function<void(DatagramState const&)> const& error)
     {
