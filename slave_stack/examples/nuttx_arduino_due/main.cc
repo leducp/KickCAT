@@ -76,6 +76,8 @@ void esc_routine(Lan9252& esc)
                 // TODO check mailbox conf SM
             }
 
+            // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
+
             if (al_control & ESM_PRE_OP)
             {
                 al_status = ESM_PRE_OP;
