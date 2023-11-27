@@ -13,7 +13,7 @@ void reportError(hresult const& rc)
 }
 
 
-SyncManager sm_configs[2];
+SyncManager sm_configs[2];  // Global to tests validation functions, to be passed at init.
 
 
 
@@ -63,6 +63,8 @@ void esc_routine(Lan9252& esc)
     }
 
     // TODO better filter AL status based on error, id and reserved bits.
+
+    // ETG 1000.6 Table 99 – Primitives issued by ESM to Application
     switch (al_status)
     {
         case ESM_INIT:
@@ -73,7 +75,7 @@ void esc_routine(Lan9252& esc)
 
             if (mailbox_protocol != MailboxProtocol::None)
             {
-                // TODO check mailbox conf SM
+                // TODO check mailbox conf SM; "SM_SETTINGS_0_1_MATCH", check SM mailbox settings, SM 0 or 1
             }
 
             // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override

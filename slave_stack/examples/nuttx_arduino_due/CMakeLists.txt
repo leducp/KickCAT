@@ -7,6 +7,7 @@ set(STACK_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/AbstractSPI.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/Error.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/Slave.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/ESC/Lan9252.cc
    )
 
