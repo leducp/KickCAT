@@ -1,0 +1,192 @@
+#include "kickcat/Slave.h"
+
+
+namespace kickcat
+{
+    bool is_valid_sm(AbstractESC& esc, SyncManagerConfig const& sm_ref)
+    {
+        auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
+        {
+            return reg + sm_index * 8;
+        };
+
+        SyncManager sm_read;
+
+        reportError(esc.read(create_sm_address(0x0800, sm_ref.index), &sm_read, sizeof(sm_read)));
+
+        bool is_valid = (sm_read.start_address == sm_ref.start_address) and
+                        (sm_read.length == sm_ref.length) and
+                        (sm_read.control == sm_ref.control);
+
+        printf("SM %i: start address %x, length %u, control %x status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
+        return is_valid;
+    }
+
+
+    void reportError(hresult const& rc)
+    {
+        if (rc != hresult::OK)
+        {
+            printf("\nERROR: %s code %u\n", toString(rc), rc);
+        }
+    }
+
+
+
+    Slave::Slave(AbstractESC& esc)
+    : esc_(esc)
+    {
+
+    }
+
+
+    void Slave::init()
+    {
+        reportError(esc_.init());
+    }
+
+//    void Slave::set_sm_config(std::vector<SyncManagerConfig> const& mailbox)
+//    {
+//        printf("inside set config \n");
+//        printf("mailbox %x \n", mailbox[0].start_address); // Need this print otherwise silent crash on vector copy ???
+////        sm_mailbox_configs_ = mailbox;
+////        sm_mailbox_configs_.push_back(mailbox[0]); // no need for print to work this way.
+//    }
+
+
+    // crash on entering function.
+    void Slave::set_sm_config(std::vector<SyncManagerConfig> const& mailbox, std::vector<SyncManagerConfig> const& process_data)
+    {
+        printf("Inside set sm config \n");
+        sm_mailbox_configs_ = mailbox;
+        sm_process_data_configs_ = process_data;
+    }
+
+    void Slave::routine()
+    {
+        reportError(esc_.read(AL_CONTROL, &al_control_, sizeof(al_control_)));
+        reportError(esc_.read(AL_STATUS, &al_status_, sizeof(al_status_)));
+        bool watchdog = false;
+        reportError(esc_.read(WDOG_STATUS, &watchdog, 1));
+
+        if (al_control_ & ESM_INIT)
+        {
+            al_status_ = ESM_INIT;
+        }
+
+        // ETG 1000.6 Table 99 – Primitives issued by ESM to Application
+        switch (al_status_)
+        {
+            case ESM_INIT:
+            {
+                routine_init();
+                break;
+            }
+
+            case ESM_PRE_OP:
+            {
+                routine_preop();
+                break;
+            }
+
+            case ESM_SAFE_OP:
+            {
+                routine_safeop();
+                break;
+            }
+
+            case ESM_OP:
+            {
+                routine_op();
+                break;
+            }
+            default:
+            {
+                printf("Unknown or error al_status %x \n", al_status_);
+            }
+        }
+
+
+        reportError(esc_.write(AL_STATUS, &al_status_, sizeof(al_status_)));
+        printf("al_status %x, al_control %x \n", al_status_, al_control_);
+    }
+
+
+    void Slave::routine_init()
+    {
+        uint16_t mailbox_protocol;
+        reportError(esc_.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
+        printf("Mailbox protocol %x \n", mailbox_protocol);
+
+        if (mailbox_protocol != MailboxProtocol::None)
+        {
+            bool are_sm_mailbox_valid = true;
+            for (auto& sm : sm_mailbox_configs_)
+            {
+                are_sm_mailbox_valid &= is_valid_sm(esc_, sm);
+            }
+        }
+
+        // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
+        if (al_control_ & ESM_PRE_OP)
+        {
+            al_status_ = ESM_PRE_OP;
+        }
+
+    }
+
+
+    void Slave::routine_preop()
+    {
+        // check process data SM
+        bool are_sm_process_data_valid = true;
+        for (auto& sm : sm_process_data_configs_)
+        {
+            are_sm_process_data_valid &= is_valid_sm(esc_, sm);
+        }
+
+        if (al_control_ & ESM_SAFE_OP)
+        {
+            if (are_sm_process_data_valid)
+            {
+                al_status_ = ESM_SAFE_OP;
+            }
+            else
+            {
+                // set error flag ?
+            }
+        }
+    }
+
+    void Slave::routine_safeop()
+    {
+        if (al_control_ & ESM_OP)
+        {
+            al_status_ = ESM_OP;
+        }
+    }
+
+    void Slave::routine_op()
+    {
+        // TODO encapsulate update input
+        uint32_t nb_bytes = 32;
+        uint8_t test_write[nb_bytes];
+        for (uint32_t i=0; i < nb_bytes; ++i)
+        {
+            test_write[i] = i;
+        }
+        reportError(esc_.write(0x1200, &test_write, nb_bytes));
+
+        //    // Print received data (slow down the execution)
+        //    if ((al_status & ESM_OP) and watchdog)
+        //    {
+        //        uint8_t test_read[nb_bytes];
+        //        reportError(esc.read(0x1000, &test_read, nb_bytes));
+        //        for (uint32_t i=0; i < nb_bytes; i++)
+        //        {
+        //            printf("%x ", test_read[i]);
+        //        }
+        //        printf(" received\n");
+        //    }
+    }
+}
