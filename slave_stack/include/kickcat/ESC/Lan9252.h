@@ -112,6 +112,8 @@ namespace kickcat
     constexpr uint32_t ESM_SAFE_OP     = 0x4;
     constexpr uint32_t ESM_OP          = 0x8;
 
+    constexpr uint16_t AL_CONTROL_ERR_ACK = 0x10;
+
 
     constexpr uint32_t BYTE_TEST_DEFAULT = 0x87654321;
 

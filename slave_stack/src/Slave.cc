@@ -45,19 +45,8 @@ namespace kickcat
         reportError(esc_.init());
     }
 
-//    void Slave::set_sm_config(std::vector<SyncManagerConfig> const& mailbox)
-//    {
-//        printf("inside set config \n");
-//        printf("mailbox %x \n", mailbox[0].start_address); // Need this print otherwise silent crash on vector copy ???
-////        sm_mailbox_configs_ = mailbox;
-////        sm_mailbox_configs_.push_back(mailbox[0]); // no need for print to work this way.
-//    }
-
-
-    // crash on entering function.
     void Slave::set_sm_config(std::vector<SyncManagerConfig> const& mailbox, std::vector<SyncManagerConfig> const& process_data)
     {
-        printf("Inside set sm config \n");
         sm_mailbox_configs_ = mailbox;
         sm_process_data_configs_ = process_data;
     }
@@ -106,8 +95,9 @@ namespace kickcat
             }
         }
 
-
+        al_control_ &= ~AL_CONTROL_ERR_ACK;
         reportError(esc_.write(AL_STATUS, &al_status_, sizeof(al_status_)));
+        reportError(esc_.write(AL_CONTROL, &al_control_, sizeof(al_control_))); // reset Error Ind Ack
         printf("al_status %x, al_control %x \n", al_status_, al_control_);
     }
 
@@ -132,7 +122,6 @@ namespace kickcat
         {
             al_status_ = ESM_PRE_OP;
         }
-
     }
 
 
