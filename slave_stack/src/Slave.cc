@@ -18,7 +18,7 @@ namespace kickcat
                         (sm_read.length == sm_ref.length) and
                         (sm_read.control == sm_ref.control);
 
-        printf("SM %i: start address %x, length %u, control %x status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
+        printf("SM read %i: start address %x, length %u, control %x status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
         return is_valid;
     }
 
@@ -45,10 +45,25 @@ namespace kickcat
         reportError(esc_.init());
     }
 
-    void Slave::set_sm_config(std::vector<SyncManagerConfig> const& mailbox, std::vector<SyncManagerConfig> const& process_data)
+    void Slave::set_sm_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
     {
         sm_mailbox_configs_ = mailbox;
-        sm_process_data_configs_ = process_data;
+    }
+
+
+    void Slave::set_process_data_input(uint8_t* buffer, SyncManagerConfig const& config)
+    {
+        sm_process_data_configs_.push_back(config);
+        process_data_input_ = buffer;
+        sm_pd_input_ = config;
+    }
+
+
+    void Slave::set_process_data_output(uint8_t* buffer, SyncManagerConfig const& config)
+    {
+        sm_process_data_configs_.push_back(config);
+        process_data_output_ = buffer;
+        sm_pd_output_ = config;
     }
 
     void Slave::routine()
@@ -98,6 +113,7 @@ namespace kickcat
         al_control_ &= ~AL_CONTROL_ERR_ACK;
         reportError(esc_.write(AL_STATUS, &al_status_, sizeof(al_status_)));
         reportError(esc_.write(AL_CONTROL, &al_control_, sizeof(al_control_))); // reset Error Ind Ack
+
         printf("al_status %x, al_control %x \n", al_status_, al_control_);
     }
 
@@ -149,6 +165,7 @@ namespace kickcat
 
     void Slave::routine_safeop()
     {
+        update_process_data_input();
         if (al_control_ & ESM_OP)
         {
             al_status_ = ESM_OP;
@@ -157,25 +174,27 @@ namespace kickcat
 
     void Slave::routine_op()
     {
-        // TODO encapsulate update input
-        uint32_t nb_bytes = 32;
-        uint8_t test_write[nb_bytes];
-        for (uint32_t i=0; i < nb_bytes; ++i)
-        {
-            test_write[i] = i;
-        }
-        reportError(esc_.write(0x1200, &test_write, nb_bytes));
+        update_process_data_input();
+        update_process_data_output();
+    }
 
-        //    // Print received data (slow down the execution)
-        //    if ((al_status & ESM_OP) and watchdog)
-        //    {
-        //        uint8_t test_read[nb_bytes];
-        //        reportError(esc.read(0x1000, &test_read, nb_bytes));
-        //        for (uint32_t i=0; i < nb_bytes; i++)
-        //        {
-        //            printf("%x ", test_read[i]);
-        //        }
-        //        printf(" received\n");
-        //    }
+
+    void Slave::update_process_data_output()
+    {
+        hresult rc = esc_.read(sm_pd_output_.start_address, process_data_output_, sm_pd_output_.length);
+        if (rc != hresult::OK)
+        {
+            printf("\n update_process_data_output ERROR: %s code %u\n", toString(rc), rc);
+        }
+    }
+
+
+    void Slave::update_process_data_input()
+    {
+        hresult rc = esc_.write(sm_pd_input_.start_address, process_data_input_, sm_pd_input_.length);
+        if (rc != hresult::OK)
+        {
+            printf("\n update_process_data_input ERROR: %s code %u\n", toString(rc), rc);
+        }
     }
 }
