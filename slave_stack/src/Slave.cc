@@ -3,7 +3,7 @@
 
 namespace kickcat
 {
-    bool is_valid_sm(AbstractESC& esc, SyncManagerConfig const& sm_ref)
+    bool is_valid_sm(std::shared_ptr<AbstractESC> esc, SyncManagerConfig const& sm_ref)
     {
         auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
         {
@@ -12,7 +12,7 @@ namespace kickcat
 
         SyncManager sm_read;
 
-        reportError(esc.read(create_sm_address(0x0800, sm_ref.index), &sm_read, sizeof(sm_read)));
+        reportError(esc->read(create_sm_address(0x0800, sm_ref.index), &sm_read, sizeof(sm_read)));
 
         bool is_valid = (sm_read.start_address == sm_ref.start_address) and
                         (sm_read.length == sm_ref.length) and
@@ -33,7 +33,7 @@ namespace kickcat
 
 
 
-    Slave::Slave(AbstractESC& esc)
+    Slave::Slave(std::shared_ptr<AbstractESC> esc)
     : esc_(esc)
     {
 
@@ -42,7 +42,7 @@ namespace kickcat
 
     void Slave::init()
     {
-        reportError(esc_.init());
+        reportError(esc_->init());
     }
 
     void Slave::set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
@@ -68,10 +68,10 @@ namespace kickcat
 
     void Slave::routine()
     {
-        reportError(esc_.read(AL_CONTROL, &al_control_, sizeof(al_control_)));
-        reportError(esc_.read(AL_STATUS, &al_status_, sizeof(al_status_)));
+        reportError(esc_->read(AL_CONTROL, &al_control_, sizeof(al_control_)));
+        reportError(esc_->read(AL_STATUS, &al_status_, sizeof(al_status_)));
         bool watchdog = false;
-        reportError(esc_.read(WDOG_STATUS, &watchdog, 1));
+        reportError(esc_->read(WDOG_STATUS, &watchdog, 1));
 
         if (al_control_ & ESM_INIT)
         {
@@ -111,8 +111,8 @@ namespace kickcat
         }
 
         al_control_ &= ~AL_CONTROL_ERR_ACK;
-        reportError(esc_.write(AL_STATUS, &al_status_, sizeof(al_status_)));
-        reportError(esc_.write(AL_CONTROL, &al_control_, sizeof(al_control_))); // reset Error Ind Ack
+        reportError(esc_->write(AL_STATUS, &al_status_, sizeof(al_status_)));
+        reportError(esc_->write(AL_CONTROL, &al_control_, sizeof(al_control_))); // reset Error Ind Ack
 
         printf("al_status %x, al_control %x \n", al_status_, al_control_);
     }
@@ -124,7 +124,7 @@ namespace kickcat
         if (al_control_ & ESM_PRE_OP)
         {
             uint16_t mailbox_protocol;
-            reportError(esc_.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
+            reportError(esc_->read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
             printf("Mailbox protocol %x \n", mailbox_protocol);
 
             bool are_sm_mailbox_valid = true;
@@ -197,7 +197,7 @@ namespace kickcat
 
     void Slave::update_process_data_output()
     {
-        hresult rc = esc_.read(sm_pd_output_.start_address, process_data_output_, sm_pd_output_.length);
+        hresult rc = esc_->read(sm_pd_output_.start_address, process_data_output_, sm_pd_output_.length);
         if (rc != hresult::OK)
         {
             printf("\n update_process_data_output ERROR: %s code %u\n", toString(rc), rc);
@@ -207,7 +207,7 @@ namespace kickcat
 
     void Slave::update_process_data_input()
     {
-        hresult rc = esc_.write(sm_pd_input_.start_address, process_data_input_, sm_pd_input_.length);
+        hresult rc = esc_->write(sm_pd_input_.start_address, process_data_input_, sm_pd_input_.length);
         if (rc != hresult::OK)
         {
             printf("\n update_process_data_input ERROR: %s code %u\n", toString(rc), rc);

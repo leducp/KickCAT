@@ -4,15 +4,15 @@
 
 namespace kickcat
 {
-    Lan9252::Lan9252(AbstractSPI& spi_interface)
+    Lan9252::Lan9252(std::shared_ptr<AbstractSPI> spi_interface)
     : spi_interface_(spi_interface)
     {
     }
 
     hresult Lan9252::init()
     {
-        spi_interface_.init();
-        spi_interface_.disableChipSelect();
+        spi_interface_->init();
+        spi_interface_->disableChipSelect();
 
         printf("init lan \n");
 
@@ -91,11 +91,11 @@ namespace kickcat
     {
         InternalRegisterControl cmd{READ, hton<uint16_t>(address), {}};
 
-        spi_interface_.enableChipSelect();
-        spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE);
+        spi_interface_->enableChipSelect();
+        spi_interface_->write(&cmd, CSR_CMD_HEADER_SIZE);
 
-        spi_interface_.read(payload, size);
-        spi_interface_.disableChipSelect();
+        spi_interface_->read(payload, size);
+        spi_interface_->disableChipSelect();
     }
 
 
@@ -103,9 +103,9 @@ namespace kickcat
     {
         InternalRegisterControl cmd{WRITE, hton<uint16_t>(address), {}};
         memcpy(cmd.payload, payload, size);
-        spi_interface_.enableChipSelect();
-        spi_interface_.write(&cmd, CSR_CMD_HEADER_SIZE + size);
-        spi_interface_.disableChipSelect();
+        spi_interface_->enableChipSelect();
+        spi_interface_->write(&cmd, CSR_CMD_HEADER_SIZE + size);
+        spi_interface_->disableChipSelect();
     }
 
 

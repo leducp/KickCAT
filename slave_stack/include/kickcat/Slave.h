@@ -4,7 +4,6 @@
 
 #include "kickcat/AbstractESC.h"
 
-
 #include "kickcat/ESC/Lan9252.h" // TODO remove when access to Protocol.h
 
 #include <vector>
@@ -23,12 +22,12 @@ namespace kickcat
         uint8_t  control;
     };
 
-    bool is_valid_sm(AbstractESC& esc, SyncManagerConfig const& sm_ref);
+    bool is_valid_sm(std::shared_ptr<AbstractESC> esc, SyncManagerConfig const& sm_ref);
 
     class Slave
     {
     public:
-        Slave(AbstractESC& esc);
+        Slave(std::shared_ptr<AbstractESC> esc);
         ~Slave() = default;
 
         void init();
@@ -52,7 +51,7 @@ namespace kickcat
         void update_process_data_input();
         void update_process_data_output();
 
-        AbstractESC& esc_;
+        std::shared_ptr<AbstractESC> esc_;
 
         std::vector<SyncManagerConfig> sm_mailbox_configs_ = {};
         std::vector<SyncManagerConfig> sm_process_data_configs_ = {};

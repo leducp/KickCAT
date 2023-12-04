@@ -145,7 +145,7 @@ namespace kickcat
     class Lan9252 : public AbstractESC
     {
     public:
-        Lan9252(AbstractSPI& spi_interface);
+        Lan9252(std::shared_ptr<AbstractSPI> spi_interface);
         ~Lan9252() = default;
 
         hresult init() override;
@@ -176,7 +176,7 @@ namespace kickcat
 
         int32_t writeData(uint16_t address, void const* data, uint16_t to_write);
 
-        AbstractSPI& spi_interface_; // TODO shared ptr like link in bus.h
+        std::shared_ptr<AbstractSPI> spi_interface_; // TODO shared ptr like link in bus.h
     };
 
 

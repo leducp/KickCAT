@@ -8,8 +8,8 @@ using namespace kickcat;
 
 int main(int argc, char *argv[])
 {
-    SPI spi_driver{};
-    Lan9252 esc(spi_driver);
+    std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
+    std::shared_ptr<Lan9252> esc = std::make_shared<Lan9252>(spi_driver);
     Slave slave(esc);
 
     constexpr uint32_t pdo_size = 32;
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     slave.init();
 
     uint8_t esc_config;
-    reportError(esc.read(ESC_CONFIGURATION, &esc_config, sizeof(esc_config)));
+    reportError(esc->read(ESC_CONFIGURATION, &esc_config, sizeof(esc_config)));
 
     bool is_emulated = esc_config & PDI_EMULATION;
     printf("esc config 0x%x, is emulated %i \n", esc_config, is_emulated);
