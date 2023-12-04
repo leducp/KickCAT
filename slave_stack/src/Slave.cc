@@ -66,11 +66,6 @@ namespace kickcat
         sm_pd_output_ = config;
     }
 
-    void Slave::set_process_data_output_safeop_check(uint8_t* buffer)
-    {
-        safe_op_output_ = buffer;
-    }
-
     void Slave::routine()
     {
         reportError(esc_.read(AL_CONTROL, &al_control_, sizeof(al_control_)));
@@ -125,47 +120,45 @@ namespace kickcat
 
     void Slave::routine_init()
     {
-        uint16_t mailbox_protocol;
-
-        reportError(esc_.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
-
-        uint8_t esc_config;
-        reportError(esc_.read(ESC_CONFIGURATION, &esc_config, sizeof(esc_config)));
-
-        bool is_emulated = esc_config & PDI_EMULATION;
-
-        printf("Mailbox protocol %x pdi config %x, is emulated %i \n", mailbox_protocol, esc_config, is_emulated);
-
-        if (mailbox_protocol != MailboxProtocol::None)
-        {
-            bool are_sm_mailbox_valid = true;
-            for (auto& sm : sm_mailbox_configs_)
-            {
-                are_sm_mailbox_valid &= is_valid_sm(esc_, sm);
-            }
-        }
-
-        //TODO: check  are_sm_mailbox_valid before accepting pre_op request
-
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
         if (al_control_ & ESM_PRE_OP)
         {
-            al_status_ = ESM_PRE_OP;
+            uint16_t mailbox_protocol;
+            reportError(esc_.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
+            printf("Mailbox protocol %x \n", mailbox_protocol);
+
+            bool are_sm_mailbox_valid = true;
+            if (mailbox_protocol != MailboxProtocol::None)
+            {
+                for (auto& sm : sm_mailbox_configs_)
+                {
+                    are_sm_mailbox_valid &= is_valid_sm(esc_, sm);
+                }
+            }
+
+            if (are_sm_mailbox_valid)
+            {
+                al_status_ = ESM_PRE_OP;
+            }
+            else
+            {
+                // TODO error flag
+            }
         }
     }
 
 
     void Slave::routine_preop()
     {
-        // check process data SM
-        bool are_sm_process_data_valid = true;
-        for (auto& sm : sm_process_data_configs_)
-        {
-            are_sm_process_data_valid &= is_valid_sm(esc_, sm);
-        }
-
         if (al_control_ & ESM_SAFE_OP)
         {
+            // check process data SM
+            bool are_sm_process_data_valid = true;
+            for (auto& sm : sm_process_data_configs_)
+            {
+                are_sm_process_data_valid &= is_valid_sm(esc_, sm);
+            }
+
             if (are_sm_process_data_valid)
             {
                 al_status_ = ESM_SAFE_OP;
@@ -180,8 +173,7 @@ namespace kickcat
     void Slave::routine_safeop()
     {
         update_process_data_input();
-
-        reportError(esc_.read(sm_pd_output_.start_address, safe_op_output_, sm_pd_output_.length));
+        update_process_data_output();
 
         if (al_control_ & ESM_OP)
         {

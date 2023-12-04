@@ -10,7 +10,6 @@ int main(int argc, char *argv[])
 {
     SPI spi_driver{};
     Lan9252 esc(spi_driver);
-
     Slave slave(esc);
 
     constexpr uint32_t pdo_size = 32;
@@ -18,14 +17,11 @@ int main(int argc, char *argv[])
     uint8_t buffer_in[pdo_size];
     uint8_t buffer_out[pdo_size];
 
-    uint8_t buffer_safeop_out[pdo_size];
-
     // init values
     for (uint32_t i=0; i < pdo_size; ++i)
     {
         buffer_in[i] = i;
         buffer_out[i] = 0xFF;
-        buffer_safeop_out[i] = 0;
     }
 
        //TODO macros for basic cases?
@@ -35,23 +31,27 @@ int main(int argc, char *argv[])
     slave.set_mailbox_config({{}});
     slave.set_process_data_input(buffer_in, process_data_in);
     slave.set_process_data_output(buffer_out, process_data_out);
-    slave.set_process_data_output_safeop_check(buffer_safeop_out);
 
     slave.init();
 
+    uint8_t esc_config;
+    reportError(esc.read(ESC_CONFIGURATION, &esc_config, sizeof(esc_config)));
+
+    bool is_emulated = esc_config & PDI_EMULATION;
+    printf("esc config 0x%x, is emulated %i \n", esc_config, is_emulated);
 
     while(true)
     {
         slave.routine();
         for (uint8_t i = 0; i < pdo_size; ++i)
         {
-            printf("%x", buffer_safeop_out[i]);
+            printf("%x", buffer_out[i]);
         }
         printf("\n");
 
         if (slave.al_status() & ESM_SAFE_OP)
         {
-            if (buffer_safeop_out[1] != 0)
+            if (buffer_out[1] != 0xFF)
             {
                 slave.set_valid_output_data_received(true);
             }
