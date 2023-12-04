@@ -45,7 +45,7 @@ namespace kickcat
         reportError(esc_.init());
     }
 
-    void Slave::set_sm_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
+    void Slave::set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
     {
         sm_mailbox_configs_ = mailbox;
     }
@@ -64,6 +64,11 @@ namespace kickcat
         sm_process_data_configs_.push_back(config);
         process_data_output_ = buffer;
         sm_pd_output_ = config;
+    }
+
+    void Slave::set_process_data_output_safeop_check(uint8_t* buffer)
+    {
+        safe_op_output_ = buffer;
     }
 
     void Slave::routine()
@@ -121,8 +126,15 @@ namespace kickcat
     void Slave::routine_init()
     {
         uint16_t mailbox_protocol;
+
         reportError(esc_.read(MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
-        printf("Mailbox protocol %x \n", mailbox_protocol);
+
+        uint8_t esc_config;
+        reportError(esc_.read(ESC_CONFIGURATION, &esc_config, sizeof(esc_config)));
+
+        bool is_emulated = esc_config & PDI_EMULATION;
+
+        printf("Mailbox protocol %x pdi config %x, is emulated %i \n", mailbox_protocol, esc_config, is_emulated);
 
         if (mailbox_protocol != MailboxProtocol::None)
         {
@@ -132,6 +144,8 @@ namespace kickcat
                 are_sm_mailbox_valid &= is_valid_sm(esc_, sm);
             }
         }
+
+        //TODO: check  are_sm_mailbox_valid before accepting pre_op request
 
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
         if (al_control_ & ESM_PRE_OP)
@@ -158,7 +172,7 @@ namespace kickcat
             }
             else
             {
-                // set error flag ?
+                //TODO set error flag / report error to master
             }
         }
     }
@@ -166,9 +180,19 @@ namespace kickcat
     void Slave::routine_safeop()
     {
         update_process_data_input();
+
+        reportError(esc_.read(sm_pd_output_.start_address, safe_op_output_, sm_pd_output_.length));
+
         if (al_control_ & ESM_OP)
         {
-            al_status_ = ESM_OP;
+            if (are_valid_output_data_)
+            {
+                al_status_ = ESM_OP;
+            }
+            else
+            {
+                // error flag
+            }
         }
     }
 
@@ -196,5 +220,11 @@ namespace kickcat
         {
             printf("\n update_process_data_input ERROR: %s code %u\n", toString(rc), rc);
         }
+    }
+
+    void Slave::set_valid_output_data_received(bool are_valid_output)
+    {
+        printf("Set valid output data received \n");
+        are_valid_output_data_ = are_valid_output;
     }
 }

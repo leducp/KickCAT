@@ -35,16 +35,20 @@ namespace kickcat
 
         void routine();
 
-        void set_sm_mailbox_config(std::vector<SyncManagerConfig> const& mailbox);
+        void set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox);
 
         void set_process_data_input(uint8_t* buffer, SyncManagerConfig const& config);
         void set_process_data_output(uint8_t* buffer, SyncManagerConfig const& config);
+        void set_process_data_output_safeop_check(uint8_t* buffer);
+
+        void set_valid_output_data_received(bool are_valid_output);
 
         void routine_init();
         void routine_preop();
         void routine_safeop();
         void routine_op();
 
+        uint16_t al_status() { return al_status_;};
     private:
         void update_process_data_input();
         void update_process_data_output();
@@ -62,6 +66,9 @@ namespace kickcat
 
         uint8_t* process_data_output_ = {nullptr};
         SyncManagerConfig sm_pd_output_ = {};
+
+        uint8_t* safe_op_output_ = {nullptr};
+        bool are_valid_output_data_ = false;
     };
 
 

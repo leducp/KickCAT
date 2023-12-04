@@ -116,6 +116,13 @@ int main(int argc, char* argv[])
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
 
+    // Set valid output to exit safe op.
+    auto& easycat = bus.slaves().at(0);
+    for (int32_t i = 0; i < easycat.output.bsize; ++i)
+    {
+        easycat.output.data[i] = 0xBB;
+    }
+
     try
     {
         bus.processDataRead(callback_error);
@@ -125,6 +132,7 @@ int main(int argc, char* argv[])
         //TODO: need a way to check expected working counter depending on state
         // -> in safe op write is not working
     }
+    bus.processDataWrite(callback_error);
 
     try
     {
@@ -148,8 +156,6 @@ int main(int argc, char* argv[])
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
     fwrite("latency\n", 1, 8, stat_file);
-
-    auto& easycat = bus.slaves().at(0);
 
     for (int32_t i = 0; i < easycat.output.bsize; ++i)
     {
