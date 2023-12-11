@@ -32,7 +32,6 @@ namespace kickcat
     }
 
 
-
     Slave::Slave(std::shared_ptr<AbstractESC> esc)
     : esc_(esc)
     {
@@ -44,6 +43,7 @@ namespace kickcat
     {
         reportError(esc_->init());
     }
+
 
     void Slave::set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
     {
@@ -65,6 +65,7 @@ namespace kickcat
         process_data_output_ = buffer;
         sm_pd_output_ = config;
     }
+
 
     void Slave::routine()
     {
@@ -150,6 +151,7 @@ namespace kickcat
 
     void Slave::routine_preop()
     {
+        update_process_data_input();
         if (al_control_ & ESM_SAFE_OP)
         {
             // check process data SM
@@ -170,6 +172,7 @@ namespace kickcat
         }
     }
 
+
     void Slave::routine_safeop()
     {
         update_process_data_input();
@@ -187,6 +190,7 @@ namespace kickcat
             }
         }
     }
+
 
     void Slave::routine_op()
     {
@@ -213,6 +217,7 @@ namespace kickcat
             printf("\n update_process_data_input ERROR: %s code %u\n", toString(rc), rc);
         }
     }
+
 
     void Slave::set_valid_output_data_received(bool are_valid_output)
     {

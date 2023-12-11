@@ -837,7 +837,7 @@ namespace kickcat
         {
             if (wkc != 1)
             {
-                bus_info("Process INVALID WKC \n");
+                bus_error("Process INVALID WKC \n");
                 return DatagramState::INVALID_WKC;
             }
             return DatagramState::OK;

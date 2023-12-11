@@ -1,7 +1,14 @@
 
 #include "nuttx/SPI.h"
+#include <time.h>
 
 #include "kickcat/Slave.h"
+
+
+#include <nuttx/board.h>
+
+#include <arch/board/board.h>
+
 
 using namespace kickcat;
 
@@ -40,24 +47,28 @@ int main(int argc, char *argv[])
     bool is_emulated = esc_config & PDI_EMULATION;
     printf("esc config 0x%x, is emulated %i \n", esc_config, is_emulated);
 
+    uint8_t pdi_config;
+    reportError(esc->read(PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config)));
+    printf("pdi config 0x%x \n", pdi_config);
+
     while(true)
     {
         slave.routine();
-        for (uint8_t i = 0; i < pdo_size; ++i)
-        {
-            printf("%x", buffer_out[i]);
-        }
-        printf("\n");
+        // Print received data
+    //    for (uint8_t i = 0; i < pdo_size; ++i)
+    //    {
+    //        printf("%x", buffer_out[i]);
+    //    }
+    //    printf("\n");
 
-        if (slave.al_status() & ESM_SAFE_OP)
-        {
-            if (buffer_out[1] != 0xFF)
-            {
-                slave.set_valid_output_data_received(true);
-            }
-        }
-        usleep(1000);
+       if (slave.al_status() & ESM_SAFE_OP)
+       {
+           if (buffer_out[1] != 0xFF)
+           {
+               slave.set_valid_output_data_received(true);
+           }
+       }
+       usleep(1000);
     }
-
     return 0;
 }

@@ -370,7 +370,6 @@ namespace kickcat
             }
             case eeprom::Command::WRITE:
             {
-				printf("Write eeprom %x address %x \n", memory_.eeprom_data, memory_.eeprom_address);
                 memory_.eeprom_control &= ~0x0700; // clear order
                 if (elapsed_time(last_write_eeprom_) < 2ms)
                 {
@@ -388,11 +387,6 @@ namespace kickcat
                     memory_.eeprom_control &= ~0x0700; // clear order
                 }
 
-                // dump new eeprom
-                std::ofstream f("simu_EEPROM_Dump", std::ofstream::binary);
-                char const* raw_data = reinterpret_cast<char const*>(eeprom_.data());
-                f.write(raw_data, eeprom_.size() * 2);
-                f.close();
                 break;
             }
             case eeprom::Command::NOP:
@@ -401,8 +395,6 @@ namespace kickcat
                 break;
             }
         }
-
-        printf("memory_.eeprom_control %x \n", memory_.eeprom_control);
     }
 
 

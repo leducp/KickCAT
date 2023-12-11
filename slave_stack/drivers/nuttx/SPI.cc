@@ -13,7 +13,7 @@ namespace kickcat
 
         printf("Setting SPI Frequecy and mode \n");
         // Setup SPI frequency and mode
-        SPI_SETFREQUENCY(*priv_spi_, 4000000);
+        SPI_SETFREQUENCY(*priv_spi_, 10000000); // set 4 000 000 Hz to use oscillo measurements.
         SPI_SETMODE(*priv_spi_, SPIDEV_MODE0);
 
         SPI_LOCK(*priv_spi_, true);

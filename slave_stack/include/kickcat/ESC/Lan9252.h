@@ -64,6 +64,7 @@ namespace kickcat
 
     constexpr uint16_t MAILBOX_PROTOCOL    = 0x1C;
     constexpr uint16_t ESC_CONFIGURATION   = 0x141;
+    constexpr uint16_t PDI_CONFIGURATION   = 0x14E;
     constexpr uint8_t  PDI_EMULATION = 0x1;
 
 
