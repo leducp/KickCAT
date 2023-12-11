@@ -122,6 +122,8 @@ namespace kickcat
         bool isEepromAcknowledged(Slave& slave);
         void writeEeprom(Slave& slave, uint16_t address, void* data, uint16_t size);
 
+        void resetSlaves(nanoseconds watchdog);
+
     protected: // for unit testing
         // helper with trivial bus management (write then read)
         void processFrames();
@@ -130,7 +132,7 @@ namespace kickcat
         std::tuple<DatagramHeader const*, T const*, uint16_t> nextDatagram();
 
         // INIT state methods
-        void resetSlaves(nanoseconds watchdog);
+
         void configureMailboxes();
 
         // mapping helpers

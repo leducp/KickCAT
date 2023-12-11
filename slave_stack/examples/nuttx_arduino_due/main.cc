@@ -1,73 +1,74 @@
 
 #include "nuttx/SPI.h"
-#include "kickcat/ESC/Lan9252.h"
+#include <time.h>
+
+#include "kickcat/Slave.h"
+
+
+#include <nuttx/board.h>
+
+#include <arch/board/board.h>
+
 
 using namespace kickcat;
 
-void reportError(hresult const& rc)
-{
-    if (rc != hresult::OK)
-    {
-        printf("%s\n", toString(rc));
-    }
-}
-
-void esc_routine(Lan9252& esc)
-{
-    uint32_t nb_bytes = 32;
-    uint8_t test_write[nb_bytes];
-    for (uint32_t i=0; i < nb_bytes; ++i)
-    {
-        test_write[i] = i;
-    }
-    reportError(esc.write(0x1200, &test_write, nb_bytes));
-
-    uint16_t al_status;
-    reportError(esc.read(AL_STATUS, &al_status, sizeof(al_status)));
-    bool watchdog = false;
-    reportError(esc.read(WDOG_STATUS, &watchdog, 1));
-
-//    // Print received data (slow down the execution)
-//    if ((al_status & ESM_OP) and watchdog)
-//    {
-//        uint8_t test_read[nb_bytes];
-//        reportError(esc.read(0x1000, &test_read, nb_bytes));
-//        for (uint32_t i=0; i < nb_bytes; i++)
-//        {
-//            printf("%x ", test_read[i]);
-//        }
-//        printf(" received\n");
-//    }
-}
 
 int main(int argc, char *argv[])
 {
-    SPI spi_driver{};
-    Lan9252 esc(spi_driver);
+    std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
+    std::shared_ptr<Lan9252> esc = std::make_shared<Lan9252>(spi_driver);
+    Slave slave(esc);
 
-    reportError(esc.init());
+    constexpr uint32_t pdo_size = 32;
 
-//    // How to test esc accesses.
+    uint8_t buffer_in[pdo_size];
+    uint8_t buffer_out[pdo_size];
 
-//    uint16_t al_status;
-//    reportError(esc.read(AL_STATUS, &al_status, sizeof(al_status)));
-//    printf("Al status %x \n", al_status);
+    // init values
+    for (uint32_t i=0; i < pdo_size; ++i)
+    {
+        buffer_in[i] = i;
+        buffer_out[i] = 0xFF;
+    }
 
-//    uint16_t station_alias;
-//    reportError(esc.read(0x0012, &station_alias, sizeof(station_alias)));
-//    printf("before write station_alias %x \n", station_alias);
-//
-//    station_alias = 0xCAFE;
-//    reportError(esc.write(0x0012, &station_alias, sizeof(station_alias)));
-//    printf("Between read station alias \n");
-//    reportError(esc.read(0x0012, &station_alias, sizeof(station_alias)));
-//    printf("after station_alias %x \n", station_alias);
+       //TODO macros for basic cases?
+    SyncManagerConfig process_data_out(0, 0x1000, pdo_size, 0x64); // Process data out (master view)
+    SyncManagerConfig process_data_in(1, 0x1200, pdo_size, 0x20); // Process data in (master view)
+
+    slave.set_mailbox_config({{}});
+    slave.set_process_data_input(buffer_in, process_data_in);
+    slave.set_process_data_output(buffer_out, process_data_out);
+
+    slave.init();
+
+    uint8_t esc_config;
+    reportError(esc->read(ESC_CONFIGURATION, &esc_config, sizeof(esc_config)));
+
+    bool is_emulated = esc_config & PDI_EMULATION;
+    printf("esc config 0x%x, is emulated %i \n", esc_config, is_emulated);
+
+    uint8_t pdi_config;
+    reportError(esc->read(PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config)));
+    printf("pdi config 0x%x \n", pdi_config);
 
     while(true)
     {
-        esc_routine(esc);
-        usleep(1000);
-    }
+        slave.routine();
+        // Print received data
+    //    for (uint8_t i = 0; i < pdo_size; ++i)
+    //    {
+    //        printf("%x", buffer_out[i]);
+    //    }
+    //    printf("\n");
 
+       if (slave.al_status() & ESM_SAFE_OP)
+       {
+           if (buffer_out[1] != 0xFF)
+           {
+               slave.set_valid_output_data_received(true);
+           }
+       }
+       usleep(1000);
+    }
     return 0;
 }
