@@ -1,47 +1,14 @@
 cmake_minimum_required(VERSION 3.15)
 project(KickCAT)
 
+
 # Custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_BINARY_DIR})
 include(Config)
 include(debug)
 
-set(LIB_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Gateway.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cc
-)
-
-if (UNIX)
-  set(OS_LIB_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
-  )
-  set(OS_LIBRARIES pthread rt)
-elseif(PIKEOS)
-  set(OS_LIB_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Socket.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Time.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/ErrorCategory.cc
-  )
-  set(OS_LIBRARIES )
-endif()
-
-add_library(kickcat ${LIB_SOURCES} ${OS_LIB_SOURCES})
-target_include_directories(kickcat PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
-target_link_libraries(kickcat pthread rt)
-set_kickcat_properties(kickcat)
+add_subdirectory(lib)
 
 option(BUILD_UNIT_TESTS "Build unit tests" OFF)
 if (BUILD_UNIT_TESTS)
@@ -96,7 +63,10 @@ endif()
 option(BUILD_EXAMPLES "Build examples" ON)
 if (BUILD_EXAMPLES)
   if (UNIX)
-      add_subdirectory(examples)
+      add_subdirectory(examples/master)
+  endif()
+  if (NUTTX)
+    add_subdirectory(examples/slave)
   endif()
 endif()
 
@@ -109,5 +79,7 @@ endif()
 
 option(BUILD_TOOLS "Build tools" ON)
 if (BUILD_TOOLS)
-  add_subdirectory(tools)
+  if (UNIX)
+    add_subdirectory(tools)
+  endif()
 endif()
