@@ -1,7 +1,7 @@
 #include <cstring>
+#include <inttypes.h>
 
 #include "debug.h"
-
 #include "Bus.h"
 #include "AbstractSocket.h"
 #include "Prints.h"
@@ -47,7 +47,7 @@ namespace kickcat
         uint16_t wkc = 0;
         wkc = broadcastRead(reg::TYPE, 1);
         slaves_.resize(wkc);
-        bus_info("%lu slave detected on the network\n", slaves_.size());
+        bus_info("%zu slave detected on the network\n", slaves_.size());
         return detectedSlaves();
     }
 
@@ -135,7 +135,8 @@ namespace kickcat
             }
 
             slave.al_status = data[0];
-            slave.al_status_code = *reinterpret_cast<uint16_t const*>(data + 4);
+            // slave.al_status_code =   *reinterpret_cast<uint16_t const*>(data + 4);
+            std::memcpy(&slave.al_status_code, data + 4, sizeof(uint16_t));
             return DatagramState::OK;
         };
 
@@ -496,7 +497,7 @@ namespace kickcat
 
                 if (wkc != pi_frame.inputs.size())
                 {
-                    bus_error("Invalid working counter: expected %ld, got %d\n", pi_frame.inputs.size(), wkc);
+                    bus_error("Invalid working counter: expected %zu, got %d\n", pi_frame.inputs.size(), wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -529,7 +530,7 @@ namespace kickcat
             {
                 if (wkc != pi_frame.outputs.size())
                 {
-                    bus_error("Invalid working counter: expected %ld, got %d\n", pi_frame.outputs.size(), wkc);
+                    bus_error("Invalid working counter: expected %zu, got %" PRIu16 "\n", pi_frame.outputs.size(), wkc);
                     return DatagramState::INVALID_WKC;
                 }
                 return DatagramState::OK;
@@ -635,7 +636,7 @@ namespace kickcat
             link_->addDatagram(Command::FPWR,
                               createAddress(slave.address, reg::SYNC_MANAGER + static_cast<uint16_t>(mapping.sync_manager * 8)),
                               sm, process, error);
-            bus_info("SM[%d] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
+            bus_info("SM[%" PRIi32 "] type %d - start address 0x%04x - length %d - flags: 0x%02x\n", mapping.sync_manager, type, sm.start_address, sm.length, sm.control);
 
             fmmu.logical_address    = mapping.address;
             fmmu.length             = static_cast<uint16_t>(mapping.bsize);
@@ -645,7 +646,7 @@ namespace kickcat
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             link_->addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu, process, error);
-            bus_info("slave %04x - size %d - ladd 0x%04x - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
+            bus_info("slave %04x - size %" PRIu32 " - ladd 0x%04" PRIu32 " - paddr 0x%04x\n", slave.address, mapping.bsize, mapping.address, fmmu.physical_address);
         };
 
         for (auto& slave : slaves_)
@@ -667,7 +668,8 @@ namespace kickcat
             {
                 return DatagramState::INVALID_WKC;
             }
-            uint16_t answer = *reinterpret_cast<uint16_t const*>(data);
+            uint16_t answer;
+            std::memcpy(&answer, data, sizeof(uint16_t));
             if (answer & 0x8000)
             {
                 ready = false;
@@ -800,7 +802,8 @@ namespace kickcat
             {
                 return DatagramState::INVALID_WKC;
             }
-            uint16_t answer = *reinterpret_cast<uint16_t const*>(data);
+            uint16_t answer;
+            std::memcpy(&answer, data, sizeof(uint16_t));
             if (answer & 0x2000) // Missing EEPROM acknowledge or invalid command
             {
                 acknowleded = false;

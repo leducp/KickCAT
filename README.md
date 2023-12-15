@@ -1,8 +1,10 @@
-# A simple C++ EtherCAT master stack.
+# A simple C++ EtherCAT master/slave stack.
 
 Kick-start your slaves!
 
 Thin EtherCAT stack designed to be embedded in a more complex software and with efficiency in mind.
+
+## Master stack
 
 ### Current state:
  - Can go to OP state
@@ -27,7 +29,7 @@ Thin EtherCAT stack designed to be embedded in a more complex software and with 
  - Addressing groups
 
 ### Operatings systems:
-## Linux
+#### Linux
 To improve latency on Linux, you have to
  - use Linux RT (PREMPT_RT patches),
  - set a real time scheduler for the program (i.e. with chrt)
@@ -36,12 +38,12 @@ To improve latency on Linux, you have to
  - isolate ethercat task and network IRQ on a dedicated core
  - change network IRQ priority
 
-## PikeOS
+#### PikeOS
  - Tested on PikeOS 5.1 for native personnality (p4ext)
  - You have to provide the CMake cross-toolchain file which shall define PIKEOS variable (or adapt the main CMakelists.txt to your needs)
  - examples are provided with a working but non-optimal process/thread configuration (examples/PikeOS/p4ext_config.c): feel free to adapt it to your needs
 
-## Build:
+### Build:
 KickCAT project is handled through CMake. To build the project, call CMake to configure it and then the build tool (default on Linux is make):
   1. Configure the project (more information on https://cmake.org/cmake/help/latest/)
   ```
@@ -76,14 +78,35 @@ Note: you can easily provide GTest via conan package manager:
   cmake .. -DCMAKE_BUILD_TYPE=Release
   ```
 
-## Simulator
+### Simulator
 To start a network simulator, you can either create a virtual ethernet pair (on Linux you can use the helper script 'create_virtual_ethernet.sh') or use a real network interface by using two computer or two interfaces on the same computer.
 Note: the simulator has to be started first
 
 
 ## Slave stack
-The slave counterpart of the stack is currently under development. For now it is in a POC state with a running example on the arduino due board with the easycat shield.
-Follow the readme in the `slave_stack/examples/arduino` folder for the building and uploading information.
+A simple slave stack is under development. A working example based on Nuttx RTOS and tested on arduino due + easycat Lan9252 shield is available in `examples/slave/nuttx_lan9252`. Follow the readme in `boards/arduino_due` for insight about how to setup and build the slave stack.
+
+### Current state:
+
+- Can go from INIT to PRE-OP to SAFE-OP to OP with proper verification for each transition.
+- Can read and write PI
+- Supports ESC Lan9252 through SPI.
+- Tools available to flash/dump eeprom from ESC.
+
+
+### TODO
+
+- Test coverage
+- Integrate slave stack in the simulation
+- Cover all the ESM state transitions (going back from OP to other states)
+- Support a second ESC driver (ie: xmc4800)
+- Implement mailbox protocols.
+- Allow more than 2 PI sync manager. (multipdo)
+- DC support.
+- Improve error reporting through AL_STATUS and AL_STATUS_CODE
+
+- ci to test the cross compilation build ?
+
 
 ## Release procedure
 

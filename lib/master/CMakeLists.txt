@@ -1,4 +1,3 @@
-
 target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
@@ -11,5 +10,4 @@ target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
 )
 
-target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(kickcat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
+target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)

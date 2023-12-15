@@ -1,6 +1,7 @@
 #include "kickcat/ESC/Lan9252.h"
 
 #include <cstring>
+#include <inttypes.h>
 
 namespace kickcat
 {
@@ -50,7 +51,7 @@ namespace kickcat
           printf("Timeout get byte test \n");
           return hresult::E_ETIMEDOUT;
         }
-        printf("Byte test read: %lx \n", byte_test_result);
+        printf("Byte test read: %" PRIu32 " \n", byte_test_result);
 
 
         uint32_t hw_cfg_ready = 0;

@@ -23,5 +23,5 @@ cmake -B ${build} -S ${src}  -DCMAKE_TOOLCHAIN_FILE=${build}/${nuttx_version}/sc
 make -C ${build} -j8
 
 
-arm-none-eabi-objcopy -O binary ${build}examples/slave/nuttx_arduino_due/${bin} ${build}/${bin}.bin
+arm-none-eabi-objcopy -O binary ${build}examples/slave/nuttx/lan9252/${bin} ${build}/${bin}.bin
 ~/wdc_workspace/tools/bossac-1.6.1-arduino -i --port=ttyACM0 -U false -e -w -b ${build}/${bin}.bin -R

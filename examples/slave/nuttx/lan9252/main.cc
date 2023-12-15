@@ -30,9 +30,8 @@ int main(int argc, char *argv[])
         buffer_out[i] = 0xFF;
     }
 
-       //TODO macros for basic cases?
-    SyncManagerConfig process_data_out{0, 0x1000, pdo_size, 0x64}; // Process data out (master view)
-    SyncManagerConfig process_data_in{1, 0x1200, pdo_size, 0x20}; // Process data in (master view)
+    SyncManagerConfig process_data_out = SYNC_MANAGER_PI_OUT(0, 0x1000, pdo_size); // Process data out (master view), address consistent with eeprom conf.
+    SyncManagerConfig process_data_in = SYNC_MANAGER_PI_IN(1, 0x1200, pdo_size); // Process data in (master view), address consistent with eeprom conf.
 
     esc.set_mailbox_config({{}});
     esc.set_process_data_input(buffer_in, process_data_in);

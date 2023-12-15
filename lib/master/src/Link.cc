@@ -5,6 +5,7 @@
 #include "debug.h"
 
 #include <functional>
+#include <inttypes.h>
 
 namespace kickcat
 {
@@ -214,7 +215,7 @@ namespace kickcat
             if (written != to_Write)
             {
                 is_frame_sent = false;
-                link_error("Nominal: write failed, written %i, to write %i\n", written, to_Write);
+                link_error("Nominal: write failed, written %" PRIi32 ", to write %" PRIi32 "\n", written, to_Write);
             }
 
             return is_frame_sent;

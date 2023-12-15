@@ -1,5 +1,6 @@
 #include <cstring>
 #include <algorithm>
+#include <inttypes.h>
 
 #include "Mailbox.h"
 #include "debug.h"
@@ -236,9 +237,10 @@ namespace kickcat
         // => check if message response is coherent
         if (sdo->command == CoE::SDO::request::ABORT)
         {
-            uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
+            uint32_t code;
+            std::memcpy(&code, payload, sizeof(uint32_t));
             // TODO: let client display itself the message
-            coe_info("Abort requested for %x:%d ! code %08x - %s\n", sdo->index, sdo->subindex, code, CoE::SDO::abort_to_str(code));
+            coe_info("Abort requested for %x:%d ! code %08" PRIx32" - %s\n", sdo->index, sdo->subindex, code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }
@@ -284,7 +286,9 @@ namespace kickcat
         }
 
         // standard or segmented transfer
-        uint32_t const complete_size = *reinterpret_cast<uint32_t const*>(payload);
+
+        uint32_t complete_size;
+        std::memcpy(&complete_size, payload, sizeof(uint32_t));
         payload += 4;
 
         if (*client_data_size_ < complete_size)
@@ -305,7 +309,8 @@ namespace kickcat
         }
 
         // segmented
-        uint32_t size = *reinterpret_cast<uint32_t const*>(payload);
+        uint32_t size;
+        std::memcpy(&size, payload, sizeof(uint32_t));
         payload += 4;
 
         std::memcpy(client_data_, payload, size);
@@ -344,7 +349,7 @@ namespace kickcat
         }
         else
         {
-            size = *reinterpret_cast<uint32_t const*>(payload);
+            std::memcpy(&size, payload, sizeof(uint32_t));
             payload += sizeof(uint32_t);
         }
 

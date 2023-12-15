@@ -22,7 +22,7 @@ namespace kickcat
 
         SyncManager sm_read;
 
-        reportError(read(create_sm_address(0x0800, sm_ref.index), &sm_read, sizeof(sm_read)));
+        reportError(read(create_sm_address(reg::SYNC_MANAGER, sm_ref.index), &sm_read, sizeof(sm_read)));
 
         bool is_valid = (sm_read.start_address == sm_ref.start_address) and
                         (sm_read.length == sm_ref.length) and

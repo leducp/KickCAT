@@ -1,4 +1,6 @@
 #include <cstring>
+#include <inttypes.h>
+
 #include "Gateway.h"
 #include "debug.h"
 
@@ -49,7 +51,7 @@ namespace kickcat
             return;
         }
 
-        gateway_info("New request (%d - %d)\n", frame_size, index);
+        gateway_info("New request (%" PRIi32 " - %d)\n", frame_size, index);
         pendingRequests_.push_back(msg);
     }
 
