@@ -103,7 +103,7 @@ namespace kickcat
     void Lan9252::writeInternalRegister(uint16_t address, void const* payload, uint16_t size)
     {
         InternalRegisterControl cmd{WRITE, hton<uint16_t>(address), {}};
-        memcpy(cmd.payload, payload, size);
+        std::memcpy(cmd.payload, payload, size);
         spi_interface_->enableChipSelect();
         spi_interface_->write(&cmd, CSR_CMD_HEADER_SIZE + size);
         spi_interface_->disableChipSelect();
@@ -197,7 +197,7 @@ namespace kickcat
 
         // CSR_DATA is 4 bytes
         uint32_t padding = 0;
-        memcpy(&padding, data, size);
+        std::memcpy(&padding, data, size);
         writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
         writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, static_cast<uint8_t>(size), CSR_CMD::ESC_WRITE});
         // wait for command execution

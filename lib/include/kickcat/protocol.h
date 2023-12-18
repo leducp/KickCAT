@@ -330,6 +330,7 @@ namespace kickcat
 
         constexpr uint16_t START_CATEGORY      = 0x40;
 
+
         enum MailboxProtocol // get from EEPROM
         {
             None = 0x0,
@@ -340,12 +341,22 @@ namespace kickcat
             SoE  = 0x10
         };
 
-        enum Command : uint16_t
+        enum Control : uint16_t
         {
-            NOP    = 0x0000,  // clear error bits
-            READ   = 0x0100,
-            WRITE  = 0x0201,
-            RELOAD = 0x0300
+            NOP           = 0x0000,  // clear error bits
+            WR_EN         = 0x0001,
+            EMULATION     = 0x0020,
+            NB_READ_BYTES = 0x0040,
+            ALGO_SEL      = 0x0080,
+            READ          = 0x0100,
+            WRITE         = 0x0200,
+            RELOAD        = 0x0400,
+            COMMAND       = 0x0700,
+            CRC           = 0x0800,
+            LOADING       = 0x1000,
+            ERROR_CMD     = 0x2000,
+            ERROR_WR_EN   = 0x4000,
+            BUSY          = 0x8000,
         };
 
         enum Category : uint16_t
@@ -360,6 +371,49 @@ namespace kickcat
             DC        = 60,
             End       = 0xFFFF
         };
+
+        struct InfoEntry
+        {
+            // Config data
+            uint16_t pdi_control;
+            uint16_t pdi_configuration;
+            uint16_t sync_impulse_length;
+            uint16_t pdi_configuration_2;
+            uint16_t station_alias;
+            uint16_t reserved1;
+            uint16_t reserved2;
+            uint16_t crc;
+
+            // Identity
+            uint32_t vendor_id;
+            uint32_t product_code;
+            uint32_t revision_number;
+            uint32_t serial_number;
+
+            // hardware delays
+            uint16_t execution_delay;
+            uint16_t port0_delay;
+            uint16_t port1_delay;
+            uint16_t reserved3;
+
+            // mailbox bootstrap
+            uint16_t bootstrap_receive_mailbox_offset;
+            uint16_t bootstrap_receive_mailbox_size;
+            uint16_t bootstrap_send_mailbox_offset;
+            uint16_t bootstrap_send_mailbox_size;
+
+            // mailbox standard
+            uint16_t standard_receive_mailbox_offset;
+            uint16_t standard_receive_mailbox_size;
+            uint16_t standard_send_mailbox_offset;
+            uint16_t standard_send_mailbox_size;
+
+            uint16_t mailbox_protocol;
+
+            uint16_t reserved4[32];
+            uint16_t size;
+            uint16_t version;
+        }__attribute__((__packed__));
 
         struct GeneralEntry
         {

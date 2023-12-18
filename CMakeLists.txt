@@ -19,7 +19,8 @@ if (BUILD_UNIT_TESTS)
 endif()
 
 if (GTest_FOUND)
-  add_executable(kickcat_unit unit/bus-t.cc
+  add_executable(kickcat_unit unit/adler32_sum-t.cc
+                              unit/bus-t.cc
                               unit/debughelpers-t.cc
                               unit/diagnostics-t.cc
                               unit/error-t.cc

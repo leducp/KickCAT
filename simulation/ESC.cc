@@ -362,13 +362,13 @@ namespace kickcat
         uint16_t order = memory_.eeprom_control & 0x0701;
         switch (order)
         {
-            case eeprom::Command::READ:
+            case eeprom::Control::READ:
             {
                 std::memcpy((void*)&memory_.eeprom_data, eeprom_.data() + memory_.eeprom_address, 4);
                 memory_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
-            case eeprom::Command::WRITE:
+            case eeprom::Control::WRITE:
             {
                 memory_.eeprom_control &= ~0x0700; // clear order
                 if (elapsed_time(last_write_eeprom_) < 2ms)
@@ -389,8 +389,8 @@ namespace kickcat
 
                 break;
             }
-            case eeprom::Command::NOP:
-            case eeprom::Command::RELOAD:
+            case eeprom::Control::NOP:
+            case eeprom::Control::RELOAD:
             {
                 break;
             }

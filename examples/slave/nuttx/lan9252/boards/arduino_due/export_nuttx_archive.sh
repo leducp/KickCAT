@@ -7,7 +7,7 @@ nuttx_src=~/wdc_workspace/src/nuttxspace/nuttx
 build=~/wdc_workspace/src/KickCAT/build_slave/
 src=~/wdc_workspace/src/KickCAT/
 
-bin=main
+bin=easycat_slave
 
 nuttx_version=nuttx-export-12.3.0
 

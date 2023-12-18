@@ -1,4 +1,5 @@
-set(KICKCAT_SOURCES 
+set(KICKCAT_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/checksum/adler32.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Error.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cc

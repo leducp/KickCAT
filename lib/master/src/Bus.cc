@@ -716,7 +716,7 @@ namespace kickcat
 
         // Request specific address
         {
-            req = { eeprom::Command::READ, address, 0 };
+            req = { eeprom::Control::READ, address, 0 };
             uint16_t wkc = broadcastWrite(reg::EEPROM_CONTROL, &req, sizeof(req));
             if (wkc != slaves_.size())
             {
@@ -856,7 +856,7 @@ namespace kickcat
 
         // Request specific address
         eeprom::Request req;
-        req = {eeprom::Command::WRITE, address, 0};
+        req = {eeprom::Control::WRITE | eeprom::Control::WR_EN, address, 0};
 
         bool acknowledged = false;
 
