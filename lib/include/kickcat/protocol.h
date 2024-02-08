@@ -183,10 +183,12 @@ namespace kickcat
         constexpr uint16_t AL_EVENT        = 0x220;      // AL event request
         constexpr uint16_t ERROR_COUNTERS  = 0x300;
 
-        constexpr uint16_t WDG_DIVIDER    = 0x400; // 2 bytes, Default 0x09C2 = 2498 = 100us
-        constexpr uint16_t WDG_TIME_PDI   = 0x410; // 2 bytes, Default 0x03E8: 1000 * WDG_DIVIDER = 100ms
-        constexpr uint16_t WDG_TIME_PDO   = 0x420; // 2 bytes, Default 0x03E8: 1000 * WDG_DIVIDER = 100ms
-        constexpr uint16_t WDOG_STATUS    = 0x440;
+        constexpr uint16_t WDG_DIVIDER      = 0x400; // 2 bytes, Default 0x09C2 = 2498 = 100us
+        constexpr uint16_t WDG_TIME_PDI     = 0x410; // 2 bytes, Default 0x03E8: 1000 * WDG_DIVIDER = 100ms
+        constexpr uint16_t WDG_TIME_PDO     = 0x420; // 2 bytes, Default 0x03E8: 1000 * WDG_DIVIDER = 100ms
+        constexpr uint16_t WDOG_STATUS      = 0x440;
+        constexpr uint16_t WDOG_COUNTER_PDO = 0x442;
+        constexpr uint16_t WDOG_COUNTER_PDI = 0x443;
 
         constexpr uint16_t EEPROM_CONFIG  = 0x500;
         constexpr uint16_t EEPROM_PDI     = 0x501;

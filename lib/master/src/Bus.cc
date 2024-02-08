@@ -217,6 +217,7 @@ namespace kickcat
         broadcastWrite(reg::DC_SYSTEM_TIME,     param, 8);
         broadcastWrite(reg::DC_SYNC_ACTIVATION, param, 1);
         broadcastWrite(reg::ECAT_EVENT_MASK,    param, 2);
+        broadcastWrite(reg::WDOG_COUNTER_PDO,   param, 2);
 
         uint16_t dc_param = 0x1000; // reset value
         broadcastWrite(reg::DC_SPEED_CNT_START, &dc_param, sizeof(dc_param));

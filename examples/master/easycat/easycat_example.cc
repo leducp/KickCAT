@@ -70,14 +70,33 @@ int main(int argc, char* argv[])
         for (auto& slave : bus.slaves())
         {
             State state = bus.getCurrentState(slave);
-            printf("Slave %d state is %s\n", slave.address, toString(state));
+            printf("Slave %d state is %s (%x)\n", slave.address, toString(state), slave.al_status_code);
+        }
+
+        auto process = [](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+
+            printf("%x\n", *data);
+            return DatagramState::OK;
+        };
+
+        for (auto& slave : bus.slaves())
+        {
+            link->addDatagram(Command::FPRD, createAddress(slave.address, reg::WDOG_STATUS), nullptr, 1, process,
+            [](DatagramState const&){ THROW_ERROR("something bad happened"); });
+            link->addDatagram(Command::FPRD, createAddress(slave.address, reg::WDOG_COUNTER_PDO), nullptr, 1, process,
+            [](DatagramState const&){ THROW_ERROR("something bad happened"); });
         }
     };
 
     uint8_t io_buffer[2048];
     try
     {
-        bus.init();
+        bus.init(50ms);
 
         printf("Init done \n");
         print_current_state();
@@ -151,7 +170,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    link->setTimeout(500us);
+    link->setTimeout(10ms);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
@@ -163,7 +182,7 @@ int main(int argc, char* argv[])
     }
 
     int64_t last_error = 0;
-    for (int64_t i = 0; i < LOOP_NUMBER; ++i)
+    for (int64_t i = 1; i < LOOP_NUMBER; ++i)
     {
         sleep(1ms);
 
@@ -201,9 +220,16 @@ int main(int argc, char* argv[])
                 easycat.output.data[0] = 0;
             }
 
-            if ((i % 1000) == 0)
+            if ((i % 10000) == 0)
             {
                 printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", easycat.address, toString(easycat.error_counters).c_str());
+            }
+
+            if ((i % 1000) == 0)
+            {
+                sleep(60ms); // trigger watchdog
+                print_current_state();
+                printf("\n");
             }
 
             microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);

@@ -51,6 +51,8 @@ int main(int argc, char* argv[])
 
             for (auto& slave : slaves)
             {
+                auto raw = t1.count();
+                slave.write(0x1000, &raw, sizeof(decltype(raw)));
                 slave.processDatagram(header, data, wkc);
             }
         }

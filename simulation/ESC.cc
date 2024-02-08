@@ -14,10 +14,10 @@ namespace kickcat
         memory_.esc_configuration = 0x01;
 
         // Default value is 'Request INIT State'
-        memory_.al_control = 0x0001;
+        memory_.al_control = State::INIT;
 
         // Default value is 'INIT State'
-        memory_.al_status = 0x0001;
+        memory_.al_status = State::INIT;
 
         // eeprom never busy because the data are processed in sync with the request.
         memory_.eeprom_control &= ~0x8000;
@@ -155,7 +155,6 @@ namespace kickcat
         return computeInternalMemoryAccess(address, const_cast<void*>(data), size, Access::PDI_WRITE);
     }
 
-
     int32_t ESC::read(uint16_t address, void* data, uint16_t size)
     {
         return computeInternalMemoryAccess(address, data, size, Access::PDI_READ);
@@ -169,16 +168,57 @@ namespace kickcat
     }
 
 
+    uint16_t ESC::processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, uint8_t* data)
+    {
+        int wkc = 0;
+        for (auto const& pdo : pdos)
+        {
+            auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
+            if (to_copy == 0)
+            {
+                continue;
+            }
+
+            if (read)
+            {
+                std::memcpy(frame, internal, to_copy);
+            }
+            else
+            {
+                std::memcpy(internal, frame, to_copy);
+                lastLogicalWrite_ = since_epoch();   // update watchdog
+            }
+            ++wkc;
+        }
+        return wkc;
+    };
+
+
+    void ESC::processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    {
+        *wkc += processPDO(rx_pdos_, true, header, data);
+    }
+
+    void ESC::processLWR(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    {
+        *wkc += processPDO(tx_pdos_, false, header, data);
+    }
+
+    void ESC::processLRW(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    {
+        // WARNING: read and writing the same area is not supported yet!
+
+        *wkc += processPDO(rx_pdos_, true,  header, data);
+        *wkc += processPDO(tx_pdos_, false, header, data) * 2;
+    }
+
+
     void ESC::processEcatRequest(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         auto [position, offset] = extractAddress(header->address);
         switch (header->command)
         {
-            case Command::NOP :
-            {
-                break;
-            }
-
+            //************* Auto Inc. *************//
             case Command::APRD:
             {
                 if (position == 0)
@@ -209,6 +249,8 @@ namespace kickcat
                 header->address = createAddress(position, offset);
                 break;
             }
+
+            //************* Fixed Pos. ************//
             case Command::FPRD:
             {
                 if (position == memory_.station_address)
@@ -233,75 +275,23 @@ namespace kickcat
                 }
                 break;
             }
-            case Command::BRD:
-            {
-                processReadCommand(header, data, wkc, offset);
-                break;
-            }
-            case Command::BWR:
-            {
-                processWriteCommand(header, data, wkc, offset);
-                break;
-            }
-            case Command::BRW:
-            {
-                processReadWriteCommand(header, data, wkc, offset);
-                break;
-            }
-            case Command::LRD:
-            {
-                for (auto const& pdo : rx_pdos_)
-                {
-                    auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
-                    if (to_copy == 0)
-                    {
-                        continue;
-                    }
-                    std::memcpy(frame, internal, to_copy);
-                    *wkc += 1;
-                }
-                break;
-            }
-            case Command::LWR:
-            {
-                for (auto const& pdo : tx_pdos_)
-                {
-                    auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
-                    if (to_copy == 0)
-                    {
-                        continue;
-                    }
-                    std::memcpy(internal, frame, to_copy);
-                    *wkc += 1;
-                }
-                break;
-            }
-            case Command::LRW:
-            {
-                for (auto const& pdo : rx_pdos_)
-                {
-                    auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
-                    if (to_copy == 0)
-                    {
-                        continue;
-                    }
-                    std::memcpy(frame, internal, to_copy);
-                    *wkc += 1;
-                }
-                for (auto const& pdo : tx_pdos_)
-                {
-                    auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
-                    if (to_copy == 0)
-                    {
-                        continue;
-                    }
-                    std::memcpy(internal, frame, to_copy);
-                    *wkc += 2;
-                }
-                break;
-            }
+
+            //************* Broadcast *************//
+            case Command::BRD:  { processReadCommand     (header, data, wkc, offset); break; }
+            case Command::BWR:  { processWriteCommand    (header, data, wkc, offset); break; }
+            case Command::BRW:  { processReadWriteCommand(header, data, wkc, offset); break; }
+
+            //************** Logical **************//
+            case Command::LRD:  { processLRD(header, data, wkc); break; }
+            case Command::LWR:  { processLWR(header, data, wkc); break; }
+            case Command::LRW:  { processLRW(header, data, wkc); break; }
+
+            //******** Auto Inc. Multiples ********//
             case Command::ARMW: { break; }
             case Command::FRMW: { break; }
+
+            //*************** Misc. ***************//
+            case Command::NOP:  { break; }
         }
     }
 
@@ -319,19 +309,18 @@ namespace kickcat
 
             switch (current)
             {
-                case State::BOOT:
-                {
-                    break;
-                }
-                case State::INIT:
-                {
-                    break;
-                }
+                case State::BOOT: { break; }
+                case State::INIT: { break; }
                 case State::PRE_OP:
                 {
                     if (before == State::INIT)
                     {
                         configureSMs();
+
+                        seconds_f wdgPDI = pdiWatchdog();
+                        seconds_f wdgPDO = pdoWatchdog();
+                        simu_info("PDI watchdog: %04fs\n", wdgPDI.count());
+                        simu_info("PDO watchdog: %04fs\n", wdgPDO.count());
                     }
                     break;
                 }
@@ -343,14 +332,8 @@ namespace kickcat
                     }
                     break;
                 }
-                case State::OPERATIONAL:
-                {
-                    break;
-                }
-                default:
-                {
-
-                }
+                case State::OPERATIONAL: { break; }
+                default: {}
             }
             changeState_(before, current);
         }
@@ -395,6 +378,8 @@ namespace kickcat
                 break;
             }
         }
+
+        checkWatchdog();
     }
 
 
@@ -522,5 +507,50 @@ namespace kickcat
         uint32_t frame_offset = address_min - start_logical_address;
 
         return {data + frame_offset, pdo.physical_address + phys_offset, to_copy};
+    }
+
+
+    nanoseconds ESC::pdiWatchdog()
+    {
+        nanoseconds divider = (memory_.watchdog_divider + 2) * 40ns;
+        return memory_.watchdog_time_pdi * divider;
+    }
+
+
+    nanoseconds ESC::pdoWatchdog()
+    {
+        nanoseconds divider = (memory_.watchdog_divider + 2) * 40ns;
+        return memory_.watchdog_time_process_data * divider;
+    }
+
+
+    void ESC::checkWatchdog()
+    {
+        // Warning: PDI watchdog not handled yet!
+
+        nanoseconds delay = pdoWatchdog();
+        if (delay == 0ns)
+        {
+            return; // watchdog deactivated
+        }
+
+        if ((lastLogicalWrite_ + delay) < since_epoch())
+        {
+            // Watchog OK
+            memory_.watchdog_status_process_data = 0;
+            return;
+        }
+
+        // Watchog Triggered - detect front
+        if (memory_.watchdog_status_process_data == 0)
+        {
+            // Increase PDO wdg counter and reflect the current state
+            memory_.watchdog_status_process_data = 1;
+
+            if (memory_.watchdog_counter_process_data < 0xFF)
+            {
+                memory_.watchdog_counter_process_data++;
+            }
+        }
     }
 }
