@@ -26,14 +26,14 @@ namespace kickcat
 
         os << "\nSII size: " << std::dec << slave.sii.buffer.size() * sizeof(uint32_t) << "\n";
 
-        for (size_t i = 0; i < slave.sii.fmmus_.size(); ++i)
+        for (size_t i = 0; i < slave.sii.fmmus.size(); ++i)
         {
-            os << "FMMU[" << std::to_string(i) << "] " << fmmuTypeToString(slave.sii.fmmus_[i]) << "\n";
+            os << "FMMU[" << std::to_string(i) << "] " << fmmuTypeToString(slave.sii.fmmus[i]) << "\n";
         }
 
-        for (size_t i = 0; i < slave.sii.syncManagers_.size(); ++i)
+        for (size_t i = 0; i < slave.sii.syncManagers.size(); ++i)
         {
-            auto const& sm = slave.sii.syncManagers_[i];
+            auto const& sm = slave.sii.syncManagers[i];
             os << "SM[" << std::dec << i << "] config\n";
             os << "     physical address: " << "0x" << std::hex << sm->start_adress << "\n";
             os << "     length:           " << std::dec << sm->length << "\n";
@@ -77,17 +77,20 @@ namespace kickcat
     }
 
 
-    std::string fmmuTypeToString(uint8_t fmmu_type)
+    void printESC(Slave const& slave)
     {
-        // see ETG2010_S_R_v1i0i0_EtherCATSIISpecification
-        switch (fmmu_type)
-        {
-            case 0:  {return "Unused";}
-            case 1:  {return "Outputs (Slave to Master)";}
-            case 2:  {return "Inputs  (Master to Slave)";}
-            case 3:  {return "SyncM Status (Read Mailbox)";}
-            default: {return "Unused";}
-        }
+        printf( "\n **** ESC Description ****\n" );
+        printf("Type:          %s (0x%x)\n", typeToString(slave.esc.type), slave.esc.type);
+        printf("Revision:      0x%02x\n", slave.esc.revision);
+        printf("Build:         0x%04x\n", slave.esc.build);
+        printf("FMMUs:         %d\n", slave.esc.fmmus);
+        printf("SyncManagers:  %d\n", slave.esc.syncManagers);
+        printf("RAM Size:      %d KB\n", slave.esc.ram_size);
+        printf("Port 0:        %s\n", portToString(slave.esc.ports >> 0));
+        printf("Port 1:        %s\n", portToString(slave.esc.ports >> 2));
+        printf("Port 2:        %s\n", portToString(slave.esc.ports >> 4));
+        printf("Port 3:        %s\n", portToString(slave.esc.ports >> 6));
+        printf("Features:      \n%s\n", featuresToString(slave.esc.features).c_str());
     }
 
 
@@ -105,5 +108,177 @@ namespace kickcat
                 printf( "Slave %04x parent : master \n", it.first);
             }
         }
+    }
+
+
+
+    char const* fmmuTypeToString(uint8_t fmmu_type)
+    {
+        // see ETG2010_S_R_v1i0i0_EtherCATSIISpecification
+        switch (fmmu_type)
+        {
+            case 0:  {return "Unused";}
+            case 1:  {return "Outputs (Slave to Master)";}
+            case 2:  {return "Inputs  (Master to Slave)";}
+            case 3:  {return "SyncM Status (Read Mailbox)";}
+            default: {return "Unused";}
+        }
+    }
+
+
+    char const* typeToString(uint8_t esc_type)
+    {
+        switch (esc_type)
+        {
+            case 0x01: { return "First terminals"; }
+            case 0x02: { return "ESC10, ESC20";    }
+            case 0x03: { return "First EK1100";    }
+            case 0x04: { return "IP Core";         }
+            case 0x05: { return "Internal FPGA";   }
+            case 0x11: { return "ET1100";          }
+            case 0x12: { return "ET1200";          }
+            case 0x91: { return "TMS320F2838x";    }
+            case 0x98: { return "XMC4800";         }
+            case 0xc0: { return "LAN9252";         }
+            default:   { return "Unknown";         }
+        }
+    }
+
+    char const* portToString(uint8_t esc_port_desc)
+    {
+        switch (esc_port_desc & 0x3)
+        {
+            case 0:   { return "Not implemented";             }
+            case 1:   { return "Not configured (SII EEPROM)"; }
+            case 2:   { return "EBUS";                        }
+            case 3:   { return "MII";                         }
+            default:  { return "Unreachable";                 }
+        }
+    }
+
+    std::string featuresToString(uint16_t esc_features)
+    {
+        std::string features;
+
+        features += " - FMMU:                            ";
+        if (esc_features & (1 << 0))
+        {
+            features += "Byte-oriented\n";
+        }
+        else
+        {
+            features += "Bit-oriented\n";
+        }
+
+        features += " - Unused register access:          ";
+        if (esc_features & (1 << 1))
+        {
+            features += "not supported\n";
+        }
+        else
+        {
+            features += "allowed\n";
+        }
+
+        features += " - Distributed clocks:              ";
+        if (esc_features & (1 << 2))
+        {
+            features += "available\n";
+        }
+        else
+        {
+            features += "not available\n";
+        }
+
+        features += " - Distributed clocks (width):      ";
+        if (esc_features & (1 << 3))
+        {
+            features += "64 bits\n";
+        }
+        else
+        {
+            features += "32 bits\n";
+        }
+
+        features += " - Low jitter EBUS:                 ";
+        if (esc_features & (1 << 4))
+        {
+            features += "available, jitter minimized\n";
+        }
+        else
+        {
+            features += "not available, standard jitter\n";
+        }
+
+        features += " - Enhanced Link Detection EBUS:    ";
+        if (esc_features & (1 << 5))
+        {
+            features += "available\n";
+        }
+        else
+        {
+            features += "not available\n";
+        }
+
+        features += " - Enhanced Link Detection MII:     ";
+        if (esc_features & (1 << 6))
+        {
+            features += "available\n";
+        }
+        else
+        {
+            features += "not available\n";
+        }
+
+        features += " - Separate handling of FCS errors: ";
+        if (esc_features & (1 << 7))
+        {
+            features += "available\n";
+        }
+        else
+        {
+            features += "not available\n";
+        }
+
+        features += " - Enhanced DC SYNC Activation:     ";
+        if (esc_features & (1 << 8))
+        {
+            features += "available\n";
+        }
+        else
+        {
+            features += "not available\n";
+        }
+
+        features += " - EtherCAT LRW support:            ";
+        if (esc_features & (1 << 9))
+        {
+            features += "not available\n";
+        }
+        else
+        {
+            features += "available\n";
+        }
+
+        features += " - EtherCAT read/write support:     ";
+        if (esc_features & (1 << 10))
+        {
+            features += "not available\n";
+        }
+        else
+        {
+            features += "available\n";
+        }
+
+        features += " - Fixed FMMU/SM configuration:     ";
+        if (esc_features & (1 << 11))
+        {
+            features += "fixed\n";
+        }
+        else
+        {
+            features += "variable\n";
+        }
+        return features;
     }
 }

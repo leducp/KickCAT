@@ -10,6 +10,16 @@ namespace kickcat
     ESC::ESC(std::string const& eeprom)
         : memory_{}
     {
+        // Configure ESC constants
+        memory_.type            = 0x04;     // IP Core
+        memory_.revision        = 3;        // IP Core major version
+        memory_.build           = 0x0301;   // v3.0.1
+        memory_.ffmus_supported = 8;
+        memory_.sync_managers_supported = 8;
+        memory_.ram_size        = 60;       // 60KB, IP Core max
+        memory_.port_desc       = 0x0f;     // 2 ports (0, 1), MII
+        memory_.esc_features    = 0x01cc;
+
         // Device emulation is ON
         memory_.esc_configuration = 0x01;
 
@@ -34,6 +44,8 @@ namespace kickcat
         eeprom_.resize(size / 2); // vector of uint16_t so / 2 since the size is in byte
         eeprom_file.read((char*)eeprom_.data(), size);
         eeprom_file.close();
+
+        memory_.station_alias = eeprom_[4]; // fourth word of eeprom, at first load
     }
 
 
@@ -206,10 +218,11 @@ namespace kickcat
 
     void ESC::processLRW(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
-        // WARNING: read and writing the same area is not supported yet!
+        uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
+        std::memcpy(swap, data, header->len);
 
-        *wkc += processPDO(rx_pdos_, true,  header, data);
-        *wkc += processPDO(tx_pdos_, false, header, data) * 2;
+        *wkc += processPDO(rx_pdos_, true,  header, data);      // read directly in the frame
+        *wkc += processPDO(tx_pdos_, false, header, swap) * 2;  // write from the swap
     }
 
 
@@ -406,12 +419,13 @@ namespace kickcat
     void ESC::processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
-        int32_t read    = computeInternalMemoryAccess(offset, swap, header->len, Access::ECAT_READ);
-        int32_t written = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_WRITE);
+        std::memcpy(swap, data, header->len);
+
+        int32_t read    = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_READ);    // read directly to the frame
+        int32_t written = computeInternalMemoryAccess(offset, swap, header->len, Access::ECAT_WRITE);   // write from the swap
 
         if (read > 0)
         {
-            std::memcpy(data, swap, read);
             *wkc += 1;
         }
         if (written > 0)

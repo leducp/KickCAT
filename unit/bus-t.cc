@@ -91,7 +91,7 @@ public:
         handleReplyWriteThenRead();
 
         // reset slaves
-        for (int i = 0; i < 9; ++i)
+        for (int i = 0; i < 10; ++i)
         {
             checkSendFrameSimple(Command::BWR);
             handleReplyWriteThenRead();
@@ -129,6 +129,10 @@ public:
         // set addresses
         checkSendFrameSimple(Command::APWR);
         handleReplyWriteThenRead();
+
+        // fetch ESC
+        checkSendFrameSimple(Command::FPRD);
+        io_nominal->handleReply<ESCDescription>({ESCDescription{0x4, 0, 0, 8, 8, 16, 0xf, 0x1cc}});
 
         // request state: INIT
         checkSendFrameSimple(Command::BWR);

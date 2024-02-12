@@ -123,6 +123,7 @@ namespace kickcat
         void writeEeprom(Slave& slave, uint16_t address, void* data, uint16_t size);
 
         void resetSlaves(nanoseconds watchdog);
+        void fetchESC();
 
     protected: // for unit testing
         // helper with trivial bus management (write then read)

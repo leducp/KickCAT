@@ -218,6 +218,18 @@ namespace kickcat
     constexpr uint8_t  PDI_EMULATION = 0x1; // is PDI config emulated
     constexpr uint16_t AL_CONTROL_ERR_ACK = 0x10;
 
+    struct ESCDescription
+    {
+        uint8_t type;
+        uint8_t revision;
+        uint16_t build;
+        uint8_t fmmus;
+        uint8_t syncManagers;
+        uint8_t ram_size;
+        uint8_t ports;
+        uint16_t features;
+    }__attribute__((__packed__));
+
     struct DLStatus
     {
         uint16_t  PDI_op : 1,
