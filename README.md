@@ -112,7 +112,7 @@ A simple slave stack is under development. A working example based on Nuttx RTOS
 
 KickCAT versions follow the rules of semantic versioning https://semver.org/
 
-On major version update, a process of testing starts. The version is in alpha phase until API stabilization. Then we 
+On major version update, a process of testing starts. The version is in alpha phase until API stabilization. Then we
 switch to release candidate (-rcx). To leave a release candidate state, it is required that:
 
 - the software is tested intensivly (at least 5 continuous days - 24*5 hours) without detecting a bug (realtime loss, crash, memory leak...).
@@ -127,7 +127,7 @@ https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/12
 https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf
 
 protocol:
-https://download.beckhoff.com/download/document/io/ethercat-development-products/ethercat_esc_datasheet_sec1_technology_2i2.pdf
+https://download.beckhoff.com/download/document/io/ethercat-development-products/ethercat_esc_datasheet_sec1_technology_2i3.pdf
 
 registers:
 https://download.beckhoff.com/download/Document/io/ethercat-development-products/ethercat_esc_datasheet_sec2_registers_3i0.pdf
@@ -143,7 +143,10 @@ https://www.automation.com/en-us/articles/2014-2/diagnostics-with-ethercat-part-
 https://infosys.beckhoff.com/english.php?content=../content/1033/ethercatsystem/1072509067.html&id=
 https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z000000kHwESAU
 
+esc comparison:
+https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf
+
 ## Update Conan Recipe on conan center
 Kickcat is available on **conan-io**. Whenever there is a new tag:
-1. Create a new PR on https://github.com/conan-io/conan-center-index 
+1. Create a new PR on https://github.com/conan-io/conan-center-index
 2. Follow PR: https://github.com/conan-io/conan-center-index/pull/19482 to add new versions to the recipe

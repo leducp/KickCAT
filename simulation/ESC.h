@@ -185,11 +185,21 @@ namespace kickcat
         void processWriteCommand    (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
         void processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
 
+        void processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
+        void processLWR(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
+        void processLRW(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
+        uint16_t processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, uint8_t* data);
+
         void configureSMs();
         void configurePDOs();
 
         int32_t computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access);
         std::tuple<uint8_t*, uint8_t*, uint16_t> computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo);
+
+        nanoseconds pdiWatchdog();  // Get configured PDI watchdog
+        nanoseconds pdoWatchdog();  // Get configured PDO watchdog
+        void checkWatchdog();
+        nanoseconds lastLogicalWrite_;
 
         nanoseconds last_write_eeprom_{since_epoch()};
     };

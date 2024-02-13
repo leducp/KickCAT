@@ -28,7 +28,7 @@ namespace kickcat
     {
         for (int32_t i = 0; i < section_size; ++i)
         {
-            sii.fmmus_.push_back(*(section_start + i));
+            sii.fmmus.push_back(*(section_start + i));
         }
     }
 
@@ -39,7 +39,7 @@ namespace kickcat
 
         while (pos < end)
         {
-            sii.syncManagers_.push_back(reinterpret_cast<eeprom::SyncManagerEntry const*>(pos));
+            sii.syncManagers.push_back(reinterpret_cast<eeprom::SyncManagerEntry const*>(pos));
             pos += sizeof(eeprom::SyncManagerEntry);
         }
     }

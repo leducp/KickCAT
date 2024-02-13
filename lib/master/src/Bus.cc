@@ -86,6 +86,7 @@ namespace kickcat
         }
         resetSlaves(watchdogTimePDIO);
         setAddresses();
+        fetchESC();
 
         requestState(State::INIT);
         waitForState(State::INIT, 5000ms);
@@ -217,6 +218,7 @@ namespace kickcat
         broadcastWrite(reg::DC_SYSTEM_TIME,     param, 8);
         broadcastWrite(reg::DC_SYNC_ACTIVATION, param, 1);
         broadcastWrite(reg::ECAT_EVENT_MASK,    param, 2);
+        broadcastWrite(reg::WDOG_COUNTER_PDO,   param, 2);
 
         uint16_t dc_param = 0x1000; // reset value
         broadcastWrite(reg::DC_SPEED_CNT_START, &dc_param, sizeof(dc_param));
@@ -240,6 +242,31 @@ namespace kickcat
 
         // eeprom to master
         broadcastWrite(reg::EEPROM_CONFIG, param, 2);
+    }
+
+
+    void Bus::fetchESC()
+    {
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error while fetching Slave ESC description", state);
+        };
+
+        for (auto& slave : slaves_)
+        {
+            auto process = [this, &slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+                std::memcpy(&slave.esc, data, sizeof(ESCDescription));
+                return DatagramState::OK;
+            };
+
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::TYPE), nullptr, sizeof(ESCDescription), process, error);
+        }
+        link_->processDatagrams();
     }
 
 
@@ -386,9 +413,9 @@ namespace kickcat
                         mapping->size += pdo->bitlen;
                     }
                     mapping->bsize = bits_to_bytes(mapping->size);
-                    for (uint32_t i = 0; i < slave.sii.syncManagers_.size(); ++i)
+                    for (uint32_t i = 0; i < slave.sii.syncManagers.size(); ++i)
                     {
-                        auto sm = slave.sii.syncManagers_[i];
+                        auto sm = slave.sii.syncManagers[i];
                         if (sm->type == type)
                         {
                             mapping->sync_manager = i;
@@ -611,7 +638,7 @@ namespace kickcat
             };
 
             // Get SyncManager configuration from SII
-            auto& sii_sm = slave.sii.syncManagers_[mapping.sync_manager];
+            auto& sii_sm = slave.sii.syncManagers[mapping.sync_manager];
 
             SyncManager sm;
             FMMU fmmu;

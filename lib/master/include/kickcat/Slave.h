@@ -23,7 +23,7 @@ namespace kickcat
         /// \brief  Check the total number of errors since start of the slave
         /// \return True if too many errors detected since start of the slave. Return false otherwise.
         bool checkAbsoluteErrorCounters(int max_absolute_errors);
-        
+
         int countOpenPorts();
 
         uint16_t address;
@@ -50,8 +50,8 @@ namespace kickcat
             std::vector<uint32_t> buffer;
             std::vector<std::string_view> strings;
             eeprom::GeneralEntry const* general;
-            std::vector<uint8_t> fmmus_;
-            std::vector<eeprom::SyncManagerEntry const*> syncManagers_;
+            std::vector<uint8_t> fmmus;
+            std::vector<eeprom::SyncManagerEntry const*> syncManagers;
             std::vector<eeprom::PDOEntry const*> RxPDO;
             std::vector<eeprom::PDOEntry const*> TxPDO;
 
@@ -74,6 +74,8 @@ namespace kickcat
 
         ErrorCounters error_counters;
         int previous_errors_sum{0};
+
+        ESCDescription esc;
 
     private:
         void parseStrings(uint8_t const* section_start);

@@ -118,8 +118,8 @@ TEST(Slave, parse_SII)
 
     slave.parseSII();
     ASSERT_EQ(2, slave.sii.strings.size()); // 2 strings since 0 is unused
-    ASSERT_EQ(4, slave.sii.fmmus_.size());
-    ASSERT_EQ(1, slave.sii.syncManagers_.size());
+    ASSERT_EQ(4, slave.sii.fmmus.size());
+    ASSERT_EQ(1, slave.sii.syncManagers.size());
 }
 
 TEST(Slave, countOpenPorts)
