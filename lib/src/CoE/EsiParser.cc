@@ -1,0 +1,344 @@
+#include <algorithm>
+#include <stdexcept>
+
+#include "kickcat/CoE/EsiParser.h"
+
+using namespace tinyxml2;
+
+namespace kickcat::CoE
+{
+
+    const std::unordered_map<std::string, std::tuple<DataType, uint16_t>> EsiParser::BASIC_TYPES
+    {
+        {"BOOL",  {DataType::BOOLEAN,    1  }},
+        {"BYTE",  {DataType::BYTE,       8  }},
+        {"SINT",  {DataType::INTEGER8,   8  }},
+        {"USINT", {DataType::UNSIGNED8,  8  }},
+        {"INT",   {DataType::INTEGER16,  16 }},
+        {"UINT",  {DataType::UNSIGNED16, 16 }},
+        {"DINT",  {DataType::INTEGER32,  32 }},
+        {"UDINT", {DataType::UNSIGNED32, 32 }},
+        {"LINT",  {DataType::INTEGER64,  64 }},
+        {"ULINT", {DataType::UNSIGNED64, 64 }},
+        {"REAL",  {DataType::REAL32,     32 }},
+    };
+
+
+    Dictionary EsiParser::load(std::string const& file)
+    {
+        XMLError result = doc_.LoadFile(file.c_str());
+        if (result != XML_SUCCESS)
+        {
+            throw std::runtime_error(doc_.ErrorIDToName(result));
+        }
+
+        root_ = doc_.RootElement();
+
+        // Helper to find and check a child element, throw if not found
+        auto firstChildElement = [](XMLNode* node, char const* name) -> XMLElement*
+        {
+            auto element = node->FirstChildElement(name);
+            if (element == nullptr)
+            {
+                std::string desc = "Cannot find child element <";
+                desc += node->Value();
+                desc += "> -> ";
+                desc += name;
+                throw std::invalid_argument(desc);
+            }
+            return element;
+        };
+
+        // Position handler on main entry points
+        vendor_ = firstChildElement(root_, "Vendor");
+        desc_   = firstChildElement(root_, "Descriptions");
+
+        // jump on profile and associated dictionnary
+        devices_    = firstChildElement(desc_,       "Devices");
+        device_     = firstChildElement(devices_,    "Device");
+        profile_    = firstChildElement(device_,     "Profile");
+        dictionary_ = firstChildElement(profile_,    "Dictionary");
+        dtypes_     = firstChildElement(dictionary_, "DataTypes");
+        objects_    = firstChildElement(dictionary_, "Objects");
+
+        // Load dictionary
+        Dictionary dictionary;
+
+        // loop over dictionnary
+        auto node_object = objects_->FirstChild();
+        while (node_object)
+        {
+            CoE::Object obj = create(node_object);
+            dictionary.push_back(std::move(obj));
+            node_object = node_object->NextSibling();
+        }
+
+        return dictionary;
+    }
+
+    std::vector<uint8_t> EsiParser::loadHexBinary(XMLElement* node)
+    {
+        std::string field = node->GetText();
+        std::vector<uint8_t> data;
+        data.reserve(field.size() / 2); // 2 ascii character for one byte
+
+        // Extract hex, data is already LE
+        for (std::size_t i = 0; i < field.size(); i += 2)
+        {
+            std::string hex = field.substr(i, 2);
+            uint8_t byte = std::stoi(hex, nullptr, 16);
+            data.push_back(byte);
+        }
+
+        return data;
+    }
+
+    void EsiParser::loadDefaultData(XMLNode* node, Object& obj, Entry& entry)
+    {
+        auto node_default_data = node->FirstChildElement("Info")->FirstChildElement("DefaultData");
+        if (node_default_data == nullptr)
+        {
+            return;
+        }
+
+        auto data = loadHexBinary(node_default_data);
+        if (data.size() != (entry.bitlen / 8))
+        {
+            // throw ?
+            printf("Cannot load default data for 0x%04x.%d, expected size mismatch.\n"
+                    "-> Got %ld bits, expected: %d bit\n"
+                    "==> Skipping entry\n",
+                obj.index, entry.subindex,
+                data.size() * 8, entry.bitlen);
+        }
+        entry.data = malloc(entry.bitlen / 8);
+        std::memcpy(entry.data, data.data(), data.size());
+    }
+
+    uint16_t EsiParser::loadAccess(XMLNode* node)
+    {
+        uint16_t flags = 0;
+
+        auto node_flags = node->FirstChildElement("Flags");
+        if (node_flags == nullptr)
+        {
+            return flags;
+        }
+
+        auto node_access = node_flags->FirstChildElement("Access");
+        if (node_access != nullptr)
+        {
+            std::string access = node_access->GetText();
+
+            // global read rule
+            if (access == "rw" or access == "ro")
+            {
+                flags |= Access::READ;
+            }
+
+            // global write rule
+            if (access == "rw" or access == "wo")
+            {
+                flags |= Access::WRITE;
+            }
+
+            auto parseRestrictions = [](char const* raw_restrictions) -> uint16_t
+            {
+                if (raw_restrictions == nullptr)
+                {
+                    return Access::READ;
+                }
+
+                // lower the string
+                std::string restrictions{raw_restrictions};
+                std::transform(restrictions.begin(), restrictions.end(), restrictions.begin(),
+                    [](char c){ return std::tolower(c); });
+
+                uint16_t result = 0;
+                if (restrictions.find("preop")  != std::string::npos) { result |= Access::READ_PREOP;  }
+                if (restrictions.find("safeop") != std::string::npos) { result |= Access::READ_SAFEOP; }
+                if (restrictions.find("_op")    != std::string::npos) { result |= Access::READ_OP;     }
+                if (restrictions.find("op") == 0)                     { result |= Access::READ_OP;     }
+
+                return result;
+            };
+
+            // restrictions
+            uint16_t restrictions_mask = 0;
+            restrictions_mask |= (parseRestrictions(node_access->Attribute("ReadRestrictions"))  << 0);
+            restrictions_mask |= (parseRestrictions(node_access->Attribute("WriteRestrictions")) << 3);
+
+            flags &= restrictions_mask;
+        }
+        else
+        {
+            flags |= Access::READ; // Default value
+        }
+
+        auto node_pdo_mapping = node_flags->FirstChildElement("PdoMapping");
+        if (node_pdo_mapping != nullptr)
+        {
+            std::string mapping = node_pdo_mapping->GetText();
+            for (auto const& c : mapping)
+            {
+                if (std::tolower(c) == 'r') { flags |= Access::RxPDO; }
+                if (std::tolower(c) == 't') { flags |= Access::TxPDO; }
+            }
+        }
+
+        auto node_backup = node_flags->FirstChildElement("Backup");
+        if (node_backup != nullptr)
+        {
+            if (node_backup->GetText()[0] == '1') { flags |= Access::BACKUP; }
+        }
+
+        auto node_setting = node_flags->FirstChildElement("Setting");
+        if (node_setting != nullptr)
+        {
+            if (node_setting->GetText()[0] == '1') { flags |= Access::SETTING; }
+        }
+
+        return flags;
+    }
+
+    std::tuple<DataType, uint16_t> EsiParser::toType(XMLNode* node)
+    {
+        auto node_type = node->FirstChildElement("Type");
+        if (not node_type)
+        {
+            node_type = node->FirstChildElement("BaseType");
+        }
+        auto it = BASIC_TYPES.find(node_type->GetText());
+        if (it == BASIC_TYPES.end())
+        {
+            return {DataType::UNKNOWN, 0};
+        }
+        return it->second;
+    }
+
+
+    XMLNode* EsiParser::findNodeType(XMLNode* node)
+    {
+        std::string raw_type = node->FirstChildElement("Type")->GetText();
+
+        auto dtype = dtypes_->FirstChild();
+        while (dtype)
+        {
+            if (raw_type == dtype->FirstChildElement("Name")->GetText())
+            {
+                break;
+            }
+            dtype = dtype->NextSibling();
+        }
+
+        return dtype;
+    }
+
+
+    Object EsiParser::create(XMLNode* node)
+    {
+        Object object;
+        object.index = toNumber<uint16_t>(node->FirstChildElement("Index"));
+        object.name  = node->FirstChildElement("Name")->GetText();
+        auto [type, bitlen] = toType(node);
+        if (isBasic(type))
+        {
+            // Basic type: no subindex in the ESI file because it is defined directly in the object node.
+            object.code = ObjectCode::VAR;
+            object.entries.resize(1);
+            auto& entry = object.entries.at(0);
+            entry.subindex = 0;
+            entry.bitlen = bitlen;
+            entry.type = type;
+            entry.access = loadAccess(node);
+
+            loadDefaultData(node, object, entry);
+
+            return object;
+        }
+
+        auto node_type = findNodeType(node);
+        auto node_subitem = node_type->FirstChildElement("SubItem");
+        while (node_subitem)
+        {
+            Entry entry;
+            auto node_name = node_subitem->FirstChildElement("Name");
+            if (node_name)
+            {
+                entry.description = node_name->GetText();
+            }
+
+            auto [subitem_type, subitem_bitlen] = toType(node_subitem);
+            if (isBasic(subitem_type))
+            {
+                object.code  = ObjectCode::RECORD;
+
+                entry.type   = subitem_type;
+                entry.bitlen = subitem_bitlen;
+                entry.subindex = toNumber<uint8_t>(node_subitem->FirstChildElement("SubIdx"));
+                entry.access = loadAccess(node_subitem);
+
+                object.entries.push_back(std::move(entry));
+            }
+            else
+            {
+                object.code = ObjectCode::ARRAY;
+
+                auto node_array_type = findNodeType(node_subitem);
+                auto [array_type, array_bitlen] = toType(node_array_type);
+                entry.type   = array_type;
+                entry.bitlen = array_bitlen;
+                entry.access = loadAccess(node_subitem);
+
+                auto node_array_info = node_array_type->FirstChildElement("ArrayInfo");
+                uint8_t lbound = toNumber<uint8_t>(node_array_info->FirstChildElement("LBound"));
+                if (lbound == 0)
+                {
+                    // one big entry which is an array:
+                    // - bitlen shall be updated accordingly
+                    // - elements cannot be used because it represents the internal elements, not the elements accessible
+                    //   through subindex
+                    entry.subindex = 1;
+                    entry.bitlen = toNumber<uint16_t>(node_array_type->FirstChildElement("BitSize"));
+                    object.entries.push_back(std::move(entry));
+                }
+                else
+                {
+                    // array entries are the subindex starting from 1, 0 is the array size
+                    uint8_t elements = toNumber<uint8_t>(node_array_info->FirstChildElement("Elements"));
+                    for (uint8_t i = 0; i < elements; ++i)
+                    {
+                        entry.subindex = i + 1;
+                        object.entries.push_back(std::move(entry));
+                    }
+                }
+            }
+
+            node_subitem = node_subitem->NextSiblingElement("SubItem");
+        }
+
+
+        // Set default data value
+        // Update name if possible by using the object node
+        auto object_subitem = node->FirstChildElement("Info")->FirstChildElement("SubItem");
+        auto entry = object.entries.begin();
+        for (auto& object_entry : object.entries)
+        {
+            if (object_subitem)
+            {
+                auto object_subitem_name = object_subitem->FirstChildElement("Name");
+                if (object_subitem_name)
+                {
+                    object_entry.description = object_subitem_name->GetText();
+                }
+
+                loadDefaultData(object_subitem, object, *entry);
+
+                entry++;
+                object_subitem = object_subitem->NextSiblingElement();
+            }
+        }
+
+        return object;
+    }
+}

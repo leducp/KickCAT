@@ -292,7 +292,7 @@ namespace kickcat
     };
     constexpr uint8_t MAILBOX_STATUS = (1 << 3);
 
-    std::string toString(SyncManagerType const& type);
+    char const* toString(SyncManagerType const& type);
 
     struct FMMU
     {
@@ -528,6 +528,7 @@ namespace kickcat
                     reserved : 3,
                     service : 4; // i.e. request, response
         } __attribute__((__packed__));
+        std::string toString(Header const* header); // Stringify the whole message, not just the header
 
         struct ServiceData      // ETG1000.6 chapter 5.6.2 SDO
         {
@@ -543,9 +544,9 @@ namespace kickcat
         struct ServiceDataInfo // ETG1000.6 chapter 5.6.3 SDO Information
         {
             uint16_t opcode : 7,
-                    incomplete : 1,
-                    reserved : 8;
-            uint16_t index;
+                     incomplete : 1,
+                     reserved : 8;
+            uint16_t fragments_left;
         } __attribute__((__packed__));
 
         struct Emergency        // ETG1000.6 chapter 5.6.4 Emergency
@@ -554,6 +555,7 @@ namespace kickcat
             uint8_t  error_register;
             uint8_t  data[5];
         } __attribute__((__packed__));
+        std::string toString(Emergency const& emg);
 
         enum Service
         {
@@ -577,6 +579,8 @@ namespace kickcat
                 constexpr uint8_t UPLOAD             = 0x02;
                 constexpr uint8_t UPLOAD_SEGMENTED   = 0x03;
                 constexpr uint8_t ABORT              = 0x04;
+
+                char const* toString(uint8_t command);
             }
 
             namespace response

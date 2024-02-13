@@ -1,5 +1,6 @@
 [requires]
 gtest/1.12.1
+tinyxml2/10.0.0
 
 [generators]
 CMakeDeps

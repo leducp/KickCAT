@@ -1,0 +1,4 @@
+add_executable(load_esi load_esi.cc ${OS_SRCS})
+target_include_directories(load_esi PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(load_esi common kickcat)
+set_kickcat_properties(load_esi)

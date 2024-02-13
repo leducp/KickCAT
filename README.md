@@ -69,7 +69,7 @@ Note: you can easily provide GTest via conan package manager:
   ```
   mkdir -p build
   cd build
-  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_linux_x86_64.txt --build=missing -s build_type=Debug
+  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_linux_x86_64.txt -pr:b ../conan/profile_linux_x86_64.txt --build=missing -s build_type=Debug
   ```
   Beware `-s build_type` must be consistent with `CMAKE_BUILD_TYPE` otherwise gtest will not be found.
 
@@ -91,6 +91,7 @@ A simple slave stack is under development. A working example based on Nuttx RTOS
 - Can go from INIT to PRE-OP to SAFE-OP to OP with proper verification for each transition.
 - Can read and write PI
 - Supports ESC Lan9252 through SPI.
+- Supports XMC4800 ESC (with NuttX RTOS)
 - Tools available to flash/dump eeprom from ESC.
 
 
