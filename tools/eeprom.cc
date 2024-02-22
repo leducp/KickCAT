@@ -154,6 +154,8 @@ int main(int argc, char* argv[])
             fflush(stdout);
         }
         printf("\n");
+
+        printf("Wait for Err led to go off on the board.\nReset device to trigger reloading of new EEPROM.\n");
     }
     return 0;
 }

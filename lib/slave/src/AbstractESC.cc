@@ -28,7 +28,7 @@ namespace kickcat
                         (sm_read.length == sm_ref.length) and
                         (sm_read.control == sm_ref.control);
 
-        printf("SM read %i: start address %x, length %u, control %x status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
+        printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
         return is_valid;
     }
 
@@ -102,8 +102,6 @@ namespace kickcat
         al_control_ &= ~AL_CONTROL_ERR_ACK;
         reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
         reportError(write(reg::AL_CONTROL, &al_control_, sizeof(al_control_))); // reset Error Ind Ack
-
-        printf("al_status %x, al_control %x \n", al_status_, al_control_);
     }
 
 
