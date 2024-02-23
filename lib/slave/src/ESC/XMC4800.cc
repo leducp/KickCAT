@@ -17,7 +17,7 @@ namespace kickcat
             return hresult::E_ERANGE;
         }
 
-        std::memcpy(data, (void*)(ECAT0_BASE_ADDRESS + address), size);
+        std::memcpy(data, reinterpret_cast<void*>(ECAT0_BASE_ADDRESS + address), size);
         return hresult::OK;
     }
 
@@ -29,7 +29,7 @@ namespace kickcat
             return hresult::E_ERANGE;
         }
 
-        std::memcpy((void*)(ECAT0_BASE_ADDRESS + address), data, size);
+        std::memcpy(reinterpret_cast<void*>(ECAT0_BASE_ADDRESS + address), data, size);
         return hresult::OK;
     }
 }

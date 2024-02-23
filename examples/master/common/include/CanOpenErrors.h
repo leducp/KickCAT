@@ -18,7 +18,7 @@ namespace kickcat
             case 0xFF01 : {return "Request by user program “emit” function\n";}
             case 0xFF02 : {return "DS 402 IP Underflow \n";}
 
-            //Motor fault
+            // Motor fault
             case 0x3120 : {return "Under-voltage: power supply is shut down or it has too high an output impedance\n";}
             case 0x2340 : {return "Short circuit: motor or its wiring may be defective, or drive is faulty\n";}
             case 0x3310 : {return "Over-voltage: power-supply voltage is too high or servo drive could not absorb kinetic energy while braking a load. A shunt resistor may be required\n";}
@@ -40,7 +40,7 @@ namespace kickcat
             case 0x8611 : {return "Position tracking error : exceeded position error limit ER[3], due to Bad tuning of position or speed controller / Too tight a position error tolerance / Abnormal motor load, a mechanical limit reached\n";}
             case 0x8680 : {return "Position limit exceeded\n";}
             case 0xFF10 : {return "Cannot start motor\n";}
-            
+
             default : {return "Unknown error\n";}
         }
     }
@@ -56,7 +56,7 @@ namespace kickcat
         if ((reg & (1U << 4)) == (1U << 4)) {result += " + COMMUNICATION_ERROR";}
         if ((reg & (1U << 5)) == (1U << 5)) {result += " + DEVICE_SPECIFIC";}
         if ((reg & (1U << 7)) == (1U << 7)) {result += " + MANUFACTURER_SPECIFIC";}
-        
+
         result += "\n";
         return result.c_str();
     }

@@ -1,6 +1,8 @@
 #ifndef KICKCAT_DEBUG_H
 #define KICKCAT_DEBUG_H
 
+#include "kickcat/Error.h"
+
 namespace kickcat
 {
 
