@@ -29,6 +29,7 @@ namespace kickcat
     #define SYNC_MANAGER_MBX_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x06}
 
 
+    // Regarding the state machine, see ETG1000.6 6.4.1 AL state machine
     class AbstractESC
     {
     public:
@@ -49,6 +50,9 @@ namespace kickcat
         void routine_preop();
         void routine_safeop();
         void routine_op();
+
+        void set_state_on_error(State state, StatusCode error_code);
+        void clear_error();
 
         uint16_t al_status() { return al_status_;};
 
@@ -71,7 +75,6 @@ namespace kickcat
 
         bool are_valid_output_data_ = false;
     };
-
 
 }
 #endif

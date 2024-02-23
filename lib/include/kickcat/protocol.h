@@ -140,6 +140,73 @@ namespace kickcat
 
     char const* ALStatus_to_string(int32_t code);
 
+    enum StatusCode : uint16_t
+    {
+        NO_ERROR                              = 0x0000,
+        UNSPECIFIED_ERROR                     = 0x0001,
+        NO_MEMORY                             = 0x0002,
+        INVALID_REVISION                      = 0x0004,
+        INVALID_DEVICE_SETUP                  = 0x0003,
+        SII_EEPROM_INFO_MISMATCH              = 0x0006,
+        FIRMWARE_UPDATE_UNSUCCESSFUL          = 0x0007,
+        LICENSE_ERROR                         = 0x000E,
+        INVALID_REQUESTED_STATE_CHANGE        = 0x0011,
+        UNKNOWN_REQUESTED_STATE               = 0x0012,
+        BOOTSTRAP_NOT_SUPPORTED               = 0x0013,
+        NO_VALID_FIRMWARE                     = 0x0014,
+        INVALID_MAILBOX_CONFIGURATION_BOOT    = 0x0015,
+        INVALID_MAILBOX_CONFIGURATION_PREOP   = 0x0016,
+        INVALID_SYNC_MANAGER_CONFIGURATION    = 0x0017,
+        NO_VALID_INPUTS_AVAILABLE             = 0x0018,
+        NO_VALID_OUTPUTS_AVAILABLE            = 0x0019,
+        SYNCHRONIZATION_ERROR                 = 0x001A,
+        SYNC_MANAGER_WATCHDOG                 = 0x001B,
+        INVALID_SYNC_MANAGER_TYPES            = 0x001C,
+        INVALID_OUTPUT_CONFIGURATION          = 0x001D,
+        INVALID_INPUT_CONFIGURATION           = 0x001E,
+        INVALID_WATCHDOG_CONFIGURATION        = 0x001F,
+        SLAVE_NEEDS_COLD_START                = 0x0020,
+        SLAVE_NEEDS_INIT                      = 0x0021,
+        SLAVE_NEEDS_PREOP                     = 0x0022,
+        SLAVE_NEEDS_SAFEOP                    = 0x0023,
+        INVALID_INPUT_MAPPING                 = 0x0024,
+        INVALID_OUTPUT_MAPPING                = 0x0025,
+        INCONSISTENT_SETTINGS                 = 0x0026,
+        FREERUN_NOT_SUPPORTED                 = 0x0027,
+        SYNCHRONIZATION_NOT_SUPPORTED         = 0x0028,
+        FREERUN_NEEDS_3_BUFFER_MODE           = 0x0029,
+        BACKGROUND_WATCHDOG                   = 0x002A,
+        NO_VALID_INPUTS_AND_OUTPUTS           = 0x002B,
+        FATAL_SYNC_ERROR                      = 0x002C,
+        NO_SYNC_ERROR                         = 0x002D,
+        CYCLE_TIME_TOO_SMALL                  = 0x002E,
+        INVALID_DC_SYNC_CONFIGURATION         = 0x0030,
+        INVALID_DC_LATCH_CONFIGURATION        = 0x0031,
+        PLL_ERROR                             = 0x0032,
+        DC_SYNC_IO_ERROR                      = 0x0033,
+        DC_SYNC_TIMEOUT_ERROR                 = 0x0034,
+        DC_INVALID_SYNC_CYCLE_TIME            = 0x0035,
+        DC_SYNC0_CYCLE_TIME                   = 0x0036,
+        DC_SYNC1_CYCLE_TIME                   = 0x0037,
+        MBX_AOE                               = 0x0041,
+        MBX_EOE                               = 0x0042,
+        MBX_COE                               = 0x0043,
+        MBX_FOE                               = 0x0044,
+        MBX_SOE                               = 0x0045,
+        MBX_VOE                               = 0x004F,
+        EEPROM_NO_ACCESS                      = 0x0050,
+        EEPROM_ERROR                          = 0x0051,
+        EXTERNAL_HARDWARE_NOT_READY           = 0x0052,
+        SLAVE_RESTARTED_LOCALLY               = 0x0060,
+        DEVICE_IDENTIFICATION_VALUE_UPDATED   = 0x0061,
+        DETECTED_MODULE_IDENT_LIST_MISMATCH   = 0x0070,
+        SUPPLY_VOLTAGE_TOO_LOW                = 0x0080,
+        SUPPLY_VOLTAGE_TOO_HIGH               = 0x0081,
+        TEMPERATURE_TOO_LOW                   = 0x0082,
+        TEMPERATURE_TOO_HIGH                  = 0x0083,
+        APPLICATION_CONTROLLER_AVAILABLE      = 0x00F0
+    };
+
     //TODO need unit test on bitfield to check position !
 
     // EtherCAT standard registers
@@ -217,6 +284,7 @@ namespace kickcat
 
     constexpr uint8_t  PDI_EMULATION = 0x1; // is PDI config emulated
     constexpr uint16_t AL_CONTROL_ERR_ACK = 0x10;
+    constexpr uint16_t AL_STATUS_ERR_IND = 0x10;
 
     struct ESCDescription
     {
