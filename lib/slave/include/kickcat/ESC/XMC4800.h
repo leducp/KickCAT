@@ -20,8 +20,6 @@ namespace kickcat
         hresult read(uint16_t address, void* data, uint16_t size) override;
 
         hresult write(uint16_t address, void const* data, uint16_t size) override;
-
-    private:
     };
 }
 
