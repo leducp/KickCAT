@@ -65,6 +65,7 @@ namespace kickcat
         if (al_control_ & State::INIT)
         {
             al_status_ = State::INIT;
+            clear_error();
         }
 
         // ETG 1000.6 Table 99 – Primitives issued by ESM to Application
@@ -99,9 +100,7 @@ namespace kickcat
             }
         }
 
-        al_control_ &= ~AL_CONTROL_ERR_ACK;
         reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
-        reportError(write(reg::AL_CONTROL, &al_control_, sizeof(al_control_))); // reset Error Ind Ack
     }
 
 
@@ -175,6 +174,10 @@ namespace kickcat
                 // error flag
             }
         }
+        else if (al_control_ & State::PRE_OP)
+        {
+            al_status_ = State::PRE_OP;
+        }
     }
 
 
@@ -182,6 +185,15 @@ namespace kickcat
     {
         update_process_data_input();
         update_process_data_output();
+
+        if (al_control_ & State::PRE_OP)
+        {
+            al_status_ = State::PRE_OP;
+        }
+        else if (al_control_ & State::SAFE_OP)
+        {
+            al_status_ = State::SAFE_OP;
+        }
     }
 
 
@@ -209,5 +221,22 @@ namespace kickcat
     {
         printf("Set valid output data received \n");
         are_valid_output_data_ = are_valid_output;
+    }
+
+
+    void AbstractESC::set_state_on_error(State state, StatusCode error_code)
+    {
+        reportError(write(reg::AL_STATUS_CODE, &error_code, sizeof(error_code)));
+        al_status_ = state | AL_STATUS_ERR_IND;
+        reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
+    }
+
+
+    void AbstractESC::clear_error()
+    {
+        StatusCode code = StatusCode::NO_ERROR;
+        reportError(write(reg::AL_STATUS_CODE, &code, sizeof(code)));
+        al_status_ &= ~ AL_STATUS_ERR_IND;
+        reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
     }
 }

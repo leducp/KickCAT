@@ -118,7 +118,7 @@ namespace kickcat
             case 0x0051:    { return "EEPROM access error";         }
             case 0x0052:    { return "External hardware not ready"; }
 
-            case 0x0060:    { return "Slave Requested Locally";             }
+            case 0x0060:    { return "Slave Restarted Locally"; }
             case 0x0061:    { return "Device Identification Value updated"; }
 
             case 0x0070:    { return "Detected module ident list does not match"; }
