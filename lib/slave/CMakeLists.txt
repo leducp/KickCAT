@@ -12,5 +12,5 @@ if (NUTTX)
     ${CMAKE_CURRENT_SOURCE_DIR}/driver/nuttx/src/SPI.cc
   )
 
-  target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/driver/nuttx/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}driver/nuttx//include/kickcat/nuttx)
+  target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/driver/nuttx/include)
 endif()
