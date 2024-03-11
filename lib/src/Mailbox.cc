@@ -1,5 +1,6 @@
 #include <cstring>
 #include <algorithm>
+>>>>>>> Move mailbox in common part again, but add namespace to split request/response sides.:lib/src/Mailbox.cc
 #include <cinttypes>
 
 #include "Mailbox.h"

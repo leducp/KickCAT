@@ -1,8 +1,16 @@
 #include <cstring>
+<<<<<<< HEAD:lib/src/CoE/mailbox/request.cc
+=======
+#include <algorithm>
+>>>>>>> Move mailbox in common part again, but add namespace to split request/response sides.:lib/src/Mailbox.cc
 #include <cinttypes>
 
 #include "debug.h"
+<<<<<<< HEAD:lib/src/CoE/mailbox/request.cc
 #include "kickcat/CoE/mailbox/request.h"
+=======
+#include "CoE/Mailbox.h"
+>>>>>>> Move mailbox in common part again, but add namespace to split request/response sides.:lib/src/Mailbox.cc
 
 namespace kickcat::mailbox::request
 {
@@ -272,4 +280,204 @@ namespace kickcat::mailbox::request
         mailbox_.emergencies.push_back(*emg);
         return ProcessingResult::FINALIZE_AND_KEEP;
     }
+<<<<<<< HEAD:lib/src/CoE/mailbox/request.cc
 }
+=======
+
+
+    GatewayMessage::GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout)
+        : AbstractMessage(mailbox_size, timeout)
+    {
+        auto const* header = pointData<mailbox::Header>(raw_message);
+
+        // Copy raw message in internal data field
+        int32_t size = sizeof(mailbox::Header) + header->len;
+        std::memcpy(data_.data(), raw_message, size);
+
+        // Store gateway index to associate the reply with the request
+        gateway_index_ = gateway_index;
+
+        // Switch address field with gateway index and identifier
+        address_ = header_->address;
+        header_->address = mailbox::GATEWAY_MESSAGE_MASK | gateway_index;
+    }
+
+
+    ProcessingResult GatewayMessage::process(uint8_t const* received)
+    {
+        auto const* header = pointData<mailbox::Header>(received);
+
+        // Check if the message is associated to our gateway request
+        if (header->address != header_->address)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        // It is the reply to this request: store the result and set back the address field
+        int32_t size = header->len + sizeof(mailbox::Header);
+        data_.resize(size);
+        std::memcpy(data_.data(), received, size);
+
+        header_->address = address_;
+
+        status_ = MessageStatus::SUCCESS;
+        return ProcessingResult::FINALIZE;
+    }
+}
+
+
+namespace kickcat::mailbox::response
+{
+    Mailbox::Mailbox(AbstractESC* esc, SyncManagerConfig mbx_in, SyncManagerConfig mbx_out, uint16_t max_msgs)
+        : esc_{esc}
+        , mbx_in_{mbx_in}
+        , mbx_out_{mbx_out}
+        , max_msgs_{max_msgs}
+    {
+
+    }
+
+    void Mailbox::receive()
+    {
+        std::vector<uint8_t> raw_message;
+        raw_message.resize(mbx_in_.length);
+        int32_t read_bytes = esc_->read(mbx_in_.start_address, raw_message.data(), mbx_in_.length);
+        if (read_bytes != mbx_in_.length)
+        {
+            return;
+        }
+
+        auto const* header  = pointData<mailbox::Header>(raw_message.data());
+        if ((header->type == mailbox::ERR) or (header->len == 0))
+        {
+            replyError(std::move(raw_message), mailbox::Error::INVALID_HEADER);
+            return;
+        }
+
+        for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
+        {
+            ProcessingResult state = (*it)->process(raw_message);
+            switch (state)
+            {
+                case ProcessingResult::NOOP:
+                {
+                    continue;
+                }
+                case ProcessingResult::CONTINUE:
+                case ProcessingResult::FINALIZE_AND_KEEP:
+                {
+                    return;
+                }
+                case ProcessingResult::FINALIZE:
+                {
+                    it = to_process_.erase(it);
+                    return;
+                }
+                default: { }
+            }
+        }
+
+        if (to_process_.size() >= max_msgs_)
+        {
+            // Queue is full and no one process it: drop the message
+            replyError(std::move(raw_message), mailbox::Error::NO_MORE_MEMORY);
+            return;
+        }
+
+        // No message handle it: let's try to build a new one
+        for (auto& factory : factories_)
+        {
+            auto msg = factory(this, std::move(raw_message));
+            if (msg != nullptr)
+            {
+                to_process_.push_back(msg);
+                return;
+            }
+        }
+
+        // Nothing can be done with this message
+        replyError(std::move(raw_message), mailbox::Error::UNSUPPORTED_PROTOCOL);
+    }
+
+
+    void Mailbox::process()
+    {
+        for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
+        {
+            ProcessingResult state = (*it)->process();
+            switch (state)
+            {
+                case ProcessingResult::NOOP:
+                {
+                    continue;
+                }
+                case ProcessingResult::CONTINUE:
+                case ProcessingResult::FINALIZE_AND_KEEP:
+                {
+                    return;
+                }
+                case ProcessingResult::FINALIZE:
+                {
+                    it = to_process_.erase(it);
+                    return;
+                }
+                default: { }
+            }
+        }
+    }
+
+    void Mailbox::send()
+    {
+        if (to_send_.empty())
+        {
+            return;
+        }
+
+        auto& msg = to_send_.front();
+        int32_t written_bytes = esc_->write(mbx_out_.start_address, msg.data(), msg.size());
+        if (written_bytes > 0)
+        {
+            to_send_.pop();
+        }
+    }
+
+    void Mailbox::enableCoE()
+    {
+        factories_.push_back(&CoE::createSDOMessage);
+    }
+
+    void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
+    {
+        auto* header  = pointData<mailbox::Header>(raw_message.data());
+        auto* err     = pointData<mailbox::Error::ServiceData>(header);
+
+        header->type = mailbox::ERR;
+        header->len  = sizeof(mailbox::Error::ServiceData);
+        err->type    = 0x1;
+        err->detail  = code;
+
+        to_send_.push(std::move(raw_message));
+    }
+
+    AbstractMessage::AbstractMessage(Mailbox* mbx)
+        : mailbox_{mbx}
+    {
+
+    }
+
+    uint16_t AbstractMessage::replyExpectedSize()
+    {
+        return mailbox_->mbx_out_.length;
+    }
+
+    void AbstractMessage::reply(std::vector<uint8_t>&& reply)
+    {
+        mailbox_->to_send_.push(std::move(reply));
+    }
+
+    void AbstractMessage::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
+    {
+        mailbox_->replyError(std::move(raw_message), code);
+    }
+}
+>>>>>>> Move mailbox in common part again, but add namespace to split request/response sides.:lib/src/Mailbox.cc

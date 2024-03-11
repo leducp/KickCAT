@@ -365,8 +365,9 @@ namespace kickcat
 
     void AbstractESC::set_state_on_error(State state, StatusCode error_code)
     {
+        write(reg::AL_STATUS_CODE, &error_code, sizeof(error_code));
         set_al_status(state);
-        set_error(error_code);
+        write(reg::AL_STATUS, &al_status_, sizeof(al_status_));
     }
 
 
