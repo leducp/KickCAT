@@ -67,7 +67,7 @@ namespace kickcat
     } __attribute__((__packed__));
 
 
-    class Lan9252 : public AbstractESC
+    class Lan9252 final : public AbstractESC
     {
     public:
         Lan9252(std::shared_ptr<AbstractSPI> spi_interface);
@@ -75,8 +75,8 @@ namespace kickcat
 
         hresult init() override;
 
-        hresult read(uint16_t address, void* data, uint16_t size) override;
-        hresult write(uint16_t address, void const* data, uint16_t size) override;
+        int32_t read(uint16_t address, void* data, uint16_t size) override;
+        int32_t write(uint16_t address, void const* data, uint16_t size) override;
 
     private:
         template <typename T>

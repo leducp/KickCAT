@@ -37,8 +37,8 @@ namespace kickcat
         virtual ~AbstractESC() = default;
 
         virtual hresult init() = 0;
-        virtual hresult read(uint16_t address, void* data, uint16_t size) = 0;
-        virtual hresult write(uint16_t address, void const* data, uint16_t size) = 0;
+        virtual int32_t read(uint16_t address, void* data, uint16_t size) = 0;
+        virtual int32_t write(uint16_t address, void const* data, uint16_t size) = 0;
 
         void routine();
 

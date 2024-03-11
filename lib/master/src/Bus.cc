@@ -107,7 +107,7 @@ namespace kickcat
         {
             if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
             {
-                auto emg = std::make_shared<EmergencyMessage>(slave.mailbox);
+                auto emg = std::make_shared<mailbox::request::EmergencyMessage>(slave.mailbox);
                 slave.mailbox.to_process.push_back(emg);
             }
         }
@@ -1054,7 +1054,7 @@ namespace kickcat
     }
 
 
-    std::shared_ptr<GatewayMessage> Bus::addGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index)
+    std::shared_ptr<mailbox::request::GatewayMessage> Bus::addGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index)
     {
         mailbox::Header const* const mbx_header = reinterpret_cast<mailbox::Header const*>(raw_message);
 

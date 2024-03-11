@@ -556,7 +556,7 @@ namespace kickcat
     {
         enum Type // to put in Mailbox header type entry
         {
-            None  = 0x00,
+            ERR   = 0x00,
             AoE   = 0x01,  // ADS over EtherCAT
             EoE   = 0x02,  // Ethernet over EthercAT
             CoE   = 0x03,  // CANopen over EtherCAT
@@ -576,7 +576,29 @@ namespace kickcat
                     reserved : 1;
         } __attribute__((__packed__));
 
-        /// ETG 8200
+        /// ETG.1000.4 chapter 5.6 EtherCAT mailbox structure
+        namespace Error
+        {
+            struct ServiceData
+            {
+                uint16_t type;
+                uint16_t detail;
+            } __attribute__((__packed__));
+
+            constexpr uint16_t SYNTAX                   = 0x01;
+            constexpr uint16_t UNSUPPORTED_PROTOCOL     = 0x02;
+            constexpr uint16_t INVALID_CHANNEL          = 0x03;
+            constexpr uint16_t SERVICE_NOT_SUPPORTED    = 0x04;
+            constexpr uint16_t INVALID_HEADER           = 0x05;
+            constexpr uint16_t SIZE_TOO_SHORT           = 0x06;
+            constexpr uint16_t NO_MORE_MEMORY           = 0x07;
+            constexpr uint16_t INVALID_SIZE             = 0x08;
+            constexpr uint16_t SERVICE_IN_WORK          = 0x09;
+
+            char const* toString(uint16_t code);
+        }
+
+        /// ETG.8200
 
         // Bitmask to dissociate local message processing from gateway message processing
         constexpr uint16_t GATEWAY_MESSAGE_MASK = (1 << 15);
@@ -669,6 +691,46 @@ namespace kickcat
                 constexpr uint8_t GET_ED_LIST_REQ    = 0x05;
                 constexpr uint8_t GET_ED_LIST_RESP   = 0x06;
                 constexpr uint8_t SDO_INFO_ERROR_REQ = 0x07;
+            }
+
+            namespace abort
+            {
+                constexpr uint32_t TOGGLE_BIT_NOT_ALTERNATED    = 0x05030000;
+                constexpr uint32_t SDO_PROTOCOL_TIMEOUT         = 0x05040000;
+                constexpr uint32_t COMMAND_SPECIFIER_INVALID    = 0x05040001;
+                constexpr uint32_t INVALID_BLOCK_SIZE           = 0x05040002;
+                constexpr uint32_t INVALID_SEQUENCE_NUMBER      = 0x05040003;
+                constexpr uint32_t CRC_ERROR                    = 0x05040004;
+                constexpr uint32_t OUT_OF_MEMORY                = 0x05040005;
+                constexpr uint32_t UNSUPPORTED_ACCESS           = 0x06010000;
+                constexpr uint32_t READ_ONLY_ACCESS             = 0x06010001;
+                constexpr uint32_t WRITE_ONLY_ACCESS            = 0x06010002;
+                constexpr uint32_t SUBINDEX0_CANNOT_BE_WRITTEN  = 0x06010003;
+                constexpr uint32_t COMPLETE_ACCESS_UNSUPPORTED  = 0x06010004;
+                constexpr uint32_t OBJECT_TOO_BIG               = 0x06010005;
+                constexpr uint32_t OBJECT_MAPPED                = 0x06010006;
+                constexpr uint32_t OBJECT_DOES_NOT_EXIST        = 0x06020000;
+                constexpr uint32_t OBJECT_CANNOT_BE_MAPPED      = 0x06040041;
+                constexpr uint32_t PDO_LENGTH_EXCEEDED          = 0x06040042;
+                constexpr uint32_t PARAMETER_INCOMPATIBILITY    = 0x06040043;
+                constexpr uint32_t INTERNAL_INCOMPATIBILITY     = 0x06040047;
+                constexpr uint32_t HARDWARE_ERROR               = 0x06060000;
+                constexpr uint32_t DATA_TYPE_LENGTH_MISMATCH    = 0x06070010;
+                constexpr uint32_t DATA_TYPE_LENGTH_TOO_HIGH    = 0x06070012;
+                constexpr uint32_t DATA_TYPE_LENGTH_TOO_LOW     = 0x06070013;
+                constexpr uint32_t SUBINDEX_DOES_NOT_EXIST      = 0x06090011;
+                constexpr uint32_t VALUE_RANGE_EXCEEDED         = 0x06090030;
+                constexpr uint32_t VALUE_TOO_HIGH               = 0x06090031;
+                constexpr uint32_t VALUE_TOO_LOW                = 0x06090032;
+                constexpr uint32_t MODULE_LIST_MISMATCH         = 0x06090033;
+                constexpr uint32_t MAX_LESS_THAN_MIN            = 0x06090036;
+                constexpr uint32_t RESSOURCE_UNAVAILABLE        = 0x060A0023;
+                constexpr uint32_t GENERAL_ERROR                = 0x08000000;
+                constexpr uint32_t TRANSFER_ABORTED_GENERIC     = 0x08000020;
+                constexpr uint32_t TRANSFER_ABORTED_LOCAL_CTRL  = 0x08000021;
+                constexpr uint32_t TRANSFER_ABORTED_ESM_STATE   = 0x08000022;
+                constexpr uint32_t DICTIONARY_GENERTION_FAILURE = 0x08000023;
+                constexpr uint32_t NO_DATA_AVAILABLE            = 0x08000024;
             }
 
             char const* abort_to_str(uint32_t abort_code);

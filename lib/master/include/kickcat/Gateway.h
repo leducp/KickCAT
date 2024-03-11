@@ -3,7 +3,7 @@
 
 #include "AbstractDiagSocket.h"
 #include "Bus.h"
-#include "Mailbox.h"
+#include "kickcat/Mailbox.h"
 
 namespace kickcat
 {
@@ -13,7 +13,7 @@ namespace kickcat
     public:
         /// \param socket       Socket to communicate with external networks
         /// \param addMessage   Callback that enable the gateway instance to transfer the request to the EtherCAT bus
-        Gateway(std::shared_ptr<AbstractDiagSocket> socket, std::function<std::shared_ptr<GatewayMessage>(uint8_t const*, int32_t, uint16_t)> addMessage)
+        Gateway(std::shared_ptr<AbstractDiagSocket> socket, std::function<std::shared_ptr<mailbox::request::GatewayMessage>(uint8_t const*, int32_t, uint16_t)> addMessage)
             : socket_{socket}
             , addMessage_{addMessage}
             , pendingRequests_{}
@@ -32,8 +32,8 @@ namespace kickcat
 
     private:
         std::shared_ptr<AbstractDiagSocket> socket_;
-        std::function<std::shared_ptr<GatewayMessage>(uint8_t const*, int32_t, uint16_t)> addMessage_;
-        std::vector<std::shared_ptr<GatewayMessage>> pendingRequests_;
+        std::function<std::shared_ptr<mailbox::request::GatewayMessage>(uint8_t const*, int32_t, uint16_t)> addMessage_;
+        std::vector<std::shared_ptr<mailbox::request::GatewayMessage>> pendingRequests_;
     };
 }
 

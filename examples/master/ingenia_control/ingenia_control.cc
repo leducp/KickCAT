@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
 #include "kickcat/Prints.h"
@@ -71,12 +73,20 @@ int main(int argc, char *argv[])
     {
         bus.init();
 
+        for (auto& slave: bus.slaves())
+        {
+            printInfo(slave);
+            printESC(slave);
+        }
+
         // Prepare mapping for ingenia
         const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, const uint32_t *data, const uint32_t dataSize, const uint32_t SM_map) -> void
         {
+            uint8_t zeroU8 = 0;
+
+/*
             // Unmap previous registers, setting 0 in PDO_MAP subindex 0
-            uint32_t zeroU32 = 0;
-            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, false, const_cast<uint32_t *>(&zeroU32), sizeof(zeroU32));
+            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, false, const_cast<uint8_t *>(&zeroU8), sizeof(zeroU8));
             // Modify mapping, setting register address in PDO's subindexes from 0x1A00:01
             for (uint32_t i = 0; i < dataSize; i++)
             {
@@ -84,15 +94,22 @@ int main(int argc, char *argv[])
                 bus.writeSDO(bus.slaves().at(slaveId), PDO_map, subIndex, false, const_cast<uint32_t *>(&data[i]), sizeof(data[i]));
             }
             // Enable mapping by setting number of registers in PDO_MAP subindex 0
-            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, false, const_cast<uint32_t *>(&dataSize), sizeof(dataSize));
+            uint8_t pdoMapSize = static_cast<uint8_t>(dataSize);
+            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, false, const_cast<uint8_t *>(&pdoMapSize), sizeof(pdoMapSize));
+*/
+
+            uint8_t buffer[1024];
+            std::memcpy(buffer + 2, data, dataSize * 4);
+            buffer[0] = dataSize;
+            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, true, buffer, dataSize * 4 + 2);
+
             // Set PDO mapping to SM
-            uint8_t zeroU8 = 0;
             // Unmap previous mappings, setting 0 in SM_MAP subindex 0
             bus.writeSDO(bus.slaves().at(slaveId), SM_map, 0, false, const_cast<uint8_t *>(&zeroU8), sizeof(zeroU8));
             // Write first mapping (PDO_map) address in SM_MAP subindex 1
             bus.writeSDO(bus.slaves().at(slaveId), SM_map, 1, false, const_cast<uint16_t *>(&PDO_map), sizeof(PDO_map));
-            uint8_t pdoMapSize = 1;
             // Save mapping count in SM (here only one PDO_MAP)
+            uint8_t pdoMapSize = 1;
             bus.writeSDO(bus.slaves().at(slaveId), SM_map, 0, false, const_cast<uint8_t *>(&pdoMapSize), sizeof(pdoMapSize));
         };
 
@@ -117,8 +134,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    auto callback_error = [](DatagramState const &)
-    { THROW_ERROR("something bad happened"); };
+    auto callback_error = [](DatagramState const & ds)
+    {
+        THROW_ERROR_DATAGRAM("something bad happened", ds);
+    };
     auto false_alarm = [](DatagramState const &)
     { printf("previous error was a false alarm"); };
 
@@ -147,12 +166,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    link->setTimeout(500us);
+    link->setTimeout(1500us);
 
     Slave &ingenia = bus.slaves().at(0);
     pdo::Output *output_pdo = reinterpret_cast<pdo::Output *>(ingenia.output.data);
     pdo::Input *input_pdo = reinterpret_cast<pdo::Input *>(ingenia.input.data);
     CANOpenStateMachine ingenia_state_machine;
+
+    printf("mapping: input(%d) output(%d)\n", ingenia.input.bsize, ingenia.output.bsize);
 
     ingenia_state_machine.setCommand(CANOpenCommand::ENABLE);
 
@@ -178,7 +199,13 @@ int main(int argc, char *argv[])
             bus.finalizeDatagrams();
             bus.processAwaitingFrames();
         }
-        catch (std::exception const &e)
+        catch (kickcat::ErrorDatagram const& e)
+        {
+            int64_t delta = i - last_error;
+            last_error = i;
+            std::cerr << e.what() << ": " << toString(e.state()) << " at " << i << " delta: " << delta << std::endl;
+        }
+        catch (std::exception const& e)
         {
             int64_t delta = i - last_error;
             last_error = i;

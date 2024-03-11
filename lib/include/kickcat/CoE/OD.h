@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <tuple>
 
 namespace kickcat::CoE
 {
@@ -155,6 +156,8 @@ namespace kickcat::CoE
     struct Entry    // ETG1000.5 6.1.4.2.1 Formal model
     {
         Entry() = default;
+        Entry(uint8_t subindex, uint16_t bitlen, uint16_t access,
+              DataType type, std::string const& description);
         ~Entry();
 
         Entry(Entry const&) = delete;
@@ -165,7 +168,6 @@ namespace kickcat::CoE
 
         uint8_t      subindex;
         uint16_t     bitlen;    // For PDO, shall be < 11888
-        //uint16_t     access{Access::READ};
         uint16_t     access{0};
         DataType     type;
         // default value
@@ -186,6 +188,10 @@ namespace kickcat::CoE
     std::string toString(Object const& object);
 
     using Dictionary = std::vector<Object>;
+    std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex);
+
+    // Singleton
+    Dictionary& dictionary();
 }
 
 #endif

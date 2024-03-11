@@ -6,7 +6,7 @@
 #include <sstream>
 
 #include "kickcat/protocol.h"
-#include "Mailbox.h"
+#include "kickcat/Mailbox.h"
 
 namespace kickcat
 {
@@ -35,8 +35,8 @@ namespace kickcat
         uint32_t revision_number;
         uint32_t serial_number;
 
-        Mailbox mailbox;
-        Mailbox mailbox_bootstrap;
+        mailbox::request::Mailbox mailbox;
+        mailbox::request::Mailbox mailbox_bootstrap;
         eeprom::MailboxProtocol supported_mailbox;
         int32_t waiting_datagram; // how many datagram to process for this slave
 
