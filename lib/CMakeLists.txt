@@ -1,10 +1,12 @@
 set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/checksum/adler32.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Error.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cc
 
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/OD.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/Mailbox.cc
 )
 
 find_package(tinyxml2 CONFIG QUIET)

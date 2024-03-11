@@ -23,6 +23,14 @@ namespace kickcat::CoE
         {"REAL",  {DataType::REAL32,     32 }},
     };
 
+    const std::unordered_map<std::string, uint8_t> EsiParser::SM_CONF
+    {
+        {"MBoxOut",  1},
+        {"MBoxIn",   2},
+        {"Outputs",  3},
+        {"Inputs",   4},
+    };
+
 
     Dictionary EsiParser::load(std::string const& file)
     {
@@ -72,6 +80,37 @@ namespace kickcat::CoE
             dictionary.push_back(std::move(obj));
             node_object = node_object->NextSibling();
         }
+
+        // load sync managers type object
+        CoE::Object sms_type;
+        sms_type.index = 0x1c00;
+        sms_type.code = ObjectCode::ARRAY;
+        sms_type.name = "Sync manager type";
+
+        // create first entry (array size)
+        sms_type.entries.push_back(CoE::Entry{0, 8, Access::READ, DataType::UNSIGNED8, "Subindex 0"});
+
+        auto sm = firstChildElement(device_, "Sm");
+        while (sm)
+        {
+            CoE::Entry entry;
+            entry.subindex = sms_type.entries.size();
+            entry.access = Access::READ;
+            entry.bitlen = 8;
+            entry.description = "Subindex " + std::to_string(sms_type.entries.size());
+            entry.data = malloc(1);
+
+            uint8_t sm_type = SM_CONF.at(sm->GetText());
+            std::memcpy(entry.data, &sm_type, 1);
+
+            sms_type.entries.push_back(std::move(entry));
+            sm = sm->NextSiblingElement("Sm");
+        }
+        auto& subindex0 = sms_type.entries.at(0);
+        subindex0.data = malloc(1);
+        uint8_t array_size = sms_type.entries.size() - 1;
+        std::memcpy(subindex0.data, &array_size, 1);
+        dictionary.push_back(std::move(sms_type));
 
         return dictionary;
     }

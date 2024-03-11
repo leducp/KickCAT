@@ -8,6 +8,7 @@ using ::testing::_;
 using ::testing::InSequence;
 
 using namespace kickcat;
+using namespace kickcat::mailbox::request;
 
 struct Request
 {

@@ -1,4 +1,4 @@
-#include "ESC.h"
+#include "EmulatedESC.h"
 #include "kickcat/Time.h"
 #include "kickcat/debug.h"
 
@@ -7,7 +7,7 @@
 
 namespace kickcat
 {
-    ESC::ESC(std::string const& eeprom)
+    EmulatedESC::EmulatedESC(std::string const& eeprom)
         : memory_{}
     {
         // Configure ESC constants
@@ -49,7 +49,7 @@ namespace kickcat
     }
 
 
-    int32_t ESC::computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access)
+    int32_t EmulatedESC::computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access)
     {
         uint8_t* pos = reinterpret_cast<uint8_t*>(&memory_) + address;
 
@@ -162,25 +162,25 @@ namespace kickcat
     }
 
 
-    int32_t ESC::write(uint16_t address, void const* data, uint16_t size)
+    int32_t EmulatedESC::write(uint16_t address, void const* data, uint16_t size)
     {
         return computeInternalMemoryAccess(address, const_cast<void*>(data), size, Access::PDI_WRITE);
     }
 
-    int32_t ESC::read(uint16_t address, void* data, uint16_t size)
+    int32_t EmulatedESC::read(uint16_t address, void* data, uint16_t size)
     {
         return computeInternalMemoryAccess(address, data, size, Access::PDI_READ);
     }
 
 
-    void ESC::processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         processEcatRequest(header, data, wkc);
         processInternalLogic();
     }
 
 
-    uint16_t ESC::processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, uint8_t* data)
+    uint16_t EmulatedESC::processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, uint8_t* data)
     {
         int wkc = 0;
         for (auto const& pdo : pdos)
@@ -206,17 +206,17 @@ namespace kickcat
     }
 
 
-    void ESC::processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         *wkc += processPDO(rx_pdos_, true, header, data);
     }
 
-    void ESC::processLWR(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processLWR(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         *wkc += processPDO(tx_pdos_, false, header, data);
     }
 
-    void ESC::processLRW(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processLRW(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
         std::memcpy(swap, data, header->len);
@@ -226,7 +226,7 @@ namespace kickcat
     }
 
 
-    void ESC::processEcatRequest(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processEcatRequest(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
         auto [position, offset] = extractAddress(header->address);
         switch (header->command)
@@ -309,7 +309,7 @@ namespace kickcat
     }
 
 
-    void ESC::processInternalLogic()
+    void EmulatedESC::processInternalLogic()
     {
         static nanoseconds const start = since_epoch();
 
@@ -396,7 +396,7 @@ namespace kickcat
     }
 
 
-    void ESC::processReadCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
+    void EmulatedESC::processReadCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
         int32_t read = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_READ);
         if (read > 0)
@@ -406,7 +406,7 @@ namespace kickcat
     }
 
 
-    void ESC::processWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
+    void EmulatedESC::processWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
         int32_t written = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_WRITE);
         if (written > 0)
@@ -416,7 +416,7 @@ namespace kickcat
     }
 
 
-    void ESC::processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
+    void EmulatedESC::processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
     {
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
         std::memcpy(swap, data, header->len);
@@ -435,7 +435,7 @@ namespace kickcat
     }
 
 
-    void ESC::configureSMs()
+    void EmulatedESC::configureSMs()
     {
         syncs_.clear();
         for (auto& sm : memory_.sync_manager)
@@ -472,7 +472,7 @@ namespace kickcat
     }
 
 
-    void ESC::configurePDOs()
+    void EmulatedESC::configurePDOs()
     {
         tx_pdos_.clear();
         rx_pdos_.clear();
@@ -505,7 +505,7 @@ namespace kickcat
     }
 
 
-    std::tuple<uint8_t*, uint8_t*, uint16_t> ESC::computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo)
+    std::tuple<uint8_t*, uint8_t*, uint16_t> EmulatedESC::computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo)
     {
         uint32_t start_logical_address = header->address;
         uint32_t end_logical_address = header->address + header->len;
@@ -524,21 +524,21 @@ namespace kickcat
     }
 
 
-    nanoseconds ESC::pdiWatchdog()
+    nanoseconds EmulatedESC::pdiWatchdog()
     {
         nanoseconds divider = (memory_.watchdog_divider + 2) * 40ns;
         return memory_.watchdog_time_pdi * divider;
     }
 
 
-    nanoseconds ESC::pdoWatchdog()
+    nanoseconds EmulatedESC::pdoWatchdog()
     {
         nanoseconds divider = (memory_.watchdog_divider + 2) * 40ns;
         return memory_.watchdog_time_process_data * divider;
     }
 
 
-    void ESC::checkWatchdog()
+    void EmulatedESC::checkWatchdog()
     {
         // Warning: PDI watchdog not handled yet!
 

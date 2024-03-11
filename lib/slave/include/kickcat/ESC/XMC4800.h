@@ -9,7 +9,7 @@ namespace kickcat
     constexpr uint32_t ECAT0_END_ADDRESS = 0x5401FFFF;
 
 
-    class XMC4800 : public AbstractESC
+    class XMC4800 final : public AbstractESC
     {
     public:
         XMC4800() = default;
@@ -17,9 +17,8 @@ namespace kickcat
 
         hresult init() override;
 
-        hresult read(uint16_t address, void* data, uint16_t size) override;
-
-        hresult write(uint16_t address, void const* data, uint16_t size) override;
+        int32_t read(uint16_t address, void* data, uint16_t size) override;
+        int32_t write(uint16_t address, void const* data, uint16_t size) override;
     };
 }
 

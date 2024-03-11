@@ -102,7 +102,7 @@ namespace kickcat
         /// \param  raw_message_size    Size of the mailbox message (shall be less or equal of the actual storage size)
         /// \param  gateway_index       Index to link the request to the client in the gateway mechanism.
         /// \return nullptr if message cannot be added (malformed, bad address, unsupported protocol, etc.), a handle on the message otherwise
-        std::shared_ptr<GatewayMessage> addGatewayMessage(uint8_t const* raw_message, int32_t raw_message__size, uint16_t gateway_index);
+        std::shared_ptr<mailbox::request::GatewayMessage> addGatewayMessage(uint8_t const* raw_message, int32_t raw_message__size, uint16_t gateway_index);
 
         void clearErrorCounters();
 
@@ -142,7 +142,7 @@ namespace kickcat
         void configureFMMUs();
 
         // mailbox helpers
-        void waitForMessage(std::shared_ptr<AbstractMessage> message);
+        void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
 
         std::shared_ptr<Link> link_;
         std::vector<Slave> slaves_;

@@ -61,6 +61,7 @@ namespace kickcat::CoE
         tinyxml2::XMLElement* objects_;
 
         static const std::unordered_map<std::string, std::tuple<DataType, uint16_t>> BASIC_TYPES;
+        static const std::unordered_map<std::string, uint8_t> SM_CONF;
     };
 }
 

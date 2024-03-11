@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
     uint32_t sn_size = 4;
 
     // Local mailbox to generate and process messages
-    Mailbox mailbox;
+    mailbox::request::Mailbox mailbox;
     mailbox.recv_size = 128;
 
     // Frame to send/rec on the UDP socket

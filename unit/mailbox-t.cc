@@ -2,6 +2,7 @@
 #include "kickcat/Mailbox.h"
 
 using namespace kickcat;
+using namespace kickcat::mailbox::request;
 
 class MailboxTest : public ::testing::Test
 {

@@ -1,11 +1,12 @@
 #include <cstring>
 #include <algorithm>
-#include <inttypes.h>
+#include <cinttypes>
 
 #include "Mailbox.h"
 #include "debug.h"
+#include "CoE/Mailbox.h"
 
-namespace kickcat
+namespace kickcat::mailbox::request
 {
     uint8_t Mailbox::nextCounter()
     {
@@ -455,5 +456,161 @@ namespace kickcat
 
         status_ = MessageStatus::SUCCESS;
         return ProcessingResult::FINALIZE;
+    }
+}
+
+
+namespace kickcat::mailbox::response
+{
+    Mailbox::Mailbox(AbstractESC* esc, SyncManagerConfig mbx_in, SyncManagerConfig mbx_out, uint16_t max_msgs)
+        : esc_{esc}
+        , mbx_in_{mbx_in}
+        , mbx_out_{mbx_out}
+        , max_msgs_{max_msgs}
+    {
+
+    }
+
+    void Mailbox::receive()
+    {
+        std::vector<uint8_t> raw_message;
+        raw_message.resize(mbx_in_.length);
+        int32_t read_bytes = esc_->read(mbx_in_.start_address, raw_message.data(), mbx_in_.length);
+        if (read_bytes != mbx_in_.length)
+        {
+            return;
+        }
+
+        auto const* header  = pointData<mailbox::Header>(raw_message.data());
+        if ((header->type == mailbox::ERR) or (header->len == 0))
+        {
+            replyError(std::move(raw_message), mailbox::Error::INVALID_HEADER);
+            return;
+        }
+
+        for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
+        {
+            ProcessingResult state = (*it)->process(raw_message);
+            switch (state)
+            {
+                case ProcessingResult::NOOP:
+                {
+                    continue;
+                }
+                case ProcessingResult::CONTINUE:
+                case ProcessingResult::FINALIZE_AND_KEEP:
+                {
+                    return;
+                }
+                case ProcessingResult::FINALIZE:
+                {
+                    it = to_process_.erase(it);
+                    return;
+                }
+                default: { }
+            }
+        }
+
+        if (to_process_.size() >= max_msgs_)
+        {
+            // Queue is full and no one process it: drop the message
+            replyError(std::move(raw_message), mailbox::Error::NO_MORE_MEMORY);
+            return;
+        }
+
+        // No message handle it: let's try to build a new one
+        for (auto& factory : factories_)
+        {
+            auto msg = factory(this, std::move(raw_message));
+            if (msg != nullptr)
+            {
+                to_process_.push_back(msg);
+                return;
+            }
+        }
+
+        // Nothing can be done with this message
+        replyError(std::move(raw_message), mailbox::Error::UNSUPPORTED_PROTOCOL);
+    }
+
+
+    void Mailbox::process()
+    {
+        for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
+        {
+            ProcessingResult state = (*it)->process();
+            switch (state)
+            {
+                case ProcessingResult::NOOP:
+                {
+                    continue;
+                }
+                case ProcessingResult::CONTINUE:
+                case ProcessingResult::FINALIZE_AND_KEEP:
+                {
+                    return;
+                }
+                case ProcessingResult::FINALIZE:
+                {
+                    it = to_process_.erase(it);
+                    return;
+                }
+                default: { }
+            }
+        }
+    }
+
+    void Mailbox::send()
+    {
+        if (to_send_.empty())
+        {
+            return;
+        }
+
+        auto& msg = to_send_.front();
+        int32_t written_bytes = esc_->write(mbx_out_.start_address, msg.data(), msg.size());
+        if (written_bytes > 0)
+        {
+            to_send_.pop();
+        }
+    }
+
+    void Mailbox::enableCoE()
+    {
+        factories_.push_back(&CoE::createSDOMessage);
+    }
+
+    void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
+    {
+        auto* header  = pointData<mailbox::Header>(raw_message.data());
+        auto* err     = pointData<mailbox::Error::ServiceData>(header);
+
+        header->type = mailbox::ERR;
+        header->len  = sizeof(mailbox::Error::ServiceData);
+        err->type    = 0x1;
+        err->detail  = code;
+
+        to_send_.push(std::move(raw_message));
+    }
+
+    AbstractMessage::AbstractMessage(Mailbox* mbx)
+        : mailbox_{mbx}
+    {
+
+    }
+
+    uint16_t AbstractMessage::replyExpectedSize()
+    {
+        return mailbox_->mbx_out_.length;
+    }
+
+    void AbstractMessage::reply(std::vector<uint8_t>&& reply)
+    {
+        mailbox_->to_send_.push(std::move(reply));
+    }
+
+    void AbstractMessage::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
+    {
+        mailbox_->replyError(std::move(raw_message), code);
     }
 }
