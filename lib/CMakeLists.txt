@@ -12,13 +12,11 @@ if (tinyxml2_FOUND)
   list(APPEND KICKCAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/EsiParser.cc)
 endif()
 
-if (UNIX)
+if (NUTTX)
   set(OS_LIB_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
   )
-  set(OS_LIBRARIES pthread rt)
+  set(OS_LIBRARIES )
 elseif(PIKEOS)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Socket.cc
@@ -26,11 +24,13 @@ elseif(PIKEOS)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/ErrorCategory.cc
   )
   set(OS_LIBRARIES )
-elseif(NUTTX)
-  set(OS_LIB_SOURCES
+elseif (UNIX)
+set(OS_LIB_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
-  )
-  set(OS_LIBRARIES )
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
+)
+set(OS_LIBRARIES pthread rt)
 endif()
 
 add_library(kickcat ${KICKCAT_SOURCES} ${OS_LIB_SOURCES})

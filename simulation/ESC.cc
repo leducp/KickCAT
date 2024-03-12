@@ -203,7 +203,7 @@ namespace kickcat
             ++wkc;
         }
         return wkc;
-    };
+    }
 
 
     void ESC::processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc)

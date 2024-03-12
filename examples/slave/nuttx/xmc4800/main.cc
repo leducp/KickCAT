@@ -1,4 +1,4 @@
-#include "EmulatedEEPROM.h"
+#include "kickcat/EEPROM/XMC4800EEPROM.h"
 #include "kickcat/Time.h"
 #include "kickcat/ESC/XMC4800.h"
 
@@ -6,10 +6,10 @@
 int main(int , char *[])
 {
     using namespace kickcat;
-    printf("\n\n\n\n XMC hello \n");
+    printf("\n\n\n\n XMC hello  \n");
 
     XMC4800 esc;
-    EmulatedEEPROM eeprom;
+    XMC4800EEPROM eeprom;
 
     esc.init();
     eeprom.init();
