@@ -26,12 +26,35 @@ namespace kickcat
 
         bool is_valid = (sm_read.start_address == sm_ref.start_address) and
                         (sm_read.length == sm_ref.length) and
-                        (sm_read.control == sm_ref.control);
+                        (sm_read.control == sm_ref.control) and
+                        sm_read.activate == 1;
 
-        printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
+        // printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
+        // printf("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
         return is_valid;
     }
 
+    void AbstractESC::set_sm_activate(SyncManagerConfig const& sm_conf, bool is_activated)
+    {
+        auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
+        {
+            return reg + sm_index * 8;
+        };
+
+        SyncManager sm;
+        reportError(read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm)));
+
+        uint8_t sm_deactivated = 0x1;
+        if (is_activated)
+        {
+            sm.pdi_control &= ~sm_deactivated;
+        }
+        else
+        {
+            sm.pdi_control |= sm_deactivated;
+        }
+        reportError(write(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm)));
+    }
 
     void AbstractESC::set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
     {
@@ -59,17 +82,55 @@ namespace kickcat
     {
         reportError(read(reg::AL_CONTROL, &al_control_, sizeof(al_control_)));
         reportError(read(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
-        bool watchdog = false;
-        reportError(read(reg::WDOG_STATUS, &watchdog, 1));
+        reportError(read(reg::WDOG_STATUS, &watchdog_, sizeof(watchdog_)));
 
-        if (al_control_ & State::INIT)
+        if ((al_control_ & State::MASK_STATE) == State::INIT)
         {
-            al_status_ = State::INIT;
+            set_al_status(State::INIT);
+            clear_error();
+            for (auto& sm : sm_process_data_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+        }
+
+        if ((al_control_ & State::ERROR_ACK))
+        {
             clear_error();
         }
 
+        // Do nothing until error is acknowledged by master.
+        if (al_status_ & State::ERROR_ACK)
+        {
+            return;
+        }
+
+        // BOOTSTRAP not supported yet. If implemented, need to check the SII to know if enabled.
+        if ((al_control_ & State::MASK_STATE) == State::BOOT)
+        {
+            if ((al_status_ & State::MASK_STATE) == State::INIT)
+            {
+                set_error(StatusCode::BOOTSTRAP_NOT_SUPPORTED);
+            }
+            else
+            {
+                set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
+            }
+        }
+
+        // Handle unsupported state
+        uint8_t asked_state = al_control_ & State::MASK_STATE;
+        if (asked_state != State::BOOT and
+            asked_state != State::INIT and
+            asked_state != State::PRE_OP and
+            asked_state != State::SAFE_OP and
+            asked_state != State::OPERATIONAL)
+        {
+            set_error(StatusCode::UNKNOWN_REQUESTED_STATE);
+        }
+
         // ETG 1000.6 Table 99 – Primitives issued by ESM to Application
-        switch (al_status_)
+        switch (al_status_ & State::MASK_STATE)
         {
             case State::INIT:
             {
@@ -100,6 +161,7 @@ namespace kickcat
             }
         }
 
+        reportError(write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_)));
         reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
     }
 
@@ -107,7 +169,7 @@ namespace kickcat
     void AbstractESC::routine_init()
     {
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
-        if (al_control_ & State::PRE_OP)
+        if ((al_control_ & State::MASK_STATE) == State::PRE_OP)
         {
             uint16_t mailbox_protocol;
             reportError(read(reg::MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
@@ -124,12 +186,17 @@ namespace kickcat
 
             if (are_sm_mailbox_valid)
             {
-                al_status_ = State::PRE_OP;
+                set_al_status(State::PRE_OP);
             }
             else
             {
                 // TODO error flag
             }
+        }
+
+        if (((al_control_ & State::MASK_STATE) == State::SAFE_OP) or ((al_control_ & State::MASK_STATE) == State::OPERATIONAL))
+        {
+            set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
     }
 
@@ -137,23 +204,32 @@ namespace kickcat
     void AbstractESC::routine_preop()
     {
         update_process_data_input();
-        if (al_control_ & State::SAFE_OP)
+        if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not (al_status_ & State::ERROR_ACK))
         {
             // check process data SM
-            bool are_sm_process_data_valid = true;
             for (auto& sm : sm_process_data_configs_)
             {
-                are_sm_process_data_valid &= is_valid_sm(sm);
+                if (not is_valid_sm(sm))
+                {
+                    if (sm.type == SyncManagerType::Input)
+                    {
+                        set_error(StatusCode::INVALID_INPUT_CONFIGURATION);
+                    }
+                    else if (sm.type == SyncManagerType::Output)
+                    {
+                        set_error(StatusCode::INVALID_OUTPUT_CONFIGURATION);
+                    }
+                    return;
+                }
+                set_sm_activate(sm, true);
             }
 
-            if (are_sm_process_data_valid)
-            {
-                al_status_ = State::SAFE_OP;
-            }
-            else
-            {
-                //TODO set error flag / report error to master
-            }
+            set_al_status(State::SAFE_OP);
+        }
+
+        if ((al_control_ & State::MASK_STATE) == State::OPERATIONAL)
+        {
+            set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
     }
 
@@ -163,36 +239,100 @@ namespace kickcat
         update_process_data_input();
         update_process_data_output();
 
-        if (al_control_ & State::OPERATIONAL)
+        bool is_sm_process_data_invalid = false;
+        for (auto& sm : sm_process_data_configs_)
+        {
+            if (not is_valid_sm(sm))
+            {
+                if (sm.type == SyncManagerType::Input)
+                {
+                    set_error(StatusCode::INVALID_INPUT_CONFIGURATION);
+                }
+                else if (sm.type == SyncManagerType::Output)
+                {
+                    set_error(StatusCode::INVALID_OUTPUT_CONFIGURATION);
+                }
+                is_sm_process_data_invalid = true;
+                break;
+            }
+        }
+
+        if ((al_control_ & State::MASK_STATE) == State::PRE_OP or is_sm_process_data_invalid)
+        {
+            set_al_status(State::PRE_OP);
+            for (auto& sm : sm_process_data_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+        }
+        else if ((al_control_ & State::MASK_STATE) == State::OPERATIONAL)
         {
             if (are_valid_output_data_)
             {
-                al_status_ = State::OPERATIONAL;
+                set_al_status(State::OPERATIONAL);
             }
             else
             {
                 // error flag
             }
         }
-        else if (al_control_ & State::PRE_OP)
-        {
-            al_status_ = State::PRE_OP;
-        }
+
     }
 
 
     void AbstractESC::routine_op()
     {
+        if (has_expired_watchdog())
+        {
+            set_error(StatusCode::SYNC_MANAGER_WATCHDOG);
+        }
+
+        if (al_status_ & State::ERROR_ACK)
+        {
+            // In case of error in OP, go to a lower state, CTT wants safe op; not specified in the norms.
+            for (auto& sm : sm_process_data_configs_)
+            {
+                if (sm.type == SyncManagerType::Output)
+                {
+                    set_sm_activate(sm, false);
+                }
+            }
+            set_al_status(State::SAFE_OP);
+            return;
+        }
+
         update_process_data_input();
         update_process_data_output();
 
-        if (al_control_ & State::PRE_OP)
+        bool is_sm_process_data_invalid = false;
+        for (auto& sm : sm_process_data_configs_)
         {
-            al_status_ = State::PRE_OP;
+            if (not is_valid_sm(sm))
+            {
+                if (sm.type == SyncManagerType::Input)
+                {
+                    set_error(StatusCode::INVALID_INPUT_CONFIGURATION);
+                }
+                else if (sm.type == SyncManagerType::Output)
+                {
+                    set_error(StatusCode::INVALID_OUTPUT_CONFIGURATION);
+                }
+                is_sm_process_data_invalid = true;
+                break;
+            }
         }
-        else if (al_control_ & State::SAFE_OP)
+
+        if ((al_control_ & State::MASK_STATE) == State::PRE_OP or is_sm_process_data_invalid)
         {
-            al_status_ = State::SAFE_OP;
+            for (auto& sm : sm_process_data_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+            set_al_status(State::PRE_OP);
+        }
+        else if ((al_control_ & State::MASK_STATE) == State::SAFE_OP)
+        {
+            set_al_status(State::SAFE_OP);
         }
     }
 
@@ -219,24 +359,37 @@ namespace kickcat
 
     void AbstractESC::set_valid_output_data_received(bool are_valid_output)
     {
-        printf("Set valid output data received \n");
         are_valid_output_data_ = are_valid_output;
     }
 
 
     void AbstractESC::set_state_on_error(State state, StatusCode error_code)
     {
-        reportError(write(reg::AL_STATUS_CODE, &error_code, sizeof(error_code)));
-        al_status_ = state | AL_STATUS_ERR_IND;
-        reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
+        set_al_status(state);
+        set_error(error_code);
     }
 
 
     void AbstractESC::clear_error()
     {
-        StatusCode code = StatusCode::NO_ERROR;
-        reportError(write(reg::AL_STATUS_CODE, &code, sizeof(code)));
+        al_status_code_ = StatusCode::NO_ERROR;
         al_status_ &= ~ AL_STATUS_ERR_IND;
-        reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
+    }
+
+
+    void AbstractESC::set_error(StatusCode code)
+    {
+        // Don't override non acknowlegded error, demanded by CTT, not specified in the norm.
+        if (not (al_status_ & State::ERROR_ACK))
+        {
+            al_status_code_ = code;
+            al_status_ |= State::ERROR_ACK;
+        }
+    }
+
+
+    void AbstractESC::set_al_status(State state)
+    {
+        al_status_ = (al_status_ & ~State::MASK_STATE) | state;
     }
 }

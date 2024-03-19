@@ -116,7 +116,7 @@ namespace kickcat
 
     void Bus::requestState(State request)
     {
-        uint16_t param = request | State::ACK;
+        uint16_t param = request | State::ERROR_ACK;
         uint16_t wkc = broadcastWrite(reg::AL_CONTROL, &param, sizeof(param));
         if (wkc != slaves_.size())
         {
