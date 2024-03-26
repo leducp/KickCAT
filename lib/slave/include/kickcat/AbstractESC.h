@@ -20,13 +20,14 @@ namespace kickcat
         uint16_t start_address;
         uint16_t length;
         uint8_t  control;
+        SyncManagerType type;
     };
 
-    #define SYNC_MANAGER_PI_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x20}
-    #define SYNC_MANAGER_PI_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x64}
+    #define SYNC_MANAGER_PI_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x20, SyncManagerType::Input}
+    #define SYNC_MANAGER_PI_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x64, SyncManagerType::Output}
 
-    #define SYNC_MANAGER_MBX_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x02}
-    #define SYNC_MANAGER_MBX_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x06}
+    #define SYNC_MANAGER_MBX_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x02, SyncManagerType::MailboxIn}
+    #define SYNC_MANAGER_MBX_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x06, SyncManagerType::MailboxOut}
 
 
     // Regarding the state machine, see ETG1000.6 6.4.1 AL state machine
@@ -56,16 +57,28 @@ namespace kickcat
 
         uint16_t al_status() { return al_status_;};
 
-        private:
+        bool has_expired_watchdog() { return not (watchdog_ & 0x1); }
+
+    private:
         void update_process_data_input();
         void update_process_data_output();
+
         bool is_valid_sm(SyncManagerConfig const& sm_ref);
+        void set_sm_activate(SyncManagerConfig const& sm_ref, bool is_activated);
+
+        void set_error(StatusCode code);
+
+        /// \brief Set only the state, preserve the other fields.
+        void set_al_status(State state);
 
         std::vector<SyncManagerConfig> sm_mailbox_configs_ = {};
         std::vector<SyncManagerConfig> sm_process_data_configs_ = {};
 
+        StatusCode al_status_code_ = {StatusCode::NO_ERROR};
         uint16_t al_status_ = {0};
+
         uint16_t al_control_ = {0};
+        uint16_t watchdog_ = {0};
 
         uint8_t* process_data_input_ = {nullptr};
         SyncManagerConfig sm_pd_input_ = {};

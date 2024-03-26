@@ -3,11 +3,28 @@
 set -x
 set -e
 
+usage() {
+    echo "Usage: ./export_nuttx_archive.sh [foot|relax]"
+    exit
+}
+
+project=""
+
+case $1 in
+    -h|-\?|--help|"")
+        usage
+        ;;
+    *)
+        project=${1}
+esac
+
+
+
 nuttx_src=~/wdc_workspace/src/nuttxspace/nuttx
 build=~/wdc_workspace/src/KickCAT/build_slave
 src=~/wdc_workspace/src/KickCAT
 
-bin=xmc4800_slave
+bin=xmc4800_$project
 
 nuttx_version=nuttx-export-12.4.0
 

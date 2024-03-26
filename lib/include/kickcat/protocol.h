@@ -134,7 +134,8 @@ namespace kickcat
         BOOT        = 0x03,
         SAFE_OP     = 0x04,
         OPERATIONAL = 0x08,
-        ACK         = 0x10  // Acknowledge flag request - check AL_STATUS
+        MASK_STATE  = 0x0f,
+        ERROR_ACK   = 0x10  // Acknowledge flag request - check AL_STATUS
     };
     char const* toString(State state);
 
@@ -354,7 +355,7 @@ namespace kickcat
     {
         Unused     = 0,
         MailboxOut = 1,
-        MailboxInt = 2,
+        MailboxIn = 2,
         Output     = 3,
         Input      = 4  // slave to master
     };
