@@ -1,6 +1,5 @@
 #include <cstring>
 #include <algorithm>
->>>>>>> Move mailbox in common part again, but add namespace to split request/response sides.:lib/src/Mailbox.cc
 #include <cinttypes>
 
 #include "Mailbox.h"
@@ -298,13 +297,15 @@ namespace kickcat::mailbox::response
     {
         if (to_send_.empty())
         {
+            printf("Mailbox to_send_.empty \n");
             return;
         }
 
         SyncManager sync;
-        esc_->read(reg::SYNC_MANAGER + sizeof(SyncManager) * mbx_in_.index, &sync, sizeof(SyncManager));
+        esc_->read(reg::SYNC_MANAGER + sizeof(SyncManager) * mbx_out_.index, &sync, sizeof(SyncManager));
         if (sync.status & MAILBOX_STATUS)
         {
+            printf("Mailbox full \n");
             // Mailbox is full
             return;
         }

@@ -84,6 +84,8 @@ namespace kickcat
         read(reg::AL_STATUS, &al_status_, sizeof(al_status_));
         read(reg::WDOG_STATUS, &watchdog_, sizeof(watchdog_));
 
+        printf("Al_status %x, Al_control %x \n", al_status_, al_control_);
+
         if ((al_control_ & State::MASK_STATE) == State::INIT)
         {
             set_al_status(State::INIT);
@@ -203,7 +205,7 @@ namespace kickcat
 
     void AbstractESC::routine_preop()
     {
-        update_process_data_input();
+        // update_process_data_input();
         if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not (al_status_ & State::ERROR_ACK))
         {
             // check process data SM

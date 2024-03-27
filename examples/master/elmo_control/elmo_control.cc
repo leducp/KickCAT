@@ -1,11 +1,8 @@
 #include "kickcat/Link.h"
-#include "kickcat/Bus.h"
-#include "kickcat/Prints.h"
+
 #include "kickcat/SocketNull.h"
 
-#include "ElmoProtocol.h"
-#include "CanOpenErrors.h"
-#include "CanOpenStateMachine.h"
+#include "kickcat/Mailbox.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -63,119 +60,103 @@ int main(int argc, char* argv[])
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
-    link->checkRedundancyNeeded();
 
-    Bus bus(link);
-
-    uint8_t io_buffer[2048];
-    try
+    auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
     {
-        bus.init();
-
-        // Prepare mapping for elmo
-        uint32_t rx_length = sizeof(pdo::rx_mapping);
-        bus.writeSDO(bus.slaves().at(0), 0x1C12, 0, Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::rx_mapping), rx_length); // 0x1C12 refers to CoE::SM_CHANNEL + 2, subindex 0
-        uint32_t tx_length = sizeof(pdo::tx_mapping);
-        bus.writeSDO(bus.slaves().at(0), 0x1C13, 0, Bus::Access::COMPLETE, const_cast<uint8_t*>(pdo::tx_mapping), tx_length); // 0x1C13 refers to CoE::SM_CHANNEL + 3, subindex 0
-
-        bus.createMapping(io_buffer);
-
-        bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 1s);
-    }
-    catch (ErrorCode const& e)
-    {
-        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
-        return 1;
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << e.what() << std::endl;
-        return 1;
-    }
-
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    auto false_alarm = [](DatagramState const&){ printf("previous error was a false alarm"); };
-
-    try
-    {
-        bus.processDataRead(callback_error);
-        bus.processDataWrite(false_alarm);
-    }
-    catch (...)
-    {
-    }
-
-    try
-    {
-        bus.requestState(State::OPERATIONAL);
-        bus.waitForState(State::OPERATIONAL, 100ms);
-    }
-    catch (ErrorCode const& e)
-    {
-        std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
-        return 1;
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << e.what() << std::endl;
-        return 1;
-    }
-
-    link->setTimeout(500us);
-
-    Slave& elmo = bus.slaves().at(0);
-    pdo::Output* output_pdo = reinterpret_cast<pdo::Output*>(elmo.output.data);
-    pdo::Input* input_pdo = reinterpret_cast<pdo::Input*>(elmo.input.data);
-    CANOpenStateMachine elmo_state_machine;
-
-    elmo_state_machine.setCommand(CANOpenCommand::ENABLE);
-
-    // Setting a small torque
-    output_pdo->mode_of_operation = 4;
-    output_pdo->target_torque = 30;
-    output_pdo->max_torque = 3990;
-    output_pdo->target_position = 0;
-    output_pdo->velocity_offset = 0;
-    output_pdo->digital_output = 0;
-
-    constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
-    int64_t last_error = 0;
-    for (int64_t i = 0; i < LOOP_NUMBER; ++i)
-    {
-        sleep(2ms);
-
-        try
+        if (wkc != 1)
         {
-            bus.sendLogicalRead(callback_error);            // Update inputPDO
-            bus.sendLogicalWrite(callback_error);           // Update outputPDO
-            bus.sendMailboxesReadChecks(callback_error);
-            bus.sendReadMessages(callback_error);           // Get emergencies
-
-            bus.finalizeDatagrams();
-            bus.processAwaitingFrames();
+            return DatagramState::INVALID_WKC;
         }
-        catch (std::exception const& e)
+        return DatagramState::OK;
+    };
+
+    auto error = [](DatagramState const&)
+    {
+        printf("Invalid working counter \n");
+    };
+
+    uint16_t slave_address = 0x0;
+
+// Init SM
+    SyncManager SM[2];
+    mailbox::request::Mailbox mailbox;
+    mailbox.recv_size = 128;
+    mailbox.recv_offset = 0x1000;
+    mailbox.send_size = 128;
+    mailbox.send_offset = 0x1400;
+    mailbox.generateSMConfig(SM);
+    link->addDatagram(Command::FPWR, createAddress(slave_address, reg::SYNC_MANAGER), SM, process, error);
+    link->processDatagrams();
+
+    auto process_write = [](DatagramHeader const*, uint8_t const* state, uint16_t)
+    {
+        printf("SM write 0, state %x \n", *state);
+        return DatagramState::OK;
+    };
+
+    auto process_read = [&mailbox](DatagramHeader const*, uint8_t const* state, uint16_t)
+    {
+        printf("SM read 1, state %x \n", *state);
+        if ((*state & MAILBOX_STATUS) == MAILBOX_STATUS)
         {
-            int64_t delta = i - last_error;
-            last_error = i;
-            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+            printf("Mailbox can read ! \n");
+            mailbox.can_read = true;
+        }
+        else
+        {
+            mailbox.can_read = false;
+        }
+        return DatagramState::OK;
+    };
+
+
+    auto process_read_data = [](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+    {
+        if (wkc != 1)
+        {
+            printf("WKC invalid\n");
+            return DatagramState::INVALID_WKC;
         }
 
-        // Update Elmo at each step to receive emergencies in case of failure
-        elmo_state_machine.update(input_pdo->status_word);
-        output_pdo->control_word = elmo_state_machine.getControlWord();
-        if (elmo.mailbox.emergencies.size() > 0)
+        uint32_t result = *reinterpret_cast<uint32_t const*>(data);
+        printf("Result %x \n", result);
+
+        return DatagramState::OK;
+    };
+
+
+
+    // Go to preop
+    sleep(1s);
+    uint16_t data = State::PRE_OP;
+    Frame frame;
+    frame.addDatagram(0, Command::BWR, createAddress(0, reg::AL_CONTROL), &data, sizeof(data));
+    link->writeThenRead(frame);
+
+    sleep(1s);
+    // while(true)
+    // {
+        link->addDatagram(Command::FPRD, createAddress(slave_address, reg::SYNC_MANAGER_0 + reg::SM_STATS), nullptr, 1, process_write, error);
+
+        link->addDatagram(Command::FPRD, createAddress(slave_address, reg::SYNC_MANAGER_1 + reg::SM_STATS), nullptr, 1, process_read, error);
+
+        link->processDatagrams();
+
+        if (mailbox.can_read)
         {
-            for (auto& em : elmo.mailbox.emergencies)
+            printf("retrieve waiting message \n");
+            int32_t i = 0;
+            while (i < 10)
             {
-                std::cerr << "*~~~ Emergency received @ " << i << " ~~~*" << std::endl;
-                std::cerr << registerToError(em.error_register);
-                std::cerr << codeToError(em.error_code);
+                uint8_t bonjour[128];
+                link->addDatagram(Command::FPRD, createAddress(slave_address, mailbox.send_offset), bonjour, mailbox.send_size, process_read_data, error);
+                // link->addDatagram(Command::FPRD, createAddress(slave_address, mailbox.recv_offset), nullptr, mailbox.send_size, process_read_data, error);
+                link->processDatagrams();
+                i++;
+                sleep(100ms);
             }
-            elmo.mailbox.emergencies.resize(0);
         }
-    }
-
+    //     sleep(100ms);
+    // }
     return 0;
 }
