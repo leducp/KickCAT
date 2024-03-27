@@ -40,13 +40,13 @@ int main(int argc, char *argv[])
     esc.init();
 
     uint8_t esc_config;
-    reportError(esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config)));
+    esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
 
     bool is_emulated = esc_config & PDI_EMULATION;
     printf("esc config 0x%x, is emulated %i \n", esc_config, is_emulated);
 
     uint8_t pdi_config;
-    reportError(esc.read(reg::PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config)));
+    esc.read(reg::PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config));
     printf("pdi config 0x%x \n", pdi_config);
 
     while(true)

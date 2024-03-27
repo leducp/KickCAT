@@ -6,44 +6,45 @@ namespace kickcat
 {
     char const* CoE::SDO::abort_to_str(uint32_t abort_code)
     {
+        using namespace abort;
         switch (abort_code)
         {
-            case 0x05030000: { return "Toggle bit not changed";                                                                     }
-            case 0x05040000: { return "SDO protocol timeout";                                                                       }
-            case 0x05040001: { return "Client/Server command specifier not valid or unknown";                                       }
-            case 0x05040002: { return "Invalid block size (block mode only)";                                                       }
-            case 0x05040003: { return "Invalid sequence number (block mode only)";                                                  }
-            case 0x05040004: { return "CRC error (block mode only)";                                                                }
-            case 0x05040005: { return "Out of memory";                                                                              }
-            case 0x06010000: { return "Unsupported access to object";                                                               }
-            case 0x06010001: { return "Attempt to read a write only object ";                                                       }
-            case 0x06010002: { return "Attempt to write a read only object";                                                        }
-            case 0x06010003: { return "Subindex cannot be written, SI0 must be 0 for write access";                                 }
-            case 0x06010004: { return "SDO Complete access not supported for objects of variable length";                           }
-            case 0x06010005: { return "Object length exceeds mailbox size";                                                         }
-            case 0x06010006: { return "Object mapped to RxPDO, SDO Download blocked";                                               }
-            case 0x06020000: { return "The object does not exist in the object dictionnary";                                        }
-            case 0x06040041: { return "The object cannot be mapped into the PDO";                                                   }
-            case 0x06040042: { return "The number and length of the objects to be mapped would exceed the PDO lenght";              }
-            case 0x06040043: { return "General parameter incompatibility reason";                                                   }
-            case 0x06040047: { return "General internal incompatibility in the device";                                             }
-            case 0x06060000: { return "Access failed due to a hardware error";                                                      }
-            case 0x06070010: { return "Data type does not match, length of service parameter does not match";                       }
-            case 0x06070012: { return "Data type does not match, length of service parameter too high";                             }
-            case 0x06070013: { return "Data type does not match, length of service parameter too low";                              }
-            case 0x06090011: { return "Subindex does not exist";                                                                    }
-            case 0x06090030: { return "Value range of parameter exceeded";                                                          }
-            case 0x06090031: { return "Value of parameter written too high";                                                        }
-            case 0x06090032: { return "Value of parameter written too low";                                                         }
-            case 0x06090033: { return "Configured module list does not match detected module list";                                 }
-            case 0x06090036: { return "Maximum value is less than minimum value";                                                   }
-            case 0x060A0023: { return "Resource not available: SDO connection";                                                     }
-            case 0x08000000: { return "General error";                                                                              }
-            case 0x08000020: { return "Data cannot be transferred or stored to the application";                                    }
-            case 0x08000021: { return "Data cannot be transferred or stored to the application because of local control";           }
-            case 0x08000022: { return "Data cannot be transferred or stored to the application because of the present device state";}
-            case 0x08000023: { return "Object dictionnary dynamic generation fails or no object dictionnary is present";            }
-            case 0x08000024: { return "No data available";                                                                          }
+            case TOGGLE_BIT_NOT_ALTERNATED:     { return "Toggle bit not changed";                                                                     }
+            case SDO_PROTOCOL_TIMEOUT:          { return "SDO protocol timeout";                                                                       }
+            case COMMAND_SPECIFIER_INVALID:     { return "Client/Server command specifier not valid or unknown";                                       }
+            case INVALID_BLOCK_SIZE:            { return "Invalid block size (block mode only)";                                                       }
+            case INVALID_SEQUENCE_NUMBER:       { return "Invalid sequence number (block mode only)";                                                  }
+            case CRC_ERROR:                     { return "CRC error (block mode only)";                                                                }
+            case OUT_OF_MEMORY:                 { return "Out of memory";                                                                              }
+            case UNSUPPORTED_ACCESS:            { return "Unsupported access to object";                                                               }
+            case READ_ONLY_ACCESS:              { return "Attempt to read a write only object ";                                                       }
+            case WRITE_ONLY_ACCESS:             { return "Attempt to write a read only object";                                                        }
+            case SUBINDEX0_CANNOT_BE_WRITTEN:   { return "Subindex cannot be written, SI0 must be 0 for write access";                                 }
+            case COMPLETE_ACCESS_UNSUPPORTED:   { return "SDO Complete access not supported for objects of variable length";                           }
+            case OBJECT_TOO_BIG:                { return "Object length exceeds mailbox size";                                                         }
+            case OBJECT_MAPPED:                 { return "Object mapped to RxPDO, SDO Download blocked";                                               }
+            case OBJECT_DOES_NOT_EXIST:         { return "The object does not exist in the object dictionnary";                                        }
+            case OBJECT_CANNOT_BE_MAPPED:       { return "The object cannot be mapped into the PDO";                                                   }
+            case PDO_LENGTH_EXCEEDED:           { return "The number and length of the objects to be mapped would exceed the PDO lenght";              }
+            case PARAMETER_INCOMPATIBILITY:     { return "General parameter incompatibility reason";                                                   }
+            case INTERNAL_INCOMPATIBILITY:      { return "General internal incompatibility in the device";                                             }
+            case HARDWARE_ERROR:                { return "Access failed due to a hardware error";                                                      }
+            case DATA_TYPE_LENGTH_MISMATCH:     { return "Data type does not match, length of service parameter does not match";                       }
+            case DATA_TYPE_LENGTH_TOO_HIGH:     { return "Data type does not match, length of service parameter too high";                             }
+            case DATA_TYPE_LENGTH_TOO_LOW:      { return "Data type does not match, length of service parameter too low";                              }
+            case SUBINDEX_DOES_NOT_EXIST:       { return "Subindex does not exist";                                                                    }
+            case VALUE_RANGE_EXCEEDED:          { return "Value range of parameter exceeded";                                                          }
+            case VALUE_TOO_HIGH:                { return "Value of parameter written too high";                                                        }
+            case VALUE_TOO_LOW:                 { return "Value of parameter written too low";                                                         }
+            case MODULE_LIST_MISMATCH:          { return "Configured module list does not match detected module list";                                 }
+            case MAX_LESS_THAN_MIN:             { return "Maximum value is less than minimum value";                                                   }
+            case RESSOURCE_UNAVAILABLE:         { return "Resource not available: SDO connection";                                                     }
+            case GENERAL_ERROR:                 { return "General error";                                                                              }
+            case TRANSFER_ABORTED_GENERIC:      { return "Data cannot be transferred or stored to the application";                                    }
+            case TRANSFER_ABORTED_LOCAL_CTRL:   { return "Data cannot be transferred or stored to the application because of local control";           }
+            case TRANSFER_ABORTED_ESM_STATE:    { return "Data cannot be transferred or stored to the application because of the present device state";}
+            case DICTIONARY_GENERTION_FAILURE:  { return "Object dictionnary dynamic generation fails or no object dictionnary is present";            }
+            case NO_DATA_AVAILABLE:             { return "No data available";                                                                          }
 
             default:
             {
@@ -303,6 +304,26 @@ namespace kickcat
     template<> EthernetHeader const* pointData<EthernetHeader, uint8_t>(uint8_t const* base_address)
     {
         return reinterpret_cast<EthernetHeader const*>(base_address);
+    }
+
+    namespace mailbox::Error
+    {
+        char const* toString(uint16_t code)
+        {
+            switch (code)
+            {
+                case SYNTAX:                { return "Invalid syntax (mailbox header)";         }
+                case UNSUPPORTED_PROTOCOL:  { return "Protocol unsupported";                    }
+                case INVALID_CHANNEL:       { return "Invalid channel value";                   }
+                case SERVICE_NOT_SUPPORTED: { return "Service is not supported";                }
+                case INVALID_HEADER:        { return "Invalid header (mailbox header is good)"; }
+                case SIZE_TOO_SHORT:        { return "Too few received bytes";                  }
+                case NO_MORE_MEMORY:        { return "Protocol cannot be processed due to limited ressources"; }
+                case INVALID_SIZE:          { return "Data size is inconsistent";               }
+                case SERVICE_IN_WORK:       { return "Mailbox service already in use.";         }
+                default:                    { return "Unknown mailbox error code";              }
+            }
+        }
     }
 
     namespace CoE

@@ -6,6 +6,8 @@
 
 namespace kickcat
 {
+    using namespace mailbox::request;
+
     void Gateway::fetchRequest()
     {
         uint8_t frame[ETH_MTU_SIZE];
