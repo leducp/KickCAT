@@ -38,10 +38,12 @@
         <Fmmu>Outputs</Fmmu>
         <Fmmu>Inputs</Fmmu>
 
+        <Sm MinSize="34" MaxSize="256" DefaultSize="128" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+        <Sm MinSize="34" MaxSize="256" DefaultSize="128" StartAddress="#x1400" ControlByte="#x22" Enable="1">MBoxIn</Sm>
 				<!-- output base physical address -->
-        <Sm DefaultSize="2" StartAddress="#x1000" ControlByte="#x64" Enable="1">Outputs</Sm>
+        <Sm DefaultSize="2" StartAddress="#x1600" ControlByte="#x64" Enable="1">Outputs</Sm>
  				<!-- input base physical address -->
-        <Sm DefaultSize="28" StartAddress="#x1200" ControlByte="#x20" Enable="1">Inputs</Sm>
+        <Sm DefaultSize="28" StartAddress="#x1800" ControlByte="#x20" Enable="1">Inputs</Sm>
 
 <!-- ***************** output PDO  ********************************************************** -->
 
