@@ -11,7 +11,7 @@ env:
   BUILD_TYPE: Debug
 
 jobs:
-  build:
+  build_x86:
     # The CMake configure and build commands are platform agnostic and should work equally
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
@@ -55,3 +55,82 @@ jobs:
           minimum_coverage: 75
           show_line: true
           show_branch: true
+
+  build_NuttX:
+    runs-on: ubuntu-latest
+    env:
+          nuttx_version: nuttx-12.5.0-RC0
+          arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
+    steps:
+      - name: checkout KickCAT
+        uses: actions/checkout@v4
+        with:
+          path: 'KickCAT'
+
+      - name: Cache NuttX
+        id: cache-nuttx
+        uses: actions/cache@v3
+        with:
+          path: ${{GITHUB.WORKSPACE}}/nuttxspace/nuttx
+          key: nuttx_${{env.nuttx_version}}
+
+      - if: ${{ steps.cache-nuttx.outputs.cache-hit != 'true' }}
+        name: checkout NuttX
+        uses: actions/checkout@v4
+        with:
+          repository: apache/nuttx
+          path: 'nuttxspace/nuttx'
+          ref: '${{env.nuttx_version}}'
+
+      - name: Cache NuttX Apps
+        id: cache-nuttx-apps
+        uses: actions/cache@v3
+        with:
+          path: ${{GITHUB.WORKSPACE}}/nuttxspace/apps
+          key: nuttx-apps_${{env.nuttx_version}}
+
+      - if: ${{ steps.cache-nuttx-apps.outputs.cache-hit != 'true' }}
+        name: checkout NuttX Apps
+        uses: actions/checkout@v4
+        with:
+          repository: apache/nuttx-apps
+          path: 'nuttxspace/apps'
+          ref: '${{env.nuttx_version}}'
+
+      - name: Install Kconfig
+        run: sudo apt install kconfig-frontends
+
+      - name: Cache Arm None Eabi
+        id: cache-arm-none-eabi
+        uses: actions/cache@v3
+        with:
+          path: ${{GITHUB.WORKSPACE}}/gcc-arm-none-eabi
+          key: ${{env.arm_none_eabi_version}}
+
+      - if: ${{ steps.cache-arm-none-eabi.outputs.cache-hit != 'true' }}
+        name: Download gcc-arm-none-eabi
+        run: |
+          # Download the latest ARM GCC toolchain prebuilt by ARM
+          mkdir gcc-arm-none-eabi && \
+          curl -s -L  "https://developer.arm.com/-/media/Files/downloads/gnu/${{env.arm_none_eabi_version}}.tar.xz" \
+          | tar -C gcc-arm-none-eabi --strip-components 1 -xJ
+
+      - name: Build
+        run: |
+          set -x
+          export PATH="${{GITHUB.WORKSPACE}}/gcc-arm-none-eabi/bin:$PATH"
+
+          mkdir build_slave
+          nuttx_src=${{GITHUB.WORKSPACE}}/nuttxspace/nuttx
+          build=${{GITHUB.WORKSPACE}}/build_slave
+          src=${{GITHUB.WORKSPACE}}/KickCAT
+          nuttx_version=nuttx-export-12.5.0
+
+          cp ${src}/examples/slave/nuttx/xmc4800/boards/relax/defconfig ${nuttx_src}/boards/arm/xmc4/xmc4800-relax/configs/nsh/defconfig
+          ${nuttx_src}/tools/configure.sh -l xmc4800-relax:nsh
+          make -C ${nuttx_src} savedefconfig
+          make -C ${nuttx_src} export
+          cp ${nuttx_src}/${nuttx_version}.tar.gz ${build}
+          tar xf ${build}/${nuttx_version}.tar.gz -C ${build}
+          cmake -B ${build} -S ${src}  -DCMAKE_TOOLCHAIN_FILE=${build}/${nuttx_version}/scripts/toolchain.cmake
+          make -C ${build}

@@ -84,14 +84,16 @@ Note: the simulator has to be started first
 
 
 ## Slave stack
-A simple slave stack is under development. A working example based on Nuttx RTOS and tested on arduino due + easycat Lan9252 shield is available in `examples/slave/nuttx_lan9252`. Follow the readme in `boards/arduino_due` for insight about how to setup and build the slave stack.
+A simple slave stack is under development. A working example based on Nuttx RTOS and tested on arduino due + easycat Lan9252 shield is available in `examples/slave/nuttx_lan9252`.
+Another example using the XMC4800 with NuttX is available.
+Follow the readme in `KickCAT/examples/slave/nuttx/xmc4800/README.md` for insight about how to setup and build the slave stack.
 
 ### Current state:
 
 - Can go from INIT to PRE-OP to SAFE-OP to OP with proper verification for each transition.
 - Can read and write PI
 - Supports ESC Lan9252 through SPI.
-- Supports XMC4800 ESC (with NuttX RTOS)
+- Supports XMC4800 ESC (with NuttX RTOS). Pass the CTT at home tests.
 - Tools available to flash/dump eeprom from ESC.
 
 
@@ -99,14 +101,10 @@ A simple slave stack is under development. A working example based on Nuttx RTOS
 
 - Test coverage
 - Integrate slave stack in the simulation
-- Cover all the ESM state transitions (going back from OP to other states)
-- Support a second ESC driver (ie: xmc4800)
 - Implement mailbox protocols.
 - Allow more than 2 PI sync manager. (multipdo)
 - DC support.
-- Improve error reporting through AL_STATUS and AL_STATUS_CODE
-
-- ci to test the cross compilation build ?
+- Improve error reporting through AL_STATUS and AL_STATUS_CODE (For now it only reports the errors regarding state machine transitions.)
 
 
 ## Release procedure
