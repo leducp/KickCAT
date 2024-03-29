@@ -6,6 +6,8 @@
 #include "AbstractSocket.h"
 #include "Prints.h"
 
+#include "CoE/mailbox/request.h"
+
 namespace kickcat
 {
     Bus::Bus(std::shared_ptr<Link> link)

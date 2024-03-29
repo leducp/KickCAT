@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "kickcat/Mailbox.h"
+#include "kickcat/CoE/mailbox/request.h"
 
 using namespace kickcat;
 using namespace kickcat::mailbox::request;

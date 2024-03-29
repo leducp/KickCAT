@@ -3,7 +3,7 @@
 #include "EmulatedESC.h"
 
 #include "kickcat/CoE/EsiParser.h"
-#include "kickcat/CoE/Mailbox.h"
+#include "kickcat/CoE/mailbox/response.h"
 
 #include <cstring>
 #include <numeric>

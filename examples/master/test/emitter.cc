@@ -1,5 +1,5 @@
 #include "kickcat/protocol.h"
-#include "kickcat/Mailbox.h"
+#include "kickcat/CoE/mailbox/request.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"

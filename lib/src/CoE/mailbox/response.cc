@@ -1,12 +1,11 @@
 #include <algorithm>
 #include <cstring>
 
-#include "kickcat/CoE/Mailbox.h"
+#include "kickcat/CoE/mailbox/response.h"
 
-namespace kickcat::CoE
+namespace kickcat::mailbox::response
 {
-    using namespace kickcat::mailbox;
-    using namespace kickcat::mailbox::response;
+    //using namespace kickcat::CoE;
 
     std::shared_ptr<AbstractMessage> createSDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message)
     {
@@ -22,11 +21,11 @@ namespace kickcat::CoE
             return nullptr;
         }
 
-        return std::make_shared<SDOMessage>(mbx, std::move(raw_message), dictionary());
+        return std::make_shared<SDOMessage>(mbx, std::move(raw_message), CoE::dictionary());
     }
 
 
-    SDOMessage::SDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, Dictionary& dictionary)
+    SDOMessage::SDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, CoE::Dictionary& dictionary)
         : AbstractMessage{mbx}
         , dictionary_{dictionary}
     {
@@ -92,18 +91,18 @@ namespace kickcat::CoE
         return ProcessingResult::NOOP;
     }
 
-    bool SDOMessage::isUploadAuthorized(Entry* entry)
+    bool SDOMessage::isUploadAuthorized(CoE::Entry* entry)
     {
         //TODO: handle also other READ mode (depending on current state)
-        return (entry->access & Access::READ);
+        return (entry->access & CoE::Access::READ);
     }
 
-    bool SDOMessage::isDownloadAuthorized(Entry* entry)
+    bool SDOMessage::isDownloadAuthorized(CoE::Entry* entry)
     {
-        return (entry->access & Access::WRITE);
+        return (entry->access & CoE::Access::WRITE);
     }
 
-    ProcessingResult SDOMessage::upload(Entry* entry)
+    ProcessingResult SDOMessage::upload(CoE::Entry* entry)
     {
         if (not isUploadAuthorized(entry))
         {
@@ -131,7 +130,7 @@ namespace kickcat::CoE
         return ProcessingResult::FINALIZE;
     }
 
-    ProcessingResult SDOMessage::uploadComplete(Object* object)
+    ProcessingResult SDOMessage::uploadComplete(CoE::Object* object)
     {
         sdo_->transfer_type = 0; // complete access -> not expedited
 
@@ -159,7 +158,7 @@ namespace kickcat::CoE
         return ProcessingResult::FINALIZE;
     }
 
-    ProcessingResult SDOMessage::download(Entry* entry)
+    ProcessingResult SDOMessage::download(CoE::Entry* entry)
     {
         if (not isDownloadAuthorized(entry))
         {
@@ -191,7 +190,7 @@ namespace kickcat::CoE
         return ProcessingResult::FINALIZE;
     }
 
-    ProcessingResult SDOMessage::downloadComplete(Object* object)
+    ProcessingResult SDOMessage::downloadComplete(CoE::Object* object)
     {
         uint32_t msg_size;
         std::memcpy(&msg_size, payload_, 4);

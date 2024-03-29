@@ -6,7 +6,8 @@ set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Time.cc
 
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/OD.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/Mailbox.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/request.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/response.cc
 )
 
 find_package(tinyxml2 CONFIG QUIET)
