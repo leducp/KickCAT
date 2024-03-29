@@ -4,6 +4,8 @@
 
 namespace kickcat
 {
+    using namespace mailbox::request;
+
     void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message)
     {
         auto error_callback = [](DatagramState const& state)

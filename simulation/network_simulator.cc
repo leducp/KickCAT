@@ -1,6 +1,9 @@
 #include "kickcat/OS/Linux/Socket.h"
 #include "kickcat/Frame.h"
-#include "ESC.h"
+#include "EmulatedESC.h"
+
+#include "kickcat/CoE/EsiParser.h"
+#include "kickcat/CoE/mailbox/response.h"
 
 #include <cstring>
 #include <numeric>
@@ -16,19 +19,29 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    std::vector<ESC> slaves;
+    std::vector<EmulatedESC> escs;
     for (int i = 2 ; i < argc ; ++i)
     {
-        slaves.emplace_back(argv[i]);
+        escs.emplace_back(argv[i]);
     }
 
-    printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], slaves.size());
+    CoE::EsiParser parser;
+    auto& coe_dict = CoE::dictionary();
+    coe_dict = parser.load("ingenia_esi.xml");
+
+    printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
     auto socket = std::make_shared<Socket>(-1ns, 1us);
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
 
     std::vector<nanoseconds> stats;
     stats.reserve(1000);
+
+    auto const mbx_in_cfg  = SYNC_MANAGER_MBX_IN (0, 0x1000, 128);
+    auto const mbx_out_cfg = SYNC_MANAGER_MBX_OUT(1, 0x1400, 128);
+    auto& esc0 = escs.at(0);
+    mailbox::response::Mailbox mbx(&esc0, mbx_in_cfg, mbx_out_cfg);
+    mbx.enableCoE();
 
     while (true)
     {
@@ -49,11 +62,15 @@ int main(int argc, char* argv[])
                 break;
             }
 
-            for (auto& slave : slaves)
+            for (auto& esc : escs)
             {
-                auto raw = t1.count();
-                slave.write(0x1000, &raw, sizeof(decltype(raw)));
-                slave.processDatagram(header, data, wkc);
+                //auto raw = t1.count();
+                //esc.write(0x1800, &raw, sizeof(decltype(raw)));
+                esc.processDatagram(header, data, wkc);
+
+                mbx.receive();
+                mbx.process();
+                mbx.send();
             }
         }
 

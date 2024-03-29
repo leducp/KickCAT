@@ -1,4 +1,5 @@
 #include <sstream>
+#include <algorithm>
 
 #include "kickcat/CoE/OD.h"
 
@@ -192,6 +193,17 @@ namespace kickcat::CoE
         return result;
     }
 
+    Entry::Entry(uint8_t subindex_in, uint16_t bitlen_in, uint16_t access_in, DataType type_in, std::string const& description_in)
+        : subindex{subindex_in}
+        , bitlen{bitlen_in}
+        , access{access_in}
+        , type{type_in}
+        , description{description_in}
+        , data{nullptr}
+    {
+
+    }
+
 
     Entry::~Entry()
     {
@@ -218,5 +230,37 @@ namespace kickcat::CoE
         other.data = nullptr;
 
         return *this;
+    }
+
+
+    std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex)
+    {
+        auto object_it = std::find_if(dict.begin(), dict.end(), [index](Object const& object)
+        {
+            return (object.index == index);
+        });
+
+        if (object_it == dict.end())
+        {
+            return {nullptr, nullptr};
+        }
+
+        auto entry_it = std::find_if(object_it->entries.begin(), object_it->entries.end(), [subindex](Entry const& entry)
+        {
+            return (entry.subindex == subindex);
+        });
+
+        if (entry_it == object_it->entries.end())
+        {
+            return {&(*object_it), nullptr};
+        }
+
+        return {&(*object_it), &(*entry_it)};
+    }
+
+    Dictionary& dictionary()
+    {
+        static Dictionary dict;
+        return dict;
     }
 }

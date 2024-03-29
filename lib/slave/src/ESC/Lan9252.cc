@@ -133,7 +133,7 @@ namespace kickcat
     }
 
 
-    hresult Lan9252::read(uint16_t address, void* data, uint16_t size)
+    int32_t Lan9252::read(uint16_t address, void* data, uint16_t size)
     {
         if (address < 0x1000)
         {
@@ -147,12 +147,14 @@ namespace kickcat
                 int32_t readBytes = readData(address + offset, bufferPos + offset, to_read);
                 if (readBytes < 0)
                 {
-                    return hresult::E_ETIMEDOUT;
+                    return -1;
+                    //return hresult::E_ETIMEDOUT;
                 }
 
                 if (readBytes == 0)
                 {
-                    return hresult::E_ENOMEM;
+                    return -1;
+                    //return hresult::E_ENOMEM;
                 }
                 to_read -= readBytes;
             }
@@ -172,7 +174,8 @@ namespace kickcat
                 fifo_slot_available = fifo_slot_available >> 8;
                 if (elapsed_time(start_time) > TIMEOUT)
                 {
-                    return hresult::E_ETIMEDOUT;
+                    return -1;
+                    //return hresult::E_ETIMEDOUT;
                 }
             } while(fifo_slot_available != size / 4);  // beware assumption ESC will transfer 32 bytes.
 
@@ -180,9 +183,11 @@ namespace kickcat
         }
         else
         {
-            return hresult::E_ERANGE;
+            return -1;
+            //return hresult::E_ERANGE;
         }
-        return hresult::OK;
+
+        return size;
     }
 
 
@@ -212,13 +217,14 @@ namespace kickcat
     }
 
 
-    hresult Lan9252::write(uint16_t address, void const* data, uint16_t size)
+    int32_t Lan9252::write(uint16_t address, void const* data, uint16_t size)
     {
         if (address < 0x1000)
         {
             if (size > 2)
             {
-                return hresult::E_ERANGE;
+                return -1;
+                //return hresult::E_ERANGE;
             }
 
             uint16_t to_write = size;
@@ -230,12 +236,14 @@ namespace kickcat
                 int32_t writenBytes = writeData(address + offset, bufferPos + offset, to_write);
                 if (writenBytes < 0)
                 {
-                    return hresult::E_ETIMEDOUT;
+                    return -1;
+                    //return hresult::E_ETIMEDOUT;
                 }
 
                 if (writenBytes == 0)
                 {
-                    return hresult::E_ENOMEM;
+                    return -1;
+                    //return hresult::E_ENOMEM;
                 }
                 to_write -= writenBytes;
             }
@@ -258,9 +266,10 @@ namespace kickcat
         }
         else
         {
-            return hresult::E_ERANGE;
+            return -1;
+            //return hresult::E_ERANGE;
         }
 
-        return hresult::OK;
+        return size;
     }
 }

@@ -4,10 +4,13 @@
 #include <queue>
 #include <list>
 #include <memory>
+#include <functional>
 
 #include "kickcat/protocol.h"
+#include "kickcat/AbstractESC.h"
 
-namespace kickcat
+
+namespace kickcat::mailbox
 {
     enum class ProcessingResult
     {
@@ -16,7 +19,10 @@ namespace kickcat
         FINALIZE,
         FINALIZE_AND_KEEP
     };
+}
 
+namespace kickcat::mailbox::request
+{
     namespace MessageStatus
     {
         constexpr uint32_t SUCCESS                      = 0x000;
@@ -83,7 +89,7 @@ namespace kickcat
         uint16_t gateway_index_;
     };
 
-
+    /// \brief Request mailbox - it orchestrates the emission and the processing of messages (for master)
     struct Mailbox
     {
         uint16_t recv_offset;
@@ -120,38 +126,69 @@ namespace kickcat
         std::vector<CoE::Emergency> emergencies;
     private:
     };
+}
 
-    class SDOMessage : public AbstractMessage
+namespace kickcat::mailbox::response
+{
+    class Mailbox;
+
+    class AbstractMessage
     {
     public:
-        SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout);
-        virtual ~SDOMessage() = default;
+        AbstractMessage(Mailbox* mbx);
+        virtual ~AbstractMessage() = default;
 
-        ProcessingResult process(uint8_t const* received) override;
+        /// \brief Process the message
+        virtual ProcessingResult process() = 0;
+
+        /// \brief process() variant for state message (FoE, SDO segmented transfer)
+        /// \param raw_message  A raw message that may be processed by this message
+        virtual ProcessingResult process(std::vector<uint8_t> const& raw_message) = 0;
+
+        uint8_t const* data() const { return data_.data(); }
+        size_t size() const         { return data_.size(); }
 
     protected:
-        ProcessingResult processUpload           (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
-        ProcessingResult processUploadSegmented  (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
-        ProcessingResult processDownload         (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
-        ProcessingResult processDownloadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
+        void reply(std::vector<uint8_t>&& reply); /// Enqueue a raw message to be sent in the mailbox
+        void replyError(std::vector<uint8_t>&& raw_message, uint16_t code); // wrapper on mailbox replyError
+        uint16_t replyExpectedSize();
 
-        CoE::Header* coe_;
-        CoE::ServiceData* sdo_;
-        uint8_t* payload_;
-        uint8_t* client_data_;
-        uint32_t* client_data_size_;
-    };
-
-    class EmergencyMessage : public AbstractMessage
-    {
-    public:
-        EmergencyMessage(Mailbox& mailbox);
-        virtual ~EmergencyMessage() = default;
-
-        ProcessingResult process(uint8_t const* received) override;
+        std::vector<uint8_t> data_;
 
     private:
-        Mailbox& mailbox_;
+        Mailbox* mailbox_;
+    };
+
+    /// \brief Response mailbox - it orchestrates the reception and the processing of messages (for slaves and gateway)
+    class Mailbox
+    {
+        friend class AbstractMessage;
+    public:
+        /// \param max_msgs Max messages allowed simultaneously in the processing queue
+        Mailbox(AbstractESC* esc, SyncManagerConfig mbx_in, SyncManagerConfig mbx_out, uint16_t max_msgs = 1);
+        ~Mailbox() = default;
+
+        void enableCoE();
+
+        void receive(); // Try to receive a message from the ESC
+        void process(); // Process a message in the to_process_ queue if any
+        void send();    // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
+
+    private:
+        void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
+
+        AbstractESC* esc_;
+        SyncManagerConfig mbx_in_;
+        SyncManagerConfig mbx_out_;
+        uint16_t max_msgs_;
+
+        // session handle, from 1 to 7, it is used to detect duplicate frame
+        uint8_t counter_{0};
+
+        std::vector<std::function<std::shared_ptr<AbstractMessage>(Mailbox*, std::vector<uint8_t>&&)>> factories_;
+
+        std::list<std::shared_ptr<AbstractMessage>>  to_process_;   /// Received messages, waiting to be processed
+        std::queue<std::vector<uint8_t>> to_send_;      /// Messages to send (replies from a received messages)
     };
 }
 

@@ -22,7 +22,7 @@ namespace kickcat
 
         SyncManager sm_read;
 
-        reportError(read(create_sm_address(reg::SYNC_MANAGER, sm_ref.index), &sm_read, sizeof(sm_read)));
+        read(create_sm_address(reg::SYNC_MANAGER, sm_ref.index), &sm_read, sizeof(sm_read));
 
         bool is_valid = (sm_read.start_address == sm_ref.start_address) and
                         (sm_read.length == sm_ref.length) and
@@ -42,7 +42,7 @@ namespace kickcat
         };
 
         SyncManager sm;
-        reportError(read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm)));
+        read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
 
         uint8_t sm_deactivated = 0x1;
         if (is_activated)
@@ -53,7 +53,7 @@ namespace kickcat
         {
             sm.pdi_control |= sm_deactivated;
         }
-        reportError(write(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm)));
+        write(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
     }
 
     void AbstractESC::set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
@@ -80,9 +80,9 @@ namespace kickcat
 
     void AbstractESC::routine()
     {
-        reportError(read(reg::AL_CONTROL, &al_control_, sizeof(al_control_)));
-        reportError(read(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
-        reportError(read(reg::WDOG_STATUS, &watchdog_, sizeof(watchdog_)));
+        read(reg::AL_CONTROL, &al_control_, sizeof(al_control_));
+        read(reg::AL_STATUS, &al_status_, sizeof(al_status_));
+        read(reg::WDOG_STATUS, &watchdog_, sizeof(watchdog_));
 
         if ((al_control_ & State::MASK_STATE) == State::INIT)
         {
@@ -161,8 +161,8 @@ namespace kickcat
             }
         }
 
-        reportError(write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_)));
-        reportError(write(reg::AL_STATUS, &al_status_, sizeof(al_status_)));
+        write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_));
+        write(reg::AL_STATUS, &al_status_, sizeof(al_status_));
     }
 
 
@@ -172,11 +172,11 @@ namespace kickcat
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP)
         {
             uint16_t mailbox_protocol;
-            reportError(read(reg::MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol)));
+            read(reg::MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol));
             printf("Mailbox protocol %x \n", mailbox_protocol);
 
             bool are_sm_mailbox_valid = true;
-            if (mailbox_protocol != mailbox::Type::None)
+            if (mailbox_protocol != mailbox::Type::ERR)
             {
                 for (auto& sm : sm_mailbox_configs_)
                 {
@@ -339,20 +339,20 @@ namespace kickcat
 
     void AbstractESC::update_process_data_output()
     {
-        hresult rc = read(sm_pd_output_.start_address, process_data_output_, sm_pd_output_.length);
-        if (rc != hresult::OK)
+        int32_t r = read(sm_pd_output_.start_address, process_data_output_, sm_pd_output_.length);
+        if (r != sm_pd_output_.length)
         {
-            printf("\n update_process_data_output ERROR: %s code %" PRIu32"\n", toString(rc), static_cast<uint32_t>(rc));
+            printf("\n update_process_data_output ERROR\n");
         }
     }
 
 
     void AbstractESC::update_process_data_input()
     {
-        hresult rc = write(sm_pd_input_.start_address, process_data_input_, sm_pd_input_.length);
-        if (rc != hresult::OK)
+        int32_t written = write(sm_pd_input_.start_address, process_data_input_, sm_pd_input_.length);
+        if (written != sm_pd_input_.length)
         {
-            printf("\n update_process_data_input ERROR: %s code %" PRIu32"\n", toString(rc), static_cast<uint32_t>(rc));
+            printf("\n update_process_data_input ERROR\n");
         }
     }
 

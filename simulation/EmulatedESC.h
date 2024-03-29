@@ -2,12 +2,13 @@
 #define KICKCAT_SIMULATION_ESC_H
 
 #include "kickcat/protocol.h"
-#include <vector>
+#include "kickcat/AbstractESC.h"
+
 #include <functional>
 
 namespace kickcat
 {
-    class ESC
+    class EmulatedESC final : public AbstractESC
     {
         // ESC access type
         enum Access
@@ -19,17 +20,14 @@ namespace kickcat
         };
 
     public:
-        ESC(std::string const& eeprom);
+        EmulatedESC(std::string const& eeprom);
+        virtual ~EmulatedESC() = default;
 
         void processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
 
-        // Called when the ESM state change.
-        /// \param before   ESM state before changement
-        /// \param current  current ESM state
-        void setChangeStateCallback(std::function<void(State before, State current)> callback);
-
-        int32_t read (uint16_t address, void* data,       uint16_t size);
-        int32_t write(uint16_t address, void const* data, uint16_t size);
+        hresult init() override { return hresult::OK; }
+        int32_t read (uint16_t address, void* data,       uint16_t size) override;
+        int32_t write(uint16_t address, void const* data, uint16_t size) override;
 
     private:
         struct Memory

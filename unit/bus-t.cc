@@ -704,7 +704,7 @@ TEST_F(BusTest, IRQ_NOK)
 TEST_F(BusTest, add_gateway_message)
 {
     constexpr uint16_t GATEWAY_INDEX = 42;
-    Mailbox mailbox;
+    mailbox::request::Mailbox mailbox;
     mailbox.recv_size = 128;
 
     // Create a standard SDO with a non local address
