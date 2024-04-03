@@ -1,6 +1,6 @@
 #include "kickcat/OS/Linux/Socket.h"
 #include "kickcat/Frame.h"
-#include "EmulatedESC.h"
+#include "kickcat/ESC/EmulatedESC.h"
 
 #include "kickcat/CoE/EsiParser.h"
 #include "kickcat/CoE/mailbox/response.h"

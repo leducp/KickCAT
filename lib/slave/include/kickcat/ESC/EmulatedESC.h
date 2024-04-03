@@ -1,5 +1,5 @@
-#ifndef KICKCAT_SIMULATION_ESC_H
-#define KICKCAT_SIMULATION_ESC_H
+#ifndef KICKCAT_SLAVE_ESC_EMULATED_ESC_H
+#define KICKCAT_SLAVE_ESC_EMULATED_ESC_H
 
 #include "kickcat/protocol.h"
 #include "kickcat/AbstractESC.h"
