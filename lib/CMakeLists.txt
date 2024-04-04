@@ -32,6 +32,9 @@ set(OS_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Mutex.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/SharedMemory.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/ConditionVariable.cc
 )
 set(OS_LIBRARIES pthread rt)
 endif()
