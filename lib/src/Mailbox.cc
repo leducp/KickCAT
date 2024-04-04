@@ -300,6 +300,14 @@ namespace kickcat::mailbox::response
             return;
         }
 
+        SyncManager sync;
+        esc_->read(reg::SYNC_MANAGER + sizeof(SyncManager) * mbx_in_.index, &sync, sizeof(SyncManager));
+        if (sync.status & MAILBOX_STATUS)
+        {
+            // Mailbox is full
+            return;
+        }
+
         auto& msg = to_send_.front();
         int32_t written_bytes = esc_->write(mbx_out_.start_address, msg.data(), msg.size());
         if (written_bytes > 0)

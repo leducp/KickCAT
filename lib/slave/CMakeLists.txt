@@ -5,6 +5,7 @@ target_sources(kickcat PRIVATE
 
   ${CMAKE_CURRENT_SOURCE_DIR}/src/EEPROM/EEPROM_factory.cc
 
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/ESC/EmulatedESC.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/ESC/Lan9252.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/ESC/XMC4800.cc
 )
