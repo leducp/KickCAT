@@ -11,6 +11,7 @@
 
 #ifdef __linux__
 #include "kickcat/OS/Linux/Socket.h"
+#include "kickcat/TapSocket.h"
 #elif __PikeOS__
 #include "kickcat/OS/PikeOS/Socket.h"
 #else
@@ -45,7 +46,7 @@ int main(int argc, char *argv[])
         red_interface_name = argv[2];
     }
 
-    auto socket_nominal = std::make_shared<Socket>();
+    auto socket_nominal = std::make_shared<TapSocket>();
     try
     {
         socket_nominal->open(nom_interface_name);

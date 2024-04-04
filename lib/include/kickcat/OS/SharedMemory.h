@@ -3,13 +3,15 @@
 
 #include <string>
 
+#include "os_types.h"
+
 namespace kickcat
 {
     /// \brief Create if needed, then open and map (read/write) a shared memory segment
     class SharedMemory
     {
     public:
-        SharedMemory() = default;
+        SharedMemory();
         SharedMemory(SharedMemory const& shm) = delete;
         SharedMemory& operator=(SharedMemory const& shm) = delete;
         ~SharedMemory();
@@ -25,7 +27,7 @@ namespace kickcat
     private:
         std::size_t size_{};    ///< Size in bytes of the shared memory.
         void* address_{};       ///< Address of the shared memory in this processus.
-        int fd_{-1};            ///< File descriptor of the shared memory.
+        os_file fd_{};          ///< File descriptor of the shared memory.
     };
 }
 

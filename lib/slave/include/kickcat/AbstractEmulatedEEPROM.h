@@ -2,7 +2,7 @@
 #define KICKCAT_ABSTRACT_EMULATED_EEPROM
 
 #include "kickcat/protocol.h"
-#include "kickcat/Time.h"
+#include "kickcat/OS/Time.h"
 
 #include <vector>
 

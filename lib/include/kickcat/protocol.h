@@ -1,15 +1,15 @@
 #ifndef KICKCAT_PROTOCOL_H
 #define KICKCAT_PROTOCOL_H
 
-#include <cstdint>
 #include <cstdio>
 #include <string_view>
 #include <string>
 #include <array>
 #include <tuple>
 
-#include "Time.h"
-#include "Error.h"
+#include "kickcat/Units.h"
+#include "kickcat/Error.h"
+#include "kickcat/OS/Time.h"
 
 namespace kickcat
 {

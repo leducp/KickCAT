@@ -1,8 +1,10 @@
-#ifndef KICKCAT_OS_LINUX_CONDITION_VARIABLE_H
-#define KICKCAT_OS_LINUX_CONDITION_VARIABLE_H
+#ifndef KICKCAT_OS_CONDITION_VARIABLE_H
+#define KICKCAT_OS_CONDITION_VARIABLE_H
 
 #include <functional>
-#include "Mutex.h"
+
+#include "kickcat/OS/Time.h"
+#include "kickcat/OS/Mutex.h"
 
 namespace kickcat
 {
@@ -10,26 +12,29 @@ namespace kickcat
     {
     public:
         /// \param cond    nullptr for a private cond, a pointer to a shared segment otherwise.
-        ConditionVariable(pthread_cond_t& cond) : ConditionVariable(&cond) {};
-        ConditionVariable(pthread_cond_t* cond = nullptr);
+        ConditionVariable(os_cond& cond) : ConditionVariable(&cond) {};
+        ConditionVariable(os_cond* cond = nullptr);
         ~ConditionVariable();
 
         /// \brief Initialise the condition variable. Automatically called by the constructor
         ///        if the condition variable is private.
         void init();
 
+        /// Wait for a signal
+        /// \warning Mutex is assumed to be already locked
+        void wait(Mutex& mutex, std::function<bool(void)> stopWaiting);
 
         /// Wait for a signal
         /// \warning Mutex is assumed to be already locked
-        void wait(Mutex& lock, std::function<bool(void)> stopWaiting);
+        int wait_until(Mutex& mutex, nanoseconds timeout, std::function<bool(void)> stopWaiting);
 
         /// Send a signal to waiting threads
         /// \warning the corresponding lock is assumed to be already locked
         void signal();
 
     private:
-        pthread_cond_t* pcond_;
-        pthread_cond_t cond_;
+        os_cond* pcond_;
+        os_cond cond_;
     };
 }
 

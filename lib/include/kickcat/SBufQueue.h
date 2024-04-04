@@ -2,8 +2,8 @@
 #define KICKCAT_SBUF_QUEUE_H
 
 #include "Ring.h"
-#include "kickcat/OS/Linux/Mutex.h"
-#include "kickcat/OS/Linux/ConditionVariable.h"
+#include "kickcat/OS/Mutex.h"
+#include "kickcat/OS/ConditionVariable.h"
 
 
 namespace kickcat
@@ -14,12 +14,6 @@ namespace kickcat
     class SBufQueue
     {
     public:
-        enum Mode
-        {
-            BLOCKING,
-            NON_BLOCKING
-        };
-
         struct Item
         {
             uint32_t index;
@@ -81,9 +75,9 @@ namespace kickcat
             }
         }
 
-        Item alloc(enum Mode mode = BLOCKING)
+        Item allocate(nanoseconds timeout)
         {
-            return pop(free_, mode);
+            return pop(free_, timeout);
         };
 
 
@@ -93,9 +87,9 @@ namespace kickcat
         }
 
 
-        Item get(enum Mode mode = BLOCKING)
+        Item get(nanoseconds timeout)
         {
-            return pop(ready_, mode);
+            return pop(ready_, timeout);
         }
 
 
@@ -114,6 +108,8 @@ namespace kickcat
             return ready_.ring.size();
         }
 
+        constexpr static std::size_t item_size() { return sizeof(T); }
+
 
     private:
         void push(Queue& queue, Item const& item)
@@ -126,17 +122,25 @@ namespace kickcat
         }
 
 
-        Item pop(Queue& queue, enum Mode mode)
+        Item pop(Queue& queue, nanoseconds timeout)
         {
             Item item{ SBUF_INVALID_INDEX, 0, nullptr };
+            auto stop_waiting = [&queue](){ return not queue.ring.isEmpty(); };
 
             LockGuard guard(queue.lock);
-            if (mode == NON_BLOCKING and queue.ring.isEmpty())
+            if (timeout < 0ns)
             {
-                return item;
+                queue.cond.wait(queue.lock, stop_waiting);
+            }
+            else
+            {
+                int rc = queue.cond.wait_until(queue.lock, timeout+1ms, stop_waiting);
+                if (rc != 0)
+                {
+                    return item;
+                }
             }
 
-            (void) queue.cond.wait(queue.lock, [&queue](){ return not queue.ring.isEmpty(); } );
             (void) queue.ring.pop(item);
 
             // Determine item address (process dependent)

@@ -1,5 +1,5 @@
 #include "Error.h"
-#include "OS/Linux/Mutex.h"
+#include "OS/Mutex.h"
 
 namespace kickcat
 {

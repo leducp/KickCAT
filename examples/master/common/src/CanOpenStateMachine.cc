@@ -1,5 +1,5 @@
 #include "CanOpenStateMachine.h"
-#include "kickcat/Time.h"
+#include "kickcat/OS/Time.h"
 #include "kickcat/debug.h"
 
 namespace kickcat

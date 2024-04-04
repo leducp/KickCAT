@@ -69,3 +69,5 @@ namespace kickcat
         Context* ctx_;
     };
 }
+
+#endif

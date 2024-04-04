@@ -1,7 +1,7 @@
 #ifndef KICKCAT_OS_LINUX_MUTEX_H
 #define KICKCAT_OS_LINUX_MUTEX_H
 
-#include <pthread.h>
+#include "os_types.h"
 
 namespace kickcat
 {
@@ -12,8 +12,8 @@ namespace kickcat
         friend ConditionVariable;
     public:
         /// \param mutex    nullptr for a private mutex, a pointer to a shared segment otherwise.
-        Mutex(pthread_mutex_t& mutex) : Mutex(&mutex) {}
-        Mutex(pthread_mutex_t* mutex = nullptr);
+        Mutex(os_mutex& mutex) : Mutex(&mutex) {}
+        Mutex(os_mutex* mutex = nullptr);
         ~Mutex();
 
         /// \brief  Initialise the mutex. Automatically called by the constructor
@@ -31,8 +31,8 @@ namespace kickcat
 
     private:
         /// OS opaque type protecting the value.
-        pthread_mutex_t* pmutex_;
-        pthread_mutex_t mutex_;
+        os_mutex* pmutex_;
+        os_mutex mutex_;
     };
 
 

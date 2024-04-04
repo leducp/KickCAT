@@ -1,7 +1,7 @@
 #ifndef KICKCAT_DEBUGHELPERS_H
 #define KICKCAT_DEBUGHELPERS_H
 
-#include "Link.h"
+#include "kickcat/Link.h"
 #include "kickcat/Error.h"
 
 namespace kickcat

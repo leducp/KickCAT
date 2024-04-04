@@ -7,7 +7,7 @@ extern "C"
 }
 
 #include "OS/PikeOS/Socket.h"
-#include "Time.h"
+#include "OS/Time.h"
 
 namespace kickcat
 {

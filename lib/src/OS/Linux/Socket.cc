@@ -10,8 +10,8 @@
 #include <cstring>
 
 #include "OS/Linux/Socket.h"
+#include "OS/Time.h"
 #include "protocol.h"
-#include "Time.h"
 #include "debug.h"
 
 namespace kickcat

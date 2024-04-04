@@ -2,7 +2,7 @@
 #define KICKCAT_ABSTRACT_DIAG_SOCKET_H
 
 #include "kickcat/Error.h"
-#include "Frame.h"
+#include "kickcat/Frame.h"
 
 namespace kickcat
 {

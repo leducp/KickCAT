@@ -1,9 +1,9 @@
 #include "Error.h"
-#include "OS/Linux/ConditionVariable.h"
+#include "OS/ConditionVariable.h"
 
 namespace kickcat
 {
-    ConditionVariable::ConditionVariable(pthread_cond_t* cond)
+    ConditionVariable::ConditionVariable(os_cond* cond)
         : pcond_(cond)
         , cond_(PTHREAD_COND_INITIALIZER)
     {
@@ -70,6 +70,26 @@ namespace kickcat
                 THROW_SYSTEM_ERROR_CODE("pthread_cond_wait()", rc);
             }
         }
+    }
+
+
+    int ConditionVariable::wait_until(Mutex& mutex, nanoseconds timeout, std::function<bool(void)> stopWaiting)
+    {
+        nanoseconds deadline = since_epoch() + timeout;
+        seconds deadline_sec = duration_cast<seconds>(deadline);
+        deadline -= deadline_sec;
+        struct timespec abstime{deadline_sec.count(), deadline.count()};
+
+        while (not stopWaiting())
+        {
+            int rc = pthread_cond_timedwait(pcond_, mutex.pmutex_, &abstime);
+            if (rc != 0)
+            {
+                return rc;
+            }
+        }
+
+        return 0;
     }
 
 

@@ -2,10 +2,9 @@
 #define KICKCAT_LINK_H
 
 #include <array>
-#include <memory>
 #include <functional>
 
-#include "Frame.h"
+#include "kickcat/Frame.h"
 
 namespace kickcat
 {

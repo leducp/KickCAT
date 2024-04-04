@@ -3,10 +3,38 @@
 #include <sys/mman.h>
 
 #include "Error.h"
-#include "OS/Linux/SharedMemory.h"
+#include "OS/SharedMemory.h"
 
 namespace kickcat
 {
+    SharedMemory::SharedMemory()
+        : fd_{-1}
+    {
+
+    }
+
+    SharedMemory::~SharedMemory()
+    {
+        if (address_ != nullptr)
+        {
+            // Remove the mapped memory segment from the address space of the process.
+            int rc = munmap(address_, size_);
+            if (rc < 0)
+            {
+                THROW_SYSTEM_ERROR("munmap()");
+            }
+        }
+
+        if (fd_ >= 0)
+        {
+            int rc = close(fd_);
+            if (rc < 0)
+            {
+                THROW_SYSTEM_ERROR("close()");
+            }
+        }
+    }
+
     void SharedMemory::open(std::string const& name, std::size_t size, void* address)
     {
         // Open the shared memory (R/W), create it if needed.
@@ -30,29 +58,6 @@ namespace kickcat
         {
             address_ = nullptr;
             THROW_SYSTEM_ERROR("mmap()");
-        }
-    }
-
-
-    SharedMemory::~SharedMemory()
-    {
-        if (address_ != nullptr)
-        {
-            // Remove the mapped memory segment from the address space of the process.
-            int rc = munmap(address_, size_);
-            if (rc < 0)
-            {
-                THROW_SYSTEM_ERROR("munmap()");
-            }
-        }
-
-        if (fd_ < 0)
-        {
-            int rc = close(fd_);
-            if (rc < 0)
-            {
-                THROW_SYSTEM_ERROR("close()");
-            }
         }
     }
 }
