@@ -24,8 +24,8 @@ namespace kickcat
         void open(std::string const& interface) override;
         void setTimeout(nanoseconds timeout) override;
         void close() noexcept override;
-        int32_t read(uint8_t* frame, int32_t frame_size) override;
-        int32_t write(uint8_t const* frame, int32_t frame_size) override;
+        int32_t read(void* frame, int32_t frame_size) override;
+        int32_t write(void const* frame, int32_t frame_size) override;
 
     private:
         vm_file_desc_t fd_;

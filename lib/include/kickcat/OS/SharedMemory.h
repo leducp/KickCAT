@@ -18,7 +18,7 @@ namespace kickcat
 
         /// \param  name    Name of the shared memory.
         /// \param  size    Size of the shared memory in bytes.
-        /// \param  address Address where the shml segment shall be mapped. AUtomatiuc address if nullptr
+        /// \param  address Address where the shm segment shall be mapped. Automatic address if nullptr
         void open(std::string const& name, std::size_t size, void* address = nullptr);
 
         /// \return The address of the shm in this process.

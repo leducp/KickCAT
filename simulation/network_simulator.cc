@@ -1,5 +1,4 @@
 #include "kickcat/OS/Linux/Socket.h"
-#include "kickcat/TapSocket.h"
 #include "kickcat/Frame.h"
 #include "kickcat/ESC/EmulatedESC.h"
 
@@ -28,10 +27,10 @@ int main(int argc, char* argv[])
 
     CoE::EsiParser parser;
     auto& coe_dict = CoE::dictionary();
-    coe_dict = parser.load("evs-net-01_esi_2.2.3.xml");
+    coe_dict = parser.load("ingenia_esi.xml");
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
-    auto socket = std::make_shared<TapSocket>(true);
+    auto socket = std::make_shared<Socket>(-1ns, 1us);
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
 

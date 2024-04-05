@@ -141,7 +141,7 @@ namespace kickcat
         fd_ = -1;
     }
 
-    int32_t Socket::read(uint8_t* frame, int32_t frame_size)
+    int32_t Socket::read(void* frame, int32_t frame_size)
     {
         nanoseconds deadline = since_epoch() + timeout_;
         do
@@ -163,7 +163,7 @@ namespace kickcat
         return -1;
     }
 
-    int32_t Socket::write(uint8_t const* frame, int32_t frame_size)
+    int32_t Socket::write(void const* frame, int32_t frame_size)
     {
         return static_cast<int32_t>(::send(fd_, frame, frame_size, MSG_DONTWAIT));
     }

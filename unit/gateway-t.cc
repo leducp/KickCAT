@@ -42,13 +42,13 @@ TEST_F(GatewayTest, incoherent_request)
     EXPECT_CALL(*socket_, recv(_, _))
         .WillOnce(Return(std::make_tuple(-1, 0)))
         .WillOnce(Return(std::make_tuple( 1, 0)))
-        .WillOnce([&](uint8_t* frame, int32_t)
+        .WillOnce([&](void* frame, int32_t)
         {
             req.header.type = EthercatType::ETHERCAT;
             std::memcpy(frame, &req, sizeof(req));
             return std::make_tuple<int32_t, uint16_t>(sizeof(req), 1);
         })
-        .WillOnce([&](uint8_t* frame, int32_t)
+        .WillOnce([&](void* frame, int32_t)
         {
             req.header.type = EthercatType::MAILBOX;
             req.mbx_header.len = sizeof(req) * 2;
@@ -65,7 +65,7 @@ TEST_F(GatewayTest, incoherent_request)
     mbx.recv_size = 4;
 
     EXPECT_CALL(*socket_, recv(_, _))
-        .WillOnce([&](uint8_t* frame, int32_t)
+        .WillOnce([&](void* frame, int32_t)
         {
             req.header.type = EthercatType::MAILBOX;
             req.mbx_header.len = 10;
@@ -93,7 +93,7 @@ TEST_F(GatewayTest, nominal_loop)
     mbx.recv_size = 128;
 
     EXPECT_CALL(*socket_, sendTo(_, 18, GEN_GATEWAY_INDEX))
-    .WillOnce([](uint8_t const* frame, int32_t size, uint16_t)
+    .WillOnce([](void const* frame, int32_t size, uint16_t)
     {
         Request const* req = reinterpret_cast<Request const*>(frame);
         EXPECT_EQ(1003,         req->mbx_header.address);
@@ -104,7 +104,7 @@ TEST_F(GatewayTest, nominal_loop)
     });
 
     EXPECT_CALL(*socket_, recv(_, _))
-    .WillOnce([&](uint8_t* frame, int32_t)
+    .WillOnce([&](void* frame, int32_t)
     {
         Request req;
         req.header.type = EthercatType::MAILBOX;

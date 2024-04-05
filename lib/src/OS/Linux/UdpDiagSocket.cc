@@ -49,7 +49,7 @@ namespace kickcat
         fd_ = -1;
     }
 
-    std::tuple<int32_t, uint16_t> UdpDiagSocket::recv(uint8_t* frame, int32_t frame_size)
+    std::tuple<int32_t, uint16_t> UdpDiagSocket::recv(void* frame, int32_t frame_size)
     {
         socklen_t origin_size = sizeof(struct sockaddr_in);
         ssize_t rec = ::recvfrom(fd_, frame, frame_size, MSG_DONTWAIT, (struct sockaddr*)&requests_[index_], &origin_size);
@@ -64,7 +64,7 @@ namespace kickcat
         return std::make_tuple(rec, current_index);
     }
 
-    int32_t UdpDiagSocket::sendTo(uint8_t const* frame, int32_t frame_size, uint16_t id)
+    int32_t UdpDiagSocket::sendTo(void const* frame, int32_t frame_size, uint16_t id)
     {
         int32_t index = id & (mailbox::GATEWAY_MAX_REQUEST - 1);
         ssize_t sent = ::sendto(fd_, frame, frame_size, MSG_DONTWAIT, (struct sockaddr*)&requests_[index], sizeof(struct sockaddr_in));

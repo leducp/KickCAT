@@ -74,7 +74,7 @@ namespace kickcat
         timeout_ = timeout;
     }
 
-    int32_t TapSocket::read(uint8_t* frame, int32_t frame_size)
+    int32_t TapSocket::read(void* frame, int32_t frame_size)
     {
         auto item = in_->get(timeout_);
         if (item.address == nullptr)
@@ -90,7 +90,7 @@ namespace kickcat
         return toCopy;
     }
 
-    int32_t TapSocket::write(uint8_t const* frame, int32_t frame_size)
+    int32_t TapSocket::write(void const* frame, int32_t frame_size)
     {
         auto item = out_->allocate(timeout_);
         if (item.address == nullptr)

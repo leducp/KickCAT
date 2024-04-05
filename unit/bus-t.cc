@@ -56,7 +56,7 @@ public:
     void handleReplyFailReadRedFrame()
     {
         EXPECT_CALL(*io_nominal, read(_, _))
-        .WillOnce(Invoke([this](uint8_t*, int32_t)
+        .WillOnce(Invoke([this](void*, int32_t)
         {
             return 0;
         }));

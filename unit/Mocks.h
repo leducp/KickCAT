@@ -38,14 +38,14 @@ namespace kickcat
         MOCK_METHOD(void,    open,  (std::string const& interface), (override));
         MOCK_METHOD(void,    setTimeout,  (nanoseconds timeout), (override));
         MOCK_METHOD(void,    close, (), (noexcept));
-        MOCK_METHOD(int32_t, read,  (uint8_t* frame, int32_t frame_size), (override));
-        MOCK_METHOD(int32_t, write, (uint8_t const* frame, int32_t frame_size), (override));
+        MOCK_METHOD(int32_t, read,  (void* frame, int32_t frame_size), (override));
+        MOCK_METHOD(int32_t, write, (void const* frame, int32_t frame_size), (override));
 
         template<typename T>
         void checkSendFrame(std::vector<DatagramCheck<T>> expected_datagrams)
         {
             EXPECT_CALL(*this, write(::testing::_, ::testing::_))
-            .WillOnce(::testing::Invoke([this, expected_datagrams](uint8_t const* data, int32_t data_size)
+            .WillOnce(::testing::Invoke([this, expected_datagrams](void const* data, int32_t data_size)
             {
                 // store datagram to forge the answer for handle reply.
                 contexts_.emplace();
@@ -82,7 +82,7 @@ namespace kickcat
         void handleReply(std::vector<T> answers, uint16_t replied_wkc = 1, uint16_t irq = 0)
         {
             EXPECT_CALL(*this, read(::testing::_, ::testing::_))
-            .WillOnce(::testing::Invoke([this, replied_wkc, irq, answers](uint8_t* data, int32_t)
+            .WillOnce(::testing::Invoke([this, replied_wkc, irq, answers](void* data, int32_t)
             {
                 auto it = answers.begin();
                 uint16_t* wkc = reinterpret_cast<uint16_t*>(contexts_.front().payload + contexts_.front().header->len);
@@ -113,7 +113,7 @@ namespace kickcat
         void readError()
         {
             EXPECT_CALL(*this, read(::testing::_, ::testing::_))
-            .WillOnce(::testing::Invoke([](uint8_t* , int32_t)
+            .WillOnce(::testing::Invoke([](void* , int32_t)
             {
                 return -1;
             }));
@@ -128,8 +128,8 @@ namespace kickcat
     public:
         MOCK_METHOD(void,    open,  (), (override));
         MOCK_METHOD(void,    close, (), (noexcept));
-        MOCK_METHOD((std::tuple<int32_t, uint16_t>), recv,   (uint8_t* frame, int32_t frame_size), (override));
-        MOCK_METHOD(int32_t, sendTo, (uint8_t const* frame, int32_t frame_size, uint16_t), (override));
+        MOCK_METHOD((std::tuple<int32_t, uint16_t>), recv,   (void* frame, int32_t frame_size), (override));
+        MOCK_METHOD(int32_t, sendTo, (void const* frame, int32_t frame_size, uint16_t), (override));
 
         uint16_t nextIndex() { AbstractDiagSocket::nextIndex(); return index_; }
     };
