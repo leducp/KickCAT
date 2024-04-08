@@ -1,7 +1,7 @@
 #ifndef KICKCAT_CAN_ELMO_STATE_MACHINE_H
 #define KICKCAT_CAN_ELMO_STATE_MACHINE_H
 
-#include "kickcat/Time.h"
+#include "kickcat/OS/Time.h"
 
 namespace kickcat
 {

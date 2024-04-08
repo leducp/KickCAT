@@ -19,8 +19,8 @@ namespace kickcat
 
         void open() override;
         void close() noexcept override;
-        std::tuple<int32_t, uint16_t> recv(uint8_t* frame, int32_t frame_size) override;
-        int32_t sendTo(uint8_t const* frame, int32_t frame_size, uint16_t id) override;
+        std::tuple<int32_t, uint16_t> recv(void* frame, int32_t frame_size) override;
+        int32_t sendTo(void const* frame, int32_t frame_size, uint16_t id) override;
 
     private:
         int fd_{-1};

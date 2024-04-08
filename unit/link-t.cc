@@ -101,25 +101,25 @@ TEST_F(LinkTest, writeThenRead_NomOK_RedOK)
     EXPECT_CALL(*io_redundancy, setTimeout(timeout));
 
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
@@ -138,38 +138,38 @@ TEST_F(LinkTest, writeThenRead_Nom_NOK_RedOK)
 
         // Write into nominal interface
         EXPECT_CALL(*io_nominal, write(_,_))
-        .WillOnce(Invoke([&](uint8_t const*, int32_t)
+        .WillOnce(Invoke([&](void const*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
 
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         // Write into redundancy interface
         EXPECT_CALL(*io_redundancy, write(_,_))
-        .WillOnce(Invoke([&](uint8_t const*, int32_t)
+        .WillOnce(Invoke([&](void const*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
@@ -190,38 +190,38 @@ TEST_F(LinkTest, writeThenRead_NomOK_Red_NOK)
 
         // Write into nominal interface
         EXPECT_CALL(*io_nominal, write(_,_))
-        .WillOnce(Invoke([&](uint8_t const*, int32_t)
+        .WillOnce(Invoke([&](void const*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
 
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
 
         // Write into redundancy interface
         EXPECT_CALL(*io_redundancy, write(_,_))
-        .WillOnce(Invoke([&](uint8_t const*, int32_t)
+        .WillOnce(Invoke([&](void const*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
@@ -243,38 +243,38 @@ TEST_F(LinkTest, writeThenRead_NOK)
 
         // Write into nominal interface
         EXPECT_CALL(*io_nominal, write(_,_))
-        .WillOnce(Invoke([&](uint8_t const*, int32_t)
+        .WillOnce(Invoke([&](void const*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
 
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         // Write into redundancy interface
         EXPECT_CALL(*io_redundancy, write(_,_))
-        .WillOnce(Invoke([&](uint8_t const*, int32_t)
+        .WillOnce(Invoke([&](void const*, int32_t)
         {
             return ETH_MIN_SIZE;
         }));
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
 
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return 0;
         }));
@@ -287,30 +287,30 @@ TEST_F(LinkTest, writeThenRead_error_frame_type)
 {
     Frame frame;
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([&](uint8_t* frame_in, int32_t)
+    .WillOnce(Invoke([&](void* frame_in, int32_t)
     {
-        EthernetHeader* header = reinterpret_cast<EthernetHeader*>(frame_in);
-        header->type = 0;
+        EthernetHeader* ethernet_header = pointData<EthernetHeader>(frame_in);
+        ethernet_header->type = 0;
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([&](uint8_t* frame_in, int32_t)
+    .WillOnce(Invoke([&](void* frame_in, int32_t)
     {
-        EthernetHeader* header = reinterpret_cast<EthernetHeader*>(frame_in);
-        header->type = 0;
+        EthernetHeader* ethernet_header = pointData<EthernetHeader>(frame_in);
+        ethernet_header->type = 0;
         return ETH_MIN_SIZE;
     }));
 
@@ -321,30 +321,32 @@ TEST_F(LinkTest, writeThenRead_error_wrong_number_bytes_read)
 {
     Frame frame;
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([&](uint8_t* frame_in, int32_t)
+    .WillOnce(Invoke([&](void* frame_in, int32_t)
     {
-        EthercatHeader* header = reinterpret_cast<EthercatHeader*>(frame_in + sizeof(EthernetHeader));
-        header->len = ETH_MAX_SIZE;
+        EthernetHeader* ethernet_header = pointData<EthernetHeader>(frame_in);
+        EthercatHeader* ethercat_header = pointData<EthercatHeader>(ethernet_header);
+        ethercat_header->len = ETH_MAX_SIZE;
         return ETH_MAX_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([&](uint8_t* frame_in, int32_t)
+    .WillOnce(Invoke([&](void* frame_in, int32_t)
     {
-        EthercatHeader* header = reinterpret_cast<EthercatHeader*>(frame_in + sizeof(EthernetHeader));
-        header->len = ETH_MAX_SIZE;
+        EthernetHeader* ethernet_header = pointData<EthernetHeader>(frame_in);
+        EthercatHeader* ethercat_header = pointData<EthercatHeader>(ethernet_header);
+        ethercat_header->len = ETH_MAX_SIZE;
         return ETH_MAX_SIZE;
     }));
 
@@ -355,7 +357,7 @@ TEST_F(LinkTest, writeThenRead_error_write)
 {
     Frame frame;
     EXPECT_CALL(*io_nominal, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return -1;
     }));
@@ -364,32 +366,38 @@ TEST_F(LinkTest, writeThenRead_error_write)
 
 TEST_F(LinkTest, isRedundancyNeeded_true)
 {
+    InSequence s;
+
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         // The frame didn't reach the nominal interface.
         return -1;
     }));
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([](uint8_t* frame_in, int32_t)
+    .WillOnce(Invoke([](void* frame_in, int32_t)
     {
         // Add a datagram to the read frame and set its working counter to 1.
         Frame frame;
         frame.addDatagram(0, Command::BRD,  0, nullptr, 1);
         int32_t toWrite = frame.finalize();
         std::memcpy(frame_in, frame.data(), toWrite);
-        uint8_t* datagram_addr = frame_in + sizeof(EthernetHeader) + sizeof(EthercatHeader);
-        DatagramHeader const* header = reinterpret_cast<DatagramHeader*>(datagram_addr);
-        uint8_t* wkc_addr = datagram_addr + sizeof(DatagramHeader) + header->len;
+
+        EthernetHeader* ethernet_header = pointData<EthernetHeader>(frame_in);
+        EthercatHeader* ethercat_header = pointData<EthercatHeader>(ethernet_header);
+        DatagramHeader* datagram_header = pointData<DatagramHeader>(ethercat_header);
+        uint8_t* wkc_addr = reinterpret_cast<uint8_t*>(datagram_header) + sizeof(DatagramHeader) + datagram_header->len;
+
         uint16_t wkc = 1;
         std::memcpy(wkc_addr, &wkc, sizeof(uint16_t));
+
         return toWrite;
     }));
 
@@ -401,13 +409,13 @@ TEST_F(LinkTest, isRedundancyNeeded_true)
 TEST_F(LinkTest, isRedundancyNeeded_false)
 {
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
@@ -421,19 +429,19 @@ TEST_F(LinkTest, isRedundancyNeeded_false)
 TEST_F(LinkTest, isRedundancyNeeded_no_interfaces)
 {
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([&](uint8_t const*, int32_t)
+    .WillOnce(Invoke([&](void const*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         return -1;
     }));
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         return -1;
     }));
@@ -473,41 +481,41 @@ TEST_F(LinkTest, sendFrame_error_write)
 TEST_F(LinkTest, sendFrame_ok)
 {
     EXPECT_CALL(*io_nominal, write(_,_))
-    .WillOnce(Invoke([](uint8_t const* frame_in, int32_t)
+    .WillOnce(Invoke([](void const* frame_in, int32_t)
     {
+        EthernetHeader const* ethernet_header = pointData<EthernetHeader>(frame_in);
         {
-            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
-            EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
+            EXPECT_EQ(ETH_ETHERCAT_TYPE, ethernet_header->type);
             for (int32_t i = 0; i < 6; ++i)
             {
-                EXPECT_EQ(PRIMARY_IF_MAC[i], header->src[i]);
-                EXPECT_EQ(0xff, header->dst[i]);
+                EXPECT_EQ(PRIMARY_IF_MAC[i], ethernet_header->src[i]);
+                EXPECT_EQ(0xff, ethernet_header->dst[i]);
             }
         }
 
         {
-            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
-            EXPECT_EQ(header->len, 0);
+            EthercatHeader const* ethercat_header = pointData<EthercatHeader>(ethernet_header);
+            EXPECT_EQ(ethercat_header->len, 0);
         }
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([](uint8_t const* frame_in, int32_t)
+    .WillOnce(Invoke([](void const* frame_in, int32_t)
     {
+        EthernetHeader const* ethernet_header = pointData<EthernetHeader>(frame_in);
         {
-            EthernetHeader const* header = reinterpret_cast<EthernetHeader const*>(frame_in);
-            EXPECT_EQ(ETH_ETHERCAT_TYPE, header->type);
+            EXPECT_EQ(ETH_ETHERCAT_TYPE, ethernet_header->type);
             for (int32_t i = 0; i < 6; ++i)
             {
-                EXPECT_EQ(SECONDARY_IF_MAC[i], header->src[i]);
-                EXPECT_EQ(0xff, header->dst[i]);
+                EXPECT_EQ(SECONDARY_IF_MAC[i], ethernet_header->src[i]);
+                EXPECT_EQ(0xff, ethernet_header->dst[i]);
             }
         }
 
         {
-            EthercatHeader const* header = reinterpret_cast<EthercatHeader const*>(frame_in + sizeof(EthernetHeader));
-            EXPECT_EQ(header->len, 0);
+            EthercatHeader const* ethercat_header = pointData<EthercatHeader>(ethernet_header);
+            EXPECT_EQ(ethercat_header->len, 0);
         }
         return ETH_MIN_SIZE;
     }));
@@ -783,14 +791,14 @@ TEST_F(LinkTest, process_datagrams_invalid_frame)
     addDatagram(cmd, payload, payload, 0);
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([](uint8_t* data, int32_t)
+    .WillOnce(Invoke([](void* data, int32_t)
     {
         std::memset(data, 0, ETH_MIN_SIZE);
         return ETH_MIN_SIZE;
     }));
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([](uint8_t* data, int32_t)
+    .WillOnce(Invoke([](void* data, int32_t)
     {
         std::memset(data, 0, ETH_MIN_SIZE);
         return ETH_MIN_SIZE;
@@ -814,13 +822,13 @@ TEST_F(LinkTest, process_datagrams_invalid_size)
     addDatagram(cmd, payload, payload, 0);
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         return 1;
     }));
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         return 1;
     }));
@@ -836,13 +844,13 @@ TEST_F(LinkTest, process_datagrams_invalid_size)
 TEST_F(LinkTest, process_datagrams_send_error)
 {
     EXPECT_CALL(*io_nominal, write(_,_))
-    .WillOnce(Invoke([](uint8_t const*, int32_t)
+    .WillOnce(Invoke([](void const*, int32_t)
     {
         return 1;
     }));
 
     EXPECT_CALL(*io_redundancy, write(_,_))
-    .WillOnce(Invoke([](uint8_t const*, int32_t)
+    .WillOnce(Invoke([](void const*, int32_t)
     {
         return 1;
     }));
@@ -888,12 +896,12 @@ TEST_F(LinkTest, process_datagrams_error_rethrow)
     );
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([&](uint8_t*, int32_t)
+    .WillOnce(Invoke([&](void*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([&](uint8_t*, int32_t)
+    .WillOnce(Invoke([&](void*, int32_t)
     {
         return ETH_MIN_SIZE;
     }));
@@ -913,14 +921,14 @@ TEST_F(LinkTest, process_datagrams_old_frame)
     addDatagram(cmd, payload, payload, 0);
 
     EXPECT_CALL(*io_nominal, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         errno = EAGAIN;
         return -1;
     })).RetiresOnSaturation();
 
     EXPECT_CALL(*io_redundancy, read(_,_))
-    .WillOnce(Invoke([](uint8_t*, int32_t)
+    .WillOnce(Invoke([](void*, int32_t)
     {
         errno = EAGAIN;
         return -1;
@@ -940,13 +948,13 @@ TEST_F(LinkTest, process_datagrams_old_frame)
 
         // handle only response on nominal
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return -1;
         })).RetiresOnSaturation();
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t* data, int32_t)
+        .WillOnce(Invoke([](void* data, int32_t)
         {
             Frame frame;
             frame.addDatagram(0, Command::BRD,  0, nullptr, 1);
@@ -957,13 +965,13 @@ TEST_F(LinkTest, process_datagrams_old_frame)
 
 
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return -1;
         })).RetiresOnSaturation();
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             errno = EAGAIN;
             return -1;
@@ -983,13 +991,13 @@ TEST_F(LinkTest, process_datagrams_old_frame)
 
         // handle only response on nominal
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return -1;
         })).RetiresOnSaturation();
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([](uint8_t* data, int32_t)
+        .WillOnce(Invoke([](void* data, int32_t)
         {
             Frame frame;
             frame.addDatagram(1, Command::BRD,  0, nullptr, 1);
@@ -1000,13 +1008,13 @@ TEST_F(LinkTest, process_datagrams_old_frame)
 
         // handle only response on nominal
         EXPECT_CALL(*io_redundancy, read(_,_))
-        .WillOnce(Invoke([](uint8_t*, int32_t)
+        .WillOnce(Invoke([](void*, int32_t)
         {
             return -1;
         })).RetiresOnSaturation();
 
         EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Invoke([payload](uint8_t* data, int32_t)
+        .WillOnce(Invoke([payload](void* data, int32_t)
         {
             Frame frame;
             frame.addDatagram(2, Command::BRD,  0, &payload, 1);

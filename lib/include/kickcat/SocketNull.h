@@ -16,8 +16,8 @@ namespace kickcat
         void open(std::string const& ) override {}
         void setTimeout(nanoseconds ) override {}
         void close() noexcept override {}
-        int32_t read(uint8_t* , int32_t ) override { return 0;}
-        int32_t write(uint8_t const* , int32_t frame_size) override { return frame_size;};
+        int32_t read(void* , int32_t ) override { return 0;}
+        int32_t write(void const* , int32_t frame_size) override { return frame_size;};
     };
 }
 

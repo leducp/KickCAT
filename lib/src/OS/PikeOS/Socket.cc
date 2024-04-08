@@ -7,7 +7,7 @@ extern "C"
 }
 
 #include "OS/PikeOS/Socket.h"
-#include "Time.h"
+#include "OS/Time.h"
 
 namespace kickcat
 {
@@ -81,7 +81,7 @@ namespace kickcat
         vm_close(&fd_);
     }
 
-    int32_t Socket::read(uint8_t* frame, int32_t frame_size)
+    int32_t Socket::read(void* frame, int32_t frame_size)
     {
         nanoseconds deadline = since_epoch() + timeout_;
         do
@@ -111,7 +111,7 @@ namespace kickcat
         return -1;
     }
 
-    int32_t Socket::write(uint8_t const* frame, int32_t frame_size)
+    int32_t Socket::write(uint8_t const* void, int32_t frame_size)
     {
         vm_io_buf_id_t tx = vm_io_sbuf_tx_alloc(&sbuf_, 1); // 1 = non block
         if (tx == VM_IO_BUF_ID_INVALID)

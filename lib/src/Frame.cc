@@ -28,7 +28,7 @@ namespace kickcat
     }
 
 
-    Frame::Frame(uint8_t const* data, int32_t data_size)
+    Frame::Frame(void const* data, int32_t data_size)
         : ethernet_ { pointData<EthernetHeader>(frame_.data())  }
         , header_   { pointData<EthercatHeader>(ethernet_)      }
         , first_datagram_{ pointData<uint8_t>(header_)          }

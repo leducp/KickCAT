@@ -1,8 +1,8 @@
 #ifndef KICKCAT_GATEWAY_H
 #define KICKCAT_GATEWAY_H
 
-#include "AbstractDiagSocket.h"
-#include "Bus.h"
+#include "kickcat/AbstractDiagSocket.h"
+#include "kickcat/Bus.h"
 #include "kickcat/Mailbox.h"
 
 namespace kickcat

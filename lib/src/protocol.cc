@@ -305,6 +305,14 @@ namespace kickcat
     {
         return reinterpret_cast<EthernetHeader const*>(base_address);
     }
+    template<> EthernetHeader* pointData<EthernetHeader, void>(void* base_address)
+    {
+        return reinterpret_cast<EthernetHeader*>(base_address);
+    }
+    template<> EthernetHeader const* pointData<EthernetHeader, void>(void const* base_address)
+    {
+        return reinterpret_cast<EthernetHeader const*>(base_address);
+    }
 
     namespace mailbox::Error
     {

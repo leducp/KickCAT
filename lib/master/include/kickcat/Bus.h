@@ -1,13 +1,11 @@
 #ifndef KICKCAT_BUS_H
 #define KICKCAT_BUS_H
 
-#include <memory>
 #include <list>
 #include <vector>
-#include <functional>
 
 #include "kickcat/Error.h"
-#include "Frame.h"
+#include "kickcat/Frame.h"
 #include "Link.h"
 #include "Slave.h"
 

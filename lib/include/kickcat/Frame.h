@@ -15,7 +15,7 @@ namespace kickcat
     public:
         Frame();
         Frame(Frame&& other);
-        Frame(uint8_t const* data, int32_t data_size);
+        Frame(void const* data, int32_t data_size);
         Frame(Frame const& other) = delete;
         Frame& operator=(Frame&& other);
         ~Frame() = default;

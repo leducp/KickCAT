@@ -1,15 +1,15 @@
 #ifndef KICKCAT_PROTOCOL_H
 #define KICKCAT_PROTOCOL_H
 
-#include <cstdint>
 #include <cstdio>
 #include <string_view>
 #include <string>
 #include <array>
 #include <tuple>
 
-#include "Time.h"
-#include "Error.h"
+#include "kickcat/Units.h"
+#include "kickcat/Error.h"
+#include "kickcat/OS/Time.h"
 
 namespace kickcat
 {
@@ -781,6 +781,7 @@ namespace kickcat
     }
     template<> mailbox::Header* pointData<mailbox::Header, uint8_t>(uint8_t* base_address);
     template<> EthernetHeader*  pointData<EthernetHeader,  uint8_t>(uint8_t* base_address);
+    template<> EthernetHeader*  pointData<EthernetHeader,  void>(void* base_address);
 
     template<typename T, typename Previous>
     T const* pointData(Previous const* header_address)
@@ -789,6 +790,7 @@ namespace kickcat
     }
     template<> mailbox::Header const* pointData<mailbox::Header, uint8_t>(uint8_t const* base_address);
     template<> EthernetHeader const*  pointData<EthernetHeader,  uint8_t>(uint8_t const* base_address);
+    template<> EthernetHeader const*  pointData<EthernetHeader,  void>(void const* base_address);
 }
 
 #endif

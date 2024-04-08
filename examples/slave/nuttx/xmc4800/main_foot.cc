@@ -1,5 +1,5 @@
 #include "kickcat/EEPROM/XMC4800EEPROM.h"
-#include "kickcat/Time.h"
+#include "kickcat/OS/Time.h"
 #include "kickcat/ESC/XMC4800.h"
 
 namespace foot

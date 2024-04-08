@@ -2,7 +2,7 @@
 #include "kickcat/nuttx/SPI.h"
 #include "kickcat/ESC/Lan9252.h"
 #include "kickcat/protocol.h"
-#include "kickcat/Time.h"
+#include "kickcat/OS/Time.h"
 
 #include <nuttx/board.h>
 #include <arch/board/board.h>
