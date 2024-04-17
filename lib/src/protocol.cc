@@ -270,8 +270,8 @@ namespace kickcat
             case SyncManagerType::Unused:     {return "Unused";    }
             case SyncManagerType::MailboxOut: {return "MailboxOut";}
             case SyncManagerType::MailboxIn: {return "MailboxIn" ;}
-            case SyncManagerType::Output:     {return "Output (Slave to Master)";    }
-            case SyncManagerType::Input:      {return "Input  (Master to Slave)";     }
+            case SyncManagerType::Output:     {return "Output (Master to Slave)";    }
+            case SyncManagerType::Input:      {return "Input  (Slave to Master)";     }
             default:                          {return "unknown";   }
         }
     }
