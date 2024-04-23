@@ -206,10 +206,17 @@ namespace kickcat::mailbox::response
 
     void Mailbox::receive()
     {
+        SyncManager sync;
+        esc_->read(reg::SYNC_MANAGER + sizeof(SyncManager) * mbx_out_.index, &sync, sizeof(SyncManager));
+        if (not (sync.status & MAILBOX_STATUS))
+        {
+            return;
+        }
+
         std::vector<uint8_t> raw_message;
-        raw_message.resize(mbx_in_.length);
-        int32_t read_bytes = esc_->read(mbx_in_.start_address, raw_message.data(), mbx_in_.length);
-        if (read_bytes != mbx_in_.length)
+        raw_message.resize(mbx_out_.length);
+        int32_t read_bytes = esc_->read(mbx_out_.start_address, raw_message.data(), mbx_out_.length);
+        if (read_bytes != mbx_out_.length)
         {
             return;
         }
@@ -309,7 +316,7 @@ namespace kickcat::mailbox::response
         }
 
         auto& msg = to_send_.front();
-        int32_t written_bytes = esc_->write(mbx_out_.start_address, msg.data(), msg.size());
+        int32_t written_bytes = esc_->write(mbx_in_.start_address, msg.data(), msg.size());
         if (written_bytes > 0)
         {
             to_send_.pop();

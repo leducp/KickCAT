@@ -118,8 +118,8 @@ namespace kickcat
         switch (fmmu_type)
         {
             case 0:  {return "Unused";}
-            case 1:  {return "Outputs (Slave to Master)";}
-            case 2:  {return "Inputs  (Master to Slave)";}
+            case 1:  {return "Outputs (Master to Slave)";}
+            case 2:  {return "Inputs  (Slave to Master)";}
             case 3:  {return "SyncM Status (Read Mailbox)";}
             default: {return "Unused";}
         }
