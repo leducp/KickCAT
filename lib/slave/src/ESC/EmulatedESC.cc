@@ -112,7 +112,7 @@ namespace kickcat
 
             if (access & Access::PDI_READ)
             {
-                for (auto& pdo : tx_pdos_)
+                for (auto& pdo : rx_pdos_)
                 {
                     if ((pos < pdo.physical_address) or ((pos + to_copy) > (pdo.physical_address + pdo.size)))
                     {
@@ -125,7 +125,7 @@ namespace kickcat
 
             if (access & Access::PDI_WRITE)
             {
-                for (auto& pdo : rx_pdos_)
+                for (auto& pdo : tx_pdos_)
                 {
                     if ((pos < pdo.physical_address) or ((pos + to_copy) > (pdo.physical_address + pdo.size)))
                     {
@@ -208,12 +208,12 @@ namespace kickcat
 
     void EmulatedESC::processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
-        *wkc += processPDO(rx_pdos_, true, header, data);
+        *wkc += processPDO(tx_pdos_, true, header, data);
     }
 
     void EmulatedESC::processLWR(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
     {
-        *wkc += processPDO(tx_pdos_, false, header, data);
+        *wkc += processPDO(rx_pdos_, false, header, data);
     }
 
     void EmulatedESC::processLRW(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
@@ -221,8 +221,8 @@ namespace kickcat
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
         std::memcpy(swap, data, header->len);
 
-        *wkc += processPDO(rx_pdos_, true,  header, data);      // read directly in the frame
-        *wkc += processPDO(tx_pdos_, false, header, swap) * 2;  // write from the swap
+        *wkc += processPDO(tx_pdos_, true,  header, data);      // read directly in the frame
+        *wkc += processPDO(rx_pdos_, false, header, swap) * 2;  // write from the swap
     }
 
 
