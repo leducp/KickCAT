@@ -9,7 +9,7 @@
 - use the `export_nuttx_archive.sh` to build and deploy your app. You will need to tweak the paths in the script to match your environment.
 
 
-#### Create you own application
+#### Create your own application
 
 - Create a new main and a new project in CMake. Edit `export_nuttx_archive.sh` to flash your binary.
 - A minimal default EEPROM is included in the binary, it allows you to flash your own EEPROM description with the tool `KickCAT/tools/eeprom.cc`.

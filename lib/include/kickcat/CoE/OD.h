@@ -104,6 +104,9 @@ namespace kickcat::CoE
         DEFTYPE_FSOECOMMPAR    = 0x0286
     };
     char const* toString(enum DataType type);
+
+    std::string dataToString(CoE::DataType dataType, void *data);
+
     constexpr bool isBasic(DataType type)
     {
         switch (type)
@@ -189,6 +192,17 @@ namespace kickcat::CoE
 
     using Dictionary = std::vector<Object>;
     std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex);
+    
+    template<typename T>
+    void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
+              DataType type, std::string const& description, T data)
+    {
+        object.entries.emplace_back(subindex,bitlen,access,type,description);
+        T* dataAlloc = new T(data);
+        object.entries.back().data = dataAlloc;
+
+    }
+    void populateOD(); 
 
     // Singleton
     Dictionary& dictionary();

@@ -10,6 +10,10 @@ add_executable(eeprom eeprom.cc)
 target_link_libraries(eeprom kickcat)
 set_kickcat_properties(eeprom)
 
+add_executable(od_generator od_generator.cc)
+target_link_libraries(od_generator kickcat)
+
+
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     add_executable(check_network_stability checkNetworkStability.cc)
     target_link_libraries(check_network_stability kickcat)
