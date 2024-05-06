@@ -22,7 +22,7 @@ jobs:
     - uses: actions/checkout@v2
     - uses: turtlebrowser/get-conan@v1.2
       with:
-        version: 2.0.9
+        version: 2.2.3
 
     - name: GTest
       run: |
@@ -59,7 +59,8 @@ jobs:
   build_NuttX:
     runs-on: ubuntu-latest
     env:
-          nuttx_version: nuttx-12.5.0-RC0
+          nuttx_version: 3dc6b4c9bd9624ed259e676f8e9761dbf660c1bb 
+          nuttx_apps_version: nuttx-12.5.0-RC0
           arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
     steps:
       - name: checkout KickCAT
@@ -87,7 +88,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{GITHUB.WORKSPACE}}/nuttxspace/apps
-          key: nuttx-apps_${{env.nuttx_version}}
+          key: nuttx-apps_${{env.nuttx_apps_version}}
 
       - if: ${{ steps.cache-nuttx-apps.outputs.cache-hit != 'true' }}
         name: checkout NuttX Apps
@@ -95,7 +96,7 @@ jobs:
         with:
           repository: apache/nuttx-apps
           path: 'nuttxspace/apps'
-          ref: '${{env.nuttx_version}}'
+          ref: '${{env.nuttx_apps_version}}'
 
       - name: Install Kconfig
         run: sudo apt install kconfig-frontends
@@ -124,13 +125,11 @@ jobs:
           nuttx_src=${{GITHUB.WORKSPACE}}/nuttxspace/nuttx
           build=${{GITHUB.WORKSPACE}}/build_slave
           src=${{GITHUB.WORKSPACE}}/KickCAT
-          nuttx_version=nuttx-export-12.5.0
 
           cp ${src}/examples/slave/nuttx/xmc4800/boards/relax/defconfig ${nuttx_src}/boards/arm/xmc4/xmc4800-relax/configs/nsh/defconfig
           ${nuttx_src}/tools/configure.sh -l xmc4800-relax:nsh
-          make -C ${nuttx_src} savedefconfig
           make -C ${nuttx_src} export
-          cp ${nuttx_src}/${nuttx_version}.tar.gz ${build}
-          tar xf ${build}/${nuttx_version}.tar.gz -C ${build}
-          cmake -B ${build} -S ${src}  -DCMAKE_TOOLCHAIN_FILE=${build}/${nuttx_version}/scripts/toolchain.cmake
+          mkdir ${build}/nuttx-export
+          tar xf ${nuttx_src}/nuttx-export-*.tar.gz --strip-components=1 -C ${build}/nuttx-export
+          cmake -B ${build} -S ${src}  -DCMAKE_TOOLCHAIN_FILE=${build}/nuttx-export/scripts/toolchain.cmake
           make -C ${build}

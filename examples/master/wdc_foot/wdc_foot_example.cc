@@ -119,6 +119,11 @@ int main(int argc, char* argv[])
 
         bus.createMapping(io_buffer);
 
+        uint32_t identityObject[256];
+        uint32_t identityObjectSize = sizeof(identityObject);
+        bus.readSDO(bus.slaves()[0], 0x1018, 4, Bus::Access::PARTIAL, identityObject, &identityObjectSize, 1s);
+        printf("Firmware Version %02x\n", identityObject[0]);
+ 
         bus.enableIRQ(EcatEvent::DL_STATUS,
         [&]()
         {
@@ -143,7 +148,7 @@ int main(int argc, char* argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
-
+   
     for (auto& slave: bus.slaves())
     {
         printInfo(slave);

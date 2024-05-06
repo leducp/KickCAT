@@ -26,7 +26,7 @@ src=~/wdc_workspace/src/KickCAT
 
 bin=xmc4800_$project
 
-nuttx_version=nuttx-export-12.5.0
+nuttx_version=nuttx-export-12.5.1
 
 rm -f ${nuttx_src}/${nuttx_version}.tar.gz
 rm -rf ${build}/${nuttx_version}

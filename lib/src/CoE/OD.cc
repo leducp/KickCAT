@@ -105,6 +105,48 @@ namespace kickcat::CoE
         }
     }
 
+    std::string dataToString(CoE::DataType dataType, void *data)
+    {
+        std::stringstream result;
+        result << "0x" << std::hex;
+        switch (dataType)
+        {
+            case CoE::DataType::INTEGER8:
+            case CoE::DataType::UNSIGNED8:
+            case CoE::DataType::BYTE:
+            case CoE::DataType::BOOLEAN:
+            {
+                /// StringStream take uint8_t as ASCII character. uint16 wrapper to avoid that.
+                uint16_t uint8Wrapper{0};
+                uint8Wrapper = *static_cast<uint8_t const *>(data);
+                result << uint8Wrapper;
+                break;
+            }
+            case CoE::DataType::INTEGER16:
+            case CoE::DataType::UNSIGNED16:
+            {
+                result << *static_cast<int16_t const *>(data);
+                break;
+            }
+            case CoE::DataType::INTEGER32:
+            case CoE::DataType::UNSIGNED32:
+            case CoE::DataType::REAL32:
+            {
+                result << *static_cast<uint32_t const *>(data);
+                break;
+            }
+            case CoE::DataType::INTEGER64:
+            case CoE::DataType::UNSIGNED64:
+            case CoE::DataType::REAL64:
+            {
+                result << *static_cast<int64_t const *>(data);
+                break;
+            }
+        }
+
+        return result.str();
+    }
+
 
     std::string toString(Object const& object)
     {
