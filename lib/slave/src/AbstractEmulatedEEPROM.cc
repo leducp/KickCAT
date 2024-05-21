@@ -6,6 +6,7 @@
 #include "kickcat/EEPROM/EEPROM_factory.h"
 
 #include <cstring>
+#include <inttypes.h>
 
 namespace kickcat
 {
@@ -128,7 +129,7 @@ namespace kickcat
 
         uint32_t adler_sum = adler32Sum(eeprom_.data(), eeprom_.size() * 2);
 
-        printf("Adler sum read %lx, computed %lx\n", adler_checksum_, adler_sum);
+        printf("Adler sum read %" PRIx32 ", computed %" PRIx32 "\n", adler_checksum_, adler_sum);
 
         if (adler_sum != adler_checksum_)
         {
@@ -139,7 +140,7 @@ namespace kickcat
         // debug print:
         for(uint32_t i = 0; i < 20; i++)
         {
-            printf("EEPROM %li : %x\n", i, eeprom_[i]);
+            printf("EEPROM %" PRIu32 " : %x\n", i, eeprom_[i]);
         }
     }
 

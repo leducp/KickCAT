@@ -142,6 +142,7 @@ namespace kickcat::CoE
                 result << *static_cast<int64_t const *>(data);
                 break;
             }
+            default: {}
         }
 
         return result.str();
