@@ -1,6 +1,7 @@
 #ifndef KICKCAT_ERROR_H
 #define KICKCAT_ERROR_H
 
+#include <cstdint>
 #include <exception>
 #include <system_error>
 
