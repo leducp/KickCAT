@@ -5,3 +5,6 @@ build_slave/
 .cproject
 .settings/
 *.orig
+.cache/*
+compile_commands.json
+.clangd
