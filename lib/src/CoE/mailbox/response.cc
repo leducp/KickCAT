@@ -106,7 +106,7 @@ namespace kickcat::mailbox::response
     {
         if (not isUploadAuthorized(entry))
         {
-            abort(CoE::SDO::abort::READ_ONLY_ACCESS);
+            abort(CoE::SDO::abort::WRITE_ONLY_ACCESS);
             return ProcessingResult::FINALIZE;
         }
 
@@ -141,7 +141,7 @@ namespace kickcat::mailbox::response
             auto& entry = object->entries.at(i);
             if (not isUploadAuthorized(&entry))
             {
-                abort(CoE::SDO::abort::READ_ONLY_ACCESS);
+                abort(CoE::SDO::abort::WRITE_ONLY_ACCESS);
                 return ProcessingResult::FINALIZE;
             }
 
@@ -162,7 +162,7 @@ namespace kickcat::mailbox::response
     {
         if (not isDownloadAuthorized(entry))
         {
-            abort(CoE::SDO::abort::WRITE_ONLY_ACCESS);
+            abort(CoE::SDO::abort::READ_ONLY_ACCESS);
             return ProcessingResult::FINALIZE;
         }
 
@@ -215,7 +215,7 @@ namespace kickcat::mailbox::response
             auto& entry = object->entries.at(subindex);
             if (not isDownloadAuthorized(&entry))
             {
-                abort(CoE::SDO::abort::WRITE_ONLY_ACCESS);
+                abort(CoE::SDO::abort::READ_ONLY_ACCESS);
                 return ProcessingResult::FINALIZE;
             }
 
