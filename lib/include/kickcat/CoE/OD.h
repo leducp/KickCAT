@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdint>
 #include <tuple>
+#include <functional>
 
 namespace kickcat::CoE
 {
@@ -179,6 +180,12 @@ namespace kickcat::CoE
         std::string  description;
 
         void* data{nullptr};
+
+        /// Called before access
+        std::vector<std::function<void(uint16_t access, Entry*)>> before_access;
+
+        // Called after access
+        std::vector<std::function<void(uint16_t access, Entry*)>> after_access;
     };
 
     struct Object   // ETG1000.5 6.1.4.2.1 Formal model
@@ -192,7 +199,7 @@ namespace kickcat::CoE
 
     using Dictionary = std::vector<Object>;
     std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex);
-    
+
     template<typename T>
     void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
               DataType type, std::string const& description, T data)
@@ -202,7 +209,7 @@ namespace kickcat::CoE
         object.entries.back().data = dataAlloc;
 
     }
-    void populateOD(); 
+    void populateOD();
 
     // Singleton
     Dictionary& dictionary();

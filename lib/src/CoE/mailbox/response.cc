@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include "Mailbox.h"
 #include "kickcat/CoE/mailbox/response.h"
 
 namespace kickcat::mailbox::response
@@ -110,6 +111,8 @@ namespace kickcat::mailbox::response
             return ProcessingResult::FINALIZE;
         }
 
+        beforeHooks(CoE::Access::READ, entry);
+
         uint32_t size = entry->bitlen / 8;
         if (size <= 4)
         {
@@ -123,10 +126,14 @@ namespace kickcat::mailbox::response
             std::memcpy(payload_, &size, 4);
             payload_ += 4;
         }
+
         std::memcpy(payload_, entry->data, size);
 
         coe_->service = CoE::Service::SDO_RESPONSE;
         reply(std::move(data_));
+
+        afterHooks(CoE::Access::READ, entry);
+
         return ProcessingResult::FINALIZE;
     }
 
@@ -138,16 +145,20 @@ namespace kickcat::mailbox::response
         uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {
-            auto& entry = object->entries.at(i);
-            if (not isUploadAuthorized(&entry))
+            auto* entry = &object->entries.at(i);
+            if (not isUploadAuthorized(entry))
             {
                 abort(CoE::SDO::abort::WRITE_ONLY_ACCESS);
                 return ProcessingResult::FINALIZE;
             }
 
-            uint32_t entry_size = entry.bitlen / 8;
-            std::memcpy(payload_ + 4 + size, entry.data, entry_size);
+            beforeHooks(CoE::Access::READ, entry);
+
+            uint32_t entry_size = entry->bitlen / 8;
+            std::memcpy(payload_ + 4 + size, entry->data, entry_size);
             size += entry_size;
+
+            afterHooks(CoE::Access::READ, entry);
         }
 
         std::memcpy(payload_, &size, 4);
@@ -165,6 +176,8 @@ namespace kickcat::mailbox::response
             abort(CoE::SDO::abort::READ_ONLY_ACCESS);
             return ProcessingResult::FINALIZE;
         }
+
+        beforeHooks(CoE::Access::WRITE, entry);
 
         uint32_t size;
         if (sdo_->transfer_type)
@@ -187,6 +200,9 @@ namespace kickcat::mailbox::response
 
         coe_->service = CoE::Service::SDO_RESPONSE;
         reply(std::move(data_));
+
+        afterHooks(CoE::Access::WRITE, entry);
+
         return ProcessingResult::FINALIZE;
     }
 
@@ -198,9 +214,13 @@ namespace kickcat::mailbox::response
         uint32_t size = 0;
         if (sdo_->subindex == 0)
         {
-            auto& entry = object->entries.at(0);
-            std::memcpy(entry.data, payload_ + 4, 1);
+            auto* entry = &object->entries.at(0);
+            beforeHooks(CoE::Access::WRITE, entry);
+
+            std::memcpy(entry->data, payload_ + 4, 1);
             size += 2;
+
+            afterHooks(CoE::Access::WRITE, entry);
         }
 
         uint16_t subindex = 1;
@@ -212,21 +232,43 @@ namespace kickcat::mailbox::response
                 return ProcessingResult::FINALIZE;
             }
 
-            auto& entry = object->entries.at(subindex);
-            if (not isDownloadAuthorized(&entry))
+            auto* entry = &object->entries.at(subindex);
+            if (not isDownloadAuthorized(entry))
             {
                 abort(CoE::SDO::abort::READ_ONLY_ACCESS);
                 return ProcessingResult::FINALIZE;
             }
 
-            uint32_t entry_size = entry.bitlen / 8;
-            std::memcpy(entry.data, payload_ + 4 + size, entry_size);
+            beforeHooks(CoE::Access::WRITE, entry);
+
+            uint32_t entry_size = entry->bitlen / 8;
+            std::memcpy(entry->data, payload_ + 4 + size, entry_size);
             size += entry_size;
             subindex++;
+
+            afterHooks(CoE::Access::WRITE, entry);
         }
 
         coe_->service = CoE::Service::SDO_RESPONSE;
         reply(std::move(data_));
         return ProcessingResult::FINALIZE;
+    }
+
+
+    void SDOMessage::beforeHooks(uint16_t access, CoE::Entry* entry)
+    {
+        for (auto callback : entry->before_access)
+        {
+            callback(access, entry);
+        }
+    }
+
+
+    void SDOMessage::afterHooks (uint16_t access, CoE::Entry* entry)
+    {
+        for (auto callback : entry->after_access)
+        {
+            callback(access, entry);
+        }
     }
 }

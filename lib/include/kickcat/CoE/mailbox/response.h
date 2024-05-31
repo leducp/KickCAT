@@ -31,6 +31,9 @@ namespace kickcat::mailbox::response
 
         void abort(uint32_t code);
 
+        void beforeHooks(uint16_t access, CoE::Entry* entry);
+        void afterHooks (uint16_t access, CoE::Entry* entry);
+
         CoE::Dictionary& dictionary_;
 
         // Pointer on data_
