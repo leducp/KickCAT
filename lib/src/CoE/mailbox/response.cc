@@ -129,6 +129,7 @@ namespace kickcat::mailbox::response
 
         std::memcpy(payload_, entry->data, size);
 
+        header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData) + size;
         coe_->service = CoE::Service::SDO_RESPONSE;
         reply(std::move(data_));
 
