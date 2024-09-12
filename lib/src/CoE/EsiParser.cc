@@ -247,12 +247,20 @@ namespace kickcat::CoE
         {
             node_type = node->FirstChildElement("BaseType");
         }
+
         auto it = BASIC_TYPES.find(node_type->GetText());
-        if (it == BASIC_TYPES.end())
+        if (it != BASIC_TYPES.end())
         {
-            return {DataType::UNKNOWN, 0};
+            return it->second;
         }
-        return it->second;
+
+        if(strstr(node_type->GetText(), "STRING"))
+        {
+            uint32_t bitlen = toNumber<uint32_t>(node->FirstChildElement("BitSize"));
+            return {DataType::VISIBLE_STRING, bitlen};
+        }
+
+        return {DataType::UNKNOWN, 0};
     }
 
 

@@ -124,6 +124,7 @@ namespace kickcat::CoE
             case DataType::REAL64:
             case DataType::BOOLEAN:
             case DataType::BYTE:
+            case DataType::VISIBLE_STRING:
             {
                 return true;
             }
