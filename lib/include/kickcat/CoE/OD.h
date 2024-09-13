@@ -210,6 +210,8 @@ namespace kickcat::CoE
         object.entries.back().data = dataAlloc;
 
     }
+    void addEntryString(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
+              DataType type, std::string const& description, std::string data);
     void populateOD();
 
     // Singleton

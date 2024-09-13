@@ -1,5 +1,6 @@
 #include <sstream>
 #include <algorithm>
+#include <streambuf>
 
 #include "kickcat/CoE/OD.h"
 
@@ -141,6 +142,12 @@ namespace kickcat::CoE
             {
                 result << *static_cast<int64_t const *>(data);
                 break;
+            }
+            case CoE::DataType::VISIBLE_STRING:
+            {
+				std::string strResult{static_cast<char const *>(data)};
+				reverse(strResult.begin(), strResult.end());
+				return strResult;
             }
             default: {}
         }
@@ -305,5 +312,14 @@ namespace kickcat::CoE
     {
         static Dictionary dict;
         return dict;
+    }
+ 
+ 	void addEntryString(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
+              DataType type, std::string const& description, std::string data)
+    {
+        object.entries.emplace_back(subindex,bitlen,access,type,description);
+        std::string* dataAlloc = new std::string(data);
+        object.entries.back().data = dataAlloc->data();
+
     }
 }

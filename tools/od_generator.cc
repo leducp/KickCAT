@@ -1,3 +1,4 @@
+#include "kickcat/CoE/OD.h"
 #include "kickcat/Prints.h"
 #include "kickcat/CoE/EsiParser.h"
 #include <fstream>
@@ -41,17 +42,36 @@ namespace kickcat
         if (not CoE::isBasic(entryToAdd.type))
         {
             // TODO support complex type of entry
-            THROW_ERROR("Object Dictionnary Generator only support basic type for now");
+            THROW_ERROR("Object Dictionary Generator only support basic type for now");
         }
 
         std::stringstream result;
-        result << "            CoE::addEntry(object,";
+        if(entryToAdd.type == CoE::DataType::VISIBLE_STRING)
+        {
+            result << "            CoE::addEntryString(object,";
+        }
+        else 
+        {
+            result << "            CoE::addEntry(object,";
+        }
+
         result << std::to_string(entryToAdd.subindex) << ",";
         result << std::to_string(entryToAdd.bitlen) << ",";
         result << std::to_string(entryToAdd.access) << ",";
         result << "static_cast<CoE::DataType>(" << std::to_string(static_cast<uint16_t>(entryToAdd.type)) << "),";
         result << "\"" << entryToAdd.description << "\",";
+
+        if(entryToAdd.type == CoE::DataType::VISIBLE_STRING)
+        {
+            result << "\"";
+        }
+
         result << dataToString(entryToAdd.type, entryToAdd.data);
+
+        if(entryToAdd.type == CoE::DataType::VISIBLE_STRING)
+        {
+            result << "\"";
+        }
         result << ");\n";
 
         return result.str();
