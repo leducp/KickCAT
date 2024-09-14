@@ -131,6 +131,7 @@ namespace kickcat::mailbox::response
 
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData) + size;
         coe_->service = CoE::Service::SDO_RESPONSE;
+        sdo_->command = CoE::SDO::response::UPLOAD;
         reply(std::move(data_));
 
         afterHooks(CoE::Access::READ, entry);
@@ -166,6 +167,7 @@ namespace kickcat::mailbox::response
 
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData) + size;
         coe_->service = CoE::Service::SDO_RESPONSE;
+        sdo_->command = CoE::SDO::response::UPLOAD_SEGMENTED;
         reply(std::move(data_));
         return ProcessingResult::FINALIZE;
     }
