@@ -146,7 +146,6 @@ namespace kickcat::CoE
             case CoE::DataType::VISIBLE_STRING:
             {
 				std::string strResult{static_cast<char const *>(data)};
-				reverse(strResult.begin(), strResult.end());
 				return strResult;
             }
             default: {}

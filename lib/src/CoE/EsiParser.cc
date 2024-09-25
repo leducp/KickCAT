@@ -132,6 +132,13 @@ namespace kickcat::CoE
         return data;
     }
 
+    std::vector<uint8_t> EsiParser::loadString(XMLElement* node)
+    {
+        auto data = loadHexBinary(node);
+        std::reverse(data.begin(), data.end());
+        return data;
+    }
+
     void EsiParser::loadDefaultData(XMLNode* node, Object& obj, Entry& entry)
     {
         auto node_default_data = node->FirstChildElement("Info")->FirstChildElement("DefaultData");
@@ -140,7 +147,16 @@ namespace kickcat::CoE
             return;
         }
 
-        auto data = loadHexBinary(node_default_data);
+        std::vector<uint8_t> data;
+        if(entry.type == DataType::VISIBLE_STRING)
+        {
+            data = loadString(node_default_data);
+        }
+        else
+        {
+            data = loadHexBinary(node_default_data);
+        }
+
         if (data.size() != (entry.bitlen / 8))
         {
             // throw ?
