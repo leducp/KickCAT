@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <tuple>
 #include <functional>
+#include <cstring>
 
 namespace kickcat::CoE
 {
@@ -106,7 +107,6 @@ namespace kickcat::CoE
     };
     char const* toString(enum DataType type);
 
-    std::string dataToString(CoE::DataType dataType, void *data);
 
     constexpr bool isBasic(DataType type)
     {
@@ -187,6 +187,8 @@ namespace kickcat::CoE
 
         // Called after access
         std::vector<std::function<void(uint16_t access, Entry*)>> after_access;
+
+        std::string dataToString() const;
     };
 
     struct Object   // ETG1000.5 6.1.4.2.1 Formal model
@@ -203,15 +205,21 @@ namespace kickcat::CoE
 
     template<typename T>
     void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
-              DataType type, std::string const& description, T data)
+                  DataType type, std::string const& description, T data)
     {
-        object.entries.emplace_back(subindex,bitlen,access,type,description);
-        T* dataAlloc = new T(data);
-        object.entries.back().data = dataAlloc;
-
+        object.entries.emplace_back(subindex, bitlen, access, type, description);
+        if constexpr(std::is_same_v<const char*, T>)
+        {
+            object.entries.back().data = malloc(bitlen);
+            memcpy(object.entries.back().data, data, bitlen);
+        }
+        else
+        {
+            T* dataAlloc = new T(data);
+            object.entries.back().data = dataAlloc;
+        }
     }
-    void addEntryString(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
-              DataType type, std::string const& description, std::string data);
+
     void populateOD();
 
     // Singleton

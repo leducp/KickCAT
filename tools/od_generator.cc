@@ -46,15 +46,7 @@ namespace kickcat
         }
 
         std::stringstream result;
-        if(entryToAdd.type == CoE::DataType::VISIBLE_STRING)
-        {
-            result << "            CoE::addEntryString(object,";
-        }
-        else 
-        {
-            result << "            CoE::addEntry(object,";
-        }
-
+        result << "            CoE::addEntry(object,";
         result << std::to_string(entryToAdd.subindex) << ",";
         result << std::to_string(entryToAdd.bitlen) << ",";
         result << std::to_string(entryToAdd.access) << ",";
@@ -66,7 +58,7 @@ namespace kickcat
             result << "\"";
         }
 
-        result << dataToString(entryToAdd.type, entryToAdd.data);
+        result << entryToAdd.dataToString();
 
         if(entryToAdd.type == CoE::DataType::VISIBLE_STRING)
         {
