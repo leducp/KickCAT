@@ -77,7 +77,8 @@ namespace kickcat
         result << "            {\n";
         result << "                .index = 0x" << std::hex << objectToAdd.index << std::dec << ",\n";
         result << "                .code = CoE::ObjectCode::" << CoE::toString(objectToAdd.code) << ",\n";
-        result << "                .name = \"" << objectToAdd.name << "\"\n";
+        result << "                .name = \"" << objectToAdd.name << "\",\n";
+        result << "                .entries{}\n";
         result << "            };\n";
 
         for (auto const &entry : objectToAdd.entries)

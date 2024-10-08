@@ -210,8 +210,8 @@ namespace kickcat::CoE
         object.entries.emplace_back(subindex, bitlen, access, type, description);
         if constexpr(std::is_same_v<const char*, T>)
         {
-            object.entries.back().data = malloc(bitlen);
-            memcpy(object.entries.back().data, data, bitlen);
+            object.entries.back().data = malloc(bitlen/8);
+            memcpy(object.entries.back().data, data, bitlen/8);
         }
         else
         {
