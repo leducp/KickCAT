@@ -11,7 +11,8 @@ namespace kickcat::CoE
             {
                 .index = 0x1018,
                 .code = CoE::ObjectCode::RECORD,
-                .name = "Identity Object"
+                .name = "Identity Object",
+                .entries{}
             };
             CoE::addEntry(object,0,8,7,static_cast<CoE::DataType>(5),"Subindex 000",0x4);
             CoE::addEntry(object,1,32,7,static_cast<CoE::DataType>(7),"Vendor ID",0x29c);
@@ -26,7 +27,8 @@ namespace kickcat::CoE
             {
                 .index = 0x1600,
                 .code = CoE::ObjectCode::RECORD,
-                .name = "RxPDO Map 1"
+                .name = "RxPDO Map 1",
+                .entries{}
             };
             CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
             CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x10);
@@ -38,7 +40,8 @@ namespace kickcat::CoE
             {
                 .index = 0x1a00,
                 .code = CoE::ObjectCode::RECORD,
-                .name = "TxPDO Map 1"
+                .name = "TxPDO Map 1",
+                .entries{}
             };
             CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
             CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0xe0);
@@ -50,7 +53,8 @@ namespace kickcat::CoE
             {
                 .index = 0x1c00,
                 .code = CoE::ObjectCode::ARRAY,
-                .name = "Sync manager type"
+                .name = "Sync manager type",
+                .entries{}
             };
             CoE::addEntry(object,0,8,7,static_cast<CoE::DataType>(5),"Subindex 0",0x4);
             CoE::addEntry(object,1,8,7,static_cast<CoE::DataType>(5),"Subindex 1",0x1);
@@ -65,7 +69,8 @@ namespace kickcat::CoE
             {
                 .index = 0x1c12,
                 .code = CoE::ObjectCode::RECORD,
-                .name = "RxPDO assign"
+                .name = "RxPDO assign",
+                .entries{}
             };
             CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
             CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"RxPDO assign Element 1",0x1600);
@@ -77,7 +82,8 @@ namespace kickcat::CoE
             {
                 .index = 0x1c13,
                 .code = CoE::ObjectCode::RECORD,
-                .name = "TxPDO assign"
+                .name = "TxPDO assign",
+                .entries{}
             };
             CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
             CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"TxPDO assign Element 1",0x1a00);

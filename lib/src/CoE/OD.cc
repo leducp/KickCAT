@@ -1,5 +1,7 @@
 #include <sstream>
 #include <algorithm>
+#include <streambuf>
+#include <string_view>
 
 #include "kickcat/CoE/OD.h"
 
@@ -105,11 +107,11 @@ namespace kickcat::CoE
         }
     }
 
-    std::string dataToString(CoE::DataType dataType, void *data)
+    std::string Entry::dataToString() const
     {
         std::stringstream result;
         result << "0x" << std::hex;
-        switch (dataType)
+        switch (type)
         {
             case CoE::DataType::INTEGER8:
             case CoE::DataType::UNSIGNED8:
@@ -141,6 +143,12 @@ namespace kickcat::CoE
             {
                 result << *static_cast<int64_t const *>(data);
                 break;
+            }
+            case CoE::DataType::VISIBLE_STRING:
+            {
+                char const* rawString = static_cast<char const*>(data);
+                std::string_view strResult{rawString, strnlen(rawString, bitlen/8)};
+                return std::string(strResult);
             }
             default: {}
         }
@@ -306,4 +314,5 @@ namespace kickcat::CoE
         static Dictionary dict;
         return dict;
     }
+ 
 }

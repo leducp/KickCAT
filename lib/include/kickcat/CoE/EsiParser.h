@@ -32,6 +32,7 @@ namespace kickcat::CoE
         }
 
         std::vector<uint8_t> loadHexBinary(tinyxml2::XMLElement* node);
+        std::vector<uint8_t> loadString(tinyxml2::XMLElement* node);
 
         void loadDefaultData(tinyxml2::XMLNode* node, Object& obj, Entry& entry);
 
