@@ -284,14 +284,14 @@ namespace kickcat::CoE
     }
 
 
-    std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex)
+    std::tuple<Object*, Entry*> findObject(std::shared_ptr<Dictionary> dict, uint16_t index, uint8_t subindex)
     {
-        auto object_it = std::find_if(dict.begin(), dict.end(), [index](Object const& object)
+        auto object_it = std::find_if(dict->begin(), dict->end(), [index](Object const& object)
         {
             return (object.index == index);
         });
 
-        if (object_it == dict.end())
+        if (object_it == dict->end())
         {
             return {nullptr, nullptr};
         }
@@ -308,11 +308,4 @@ namespace kickcat::CoE
 
         return {&(*object_it), &(*entry_it)};
     }
-
-    Dictionary& dictionary()
-    {
-        static Dictionary dict;
-        return dict;
-    }
- 
 }

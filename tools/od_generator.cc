@@ -3,16 +3,16 @@
 #include "kickcat/CoE/EsiParser.h"
 #include <fstream>
 #include <iostream>
+#include <memory>
 
 namespace kickcat
 {
     constexpr std::string_view OD_POPULATOR_FILE{"od_populator.cc"};
 
-    void populateDictionnary(std::string esiFileName)
+    std::shared_ptr<CoE::Dictionary> loadOD(std::string esiFileName)
     {
         CoE::EsiParser parser;
-        auto &coe_dict = CoE::dictionary();
-        coe_dict = parser.load(esiFileName);
+        return parser.load(esiFileName);
     }
 
     std::string addBeginning()
@@ -23,7 +23,8 @@ namespace kickcat
 
         result << "#include \"kickcat/CoE/OD.h\"\n\n";
         result << "namespace kickcat::CoE\n{\n";
-        result << "    void populateOD()\n    {\n";
+        result << "    std::shared_ptr<CoE::Dictionary> createOD()\n    {\n";
+        result << "        auto dictionary = std::make_shared<CoE::Dictionary>();\n\n";
 
         return result.str();
     }
@@ -31,6 +32,7 @@ namespace kickcat
     std::string addEnding()
     {
         std::stringstream result;
+        result << "         return dictionary;\n";
         result << "    }\n}\n";
         return result.str();
     }
@@ -75,10 +77,10 @@ namespace kickcat
         result << "        {\n";
         result << "            static CoE::Object object\n";
         result << "            {\n";
-        result << "                .index = 0x" << std::hex << objectToAdd.index << std::dec << ",\n";
-        result << "                .code = CoE::ObjectCode::" << CoE::toString(objectToAdd.code) << ",\n";
-        result << "                .name = \"" << objectToAdd.name << "\",\n";
-        result << "                .entries{}\n";
+        result << "                0x" << std::hex << objectToAdd.index << std::dec << ",\n";
+        result << "                CoE::ObjectCode::" << CoE::toString(objectToAdd.code) << ",\n";
+        result << "                \"" << objectToAdd.name << "\",\n";
+        result << "                {}\n";
         result << "            };\n";
 
         for (auto const &entry : objectToAdd.entries)
@@ -86,7 +88,7 @@ namespace kickcat
             result << addEntry(entry);
         }
 
-        result << "            CoE::dictionary().push_back(std::move(object));\n";
+        result << "            dictionary->push_back(std::move(object));\n";
         result << "        }\n\n";
 
         return result.str();
@@ -104,17 +106,17 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    populateDictionnary(argv[1]);
+    auto dictionary = loadOD(argv[1]);
 
     std::ofstream f(std::string(OD_POPULATOR_FILE).c_str());
 
     /// Sort Dictionnary to have more readable source file
-    std::sort(CoE::dictionary().begin(), CoE::dictionary().end(),
+    std::sort(dictionary->begin(), dictionary->end(),
               [](CoE::Object &object1, CoE::Object &object2)
               { return object1.index < object2.index; });
 
     f << addBeginning();
-    for (auto const &object : CoE::dictionary())
+    for (auto const &object : *dictionary)
     {
         f << addObject(object);
     }

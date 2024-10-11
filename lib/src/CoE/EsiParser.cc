@@ -2,6 +2,7 @@
 #include <stdexcept>
 
 #include "kickcat/CoE/EsiParser.h"
+#include "CoE/OD.h"
 
 using namespace tinyxml2;
 
@@ -32,7 +33,7 @@ namespace kickcat::CoE
     };
 
 
-    Dictionary EsiParser::load(std::string const& file)
+    std::shared_ptr<Dictionary> EsiParser::load(std::string const& file)
     {
         XMLError result = doc_.LoadFile(file.c_str());
         if (result != XML_SUCCESS)
@@ -69,15 +70,15 @@ namespace kickcat::CoE
         dtypes_     = firstChildElement(dictionary_, "DataTypes");
         objects_    = firstChildElement(dictionary_, "Objects");
 
-        // Load dictionary
-        Dictionary dictionary;
+       // Load dictionary
+        auto dictionary = std::make_shared<Dictionary>();
 
         // loop over dictionnary
         auto node_object = objects_->FirstChild();
         while (node_object)
         {
             CoE::Object obj = create(node_object);
-            dictionary.push_back(std::move(obj));
+            dictionary->push_back(std::move(obj));
             node_object = node_object->NextSibling();
         }
 
@@ -110,7 +111,7 @@ namespace kickcat::CoE
         subindex0.data = malloc(1);
         uint8_t array_size = sms_type.entries.size() - 1;
         std::memcpy(subindex0.data, &array_size, 1);
-        dictionary.push_back(std::move(sms_type));
+        dictionary->push_back(std::move(sms_type));
 
         return dictionary;
     }

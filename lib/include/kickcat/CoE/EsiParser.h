@@ -14,7 +14,7 @@ namespace kickcat::CoE
         EsiParser() = default;
         ~EsiParser() = default;
 
-        CoE::Dictionary load(std::string const& file);
+        std::shared_ptr<Dictionary> load(std::string const& file);
 
         char const* vendor() const  { return vendor_->FirstChildElement("Name")->GetText();       }
         char const* profile() const { return profile_->FirstChildElement("ProfileNo")->GetText(); }

@@ -1,6 +1,7 @@
 #ifndef KICKCAT_COE_OD_H
 #define KICKCAT_COE_OD_H
 
+#include <memory>
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -201,7 +202,7 @@ namespace kickcat::CoE
     std::string toString(Object const& object);
 
     using Dictionary = std::vector<Object>;
-    std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex);
+    std::tuple<Object*, Entry*> findObject(std::shared_ptr<CoE::Dictionary> dict, uint16_t index, uint8_t subindex);
 
     template<typename T>
     void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
@@ -220,7 +221,7 @@ namespace kickcat::CoE
         }
     }
 
-    void populateOD();
+    std::shared_ptr<Dictionary> createOD();
 
     // Singleton
     Dictionary& dictionary();
