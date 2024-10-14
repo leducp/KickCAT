@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
     auto const mbx_in_cfg = SYNC_MANAGER_MBX_IN(1, 0x1400, 128);
     auto& esc0 = escs.at(0);
     mailbox::response::Mailbox mbx(&esc0, mbx_in_cfg, mbx_out_cfg);
-    mbx.enableCoE(coe_dict);
+    mbx.enableCoE(std::move(coe_dict));
 
     while (true)
     {

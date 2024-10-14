@@ -323,9 +323,9 @@ namespace kickcat::mailbox::response
         }
     }
 
-    void Mailbox::enableCoE(std::shared_ptr<CoE::Dictionary> dictionary)
+    void Mailbox::enableCoE(CoE::Dictionary&& dictionary)
     {
-        dictionary_ = dictionary;
+        dictionary_ = std::move(dictionary);
         factories_.push_back(&createSDOMessage);
     }
 

@@ -167,8 +167,8 @@ namespace kickcat::mailbox::response
         Mailbox(AbstractESC* esc, SyncManagerConfig mbx_in, SyncManagerConfig mbx_out, uint16_t max_msgs = 1);
         ~Mailbox() = default;
 
-        void enableCoE(std::shared_ptr<CoE::Dictionary> dictionary);
-        std::shared_ptr<CoE::Dictionary> getDictionary(){return dictionary_;}
+        void enableCoE(CoE::Dictionary&& dictionary);
+        CoE::Dictionary& getDictionary(){return dictionary_;}
 
         void receive(); // Try to receive a message from the ESC
         void process(); // Process a message in the to_process_ queue if any
@@ -189,7 +189,7 @@ namespace kickcat::mailbox::response
 
         std::list<std::shared_ptr<AbstractMessage>>  to_process_;   /// Received messages, waiting to be processed
         std::queue<std::vector<uint8_t>> to_send_;      /// Messages to send (replies from a received messages)
-        std::shared_ptr<CoE::Dictionary> dictionary_;
+        CoE::Dictionary dictionary_;
     };
 }
 

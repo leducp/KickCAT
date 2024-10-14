@@ -9,7 +9,7 @@ namespace kickcat
 {
     constexpr std::string_view OD_POPULATOR_FILE{"od_populator.cc"};
 
-    std::shared_ptr<CoE::Dictionary> loadOD(std::string esiFileName)
+    CoE::Dictionary loadOD(std::string esiFileName)
     {
         CoE::EsiParser parser;
         return parser.load(esiFileName);
@@ -23,8 +23,8 @@ namespace kickcat
 
         result << "#include \"kickcat/CoE/OD.h\"\n\n";
         result << "namespace kickcat::CoE\n{\n";
-        result << "    std::shared_ptr<CoE::Dictionary> createOD()\n    {\n";
-        result << "        auto dictionary = std::make_shared<CoE::Dictionary>();\n\n";
+        result << "    CoE::Dictionary createOD()\n    {\n";
+        result << "        CoE::Dictionary dictionary;\n\n";
 
         return result.str();
     }
@@ -88,7 +88,7 @@ namespace kickcat
             result << addEntry(entry);
         }
 
-        result << "            dictionary->push_back(std::move(object));\n";
+        result << "            dictionary.push_back(std::move(object));\n";
         result << "        }\n\n";
 
         return result.str();
@@ -111,12 +111,12 @@ int main(int argc, char *argv[])
     std::ofstream f(std::string(OD_POPULATOR_FILE).c_str());
 
     /// Sort Dictionnary to have more readable source file
-    std::sort(dictionary->begin(), dictionary->end(),
+    std::sort(dictionary.begin(), dictionary.end(),
               [](CoE::Object &object1, CoE::Object &object2)
               { return object1.index < object2.index; });
 
     f << addBeginning();
-    for (auto const &object : *dictionary)
+    for (auto const &object : dictionary)
     {
         f << addObject(object);
     }
