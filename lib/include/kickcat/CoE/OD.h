@@ -221,8 +221,6 @@ namespace kickcat::CoE
     }
 
     Dictionary createOD();
-
-    // Singleton
     Dictionary& dictionary();
 }
 
