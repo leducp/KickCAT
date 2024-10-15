@@ -67,7 +67,10 @@ int main(int, char *[])
     auto const mbx_out_cfg = SYNC_MANAGER_MBX_OUT(0, 0x1000, 128);
     auto const mbx_in_cfg = SYNC_MANAGER_MBX_IN(1, 0x1400, 128);
     mailbox::response::Mailbox mbx(&esc, mbx_in_cfg, mbx_out_cfg);
-    mbx.enableCoE();
+
+    auto dictionary = CoE::createOD();
+    mbx.enableCoE(std::move(dictionary));
+
     SyncManagerConfig process_data_out = SYNC_MANAGER_PI_OUT(2, 0x1600, out_pdo_size); // Process data out (master view), address consistent with eeprom conf.
     SyncManagerConfig process_data_in = SYNC_MANAGER_PI_IN(3, 0x1800, in_pdo_size);    // Process data in (master view), address consistent with eeprom conf.
 
@@ -83,8 +86,6 @@ int main(int, char *[])
     uint8_t pdi_config;
     esc.read(reg::PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config));
     printf("pdi config 0x%x \n", pdi_config);
-
-    CoE::populateOD();
 
     while(true)
     {

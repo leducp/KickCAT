@@ -1,0 +1,22 @@
+name: "Setup Conan"
+description: "Setup Conan"
+runs:
+  using: "composite"
+  steps:      
+    - name: Setup venv
+      run: |
+        python3 -m venv .venv
+        source .venv/bin/activate
+        echo "VIRTUAL_ENV=${VIRTUAL_ENV}" >> $GITHUB_ENV
+        echo "${VIRTUAL_ENV}/bin" >> $GITHUB_PATH
+      shell: bash
+    - name: Install setup tools
+      run: pip3 install wheel setuptools
+      shell: bash
+    - name: Install conan latest
+      run: pip3 install conan --upgrade
+      shell: bash
+    - name: Fix path on Linux
+      run: |
+        echo "/home/runner/.local/bin" >> $GITHUB_PATH
+      shell: bash

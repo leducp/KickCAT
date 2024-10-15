@@ -308,11 +308,4 @@ namespace kickcat::CoE
 
         return {&(*object_it), &(*entry_it)};
     }
-
-    Dictionary& dictionary()
-    {
-        static Dictionary dict;
-        return dict;
-    }
- 
 }

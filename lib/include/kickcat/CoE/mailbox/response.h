@@ -13,7 +13,7 @@ namespace kickcat::mailbox::response
     class SDOMessage final : public AbstractMessage
     {
     public:
-        SDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, CoE::Dictionary& dictionary_);
+        SDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message);
         virtual ~SDOMessage() = default;
 
         ProcessingResult process() override;
@@ -33,8 +33,6 @@ namespace kickcat::mailbox::response
 
         void beforeHooks(uint16_t access, CoE::Entry* entry);
         void afterHooks (uint16_t access, CoE::Entry* entry);
-
-        CoE::Dictionary& dictionary_;
 
         // Pointer on data_
         mailbox::Header* header_;

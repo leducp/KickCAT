@@ -26,8 +26,7 @@ int main(int argc, char* argv[])
     }
 
     CoE::EsiParser parser;
-    auto& coe_dict = CoE::dictionary();
-    coe_dict = parser.load("ingenia_esi.xml");
+    auto coe_dict = parser.load("ingenia_esi.xml");
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
     auto socket = std::make_shared<Socket>(-1ns, 1us);
@@ -41,7 +40,7 @@ int main(int argc, char* argv[])
     auto const mbx_in_cfg = SYNC_MANAGER_MBX_IN(1, 0x1400, 128);
     auto& esc0 = escs.at(0);
     mailbox::response::Mailbox mbx(&esc0, mbx_in_cfg, mbx_out_cfg);
-    mbx.enableCoE();
+    mbx.enableCoE(std::move(coe_dict));
 
     while (true)
     {
