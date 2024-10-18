@@ -22,13 +22,12 @@ namespace kickcat::mailbox::response
             return nullptr;
         }
 
-        return std::make_shared<SDOMessage>(mbx, std::move(raw_message), CoE::dictionary());
+        return std::make_shared<SDOMessage>(mbx, std::move(raw_message));
     }
 
 
-    SDOMessage::SDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, CoE::Dictionary& dictionary)
+    SDOMessage::SDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message)
         : AbstractMessage{mbx}
-        , dictionary_{dictionary}
     {
         data_ = std::move(raw_message);
 
@@ -50,7 +49,7 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOMessage::process()
     {
-        auto [object, entry] = findObject(dictionary_, sdo_->index, sdo_->subindex);
+        auto [object, entry] = findObject(mailbox_->getDictionary(), sdo_->index, sdo_->subindex);
         if (object == nullptr)
         {
             abort(CoE::SDO::abort::OBJECT_DOES_NOT_EXIST);

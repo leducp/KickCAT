@@ -20,9 +20,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - uses: turtlebrowser/get-conan@v1.2
-      with:
-        version: 2.2.3
+    - uses: ./.github/actions/setup-conan-action
 
     - name: GTest
       run: |
@@ -97,6 +95,9 @@ jobs:
           repository: apache/nuttx-apps
           path: 'nuttxspace/apps'
           ref: '${{env.nuttx_apps_version}}'
+
+      - name: apt update
+        run: sudo apt update
 
       - name: Install Kconfig
         run: sudo apt install kconfig-frontends
