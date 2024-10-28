@@ -756,8 +756,8 @@ namespace kickcat
     /// extract a position or node address
     constexpr std::tuple<uint16_t, uint16_t> extractAddress(uint32_t address)
     {
-        uint16_t offset   = address >> 16;
-        uint16_t position = address & 0xFFFF;
+        uint16_t offset   = static_cast<uint16_t>(address >> 16);
+        uint16_t position = static_cast<uint16_t>(address & 0xFFFF);
         return std::make_tuple(position, offset);
     }
 

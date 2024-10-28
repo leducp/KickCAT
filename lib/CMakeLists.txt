@@ -25,7 +25,6 @@ if (NUTTX)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
   )
   set(OS_LIBRARIES )
-  set(OS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat/OS/Linux/types)
 elseif(PIKEOS)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Socket.cc
@@ -34,7 +33,6 @@ elseif(PIKEOS)
   )
 
   set(OS_LIBRARIES )
-  set(OS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat/OS/PikeOS/types)
 elseif (UNIX)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
@@ -45,13 +43,13 @@ elseif (UNIX)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/ConditionVariable.cc
   )
   set(OS_LIBRARIES pthread rt)
-  set(OS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat/OS/Linux/types)
 endif()
 
 add_library(kickcat ${KICKCAT_SOURCES} ${OS_LIB_SOURCES})
 target_include_directories(kickcat
-  PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include ${OS_INCLUDE_DIR}
+  PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
+
 target_link_libraries(kickcat ${OS_LIBRARIES})
 if (tinyxml2_FOUND)
   target_link_libraries(kickcat tinyxml2::tinyxml2)
