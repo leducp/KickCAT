@@ -12,6 +12,13 @@ env:
 
 jobs:
   build_x86:
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: write
+      checks: write
+
     # The CMake configure and build commands are platform agnostic and should work equally
     # well on Windows or Mac.  You can convert this to a matrix build if you need
     # cross-platform coverage.
@@ -57,7 +64,7 @@ jobs:
   build_NuttX:
     runs-on: ubuntu-latest
     env:
-          nuttx_version: 3dc6b4c9bd9624ed259e676f8e9761dbf660c1bb 
+          nuttx_version: 3dc6b4c9bd9624ed259e676f8e9761dbf660c1bb
           nuttx_apps_version: nuttx-12.5.0-RC0
           arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
     steps:
