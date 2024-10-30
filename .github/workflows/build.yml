@@ -1,4 +1,4 @@
-name: CMake
+name: PR build
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - uses: ./.github/actions/setup-conan-action
 
     - name: GTest
@@ -46,18 +46,17 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: make coverage_xml
 
-    - name: coverage
-      uses: 5monkeys/cobertura-action@master
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
       with:
-          path: build/coverage_xml.xml
-          minimum_coverage: 75
-          show_line: true
-          show_branch: true
+        name: coverage
+        path: build/coverage_xml.xml
+
 
   build_NuttX:
     runs-on: ubuntu-latest
     env:
-          nuttx_version: 3dc6b4c9bd9624ed259e676f8e9761dbf660c1bb 
+          nuttx_version: 3dc6b4c9bd9624ed259e676f8e9761dbf660c1bb
           nuttx_apps_version: nuttx-12.5.0-RC0
           arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
     steps:
@@ -68,7 +67,7 @@ jobs:
 
       - name: Cache NuttX
         id: cache-nuttx
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{GITHUB.WORKSPACE}}/nuttxspace/nuttx
           key: nuttx_${{env.nuttx_version}}
@@ -83,7 +82,7 @@ jobs:
 
       - name: Cache NuttX Apps
         id: cache-nuttx-apps
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{GITHUB.WORKSPACE}}/nuttxspace/apps
           key: nuttx-apps_${{env.nuttx_apps_version}}
@@ -104,7 +103,7 @@ jobs:
 
       - name: Cache Arm None Eabi
         id: cache-arm-none-eabi
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{GITHUB.WORKSPACE}}/gcc-arm-none-eabi
           key: ${{env.arm_none_eabi_version}}
