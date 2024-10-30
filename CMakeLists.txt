@@ -84,3 +84,6 @@ if (BUILD_TOOLS)
     add_subdirectory(tools)
   endif()
 endif()
+
+option(ENABLE_ESI_PARSER "Enable Esi Parser" ON)
+

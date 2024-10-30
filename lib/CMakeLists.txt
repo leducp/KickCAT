@@ -14,10 +14,9 @@ set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/response.cc
 )
 
-find_package(tinyxml2 CONFIG QUIET)
-if (tinyxml2_FOUND)
+if (ENABLE_ESI_PARSER)
+  find_package(tinyxml2 CONFIG REQUIRED)
   list(APPEND KICKCAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/EsiParser.cc)
-  set_property(GLOBAL PROPERTY ESI_AVAILABLE True)
 endif()
 
 if (NUTTX)
@@ -51,9 +50,10 @@ target_include_directories(kickcat
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
 
 target_link_libraries(kickcat ${OS_LIBRARIES})
-if (tinyxml2_FOUND)
+if (ENABLE_ESI_PARSER)
   target_link_libraries(kickcat tinyxml2::tinyxml2)
 endif()
+
 set_kickcat_properties(kickcat)
 
 add_subdirectory(master)

@@ -1,5 +1,4 @@
-get_property(OK_TO_BUILD GLOBAL PROPERTY ESI_AVAILABLE)
-if (OK_TO_BUILD)
+if (ENABLE_ESI_PARSER)
     add_executable(load_esi load_esi.cc ${OS_SRCS})
     target_include_directories(load_esi PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_link_libraries(load_esi common kickcat)
