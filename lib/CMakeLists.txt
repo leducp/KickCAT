@@ -14,10 +14,6 @@ set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/response.cc
 )
 
-if (ENABLE_ESI_PARSER)
-  find_package(tinyxml2 CONFIG REQUIRED)
-  list(APPEND KICKCAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/EsiParser.cc)
-endif()
 
 if (NUTTX)
   set(OS_LIB_SOURCES
@@ -33,6 +29,7 @@ elseif(PIKEOS)
 
   set(OS_LIBRARIES )
 elseif (UNIX)
+
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Time.cc
@@ -42,6 +39,13 @@ elseif (UNIX)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/ConditionVariable.cc
   )
   set(OS_LIBRARIES pthread rt)
+
+  if (ENABLE_ESI_PARSER)
+    find_package(tinyxml2 CONFIG REQUIRED)
+    list(APPEND KICKCAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/EsiParser.cc)
+    list(APPEND OS_LIBRARIES tinyxml2::tinyxml2)
+  endif()
+
 endif()
 
 add_library(kickcat ${KICKCAT_SOURCES} ${OS_LIB_SOURCES})
@@ -50,9 +54,6 @@ target_include_directories(kickcat
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
 
 target_link_libraries(kickcat ${OS_LIBRARIES})
-if (ENABLE_ESI_PARSER)
-  target_link_libraries(kickcat tinyxml2::tinyxml2)
-endif()
 
 set_kickcat_properties(kickcat)
 
