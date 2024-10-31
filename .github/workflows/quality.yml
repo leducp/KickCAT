@@ -18,13 +18,12 @@ jobs:
       - name: 'Download artifact'
         uses: actions/download-artifact@v4
         with:
-          path: build/coverage_xml.xml
           pattern: coverage
 
       - name: coverage
         uses: 5monkeys/cobertura-action@master
         with:
-            path: build/coverage_xml.xml
+            path: coverage_xml.xml
             minimum_coverage: 75
             show_line: true
             show_branch: true
