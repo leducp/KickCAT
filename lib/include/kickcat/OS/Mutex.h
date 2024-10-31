@@ -1,7 +1,7 @@
 #ifndef KICKCAT_OS_LINUX_MUTEX_H
 #define KICKCAT_OS_LINUX_MUTEX_H
 
-#include "os_types.h"
+#include "kickcat/types.h"
 
 namespace kickcat
 {

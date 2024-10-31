@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "os_types.h"
+#include "kickcat/types.h"
 
 namespace kickcat
 {

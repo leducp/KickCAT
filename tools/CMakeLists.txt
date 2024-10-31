@@ -10,8 +10,10 @@ add_executable(eeprom eeprom.cc)
 target_link_libraries(eeprom kickcat)
 set_kickcat_properties(eeprom)
 
-add_executable(od_generator od_generator.cc)
-target_link_libraries(od_generator kickcat)
+if (ENABLE_ESI_PARSER)
+    add_executable(od_generator od_generator.cc)
+    target_link_libraries(od_generator kickcat)
+endif()
 
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")

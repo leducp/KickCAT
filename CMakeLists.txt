@@ -8,6 +8,7 @@ list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_BINARY_DIR})
 include(Config)
 include(debug)
 
+option(ENABLE_ESI_PARSER "Enable Esi Parser" ON)
 add_subdirectory(lib)
 
 option(BUILD_UNIT_TESTS "Build unit tests" OFF)
@@ -84,3 +85,5 @@ if (BUILD_TOOLS)
     add_subdirectory(tools)
   endif()
 endif()
+
+
