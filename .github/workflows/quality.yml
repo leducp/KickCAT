@@ -10,6 +10,13 @@ on:
 
 jobs:
   quality:
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: write
+      checks: write
+      issues: write
     runs-on: ubuntu-latest
     if: >
       github.event.workflow_run.event == 'pull_request' &&
@@ -18,12 +25,16 @@ jobs:
       - name: 'Download artifact'
         uses: actions/download-artifact@v4
         with:
-          pattern: coverage
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Display structure of downloaded files
+        run: ls -R
 
       - name: coverage
         uses: 5monkeys/cobertura-action@master
         with:
-            path: coverage_xml.xml
+            path: coverage/coverage_xml.xml
             minimum_coverage: 75
             show_line: true
             show_branch: true
