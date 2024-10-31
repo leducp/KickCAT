@@ -17,3 +17,6 @@ Take care to not deteriorate code coverage!
 ## Testing new hardware
 
 We try to have the most compliant EtherCAT master stack as possible, but we only have access to a few EtherCAT slaves to test it throughfully. Hardware world is always full of  edge cases and reporting us which board doesn't work with the KickCAT debug trace plus a network trace is really helpful to investigate what we are doing wrong or what needs to be improved.
+
+test
+
