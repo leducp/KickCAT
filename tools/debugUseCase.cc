@@ -22,6 +22,7 @@ int main(int , char* argv[])
     std::string red_interface_name = "null";
     std::string nom_interface_name = argv[1];
 
+
     socketRedundancy = std::make_shared<SocketNull>();
     auto socketNominal = std::make_shared<Socket>();
     try
