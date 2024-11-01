@@ -108,7 +108,7 @@ namespace kickcat
         // create CoE emergency reception callback
         for (auto& slave : slaves_)
         {
-            if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
+            if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::CoE)
             {
                 auto emg = std::make_shared<mailbox::request::EmergencyMessage>(slave.mailbox);
                 slave.mailbox.to_process.push_back(emg);
@@ -327,7 +327,7 @@ namespace kickcat
 
         for (auto& slave : slaves_)
         {
-            if (slave.supported_mailbox)
+            if (slave.sii.supported_mailbox)
             {
                 SyncManager SM[2];
                 slave.mailbox.generateSMConfig(SM);
@@ -362,7 +362,7 @@ namespace kickcat
                 continue;
             }
 
-            if (slave.supported_mailbox & eeprom::MailboxProtocol::CoE)
+            if (slave.sii.supported_mailbox& eeprom::MailboxProtocol::CoE)
             {
                 // Slave support CAN over EtherCAT -> use mailbox/SDO to get mapping size
                 uint8_t sm[512];
@@ -801,7 +801,7 @@ namespace kickcat
             readEeprom(static_cast<uint16_t>(pos), slaves,
             [](Slave& s, uint32_t word)
             {
-                s.sii.buffer.push_back(word);
+                s.sii.eeprom.push_back(word);
             });
 
             pos += 2;
@@ -810,9 +810,9 @@ namespace kickcat
             [](Slave* s)
             {
                 // First section (64 words == 32 double words) may have bytes with the eeprom::Category::End value
-                return ((((s->sii.buffer.back() >> 16) == eeprom::Category::End) or
-                         ((s->sii.buffer.back() & eeprom::Category::End) == eeprom::Category::End)) and
-                          (s->sii.buffer.size() > 32));
+                return ((((s->sii.eeprom.back() >> 16) == eeprom::Category::End) or
+                         ((s->sii.eeprom.back() & eeprom::Category::End) == eeprom::Category::End)) and
+                          (s->sii.eeprom.size() > 32));
             }),
             slaves.end());
         }
@@ -933,7 +933,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            if (slave.supported_mailbox == 0)
+            if (slave.sii.supported_mailbox == 0)
             {
                 continue;
             }
@@ -961,7 +961,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            if (slave.supported_mailbox == 0)
+            if (slave.sii.supported_mailbox == 0)
             {
                 continue;
             }

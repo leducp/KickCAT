@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include "Mailbox.h"
 
 #include "kickcat/AbstractESC.h"
 #include "kickcat/debug.h"
@@ -47,49 +48,57 @@ namespace kickcat
     }
 
 
-    void AbstractESC::set_sm_activate(SyncManagerConfig const& sm_conf, bool is_activated)
+    void AbstractESC::set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated)
     {
-        auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
-        {
-            return reg + sm_index * 8;
-        };
+        auto create_sm_address = [](uint16_t reg, uint16_t sm_index) { return reg + sm_index * 8; };
 
-        SyncManager sm;
-        read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
+        for (auto& sm_conf : sync_managers)
+        {
+            SyncManager sm;
+            read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
 
-        uint8_t sm_deactivated = 0x1;
-        if (is_activated)
-        {
-            sm.pdi_control &= ~sm_deactivated;
+            uint8_t sm_deactivated = 0x1;
+            if (is_activated)
+            {
+                sm.pdi_control &= ~sm_deactivated;
+            }
+            else
+            {
+                sm.pdi_control |= sm_deactivated;
+            }
+            write(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
         }
-        else
-        {
-            sm.pdi_control |= sm_deactivated;
-        }
-        write(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
     }
 
-    void AbstractESC::set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox)
+    void AbstractESC::set_mailbox(mailbox::response::Mailbox* mailbox)
     {
-        sm_mailbox_configs_ = mailbox;
+        mbx_ = mailbox;
     }
 
-
-    void AbstractESC::set_process_data_input(uint8_t* buffer, SyncManagerConfig const& config)
+    void AbstractESC::set_process_data_input(uint8_t* buffer)
     {
-        sm_process_data_configs_.push_back(config);
         process_data_input_ = buffer;
-        sm_pd_input_ = config;
     }
 
-
-    void AbstractESC::set_process_data_output(uint8_t* buffer, SyncManagerConfig const& config)
+    void AbstractESC::set_process_data_output(uint8_t* buffer)
     {
-        sm_process_data_configs_.push_back(config);
         process_data_output_ = buffer;
-        sm_pd_output_ = config;
     }
 
+    std::tuple<uint8_t, SyncManager> AbstractESC::find_sm(uint16_t controlMode)
+    {
+        for (uint8_t i = 0; i < reg::SM_STATS; i++)
+        {
+            SyncManager sync;
+            read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, &sync, sizeof(SyncManager));
+            if ((sync.control & 0x0F) == (controlMode & 0x0F))
+            {
+                return std::tuple(i, sync);
+            }
+        }
+
+        THROW_ERROR("SyncManager not found");
+    }
 
     void AbstractESC::routine()
     {
@@ -101,14 +110,7 @@ namespace kickcat
         {
             set_al_status(State::INIT);
             clear_error();
-            for (auto& sm : sm_process_data_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
-            for (auto& sm : sm_mailbox_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
+            set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);
         }
 
         if ((al_control_ & State::ERROR_ACK))
@@ -188,16 +190,25 @@ namespace kickcat
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP)
         {
-            if (are_valid_sm(sm_mailbox_configs_))
+            if (not mbx_)
             {
-                for (auto& sm : sm_mailbox_configs_)
+                set_al_status(State::PRE_OP);
+                return;
+            }
+
+            try
+            {
+                std::tie(sm_mbx_input_, sm_mbx_output_) = mbx_->configureSm();
+                if (are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
                 {
-                    set_sm_activate(sm, true);
+                    set_sm_activate({sm_mbx_input_, sm_mbx_output_}, true);
+                    set_al_status(State::PRE_OP);
+                    return;
                 }
 
-                set_al_status(State::PRE_OP);
+                set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
             }
-            else
+            catch (std::exception const& e)
             {
                 set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
             }
@@ -212,21 +223,22 @@ namespace kickcat
 
     void AbstractESC::routine_preop()
     {
-        if (not are_valid_sm(sm_mailbox_configs_))
+        if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
-            for (auto& sm : sm_mailbox_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
-
+            set_sm_activate({sm_mbx_input_, sm_mbx_output_}, false);
             set_al_status(State::INIT);
             set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
         }
 
         if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
         {
+            if (not configure_pdo_sm())
+            {
+                return;
+            }
+
             // check process data SM
-            for (auto& sm : sm_process_data_configs_)
+            for (auto& sm : {sm_pd_input_, sm_pd_output_})
             {
                 if (not is_valid_sm(sm))
                 {
@@ -240,9 +252,9 @@ namespace kickcat
                     }
                     return;
                 }
-                set_sm_activate(sm, true);
             }
 
+            set_sm_activate({sm_pd_input_, sm_pd_output_}, true);
             set_al_status(State::SAFE_OP);
         }
 
@@ -258,24 +270,15 @@ namespace kickcat
         update_process_data_input();
         update_process_data_output();
 
-        if (not are_valid_sm(sm_mailbox_configs_))
+        if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
-            for (auto& sm : sm_mailbox_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
-
-            for (auto& sm : sm_process_data_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
-
+            set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);
             set_al_status(State::INIT);
             set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
         }
 
         bool is_sm_process_data_invalid = false;
-        for (auto& sm : sm_process_data_configs_)
+        for (auto& sm : {sm_pd_input_, sm_pd_output_})
         {
             if (not is_valid_sm(sm))
             {
@@ -295,10 +298,7 @@ namespace kickcat
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP or is_sm_process_data_invalid)
         {
             set_al_status(State::PRE_OP);
-            for (auto& sm : sm_process_data_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
+            set_sm_activate({sm_pd_input_, sm_pd_output_}, false);
         }
         else if ((al_control_ & State::MASK_STATE) == State::OPERATIONAL)
         {
@@ -325,13 +325,7 @@ namespace kickcat
         if (al_status_ & State::ERROR_ACK)
         {
             // In case of error in OP, go to a lower state, CTT wants safe op; not specified in the norms.
-            for (auto& sm : sm_process_data_configs_)
-            {
-                if (sm.type == SyncManagerType::Output)
-                {
-                    set_sm_activate(sm, false);
-                }
-            }
+            set_sm_activate({sm_pd_output_}, false);
             set_al_status(State::SAFE_OP);
             return;
         }
@@ -339,25 +333,16 @@ namespace kickcat
         update_process_data_input();
         update_process_data_output();
         
-        if (not are_valid_sm(sm_mailbox_configs_))
+        if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
-            for (auto& sm : sm_mailbox_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
-
-            for (auto& sm : sm_process_data_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
-
+            set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);
             set_al_status(State::INIT);
             set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
         }
 
 
         bool is_sm_process_data_invalid = false;
-        for (auto& sm : sm_process_data_configs_)
+        for (auto& sm : {sm_pd_input_, sm_pd_output_})
         {
             if (not is_valid_sm(sm))
             {
@@ -376,10 +361,7 @@ namespace kickcat
 
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP or is_sm_process_data_invalid)
         {
-            for (auto& sm : sm_process_data_configs_)
-            {
-                set_sm_activate(sm, false);
-            }
+            set_sm_activate({sm_pd_input_, sm_pd_output_}, false);
             set_al_status(State::PRE_OP);
         }
         else if ((al_control_ & State::MASK_STATE) == State::SAFE_OP)
@@ -387,6 +369,26 @@ namespace kickcat
             set_al_status(State::SAFE_OP);
         }
     }
+
+
+    bool AbstractESC::configure_pdo_sm()
+    {
+        try
+        {
+            auto [indexIn, pdoIn]   = find_sm(SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ);
+            auto [indexOut, pdoOut] = find_sm(SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE);
+
+            sm_pd_input_  = SYNC_MANAGER_PI_IN(indexIn, pdoIn.start_address, pdoIn.length);
+            sm_pd_output_ = SYNC_MANAGER_PI_OUT(indexOut, pdoOut.start_address, pdoOut.length);
+        }
+        catch (std::exception const& e)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
 
 
     void AbstractESC::update_process_data_output()

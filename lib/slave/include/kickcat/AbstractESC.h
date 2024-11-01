@@ -2,7 +2,6 @@
 #define SLAVE_STACK_INCLUDE_ABSTRACTESC_H_
 
 #include <cstdint>
-#include <memory>
 #include <vector>
 
 #include "kickcat/protocol.h"
@@ -30,22 +29,30 @@ namespace kickcat
     #define SYNC_MANAGER_MBX_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x06, SyncManagerType::MailboxOut}
 
 
+    namespace mailbox::response
+    {
+        class Mailbox;
+    }
+
     // Regarding the state machine, see ETG1000.6 6.4.1 AL state machine
     class AbstractESC
     {
     public:
         virtual ~AbstractESC() = default;
 
-        virtual hresult init() = 0;
-        virtual int32_t read(uint16_t address, void* data, uint16_t size) = 0;
+        virtual hresult init()                                                   = 0;
+        virtual int32_t read(uint16_t address, void* data, uint16_t size)        = 0;
         virtual int32_t write(uint16_t address, void const* data, uint16_t size) = 0;
 
         void routine();
 
-        void set_mailbox_config(std::vector<SyncManagerConfig> const& mailbox);
-        void set_process_data_input(uint8_t* buffer, SyncManagerConfig const& config);
-        void set_process_data_output(uint8_t* buffer, SyncManagerConfig const& config);
+
+        // Mailbox that the ESC will try to configure before passing to preop
+        void set_mailbox(mailbox::response::Mailbox* mailbox);
+        void set_process_data_input(uint8_t* buffer);
+        void set_process_data_output(uint8_t* buffer);
         void set_valid_output_data_received(bool are_valid_output);
+        std::tuple<uint8_t, SyncManager> find_sm(uint16_t controlMode);
 
         void routine_init();
         void routine_preop();
@@ -60,20 +67,19 @@ namespace kickcat
         bool has_expired_watchdog() { return not (watchdog_ & 0x1); }
 
     private:
+        bool configure_pdo_sm();
+
         void update_process_data_input();
         void update_process_data_output();
 
         bool is_valid_sm(SyncManagerConfig const& sm_ref);
         bool are_valid_sm(std::vector<SyncManagerConfig> const& sm);
-        void set_sm_activate(SyncManagerConfig const& sm_ref, bool is_activated);
+        void set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
 
         void set_error(StatusCode code);
 
         /// \brief Set only the state, preserve the other fields.
         void set_al_status(State state);
-
-        std::vector<SyncManagerConfig> sm_mailbox_configs_ = {};
-        std::vector<SyncManagerConfig> sm_process_data_configs_ = {};
 
         StatusCode al_status_code_ = {StatusCode::NO_ERROR};
         uint16_t al_status_ = {0};
@@ -87,7 +93,12 @@ namespace kickcat
         uint8_t* process_data_output_ = {nullptr};
         SyncManagerConfig sm_pd_output_ = {};
 
+        SyncManagerConfig sm_mbx_input_  = {};
+        SyncManagerConfig sm_mbx_output_ = {};
+
         bool are_valid_output_data_ = false;
+
+        mailbox::response::Mailbox* mbx_;
     };
 
 }

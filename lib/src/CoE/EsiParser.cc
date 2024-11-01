@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <stdexcept>
+#include "kickcat/debug.h"
 
 #include "kickcat/CoE/EsiParser.h"
 
@@ -159,8 +160,7 @@ namespace kickcat::CoE
 
         if (data.size() != (entry.bitlen / 8))
         {
-            // throw ?
-            printf("Cannot load default data for 0x%04x.%d, expected size mismatch.\n"
+            esi_warning("Cannot load default data for 0x%04x.%d, expected size mismatch.\n"
                     "-> Got %ld bits, expected: %d bit\n"
                     "==> Skipping entry\n",
                 obj.index, entry.subindex,

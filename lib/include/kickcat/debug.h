@@ -145,6 +145,25 @@ namespace kickcat
 #endif
 
 
+#ifdef DEBUG_ESI_ERROR
+    #define esi_error   _error
+#else
+    #define esi_error   _none
+#endif
+
+#ifdef DEBUG_ESI_WARNING
+    #define esi_warning _warning
+#else
+    #define esi_warning _none
+#endif
+
+#ifdef DEBUG_ESI_INFO
+    #define esi_info    _info
+#else
+    #define esi_info    _none
+#endif
+
+
 }
 
 #endif

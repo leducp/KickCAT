@@ -74,7 +74,7 @@ int main(int, char *[])
     SyncManagerConfig process_data_out = SYNC_MANAGER_PI_OUT(2, 0x1600, out_pdo_size); // Process data out (master view), address consistent with eeprom conf.
     SyncManagerConfig process_data_in = SYNC_MANAGER_PI_IN(3, 0x1800, in_pdo_size);    // Process data in (master view), address consistent with eeprom conf.
 
-    esc.set_mailbox_config({{mbx_out_cfg, mbx_in_cfg}});
+    esc.set_mailbox(&mbx);
     esc.set_process_data_input(reinterpret_cast<uint8_t *>(&input_PDO), process_data_in);
     esc.set_process_data_output(reinterpret_cast<uint8_t *>(&output_PDO), process_data_out);
 

@@ -7,7 +7,7 @@ using namespace kickcat;
 TEST(Slave, parse_SII)
 {
     Slave slave;
-    slave.sii.buffer =
+    slave.sii.eeprom =
     {
         //
         0x00000000,
