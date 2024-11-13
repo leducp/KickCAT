@@ -3,10 +3,10 @@
 
 #include <vector>
 #include <string>
+#include <cstring>
 #include <cstdint>
 #include <tuple>
 #include <functional>
-#include <cstring>
 
 namespace kickcat::CoE
 {

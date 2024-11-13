@@ -1,5 +1,6 @@
 #include <cstring>
 #include <inttypes.h>
+#include <algorithm>
 
 #include "debug.h"
 #include "Bus.h"
@@ -699,7 +700,7 @@ namespace kickcat
             }
             uint16_t answer;
             std::memcpy(&answer, data, sizeof(uint16_t));
-            if (answer & 0x8000)
+            if (answer & eeprom::Control::BUSY)
             {
                 ready = false;
             }
@@ -809,7 +810,9 @@ namespace kickcat
             [](Slave* s)
             {
                 // First section (64 words == 32 double words) may have bytes with the eeprom::Category::End value
-                return (((s->sii.buffer.back() >> 16) == eeprom::Category::End) and (s->sii.buffer.size() > 32));
+                return ((((s->sii.buffer.back() >> 16) == eeprom::Category::End) or
+                         ((s->sii.buffer.back() & eeprom::Category::End) == eeprom::Category::End)) and
+                          (s->sii.buffer.size() > 32));
             }),
             slaves.end());
         }
@@ -833,7 +836,7 @@ namespace kickcat
             }
             uint16_t answer;
             std::memcpy(&answer, data, sizeof(uint16_t));
-            if (answer & 0x2000) // Missing EEPROM acknowledge or invalid command
+            if (answer & eeprom::Control::ERROR_CMD) // Missing EEPROM acknowledge or invalid command
             {
                 acknowleded = false;
             }

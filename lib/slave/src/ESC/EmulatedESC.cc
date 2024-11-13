@@ -360,21 +360,37 @@ namespace kickcat
         {
             case eeprom::Control::READ:
             {
-                std::memcpy((void*)&memory_.eeprom_data, eeprom_.data() + memory_.eeprom_address, 4);
+                if (memory_.eeprom_address < eeprom_.size())
+                {
+                    std::memcpy((void*)&memory_.eeprom_data, eeprom_.data() + memory_.eeprom_address, 4);
+                }
+                else
+                {
+                    // Eeprom address is out of bound: return the default value of an unwritten eeprom.
+                    // This is a shortcut for emulation, real device should handle the eeprom size.
+                    memory_.eeprom_data = UINT64_MAX;
+                }
                 memory_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
             case eeprom::Control::WRITE:
             {
+                if (memory_.eeprom_address >= eeprom_.size())
+                {
+                    // Increase eeprom size to let the write be done properly
+                    // This is a shortcut for emulation, real device should handle the eeprom size.
+                    eeprom_.resize(memory_.eeprom_address);
+                }
+
                 memory_.eeprom_control &= ~0x0700; // clear order
                 if (elapsed_time(last_write_eeprom_) < 2ms)
                 {
-                    memory_.eeprom_control |= 0x8000; // esc EEPROM interface busy
+                    memory_.eeprom_control |= eeprom::Control::BUSY; // esc EEPROM interface busy
                 }
 
                 if (elapsed_time(last_write_eeprom_) < 4ms)
                 {
-                    memory_.eeprom_control |= 0x2000;// wait EEPROM acknowledge
+                    memory_.eeprom_control |= eeprom::Control::ERROR_CMD;// wait EEPROM acknowledge
                 }
                 else
                 {
@@ -386,6 +402,10 @@ namespace kickcat
                 break;
             }
             case eeprom::Control::NOP:
+            {
+                memory_.eeprom_control &= ~eeprom::Control::ERROR_CMD;
+                break;
+            }
             case eeprom::Control::RELOAD:
             {
                 break;
