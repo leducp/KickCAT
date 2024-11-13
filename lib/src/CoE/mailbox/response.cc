@@ -35,6 +35,7 @@ namespace kickcat::mailbox::response
         coe_     = pointData<CoE::Header>(header_);
         sdo_     = pointData<CoE::ServiceData>(coe_);
         payload_ = pointData<uint8_t>(sdo_);
+        
 
     }
 
@@ -113,22 +114,26 @@ namespace kickcat::mailbox::response
         beforeHooks(CoE::Access::READ, entry);
 
         uint32_t size = entry->bitlen / 8;
+        header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData);
+
         if (size <= 4)
         {
             // expedited
             sdo_->transfer_type = 1;
             sdo_->block_size = 4 - size;
+            sdo_->size_indicator = 1;
         }
         else
         {
             sdo_->transfer_type = 0;
             std::memcpy(payload_, &size, 4);
             payload_ += 4;
+            header_->len  +=  size;
+            sdo_->size_indicator = 0;
         }
 
         std::memcpy(payload_, entry->data, size);
 
-        header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData) + size;
         coe_->service = CoE::Service::SDO_RESPONSE;
         sdo_->command = CoE::SDO::response::UPLOAD;
         reply(std::move(data_));
