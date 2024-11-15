@@ -228,6 +228,7 @@ namespace kickcat::mailbox::response
             return;
         }
 
+
         for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
         {
             ProcessingResult state = (*it)->process(raw_message);

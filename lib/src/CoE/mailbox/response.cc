@@ -1,13 +1,12 @@
-#include <algorithm>
+#include <cstdint>
 #include <cstring>
 
 #include "Mailbox.h"
 #include "kickcat/CoE/mailbox/response.h"
+#include "protocol.h"
 
 namespace kickcat::mailbox::response
 {
-    //using namespace kickcat::CoE;
-
     std::shared_ptr<AbstractMessage> createSDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message)
     {
         auto const* header = pointData<mailbox::Header>(raw_message.data());
@@ -17,12 +16,29 @@ namespace kickcat::mailbox::response
         }
 
         auto const* coe = pointData<CoE::Header>(header);
-        if (coe->service != CoE::Service::SDO_REQUEST)
+        switch (coe->service)
         {
-            return nullptr;
-        }
+            case CoE::Service::SDO_REQUEST:
+            {
+                return std::make_shared<SDOMessage>(mbx, std::move(raw_message));
+            }
+            case CoE::Service::EMERGENCY:
+            case CoE::Service::SDO_RESPONSE:
+            case CoE::Service::TxPDO:
+            case CoE::Service::RxPDO:
+            case CoE::Service::TxPDO_REMOTE_REQUEST:
+            case CoE::Service::RxPDO_REMOTE_REQUEST:
+            case CoE::Service::SDO_INFORMATION:
+            {
+                return nullptr;
+            }
 
-        return std::make_shared<SDOMessage>(mbx, std::move(raw_message));
+            default:
+            {
+                return std::make_shared<MailboxErrorMessage>(
+                    mbx, std::move(raw_message), mailbox::Error::INVALID_HEADER);
+            }
+        }
     }
 
 
@@ -35,8 +51,6 @@ namespace kickcat::mailbox::response
         coe_     = pointData<CoE::Header>(header_);
         sdo_     = pointData<CoE::ServiceData>(coe_);
         payload_ = pointData<uint8_t>(sdo_);
-        
-
     }
 
     void SDOMessage::abort(uint32_t code)
@@ -50,6 +64,12 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOMessage::process()
     {
+        if (header_->len < (sizeof(mailbox::Header) + sizeof(CoE::ServiceData)))
+        {
+            replyError(std::move(data_), mailbox::Error::SIZE_TOO_SHORT);
+            return ProcessingResult::FINALIZE;
+        }
+
         auto [object, entry] = findObject(mailbox_->getDictionary(), sdo_->index, sdo_->subindex);
         if (object == nullptr)
         {
@@ -63,6 +83,7 @@ namespace kickcat::mailbox::response
             return ProcessingResult::FINALIZE;
         }
 
+
         if (sdo_->complete_access == 1)
         {
             if (sdo_->subindex > 1)
@@ -73,15 +94,27 @@ namespace kickcat::mailbox::response
 
             switch (sdo_->command)
             {
-                case CoE::SDO::request::UPLOAD:   { return uploadComplete  (object); }
-                case CoE::SDO::request::DOWNLOAD: { return downloadComplete(object); }
+                case CoE::SDO::request::UPLOAD:
+                {
+                    return uploadComplete(object);
+                }
+                case CoE::SDO::request::DOWNLOAD:
+                {
+                    return downloadComplete(object);
+                }
             }
         }
 
         switch (sdo_->command)
         {
-            case CoE::SDO::request::UPLOAD:   { return upload(entry);   }
-            case CoE::SDO::request::DOWNLOAD: { return download(entry); }
+            case CoE::SDO::request::UPLOAD:
+            {
+                return upload(entry);
+            }
+            case CoE::SDO::request::DOWNLOAD:
+            {
+                return download(entry);
+            }
         }
 
         return ProcessingResult::NOOP;
@@ -119,8 +152,8 @@ namespace kickcat::mailbox::response
         if (size <= 4)
         {
             // expedited
-            sdo_->transfer_type = 1;
-            sdo_->block_size = 4 - size;
+            sdo_->transfer_type  = 1;
+            sdo_->block_size     = 4 - size;
             sdo_->size_indicator = 1;
         }
         else
@@ -128,7 +161,7 @@ namespace kickcat::mailbox::response
             sdo_->transfer_type = 0;
             std::memcpy(payload_, &size, 4);
             payload_ += 4;
-            header_->len  +=  size;
+            header_->len += size;
             sdo_->size_indicator = 0;
         }
 
@@ -145,9 +178,9 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOMessage::uploadComplete(CoE::Object* object)
     {
-        sdo_->transfer_type = 0; // complete access -> not expedited
+        sdo_->transfer_type = 0;  // complete access -> not expedited
 
-        uint32_t size = 0;
+        uint32_t size             = 0;
         uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {
@@ -273,11 +306,31 @@ namespace kickcat::mailbox::response
     }
 
 
-    void SDOMessage::afterHooks (uint16_t access, CoE::Entry* entry)
+    void SDOMessage::afterHooks(uint16_t access, CoE::Entry* entry)
     {
         for (auto callback : entry->after_access)
         {
             callback(access, entry);
         }
     }
+
+    MailboxErrorMessage::MailboxErrorMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, uint16_t error)
+        : AbstractMessage{mbx}
+        , error_{error}
+    {
+        data_ = std::move(raw_message);
+    }
+
+    ProcessingResult MailboxErrorMessage::process()
+    {
+        replyError(std::move(data_), mailbox::Error::INVALID_HEADER);
+        return ProcessingResult::FINALIZE;
+    }
+
+    ProcessingResult MailboxErrorMessage::process(std::vector<uint8_t> const&)
+    {
+        return ProcessingResult::NOOP;
+    }
+
+
 }
