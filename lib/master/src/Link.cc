@@ -1,11 +1,11 @@
+#include <inttypes.h>
+#include <algorithm>
+
 #include "Link.h"
 
 #include "AbstractSocket.h"
 #include "Error.h"
 #include "debug.h"
-
-#include <functional>
-#include <inttypes.h>
 
 namespace kickcat
 {

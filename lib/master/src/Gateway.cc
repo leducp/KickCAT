@@ -1,5 +1,6 @@
 #include <cstring>
 #include <inttypes.h>
+#include <algorithm>
 
 #include "Gateway.h"
 #include "debug.h"

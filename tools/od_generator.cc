@@ -1,9 +1,10 @@
+#include <fstream>
+#include <memory>
+#include <algorithm>
+
 #include "kickcat/CoE/OD.h"
 #include "kickcat/Prints.h"
 #include "kickcat/CoE/EsiParser.h"
-#include <fstream>
-#include <iostream>
-#include <memory>
 
 namespace kickcat
 {

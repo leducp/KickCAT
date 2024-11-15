@@ -1,6 +1,8 @@
+#include <inttypes.h>
+
+#include "kickcat/debug.h"
 #include "kickcat/AbstractESC.h"
 
-#include <inttypes.h>
 
 namespace kickcat
 {
@@ -342,7 +344,7 @@ namespace kickcat
         int32_t r = read(sm_pd_output_.start_address, process_data_output_, sm_pd_output_.length);
         if (r != sm_pd_output_.length)
         {
-            printf("\n update_process_data_output ERROR\n");
+            slave_error("\n update_process_data_output ERROR\n");
         }
     }
 
@@ -352,7 +354,7 @@ namespace kickcat
         int32_t written = write(sm_pd_input_.start_address, process_data_input_, sm_pd_input_.length);
         if (written != sm_pd_input_.length)
         {
-            printf("\n update_process_data_input ERROR\n");
+            slave_error("\n update_process_data_input ERROR\n");
         }
     }
 
