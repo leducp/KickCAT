@@ -1,5 +1,5 @@
 [requires]
-gtest/1.12.1
+gtest/1.15.0
 tinyxml2/10.0.0
 
 [generators]

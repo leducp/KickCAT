@@ -2,11 +2,18 @@ name: "Setup Conan"
 description: "Setup Conan"
 runs:
   using: "composite"
-  steps:      
+  steps:
     - name: Setup venv
       run: |
-        python3 -m venv .venv
-        source .venv/bin/activate
+        python3 -m venv venv
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          source venv/bin/activate
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          venv/Scripts/activate.bat
+        else
+          echo "$RUNNER_OS not supported"
+          exit 1
+        fi
         echo "VIRTUAL_ENV=${VIRTUAL_ENV}" >> $GITHUB_ENV
         echo "${VIRTUAL_ENV}/bin" >> $GITHUB_PATH
       shell: bash
@@ -15,8 +22,4 @@ runs:
       shell: bash
     - name: Install conan latest
       run: pip3 install conan --upgrade
-      shell: bash
-    - name: Fix path on Linux
-      run: |
-        echo "/home/runner/.local/bin" >> $GITHUB_PATH
       shell: bash

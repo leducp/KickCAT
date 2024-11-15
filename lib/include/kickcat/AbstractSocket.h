@@ -3,6 +3,7 @@
 
 #include <string>
 #include <chrono>
+#include <vector>
 
 #include "kickcat/Error.h"
 
@@ -24,6 +25,16 @@ namespace kickcat
         virtual int32_t read(void* frame, int32_t frame_size) = 0;
         virtual int32_t write(void const* frame, int32_t frame_size) = 0;
     };
+
+
+    struct NetworkInterface
+    {
+        std::string name;
+        std::string description;
+
+        std::string format() const;
+    };
+    std::vector<NetworkInterface> listInterfaces();
 }
 
 #endif

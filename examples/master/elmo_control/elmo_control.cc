@@ -1,7 +1,10 @@
+#include <iostream>
+
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
+#include "kickcat/helpers.h"
 
 #include "ElmoProtocol.h"
 #include "CanOpenErrors.h"
@@ -11,11 +14,12 @@
     #include "kickcat/OS/Linux/Socket.h"
 #elif __PikeOS__
     #include "kickcat/OS/PikeOS/Socket.h"
+#elif __MINGW64__
+    #include "kickcat/OS/Windows/Socket.h"
 #else
     #error "Unknown platform"
 #endif
 
-#include <iostream>
 
 using namespace kickcat;
 
@@ -27,7 +31,6 @@ int main(int argc, char* argv[])
         printf("usage no redundancy mode : ./test NIC_nominal\n");
         return 1;
     }
-
 
     std::shared_ptr<AbstractSocket> socket_redundancy;
     std::string red_interface_name = "null";
@@ -43,6 +46,8 @@ int main(int argc, char* argv[])
         socket_redundancy = std::make_shared<Socket>();
         red_interface_name = argv[2];
     }
+
+    selectInterface(nom_interface_name, red_interface_name);
 
     auto socket_nominal = std::make_shared<Socket>();
     try
