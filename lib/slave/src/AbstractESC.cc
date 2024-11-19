@@ -213,9 +213,6 @@ namespace kickcat
             set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
         }
 
-        // TODO: to remove ?
-        //update_process_data_input();
-        //
         if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
         {
             // check process data SM

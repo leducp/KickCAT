@@ -221,14 +221,6 @@ namespace kickcat::mailbox::response
             return;
         }
 
-        auto const* header  = pointData<mailbox::Header>(raw_message.data());
-        if ((header->type == mailbox::ERR) or (header->len == 0))
-        {
-            replyError(std::move(raw_message), mailbox::Error::INVALID_HEADER);
-            return;
-        }
-
-
         for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
         {
             ProcessingResult state = (*it)->process(raw_message);
