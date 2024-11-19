@@ -1,7 +1,7 @@
 #include <inttypes.h>
 
-#include "kickcat/debug.h"
 #include "kickcat/AbstractESC.h"
+#include "kickcat/debug.h"
 
 
 namespace kickcat
@@ -68,7 +68,7 @@ namespace kickcat
     {
         sm_process_data_configs_.push_back(config);
         process_data_input_ = buffer;
-        sm_pd_input_ = config;
+        sm_pd_input_        = config;
     }
 
 
@@ -76,7 +76,7 @@ namespace kickcat
     {
         sm_process_data_configs_.push_back(config);
         process_data_output_ = buffer;
-        sm_pd_output_ = config;
+        sm_pd_output_        = config;
     }
 
 
@@ -173,17 +173,10 @@ namespace kickcat
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP)
         {
-            uint16_t mailbox_protocol;
-            read(reg::MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol));
-            printf("Mailbox protocol %x \n", mailbox_protocol);
-
             bool are_sm_mailbox_valid = true;
-            if (mailbox_protocol != mailbox::Type::ERR)
+            for (auto& sm : sm_mailbox_configs_)
             {
-                for (auto& sm : sm_mailbox_configs_)
-                {
-                    are_sm_mailbox_valid &= is_valid_sm(sm);
-                }
+                are_sm_mailbox_valid &= is_valid_sm(sm);
             }
 
             if (are_sm_mailbox_valid)
@@ -192,11 +185,12 @@ namespace kickcat
             }
             else
             {
-                // TODO error flag
+                set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
             }
         }
 
-        if (((al_control_ & State::MASK_STATE) == State::SAFE_OP) or ((al_control_ & State::MASK_STATE) == State::OPERATIONAL))
+        if (((al_control_ & State::MASK_STATE) == State::SAFE_OP)
+            or ((al_control_ & State::MASK_STATE) == State::OPERATIONAL))
         {
             set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
@@ -205,8 +199,8 @@ namespace kickcat
 
     void AbstractESC::routine_preop()
     {
-        update_process_data_input();
-        if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not (al_status_ & State::ERROR_ACK))
+        //update_process_data_input();
+        if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
         {
             // check process data SM
             for (auto& sm : sm_process_data_configs_)
@@ -375,14 +369,14 @@ namespace kickcat
     void AbstractESC::clear_error()
     {
         al_status_code_ = StatusCode::NO_ERROR;
-        al_status_ &= ~ AL_STATUS_ERR_IND;
+        al_status_ &= ~AL_STATUS_ERR_IND;
     }
 
 
     void AbstractESC::set_error(StatusCode code)
     {
         // Don't override non acknowlegded error, demanded by CTT, not specified in the norm.
-        if (not (al_status_ & State::ERROR_ACK))
+        if (not(al_status_ & State::ERROR_ACK))
         {
             al_status_code_ = code;
             al_status_ |= State::ERROR_ACK;
