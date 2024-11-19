@@ -251,6 +251,22 @@ namespace kickcat
         update_process_data_input();
         update_process_data_output();
 
+        if (not are_valid_sm(sm_mailbox_configs_))
+        {
+            for (auto& sm : sm_mailbox_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            for (auto& sm : sm_process_data_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            set_al_status(State::INIT);
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
+
         bool is_sm_process_data_invalid = false;
         for (auto& sm : sm_process_data_configs_)
         {
