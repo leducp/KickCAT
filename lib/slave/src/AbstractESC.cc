@@ -17,31 +17,34 @@ namespace kickcat
 
     bool AbstractESC::is_valid_sm(SyncManagerConfig const& sm_ref)
     {
-        auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
-        {
-            return reg + sm_index * 8;
-        };
+        auto create_sm_address = [](uint16_t reg, uint16_t sm_index) { return reg + sm_index * 8; };
 
         SyncManager sm_read;
 
         read(create_sm_address(reg::SYNC_MANAGER, sm_ref.index), &sm_read, sizeof(sm_read));
 
-        bool is_valid = (sm_read.start_address == sm_ref.start_address) and
-                        (sm_read.length == sm_ref.length) and
-                        (sm_read.control == sm_ref.control) and
-                        sm_read.activate == 1;
+        bool is_valid = (sm_read.start_address == sm_ref.start_address) and (sm_read.length == sm_ref.length)
+                        and (sm_read.control == sm_ref.control) and sm_read.activate == 1;
 
         // printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
         // printf("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
         return is_valid;
     }
 
+    bool AbstractESC::are_valid_sm(std::vector<SyncManagerConfig> const& sync_managers)
+    {
+        bool valid = true;
+        for (auto& sm : sync_managers)
+        {
+            valid &= is_valid_sm(sm);
+        }
+        return valid;
+    }
+
+
     void AbstractESC::set_sm_activate(SyncManagerConfig const& sm_conf, bool is_activated)
     {
-        auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
-        {
-            return reg + sm_index * 8;
-        };
+        auto create_sm_address = [](uint16_t reg, uint16_t sm_index) { return reg + sm_index * 8; };
 
         SyncManager sm;
         read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
@@ -94,6 +97,10 @@ namespace kickcat
             {
                 set_sm_activate(sm, false);
             }
+            for (auto& sm : sm_mailbox_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
         }
 
         if ((al_control_ & State::ERROR_ACK))
@@ -122,11 +129,8 @@ namespace kickcat
 
         // Handle unsupported state
         uint8_t asked_state = al_control_ & State::MASK_STATE;
-        if (asked_state != State::BOOT and
-            asked_state != State::INIT and
-            asked_state != State::PRE_OP and
-            asked_state != State::SAFE_OP and
-            asked_state != State::OPERATIONAL)
+        if (asked_state != State::BOOT and asked_state != State::INIT and asked_state != State::PRE_OP
+            and asked_state != State::SAFE_OP and asked_state != State::OPERATIONAL)
         {
             set_error(StatusCode::UNKNOWN_REQUESTED_STATE);
         }
@@ -173,14 +177,13 @@ namespace kickcat
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP)
         {
-            bool are_sm_mailbox_valid = true;
-            for (auto& sm : sm_mailbox_configs_)
+            if (are_valid_sm(sm_mailbox_configs_))
             {
-                are_sm_mailbox_valid &= is_valid_sm(sm);
-            }
+                for (auto& sm : sm_mailbox_configs_)
+                {
+                    set_sm_activate(sm, true);
+                }
 
-            if (are_sm_mailbox_valid)
-            {
                 set_al_status(State::PRE_OP);
             }
             else
@@ -199,7 +202,20 @@ namespace kickcat
 
     void AbstractESC::routine_preop()
     {
+        if (not are_valid_sm(sm_mailbox_configs_))
+        {
+            for (auto& sm : sm_mailbox_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            set_al_status(State::INIT);
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
+
+        // TODO: to remove ?
         //update_process_data_input();
+        //
         if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
         {
             // check process data SM

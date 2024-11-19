@@ -64,6 +64,7 @@ namespace kickcat
         void update_process_data_output();
 
         bool is_valid_sm(SyncManagerConfig const& sm_ref);
+        bool are_valid_sm(std::vector<SyncManagerConfig> const& sm);
         void set_sm_activate(SyncManagerConfig const& sm_ref, bool is_activated);
 
         void set_error(StatusCode code);
