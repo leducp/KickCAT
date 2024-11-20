@@ -49,7 +49,10 @@ namespace kickcat
 
     void AbstractESC::set_sm_activate(SyncManagerConfig const& sm_conf, bool is_activated)
     {
-        auto create_sm_address = [](uint16_t reg, uint16_t sm_index) { return reg + sm_index * 8; };
+        auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
+        {
+            return reg + sm_index * 8;
+        };
 
         SyncManager sm;
         read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
@@ -76,7 +79,7 @@ namespace kickcat
     {
         sm_process_data_configs_.push_back(config);
         process_data_input_ = buffer;
-        sm_pd_input_        = config;
+        sm_pd_input_ = config;
     }
 
 
@@ -84,7 +87,7 @@ namespace kickcat
     {
         sm_process_data_configs_.push_back(config);
         process_data_output_ = buffer;
-        sm_pd_output_        = config;
+        sm_pd_output_ = config;
     }
 
 
@@ -134,8 +137,11 @@ namespace kickcat
 
         // Handle unsupported state
         uint8_t asked_state = al_control_ & State::MASK_STATE;
-        if (asked_state != State::BOOT and asked_state != State::INIT and asked_state != State::PRE_OP
-            and asked_state != State::SAFE_OP and asked_state != State::OPERATIONAL)
+        if (asked_state != State::BOOT and
+            asked_state != State::INIT and
+            asked_state != State::PRE_OP and
+            asked_state != State::SAFE_OP and
+            asked_state != State::OPERATIONAL)
         {
             set_error(StatusCode::UNKNOWN_REQUESTED_STATE);
         }
@@ -306,6 +312,7 @@ namespace kickcat
                 // error flag
             }
         }
+
     }
 
 

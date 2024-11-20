@@ -1,12 +1,14 @@
 #ifndef KICKCAT_COE_MAILBOX_RESPONSE_H
 #define KICKCAT_COE_MAILBOX_RESPONSE_H
 
-#include "kickcat/CoE/OD.h"
 #include "kickcat/Mailbox.h"
+#include "kickcat/CoE/OD.h"
 
 namespace kickcat::mailbox::response
 {
-    std::shared_ptr<AbstractMessage> createSDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message);
+    std::shared_ptr<AbstractMessage> createSDOMessage(
+            Mailbox *mbx,
+            std::vector<uint8_t>&& raw_message);
 
     class SDOMessage final : public AbstractMessage
     {

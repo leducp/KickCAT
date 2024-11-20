@@ -83,7 +83,6 @@ namespace kickcat::mailbox::response
             return ProcessingResult::FINALIZE;
         }
 
-
         if (sdo_->complete_access == 1)
         {
             if (sdo_->subindex > 1)
@@ -94,27 +93,15 @@ namespace kickcat::mailbox::response
 
             switch (sdo_->command)
             {
-                case CoE::SDO::request::UPLOAD:
-                {
-                    return uploadComplete(object);
-                }
-                case CoE::SDO::request::DOWNLOAD:
-                {
-                    return downloadComplete(object);
-                }
+                case CoE::SDO::request::UPLOAD:   { return uploadComplete  (object); }
+                case CoE::SDO::request::DOWNLOAD: { return downloadComplete(object); }
             }
         }
 
         switch (sdo_->command)
         {
-            case CoE::SDO::request::UPLOAD:
-            {
-                return upload(entry);
-            }
-            case CoE::SDO::request::DOWNLOAD:
-            {
-                return download(entry);
-            }
+            case CoE::SDO::request::UPLOAD:   { return upload(entry);   }
+            case CoE::SDO::request::DOWNLOAD: { return download(entry); }
         }
 
         return ProcessingResult::NOOP;
@@ -178,9 +165,9 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOMessage::uploadComplete(CoE::Object* object)
     {
-        sdo_->transfer_type = 0;  // complete access -> not expedited
+        sdo_->transfer_type = 0; // complete access -> not expedited
 
-        uint32_t size             = 0;
+        uint32_t size = 0;
         uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {

@@ -149,7 +149,6 @@ namespace kickcat::mailbox::response
         uint8_t const* data() const { return data_.data(); }
         size_t size() const         { return data_.size(); }
 
-    
     protected:
         void reply(std::vector<uint8_t>&& reply); /// Enqueue a raw message to be sent in the mailbox
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code); // wrapper on mailbox replyError
@@ -175,6 +174,7 @@ namespace kickcat::mailbox::response
         void process(); // Process a message in the to_process_ queue if any
         void send();    // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
 
+    private:
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
 
         AbstractESC* esc_;
