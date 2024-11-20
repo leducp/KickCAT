@@ -361,6 +361,10 @@ namespace kickcat
     };
     constexpr uint8_t MAILBOX_STATUS = (1 << 3);
 
+    constexpr uint8_t SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK = (1 << 0);
+    constexpr uint8_t SYNC_MANAGER_CONTROL_DIRECTION_MASK = (1 << 1);
+    
+
     char const* toString(SyncManagerType const& type);
 
     struct FMMU

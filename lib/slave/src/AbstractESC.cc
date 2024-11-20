@@ -2,6 +2,7 @@
 
 #include "kickcat/AbstractESC.h"
 #include "kickcat/debug.h"
+#include "protocol.h"
 
 
 namespace kickcat
@@ -24,7 +25,11 @@ namespace kickcat
         read(create_sm_address(reg::SYNC_MANAGER, sm_ref.index), &sm_read, sizeof(sm_read));
 
         bool is_valid = (sm_read.start_address == sm_ref.start_address) and (sm_read.length == sm_ref.length)
-                        and (sm_read.control == sm_ref.control) and sm_read.activate == 1;
+                        and ((sm_read.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK)
+                             == (sm_ref.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK))
+                        and ((sm_read.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK)
+                             == (sm_ref.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK))
+                        and sm_read.activate == 1;
 
         // printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
         // printf("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
@@ -301,7 +306,6 @@ namespace kickcat
                 // error flag
             }
         }
-
     }
 
 
