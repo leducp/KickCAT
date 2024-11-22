@@ -30,11 +30,8 @@ int main(int argc, char *argv[])
         buffer_out[i] = 0xFF;
     }
 
-    SyncManagerConfig process_data_out = SYNC_MANAGER_PI_OUT(0, 0x1000, pdo_size); // Process data out (master view), address consistent with eeprom conf.
-    SyncManagerConfig process_data_in = SYNC_MANAGER_PI_IN(1, 0x1200, pdo_size); // Process data in (master view), address consistent with eeprom conf.
-
-    esc.set_process_data_input(buffer_in, process_data_in);
-    esc.set_process_data_output(buffer_out, process_data_out);
+    esc.set_process_data_input(buffer_in);
+    esc.set_process_data_output(buffer_out);
 
     esc.init();
 
