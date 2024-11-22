@@ -32,7 +32,7 @@ namespace kickcat::mailbox::response
         void abort(uint32_t code);
 
         void beforeHooks(uint16_t access, CoE::Entry* entry);
-        void afterHooks (uint16_t access, CoE::Entry* entry);
+        void afterHooks(uint16_t access, CoE::Entry* entry);
 
         // Pointer on data_
         mailbox::Header* header_;
@@ -40,6 +40,20 @@ namespace kickcat::mailbox::response
         CoE::ServiceData* sdo_;
         uint8_t* payload_;
     };
+
+    class MailboxErrorMessage final : public AbstractMessage
+    {
+    public:
+        MailboxErrorMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, uint16_t error);
+        virtual ~MailboxErrorMessage() = default;
+
+        ProcessingResult process() override;
+        ProcessingResult process(std::vector<uint8_t> const& raw_message) override;
+
+    private:
+        uint16_t error_;
+    };
+
 }
 
 #endif

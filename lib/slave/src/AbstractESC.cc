@@ -1,7 +1,8 @@
 #include <inttypes.h>
 
-#include "kickcat/debug.h"
 #include "kickcat/AbstractESC.h"
+#include "kickcat/debug.h"
+#include "protocol.h"
 
 
 namespace kickcat
@@ -17,24 +18,34 @@ namespace kickcat
 
     bool AbstractESC::is_valid_sm(SyncManagerConfig const& sm_ref)
     {
-        auto create_sm_address = [](uint16_t reg, uint16_t sm_index)
-        {
-            return reg + sm_index * 8;
-        };
+        auto create_sm_address = [](uint16_t reg, uint16_t sm_index) { return reg + sm_index * 8; };
 
         SyncManager sm_read;
 
         read(create_sm_address(reg::SYNC_MANAGER, sm_ref.index), &sm_read, sizeof(sm_read));
 
-        bool is_valid = (sm_read.start_address == sm_ref.start_address) and
-                        (sm_read.length == sm_ref.length) and
-                        (sm_read.control == sm_ref.control) and
-                        sm_read.activate == 1;
+        bool is_valid = (sm_read.start_address == sm_ref.start_address) and (sm_read.length == sm_ref.length)
+                        and ((sm_read.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK)
+                             == (sm_ref.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK))
+                        and ((sm_read.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK)
+                             == (sm_ref.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK))
+                        and sm_read.activate == 1;
 
         // printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
         // printf("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
         return is_valid;
     }
+
+    bool AbstractESC::are_valid_sm(std::vector<SyncManagerConfig> const& sync_managers)
+    {
+        bool valid = true;
+        for (auto& sm : sync_managers)
+        {
+            valid &= is_valid_sm(sm);
+        }
+        return valid;
+    }
+
 
     void AbstractESC::set_sm_activate(SyncManagerConfig const& sm_conf, bool is_activated)
     {
@@ -91,6 +102,10 @@ namespace kickcat
             set_al_status(State::INIT);
             clear_error();
             for (auto& sm : sm_process_data_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+            for (auto& sm : sm_mailbox_configs_)
             {
                 set_sm_activate(sm, false);
             }
@@ -173,26 +188,18 @@ namespace kickcat
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP)
         {
-            uint16_t mailbox_protocol;
-            read(reg::MAILBOX_PROTOCOL, &mailbox_protocol, sizeof(mailbox_protocol));
-            printf("Mailbox protocol %x \n", mailbox_protocol);
-
-            bool are_sm_mailbox_valid = true;
-            if (mailbox_protocol != mailbox::Type::ERR)
+            if (are_valid_sm(sm_mailbox_configs_))
             {
                 for (auto& sm : sm_mailbox_configs_)
                 {
-                    are_sm_mailbox_valid &= is_valid_sm(sm);
+                    set_sm_activate(sm, true);
                 }
-            }
 
-            if (are_sm_mailbox_valid)
-            {
                 set_al_status(State::PRE_OP);
             }
             else
             {
-                // TODO error flag
+                set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
             }
         }
 
@@ -205,8 +212,18 @@ namespace kickcat
 
     void AbstractESC::routine_preop()
     {
-        update_process_data_input();
-        if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not (al_status_ & State::ERROR_ACK))
+        if (not are_valid_sm(sm_mailbox_configs_))
+        {
+            for (auto& sm : sm_mailbox_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            set_al_status(State::INIT);
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
+
+        if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
         {
             // check process data SM
             for (auto& sm : sm_process_data_configs_)
@@ -240,6 +257,22 @@ namespace kickcat
     {
         update_process_data_input();
         update_process_data_output();
+
+        if (not are_valid_sm(sm_mailbox_configs_))
+        {
+            for (auto& sm : sm_mailbox_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            for (auto& sm : sm_process_data_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            set_al_status(State::INIT);
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
 
         bool is_sm_process_data_invalid = false;
         for (auto& sm : sm_process_data_configs_)
@@ -305,6 +338,23 @@ namespace kickcat
 
         update_process_data_input();
         update_process_data_output();
+        
+        if (not are_valid_sm(sm_mailbox_configs_))
+        {
+            for (auto& sm : sm_mailbox_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            for (auto& sm : sm_process_data_configs_)
+            {
+                set_sm_activate(sm, false);
+            }
+
+            set_al_status(State::INIT);
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
+
 
         bool is_sm_process_data_invalid = false;
         for (auto& sm : sm_process_data_configs_)
@@ -375,14 +425,14 @@ namespace kickcat
     void AbstractESC::clear_error()
     {
         al_status_code_ = StatusCode::NO_ERROR;
-        al_status_ &= ~ AL_STATUS_ERR_IND;
+        al_status_ &= ~AL_STATUS_ERR_IND;
     }
 
 
     void AbstractESC::set_error(StatusCode code)
     {
         // Don't override non acknowlegded error, demanded by CTT, not specified in the norm.
-        if (not (al_status_ & State::ERROR_ACK))
+        if (not(al_status_ & State::ERROR_ACK))
         {
             al_status_code_ = code;
             al_status_ |= State::ERROR_ACK;
