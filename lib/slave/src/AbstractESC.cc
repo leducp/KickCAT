@@ -203,8 +203,7 @@ namespace kickcat
             }
         }
 
-        if (((al_control_ & State::MASK_STATE) == State::SAFE_OP)
-            or ((al_control_ & State::MASK_STATE) == State::OPERATIONAL))
+        if (((al_control_ & State::MASK_STATE) == State::SAFE_OP) or ((al_control_ & State::MASK_STATE) == State::OPERATIONAL))
         {
             set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
