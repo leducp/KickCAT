@@ -898,9 +898,9 @@ namespace kickcat
             link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_CONTROL), &req, sizeof(req), process, error);
             link_->processDatagrams();
             acknowledged = isEepromAcknowledged(slave);
-            sleep(2ms);
+            sleep(big_wait);
 
-            if (elapsed_time(start_time) > 10ms)
+            if (elapsed_time(start_time) > (10 * big_wait))
             {
                 THROW_ERROR("Timeout acknowledge write eeprom");
             }

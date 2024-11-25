@@ -1,0 +1,10 @@
+[requires]
+gtest/1.15.0
+tinyxml2/10.0.0
+npcap/1.70
+
+[generators]
+CMakeDeps
+
+[options]
+gtest*:build_gmock=True

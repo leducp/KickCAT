@@ -193,7 +193,7 @@ TEST_F(MailboxTest, SDO_upload_standard_OK)
 
 TEST_F(MailboxTest, SDO_upload_segmented_OK)
 {
-    int32_t data[4] = {0};
+    int32_t data[6] = {0};
     uint32_t data_size = sizeof(data);
     mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size);
 
@@ -223,10 +223,22 @@ TEST_F(MailboxTest, SDO_upload_segmented_OK)
     sdo->index = 0x1018;
     sdo->subindex = 1;
     int32_t* reply = static_cast<int32_t*>(payload);
-    reply[0] = 16; // complete size - partial (seggmented) since more than contains in ths header
+    reply[0] = 24; // complete size - partial (segmented) since more than contains in this header
     reply[1] = 8;  // segment size
     reply[2] = 0xDEADBEEF;
     reply[3] = 0xA5A5A5A5;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+    ASSERT_EQ(CoE::SDO::request::UPLOAD_SEGMENTED, sdo_section->command);
+
+    header->len = 10 + 8;
+    sdo->size_indicator = 1;    // more follow
+    sdo->complete_access = 0;
+    sdo->command = CoE::SDO::response::UPLOAD_SEGMENTED;
+    reply[0] = 8;
+    reply[1] = 0xCAFEDECA;
+    reply[2] = 0xD0D0FACE;
     ASSERT_TRUE(mailbox.receive(raw_message));
     message = mailbox.send();
     ASSERT_EQ(MessageStatus::RUNNING, message->status());
@@ -237,8 +249,8 @@ TEST_F(MailboxTest, SDO_upload_segmented_OK)
     sdo->complete_access = not sdo->complete_access;
     sdo->command = CoE::SDO::response::UPLOAD_SEGMENTED;
     reply[0] = 8;
-    reply[1] = 0xCAFEDECA;
-    reply[2] = 0xD0D0FACE;
+    reply[1] = 0xD1CECA5E;
+    reply[2] = 0x00B0CAD0;
     ASSERT_TRUE(mailbox.receive(raw_message));
     ASSERT_EQ(MessageStatus::SUCCESS, message->status());
 
@@ -246,7 +258,9 @@ TEST_F(MailboxTest, SDO_upload_segmented_OK)
     ASSERT_EQ(0xA5A5A5A5, data[1]);
     ASSERT_EQ(0xCAFEDECA, data[2]);
     ASSERT_EQ(0xD0D0FACE, data[3]);
-    ASSERT_EQ(16, data_size);
+    ASSERT_EQ(0xD1CECA5E, data[4]);
+    ASSERT_EQ(0x00B0CAD0, data[5]);
+    ASSERT_EQ(24, data_size);
 }
 
 

@@ -43,6 +43,15 @@ To improve latency on Linux, you have to
  - You have to provide the CMake cross-toolchain file which shall define PIKEOS variable (or adapt the main CMakelists.txt to your needs)
  - examples are provided with a working but non-optimal process/thread configuration (examples/PikeOS/p4ext_config.c): feel free to adapt it to your needs
 
+#### Windows
+Absolutely NOT suitable for real time use, but it can come in handy to run tools that rely on EtherCAT communication.
+
+To build the library, you need to install:
+- conan for windows (tested with 2.9.1)
+- gcc for Windows (tested with w64devkit 2.0.0)
+- npcap (tested with driver 1.80 + SDK 1.70 through conan package)
+
+
 ### Build:
 KickCAT project is handled through CMake. To build the project, call CMake to configure it and then the build tool (default on Linux is make):
   1. Configure the project (more information on https://cmake.org/cmake/help/latest/)

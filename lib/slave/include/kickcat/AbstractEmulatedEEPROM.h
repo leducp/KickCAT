@@ -12,7 +12,7 @@ namespace kickcat
 constexpr uint32_t EEPROM_COMMAND_PENDING = 1 << 5;
 constexpr uint32_t EEPROM_LOADING_STATUS  = 1 << 12;
 
-constexpr milliseconds EEPROM_WRITE_TIMEOUT = 100ms;
+constexpr milliseconds EEPROM_WRITE_TIMEOUT = 400ms;
 
 
 /// \brief Emulate the EEPROM accessed by the ESC.

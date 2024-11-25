@@ -16,6 +16,31 @@
 
 namespace kickcat
 {
+    std::string NetworkInterface::format() const
+    {
+        return name;
+    }
+
+    std::vector<NetworkInterface> listInterfaces()
+    {
+        std::vector<NetworkInterface> interfaces;
+
+        struct if_nameindex* ifs = if_nameindex();
+        if (ifs == nullptr)
+        {
+            return {};
+        }
+
+        for (struct if_nameindex* ifn = ifs; ifn->if_index != 0 or ifn->if_name != nullptr; ++ifn)
+        {
+            interfaces.push_back({ifn->if_name, ""});
+        }
+
+        if_freenameindex(ifs);
+
+        return interfaces;
+    }
+
     Socket::Socket(nanoseconds coalescing, nanoseconds polling_period)
         : AbstractSocket()
         , fd_{-1}

@@ -1,17 +1,20 @@
+#include <iostream>
+
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
+#include "kickcat/helpers.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
 #elif __PikeOS__
     #include "kickcat/OS/PikeOS/Socket.h"
+#elif __MINGW64__
+    #include "kickcat/OS/Windows/Socket.h"
 #else
     #error "Unknown platform"
 #endif
-
-#include <iostream>
 
 using namespace kickcat;
 
@@ -61,7 +64,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-
     std::shared_ptr<AbstractSocket> socket_redundancy;
     std::string red_interface_name = "null";
     std::string nom_interface_name = argv[1];
@@ -76,6 +78,8 @@ int main(int argc, char* argv[])
         socket_redundancy = std::make_shared<Socket>();
         red_interface_name = argv[2];
     }
+
+    selectInterface(nom_interface_name, red_interface_name);
 
     auto socket_nominal = std::make_shared<Socket>();
     try
@@ -123,7 +127,7 @@ int main(int argc, char* argv[])
         uint32_t identityObjectSize = sizeof(identityObject);
         bus.readSDO(bus.slaves()[0], 0x1018, 4, Bus::Access::PARTIAL, identityObject, &identityObjectSize, 1s);
         printf("Firmware Version %02x\n", identityObject[0]);
- 
+
         bus.enableIRQ(EcatEvent::DL_STATUS,
         [&]()
         {
@@ -148,7 +152,7 @@ int main(int argc, char* argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
-   
+
     for (auto& slave: bus.slaves())
     {
         printInfo(slave);

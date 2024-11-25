@@ -4,11 +4,14 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
+#include "kickcat/helpers.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
 #elif __PikeOS__
     #include "kickcat/OS/PikeOS/Socket.h"
+#elif __MINGW64__
+    #include "kickcat/OS/Windows/Socket.h"
 #else
     #error "Unknown platform"
 #endif
@@ -51,6 +54,8 @@ int main(int argc, char* argv[])
         red_interface_name = argv[5];
     }
 
+    selectInterface(nom_interface_name, red_interface_name);
+
     auto socket_nominal = std::make_shared<Socket>();
     try
     {
@@ -88,6 +93,7 @@ int main(int argc, char* argv[])
     link->checkRedundancyNeeded();
 
     Bus bus(link);
+    bus.configureWaitLatency(1ms, 10ms);
 
     // To interact with the EEPROM we don't need to go through the EtherCAT state machine, use a minimal init to avoid
     // being stuck on non configured slaves.
@@ -150,7 +156,7 @@ int main(int argc, char* argv[])
         for (uint32_t i = 0; i < buffer.size(); i++)
         {
             bus.writeEeprom(slave, i, static_cast<void*>(&buffer[i]), 2);
-            printf("\r Updating: %d/%lu", i+1, buffer.size());
+            printf("\r Updating: %d/%lu", i + 1, buffer.size());
             fflush(stdout);
         }
         printf("\n");

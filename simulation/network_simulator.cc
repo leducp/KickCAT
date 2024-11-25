@@ -2,7 +2,14 @@
 #include <numeric>
 #include <algorithm>
 
-#include "kickcat/OS/Linux/Socket.h"
+#ifdef __linux__
+    #include "kickcat/OS/Linux/Socket.h"
+#elif __MINGW64__
+    #include "kickcat/OS/Windows/Socket.h"
+#else
+    #error "Unsupported platform"
+#endif
+
 #include "kickcat/Frame.h"
 #include "kickcat/ESC/EmulatedESC.h"
 
@@ -31,7 +38,7 @@ int main(int argc, char* argv[])
     auto coe_dict = parser.load("ingenia_esi.xml");
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
-    auto socket = std::make_shared<Socket>(-1ns, 1us);
+    auto socket = std::make_shared<Socket>();
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
 

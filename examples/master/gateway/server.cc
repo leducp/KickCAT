@@ -6,6 +6,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
 #include "kickcat/Gateway.h"
+#include "kickcat/helpers.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -14,7 +15,6 @@
 #else
     #error "Unknown platform"
 #endif
-
 
 #include "kickcat/OS/Linux/UdpDiagSocket.h"
 
@@ -46,6 +46,8 @@ int main(int argc, char* argv[])
         socketRedundancy = std::make_shared<Socket>();
         red_interface_name = argv[2];
     }
+
+    selectInterface(nom_interface_name, red_interface_name);
 
     auto socketNominal = std::make_shared<Socket>();
     try

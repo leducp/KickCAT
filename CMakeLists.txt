@@ -8,10 +8,18 @@ list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_BINARY_DIR})
 include(Config)
 include(debug)
 
-option(ENABLE_ESI_PARSER "Enable Esi Parser" ON)
+option(BUILD_EXAMPLES     "Build examples" ON)
+
+if (NOT NUTTX)
+  option(ENABLE_ESI_PARSER  "Enable Esi Parser" ON)
+  option(BUILD_UNIT_TESTS   "Build unit tests" OFF)
+  option(CODE_COVERAGE      "Enable code coverage - gcovr shall be in the PATH" OFF)
+  option(BUILD_SIMULATION   "Build simulation" ON)
+  option(BUILD_TOOLS        "Build tools" ON)
+endif()
+
 add_subdirectory(lib)
 
-option(BUILD_UNIT_TESTS "Build unit tests" OFF)
 if (BUILD_UNIT_TESTS)
   find_package(GTest QUIET CONFIG)
   if (NOT GTest_FOUND)
@@ -20,6 +28,8 @@ if (BUILD_UNIT_TESTS)
 endif()
 
 if (GTest_FOUND)
+  enable_testing()
+
   add_executable(kickcat_unit unit/adler32_sum-t.cc
                               unit/bus-t.cc
                               unit/debughelpers-t.cc
@@ -41,8 +51,7 @@ if (GTest_FOUND)
   set_kickcat_properties(kickcat_unit)
   add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-  option(CODE_COVERAGE "Enable code coverage - gcovr shall be in the PATH" FALSE)
-  if (${CODE_COVERAGE})
+  if (CODE_COVERAGE)
     include(CodeCoverage)
     append_coverage_compiler_flags()
     set(GCOVR_ADDITIONAL_ARGS --exclude-unreachable-branches --exclude-throw-branches)
@@ -62,28 +71,17 @@ if (GTest_FOUND)
   endif()
 endif()
 
-option(BUILD_EXAMPLES "Build examples" ON)
 if (BUILD_EXAMPLES)
-  if (UNIX)
-      add_subdirectory(examples/master)
+  if (NOT NUTTX)
+    add_subdirectory(examples/master)
   endif()
-  if (NUTTX)
-    add_subdirectory(examples/slave)
-  endif()
+  add_subdirectory(examples/slave)
 endif()
 
-option(BUILD_SIMULATION "Build simulation" ON)
 if (BUILD_SIMULATION)
-  if (UNIX)
-      add_subdirectory(simulation)
-  endif()
+  add_subdirectory(simulation)
 endif()
 
-option(BUILD_TOOLS "Build tools" ON)
 if (BUILD_TOOLS)
-  if (UNIX)
-    add_subdirectory(tools)
-  endif()
+  add_subdirectory(tools)
 endif()
-
-
