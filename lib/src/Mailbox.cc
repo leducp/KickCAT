@@ -2,10 +2,13 @@
 #include <algorithm>
 #include <cinttypes>
 
-#include "Mailbox.h"
+#include "AbstractESC.h"
 #include "debug.h"
 #include "CoE/mailbox/request.h"
 #include "CoE/mailbox/response.h"
+#include "Error.h"
+#include "Mailbox.h"
+#include "protocol.h"
 
 namespace kickcat::mailbox::request
 {
@@ -195,14 +198,29 @@ namespace kickcat::mailbox::request
 
 namespace kickcat::mailbox::response
 {
-    Mailbox::Mailbox(AbstractESC* esc, SyncManagerConfig mbx_in, SyncManagerConfig mbx_out, uint16_t max_msgs)
+    Mailbox::Mailbox(AbstractESC* esc, uint16_t max_allocated_ram_by_msg, uint16_t max_msgs)
         : esc_{esc}
-        , mbx_in_{mbx_in}
-        , mbx_out_{mbx_out}
+        , max_allocated_ram_by_msg_{max_allocated_ram_by_msg}
         , max_msgs_{max_msgs}
     {
-
     }
+
+    std::tuple<SyncManagerConfig, SyncManagerConfig> Mailbox::configureSm()
+    {
+        auto [indexIn, mailboxIn]   = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
+        auto [indexOut, mailboxOut] = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
+
+        if (mailboxIn.length != mailboxOut.length or mailboxIn.length > max_allocated_ram_by_msg_)
+        {
+            THROW_ERROR("Mailbox length error");
+        }
+
+        mbx_in_  = SYNC_MANAGER_MBX_IN(indexIn, mailboxIn.start_address, mailboxIn.length);
+        mbx_out_ = SYNC_MANAGER_MBX_OUT(indexOut, mailboxOut.start_address, mailboxOut.length);
+
+        return std::tuple(mbx_in_, mbx_out_);
+    }
+
 
     void Mailbox::receive()
     {

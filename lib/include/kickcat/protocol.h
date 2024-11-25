@@ -351,6 +351,23 @@ namespace kickcat
         uint8_t  pdi_control;
     } __attribute__((__packed__));
 
+    
+    constexpr uint8_t SM_CONTROL_MODE_MASK = 0x03;
+    constexpr uint8_t SM_CONTROL_MODE_BUFFERED = 0x00;
+    constexpr uint8_t SM_CONTROL_MODE_MAILBOX = 0x02;
+    constexpr uint8_t SM_CONTROL_DIRECTION_MASK = 0x0C;
+    constexpr uint8_t SM_CONTROL_DIRECTION_READ = 0x00; // ECAT read access, PDI write access
+    constexpr uint8_t SM_CONTROL_DIRECTION_WRITE = 0x04; // ECAT write access, PDI read access
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_MASK = 0x10; 
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_DISABLED = 0x00; 
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_ENABLED = 0x10; 
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_MASK = 0x20; 
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_DISABLED = 0x00; 
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_ENABLED = 0x20; 
+    constexpr uint8_t SM_CONTROL_WATCHDOG_MASK = 0x40; 
+    constexpr uint8_t SM_CONTROL_WATCHDOG_DISABLED = 0x00; 
+    constexpr uint8_t SM_CONTROL_WATCHDOG_ENABLED = 0x40; 
+
     enum SyncManagerType
     {
         Unused     = 0,

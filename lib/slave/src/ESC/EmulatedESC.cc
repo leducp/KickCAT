@@ -20,9 +20,6 @@ namespace kickcat
         memory_.port_desc       = 0x0f;     // 2 ports (0, 1), MII
         memory_.esc_features    = 0x01cc;
 
-        // Device emulation is ON
-        memory_.esc_configuration = 0x01;
-
         // Default value is 'Request INIT State'
         memory_.al_control = State::INIT;
 
@@ -44,6 +41,9 @@ namespace kickcat
         eeprom_.resize(size / 2); // vector of uint16_t so / 2 since the size is in byte
         eeprom_file.read((char*)eeprom_.data(), size);
         eeprom_file.close();
+
+        // Device emulation
+        memory_.esc_configuration = eeprom_[0] >> 8;
 
         memory_.station_alias = eeprom_[4]; // fourth word of eeprom, at first load
     }
@@ -352,7 +352,10 @@ namespace kickcat
         }
 
         // Mirror AL_STATUS - Device Emulation
-        memory_.al_status = memory_.al_control;
+        if(memory_.esc_configuration & 0x01)
+        {
+            memory_.al_status = memory_.al_control;
+        }
 
         // Handle eeprom access
         uint16_t order = memory_.eeprom_control & 0x0701;

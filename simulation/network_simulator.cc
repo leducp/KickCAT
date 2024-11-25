@@ -45,11 +45,10 @@ int main(int argc, char* argv[])
     std::vector<nanoseconds> stats;
     stats.reserve(1000);
 
-    auto const mbx_out_cfg  = SYNC_MANAGER_MBX_OUT (0, 0x1000, 128);
-    auto const mbx_in_cfg = SYNC_MANAGER_MBX_IN(1, 0x1400, 128);
     auto& esc0 = escs.at(0);
-    mailbox::response::Mailbox mbx(&esc0, mbx_in_cfg, mbx_out_cfg);
+    mailbox::response::Mailbox mbx(&esc0, 1024);
     mbx.enableCoE(std::move(coe_dict));
+    esc0.set_mailbox(&mbx);
 
     while (true)
     {

@@ -212,10 +212,10 @@ public:
         ASSERT_EQ(1, bus.detectedSlaves());
 
         auto const& slave = bus.slaves().at(0);
-        ASSERT_EQ(0xCAFEDECA, slave.vendor_id);
-        ASSERT_EQ(0xA5A5A5A5, slave.product_code);
-        ASSERT_EQ(0x5A5A5A5A, slave.revision_number);
-        ASSERT_EQ(0x12345678, slave.serial_number);
+        ASSERT_EQ(0xCAFEDECA, slave.sii.vendor_id);
+        ASSERT_EQ(0xA5A5A5A5, slave.sii.product_code);
+        ASSERT_EQ(0x5A5A5A5A, slave.sii.revision_number);
+        ASSERT_EQ(0x12345678, slave.sii.serial_number);
         ASSERT_EQ(0x1000,     slave.mailbox.recv_offset);
         ASSERT_EQ(0x2000,     slave.mailbox.send_offset);
         ASSERT_EQ(0x0100,     slave.mailbox.recv_size);
@@ -314,7 +314,7 @@ TEST_F(BusTest, logical_cmd)
     InSequence s;
 
     auto& slave = bus.slaves().at(0);
-    slave.supported_mailbox = eeprom::MailboxProtocol::None; // disable mailbox protocol to use SII PDO mapping
+    slave.sii.supported_mailbox = eeprom::MailboxProtocol::None; // disable mailbox protocol to use SII PDO mapping
 
     checkSendFrameSimple(Command::FPWR, 4);
     io_nominal->handleReply<uint8_t>({2, 3});

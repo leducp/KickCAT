@@ -44,7 +44,7 @@ TEST(Prints, slave_uninitialized_prints)
 TEST(Prints, slave_initialized_prints)
 {
     Slave slave;
-    slave.sii.buffer =
+    slave.sii.eeprom =
     {
         //
         0x00000000,

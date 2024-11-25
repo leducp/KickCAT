@@ -123,12 +123,12 @@ int main(int argc, char* argv[])
 
     if (shall_dump)
     {
-        auto const& sii = slave.sii.buffer;
+        auto const& sii = slave.sii.eeprom;
         char const* raw_data = reinterpret_cast<char const*>(sii.data());
         std::ofstream f(file, std::ofstream::binary);
 
         // Create an eeprom binary file with the right size of empty data
-        std::vector<char> empty(slave.eeprom_size, -1);
+        std::vector<char> empty(slave.sii.eeprom_size, -1);
         f.write(empty.data(), empty.size());
         f.seekp(0);
 

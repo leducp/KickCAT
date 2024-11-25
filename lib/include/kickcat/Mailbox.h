@@ -11,6 +11,11 @@
 #include "CoE/OD.h"
 
 
+namespace kickcat
+{
+    class AbstractESC;
+}
+
 namespace kickcat::mailbox
 {
     enum class ProcessingResult
@@ -163,16 +168,17 @@ namespace kickcat::mailbox::response
     {
         friend class AbstractMessage;
     public:
-        /// \param max_msgs Max messages allowed simultaneously in the processing queue
-        Mailbox(AbstractESC* esc, SyncManagerConfig mbx_in, SyncManagerConfig mbx_out, uint16_t max_msgs = 1);
+        Mailbox(AbstractESC* esc, uint16_t max_allocated_ram_by_msg, uint16_t max_msgs = 1);
         ~Mailbox() = default;
 
         void enableCoE(CoE::Dictionary&& dictionary);
         CoE::Dictionary& getDictionary(){return dictionary_;}
 
-        void receive(); // Try to receive a message from the ESC
-        void process(); // Process a message in the to_process_ queue if any
-        void send();    // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
+        std::tuple<SyncManagerConfig, SyncManagerConfig> configureSm();
+
+        void receive();  // Try to receive a message from the ESC
+        void process();  // Process a message in the to_process_ queue if any
+        void send();  // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
 
     private:
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
@@ -180,6 +186,7 @@ namespace kickcat::mailbox::response
         AbstractESC* esc_;
         SyncManagerConfig mbx_in_;
         SyncManagerConfig mbx_out_;
+        uint16_t max_allocated_ram_by_msg_;
         uint16_t max_msgs_;
 
         // session handle, from 1 to 7, it is used to detect duplicate frame

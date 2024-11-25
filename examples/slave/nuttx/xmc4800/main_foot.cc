@@ -61,22 +61,13 @@ int main(int, char *[])
     foot::Input input_PDO;
     foot::Output output_PDO;
 
-    uint16_t in_pdo_size = sizeof(input_PDO);
-    uint16_t out_pdo_size = sizeof(output_PDO);
-
-    auto const mbx_out_cfg = SYNC_MANAGER_MBX_OUT(0, 0x1000, 128);
-    auto const mbx_in_cfg = SYNC_MANAGER_MBX_IN(1, 0x1400, 128);
-    mailbox::response::Mailbox mbx(&esc, mbx_in_cfg, mbx_out_cfg);
-
+    mailbox::response::Mailbox mbx(&esc, 1024);
     auto dictionary = CoE::createOD();
     mbx.enableCoE(std::move(dictionary));
 
-    SyncManagerConfig process_data_out = SYNC_MANAGER_PI_OUT(2, 0x1600, out_pdo_size); // Process data out (master view), address consistent with eeprom conf.
-    SyncManagerConfig process_data_in = SYNC_MANAGER_PI_IN(3, 0x1800, in_pdo_size);    // Process data in (master view), address consistent with eeprom conf.
-
-    esc.set_mailbox_config({{mbx_out_cfg, mbx_in_cfg}});
-    esc.set_process_data_input(reinterpret_cast<uint8_t *>(&input_PDO), process_data_in);
-    esc.set_process_data_output(reinterpret_cast<uint8_t *>(&output_PDO), process_data_out);
+    esc.set_mailbox(&mbx);
+    esc.set_process_data_input(reinterpret_cast<uint8_t *>(&input_PDO));
+    esc.set_process_data_output(reinterpret_cast<uint8_t *>(&output_PDO));
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));

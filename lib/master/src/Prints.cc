@@ -8,10 +8,10 @@ namespace kickcat
     {
         std::stringstream os;
         os << "\n -*-*-*-*- slave " << std::to_string(slave.address) << " -*-*-*-*-\n";
-        os << "Vendor ID:       " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.vendor_id << "\n";
-        os << "Product code:    " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.product_code << "\n";
-        os << "Revision number: " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.revision_number << "\n";
-        os << "Serial number:   " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.serial_number << "\n";
+        os << "Vendor ID:       " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.sii.vendor_id << "\n";
+        os << "Product code:    " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.sii.product_code << "\n";
+        os << "Revision number: " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.sii.revision_number << "\n";
+        os << "Serial number:   " << "0x" << std::setfill('0') << std::setw(8) << std::hex << slave.sii.serial_number << "\n";
         os << "mailbox in:  size " << std::dec << slave.mailbox.recv_size << " - offset " << "0x" << std::setfill('0')
             << std::setw(4) << std::hex << slave.mailbox.recv_offset << "\n";
 
@@ -19,12 +19,12 @@ namespace kickcat
             << std::setw(4) << std::hex << slave.mailbox.send_offset << "\n";
 
         os << "supported mailbox protocol: " << "0x" << std::setfill('0') << std::setw(2)
-            << std::hex << slave.supported_mailbox << "\n";
+            << std::hex << slave.sii.supported_mailbox<< "\n";
 
-        os << "EEPROM: size: " << std::dec << slave.eeprom_size << " - version "<< "0x" << std::setfill('0')
-            << std::setw(2) << std::hex << slave.eeprom_version << "\n";
+        os << "EEPROM: size: " << std::dec << slave.sii.eeprom_size << " - version "<< "0x" << std::setfill('0')
+            << std::setw(2) << std::hex << slave.sii.eeprom_version << "\n";
 
-        os << "\nSII size: " << std::dec << slave.sii.buffer.size() * sizeof(uint32_t) << "\n";
+        os << "\nSII size: " << std::dec << slave.sii.eeprom_size * sizeof(uint32_t) << "\n";
 
         for (size_t i = 0; i < slave.sii.fmmus.size(); ++i)
         {
