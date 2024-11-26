@@ -123,6 +123,9 @@ namespace kickcat
         void resetSlaves(nanoseconds watchdog);
         void fetchESC();
 
+        // mailbox helpers
+        void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
+
     protected: // for unit testing
         // helper with trivial bus management (write then read)
         void processFrames();
@@ -138,9 +141,6 @@ namespace kickcat
         void detectMapping();
         void readMappedPDO(Slave& slave, uint16_t index);
         void configureFMMUs();
-
-        // mailbox helpers
-        void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
 
         std::shared_ptr<Link> link_;
         std::vector<Slave> slaves_;

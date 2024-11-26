@@ -248,6 +248,125 @@ namespace kickcat::mailbox::request
     }
 
 
+    SDOInformationMessage::SDOInformationMessage(uint16_t mailbox_size, uint8_t request, void* data, uint32_t* data_size,
+                                                 uint32_t request_payload_size, nanoseconds timeout)
+        : AbstractMessage(mailbox_size, timeout)
+        , client_data_(reinterpret_cast<uint8_t*>(data))
+        , client_data_size_(data_size)
+    {
+        coe_ = pointData<CoE::Header>(header_);
+        sdo_ = pointData<CoE::ServiceDataInfo>(coe_);
+        payload_ = pointData<uint8_t>(sdo_);
+
+        header_->len      = 6 + request_payload_size;
+        header_->priority = 0; // unused
+        header_->channel  = 0;
+        header_->type     = mailbox::Type::CoE;
+        header_->reserved = 0;
+
+        coe_->number   = 0;
+        coe_->reserved = 0;
+        coe_->service  = CoE::Service::SDO_INFORMATION;
+
+        sdo_->opcode         = request & 0x7F;
+        sdo_->incomplete     = 0;
+        sdo_->reserved       = 0;
+        sdo_->fragments_left = 0;
+
+        std::memcpy(payload_, data, request_payload_size);
+    }
+
+
+    ProcessingResult SDOInformationMessage::process(uint8_t const* received)
+    {
+        auto const* header  = pointData<mailbox::Header>(received);
+        auto const* coe     = pointData<CoE::Header>(header);
+        auto const* sdo     = pointData<CoE::ServiceDataInfo>(coe);
+        auto const* payload = pointData<uint8_t>(sdo);
+
+        // skip gateway message
+        if ((header->address & mailbox::GATEWAY_MESSAGE_MASK) != 0)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        // check if the received message is related to this one
+        if (header->type != mailbox::Type::CoE)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        if ((coe->service != CoE::Service::SDO_INFORMATION))
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        // Message IS related: same index/subindex and right mailbox session handle -> low risk of collision
+        // => check if message response is coherent
+        if (sdo->opcode == CoE::SDO::information::SDO_INFO_ERROR_REQ)
+        {
+            uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
+            // TODO: let client display itself the message
+            coe_info("Abort requested for sdo information ! code %08x - %s\n", code, CoE::SDO::abort_to_str(code));
+            status_ = code;
+            return ProcessingResult::FINALIZE;
+        }
+
+        // everything is fine: process the payload
+        switch (sdo_->opcode)
+        {
+            case CoE::SDO::information::GET_OD_LIST_REQ : { return processResponse(header, sdo, payload, CoE::SDO::information::GET_OD_LIST_RESP); }
+            case CoE::SDO::information::GET_OD_REQ      : { return processResponse(header, sdo, payload, CoE::SDO::information::GET_OD_RESP);      }
+            case CoE::SDO::information::GET_ED_REQ      : { return processResponse(header, sdo, payload, CoE::SDO::information::GET_ED_RESP);      }
+            default:
+            {
+                status_ = MessageStatus::COE_UNKNOWN_SERVICE;
+                return ProcessingResult::FINALIZE;
+            }
+        }
+    }
+
+    ProcessingResult SDOInformationMessage::processResponse(mailbox::Header const* header, CoE::ServiceDataInfo const* sdo,
+                                                            uint8_t const* payload, uint8_t expected_opcode)
+    {
+        if (sdo->opcode != expected_opcode)
+        {
+            status_ = MessageStatus::COE_WRONG_SERVICE;
+            return ProcessingResult::FINALIZE;
+        }
+
+        int32_t size = header->len - sizeof(CoE::ServiceDataInfo) - sizeof(CoE::Header);
+        int32_t remaining_size = *client_data_size_ - already_received_size_;
+
+        printf("\nReceived size %i already received %i, remaining_size %i  client_data_ %p \n ", size , already_received_size_, remaining_size, client_data_);
+
+        if(remaining_size < size)
+        {
+            status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
+
+        }
+        else
+        {
+            std::memcpy(client_data_, payload, size);
+            client_data_ += size;
+        }
+        already_received_size_ += size;
+
+
+        if (sdo->fragments_left > 0)
+        {
+            return ProcessingResult::FINALIZE_AND_KEEP;
+        }
+
+        if (already_received_size_ < *client_data_size_)
+        {
+            status_ = MessageStatus::SUCCESS;
+            *client_data_size_ = already_received_size_;
+        }
+
+        return ProcessingResult::FINALIZE;
+    }
+
     EmergencyMessage::EmergencyMessage(Mailbox& mailbox)
         : AbstractMessage(mailbox.recv_size, 0ns)
         , mailbox_{mailbox}

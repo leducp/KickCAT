@@ -90,27 +90,29 @@ namespace kickcat::CoE
             // ETG1000.5 chapter 6.1.4.3.9 and ETG1000.6 chapter 5.6.3.3
             enum ListType : uint16_t
             {
-                NumberOfObjects = 0x00,
-                AllObjects      = 0x01,
-                RxPDO           = 0x02,
-                TxPDO           = 0x03,
-                Backup          = 0x04,
-                Settings        = 0x05
+                NUMBER      = 0x00,
+                ALL         = 0x01,
+                RxPDO       = 0x02,
+                TxPDO       = 0x03,
+                BACKUP      = 0x04,
+                SETTINGS    = 0x05
             };
 
-            enum ValueInfo : uint8_t
+            namespace ValueInfo
             {
-                UnitType = (1 << 3),
-                Default  = (1 << 4),
-                Minimum  = (1 << 5),
-                Maximum  = (1 << 6)
-            };
+                constexpr uint8_t UNIT_TYPE = (1 << 3);
+                constexpr uint8_t DEFAULT   = (1 << 4);
+                constexpr uint8_t MINIMUM   = (1 << 5);
+                constexpr uint8_t MAXIMUM   = (1 << 6);
+
+                std::string toString(uint8_t value_info);
+            }
 
             struct EntryDescriptionRequest
             {
-                uint16_t  index;
-                uint8_t   subindex;
-                ValueInfo value_info;
+                uint16_t index;
+                uint8_t  subindex;
+                uint8_t  value_info;
             } __attribute__((__packed__));
 
             struct ObjectDescription
@@ -120,16 +122,18 @@ namespace kickcat::CoE
                 uint8_t  max_subindex;
                 ObjectCode object_code;
             } __attribute__((__packed__));
+            std::string toString(ObjectDescription const& object_description);
 
             struct EntryDescription
             {
-                uint16_t    index;
-                uint8_t     subindex;
-                ValueInfo   value_info;
-                DataType    data_type;
-                uint16_t    bit_length;
-                uint16_t    access;
+                uint16_t  index;
+                uint8_t   subindex;
+                uint8_t   value_info;
+                DataType  data_type;
+                uint16_t  bit_length;
+                uint16_t  access;
             } __attribute__((__packed__));
+            std::string toString(EntryDescription const& entry_description);
         }
 
         namespace abort

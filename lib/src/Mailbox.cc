@@ -70,6 +70,60 @@ namespace kickcat::mailbox::request
     }
 
 
+    std::shared_ptr<AbstractMessage> Mailbox::createSDOInfoGetODList(CoE::SDO::information::ListType type, void* data, uint32_t* data_size, nanoseconds timeout)
+    {
+        if (recv_size == 0)
+        {
+            THROW_ERROR("This mailbox is inactive");
+        }
+
+        uint32_t request_payload_size = sizeof(type);
+        std::memcpy(data, &type, request_payload_size);
+
+        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, CoE::SDO::information::GET_OD_LIST_REQ, data, data_size, request_payload_size, timeout);
+        sdo->setCounter(nextCounter());
+        to_send.push(sdo);
+        return sdo;
+    }
+
+
+    std::shared_ptr<AbstractMessage> Mailbox::createSDOInfoGetOD(uint16_t index, void* data, uint32_t* data_size, nanoseconds timeout)
+    {
+        if (recv_size == 0)
+        {
+            THROW_ERROR("This mailbox is inactive");
+        }
+
+        uint32_t request_payload_size = sizeof(index);
+        std::memcpy(data, &index, request_payload_size);
+        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, CoE::SDO::information::GET_OD_REQ, data, data_size, request_payload_size, timeout);
+        sdo->setCounter(nextCounter());
+        to_send.push(sdo);
+        return sdo;
+    }
+
+
+
+
+    std::shared_ptr<AbstractMessage> Mailbox::createSDOInfoGetED(uint16_t index, uint8_t subindex, uint8_t value_info,
+                                                                 void* data, uint32_t* data_size, nanoseconds timeout)
+    {
+        if (recv_size == 0)
+        {
+            THROW_ERROR("This mailbox is inactive");
+        }
+
+        std::memcpy(data, &index, sizeof(index));
+        std::memcpy(static_cast<uint8_t*>(data) + sizeof(index), &subindex, sizeof(subindex));
+        std::memcpy(static_cast<uint8_t*>(data) + sizeof(index) + sizeof(subindex), &value_info, sizeof(value_info));
+        uint32_t request_payload_size = sizeof(index) + sizeof(subindex) + sizeof(value_info);
+        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, CoE::SDO::information::GET_ED_REQ, data, data_size, request_payload_size, timeout);
+        sdo->setCounter(nextCounter());
+        to_send.push(sdo);
+        return sdo;
+    }
+
+
     std::shared_ptr<AbstractMessage> Mailbox::send()
     {
         auto message = to_send.front();
