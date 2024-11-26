@@ -11,6 +11,7 @@ set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Time.cc
 
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/OD.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/protocol.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/request.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/response.cc
 )
