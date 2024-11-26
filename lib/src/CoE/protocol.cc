@@ -104,4 +104,64 @@ namespace kickcat::CoE
             }
         }
     }
+
+    namespace SDO::information
+    {
+        std::string ValueInfo::toString(uint8_t value_info)
+        {
+            if (value_info == 0)
+            {
+                return "None";
+            }
+
+            std::string desc;
+            if (value_info & ValueInfo::UNIT_TYPE)
+            {
+                desc += "Unit Type, ";
+            }
+
+            if (value_info & ValueInfo::DEFAULT)
+            {
+                desc += "Default, ";
+            }
+
+            if (value_info & ValueInfo::MINIMUM)
+            {
+                desc += "Minimum, ";
+            }
+
+            if (value_info & ValueInfo::MAXIMUM)
+            {
+                desc += "Maximum, ";
+            }
+
+            desc.pop_back();
+            desc.pop_back();
+            return desc;
+        }
+
+        std::string toString(ObjectDescription const& desc)
+        {
+            std::stringstream os;
+            os << "Object Description \n";
+            os << "  index:        0x" << std::hex << desc.index          << "\n";
+            os << "  data type:    " << toString(desc.data_type)          << "\n";
+            os << "  max subindex: " << std::to_string(desc.max_subindex) << "\n";
+            os << "  object code:  " << toString(desc.object_code)        << "\n";
+            return os.str();
+        }
+
+        std::string toString(EntryDescription const& desc)
+        {
+            std::stringstream os;
+            os << "Entry Description \n";
+            os << "  index:         0x" << std::hex << desc.index             << "\n";
+            os << "  subindex:      0x" << std::hex << static_cast<uint16_t>(desc.subindex) << "\n";
+            os << "  value info:    " << ValueInfo::toString(desc.value_info) << "\n";
+            os << "  data type:     " << toString(desc.data_type)             << "\n";
+            os << "  bit length:    " << std::to_string(desc.bit_length)      << "\n";
+            os << "  object access:"  << Access::toString(desc.access)        << "\n";
+            return os.str();
+        }
+    }
 }
