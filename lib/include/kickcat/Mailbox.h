@@ -9,6 +9,7 @@
 #include "kickcat/protocol.h"
 #include "kickcat/AbstractESC.h"
 #include "CoE/OD.h"
+#include "CoE/protocol.h"
 
 
 namespace kickcat
