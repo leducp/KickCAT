@@ -7,15 +7,16 @@ Thin EtherCAT stack designed to be embedded in a more complex software and with 
 ## Master stack
 
 ### Current state:
- - Can go to OP state
- - Can read and write PI
+ - Working state (can go to OP state, read/write P.I., send/receive SDO)
  - interface redundancy is supported
  - CoE: read and write SDO - blocking and async call
  - CoE: Emergency message
+ - CoE: SDO Information
  - Bus diagnostic: can reset and get errors counters
  - hook to configure non compliant slaves
  - consecutives writes to reduce latency - up to 255 datagrams in flight
- - build for Linux and PikeOS
+ - Support EtherCAT mailbox gateway (ETG.8200)
+ - build for Linux, Windows and PikeOS
 
 **NOTE** The current implementation is designed for little endian host only!
 
@@ -26,7 +27,7 @@ Thin EtherCAT stack designed to be embedded in a more complex software and with 
  - More profiles: FoE, EoE, AoE, SoE
  - Distributed clock
  - AF_XDP Linux socket to improve performance
- - Addressing groups
+ - Addressing groups (a.k.a. multi-PDO)
 
 ### Operatings systems:
 #### Linux
@@ -54,13 +55,23 @@ To build the library, you need to install:
 
 ### Build:
 KickCAT project is handled through CMake. To build the project, call CMake to configure it and then the build tool (default on Linux is make):
-  1. Configure the project (more information on https://cmake.org/cmake/help/latest/)
+  1. Create the build folder
   ```
-  mkdir -p build
+  mkdir -P build
+  ```
+  2. Install conan and the dependencies with it (you may need to adapt the profile to suit your current installation). This step is mandatory for Windows, optional otherwise
+  ```
+  python3 -m venv kickcat_venv
+  source kickcat_venv/bin/activate
+  pip install conan
+  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_linux_x86_64.txt -pr:b conan/profile_linux_x86_64.txt --build=missing -s build_type=Release
+  ```
+  2. Configure the project (more information on https://cmake.org/cmake/help/latest/)
+  ```
   cd build
-  cmake ..
+  cmake .. -DCMAKE_BUILD_TYPE=Release
   ```
-  2. Build the project
+  3. Build the project
   ```
   make
   ```
@@ -70,9 +81,9 @@ In order to build unit tests, you have to enable the option BUILD_UNIT_TESTS (de
 Note: you can easily provide GTest via conan package manager:
   1. Install conan and setup PATH variable (more information on https://docs.conan.io/en/latest/installation.html)
   ```
-  pip install conan
+  python3 -m venv kickcat_venv
+  source kickcat_venv/bin/activate
   pip install gcovr
-  export PATH="$PATH:$HOME/.local/bin"
   ```
   2. Install GTest in your build folder:
   ```
@@ -84,18 +95,10 @@ Note: you can easily provide GTest via conan package manager:
 
   3. Configure the project (can be done on an already configured project)
   ```
-  cmake .. -DCMAKE_BUILD_TYPE=Release
+  cmake .. -DCMAKE_BUILD_TYPE=Debug
   ```
 
-### Simulator
-To start a network simulator, you can either create a virtual ethernet pair (on Linux you can use the helper script 'create_virtual_ethernet.sh') or use a real network interface by using two computer or two interfaces on the same computer.
-Note: the simulator has to be started first
-
-
 ## Slave stack
-A simple slave stack is under development. A working example based on Nuttx RTOS and tested on arduino due + easycat Lan9252 shield is available in `examples/slave/nuttx_lan9252`.
-Another example using the XMC4800 with NuttX is available.
-Follow the readme in `KickCAT/examples/slave/nuttx/xmc4800/README.md` for insight about how to setup and build the slave stack.
 
 ### Current state:
 
@@ -104,17 +107,35 @@ Follow the readme in `KickCAT/examples/slave/nuttx/xmc4800/README.md` for insigh
 - Supports ESC Lan9252 through SPI.
 - Supports XMC4800 ESC (with NuttX RTOS). Pass the CTT at home tests.
 - Tools available to flash/dump eeprom from ESC.
-
+- CoE: Object dictionnary
+- CoE: SDO support
 
 ### TODO
 
 - Test coverage
-- Integrate slave stack in the simulation
-- Implement mailbox protocols.
-- Allow more than 2 PI sync manager. (multipdo)
+- Support more mailbox protocols (SDO Information, FoE, EoE)
+- Allow more than 2 PI sync manager. (multi-PDO)
 - DC support.
 - Improve error reporting through AL_STATUS and AL_STATUS_CODE (For now it only reports the errors regarding state machine transitions.)
 
+### Examples
+A working example based on Nuttx RTOS and tested on arduino due + easycat Lan9252 shield is available in `examples/slave/nuttx_lan9252`.
+Another example using the XMC4800 with NuttX is available.
+Follow the readme in `KickCAT/examples/slave/nuttx/xmc4800/README.md` for insight about how to setup and build the slave stack.
+
+## Simulator
+It is possible tu run a virtual network with the provided emulated ESC implementation.
+To start a network simulator, you can either create a virtual ethernet pair (on Linux you can use the helper script 'create_virtual_ethernet.sh') or use a real network interface by using two computer or two interfaces on the same computer.
+**Note:** the simulator has to be started first
+
+### Current state:
+ * Load eeprom
+ * Emulate basic sync manager behavior
+ * Emulate basic FFMU behavior
+
+### TODO
+ * Support interrupt (update the right register depending on the accesses on other one and the interrupt configuration)
+ * Support redundancy behavior
 
 ## Release procedure
 
@@ -129,6 +150,11 @@ switch to release candidate (-rcx). To leave a release candidate state, it is re
 For each tag, Conan center has to be updated (https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat).
 
 When a version leaves the release canditate state a github release shall be generated on the corresponding tag.
+
+### Update Conan Recipe on conan center
+Kickcat is available on **conan-io**. Whenever there is a new tag which is consider sufficiently stable:
+1. Create a new PR on https://github.com/conan-io/conan-center-index
+2. Follow PR: https://github.com/conan-io/conan-center-index/pull/19482 to add new versions to the recipe
 
 ## EtherCAT doc
 https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html&id=3196541253205318339
@@ -154,7 +180,3 @@ https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z000000kHwESAU
 esc comparison:
 https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf
 
-## Update Conan Recipe on conan center
-Kickcat is available on **conan-io**. Whenever there is a new tag:
-1. Create a new PR on https://github.com/conan-io/conan-center-index
-2. Follow PR: https://github.com/conan-io/conan-center-index/pull/19482 to add new versions to the recipe
