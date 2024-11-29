@@ -1,79 +1,53 @@
 #include "kickcat/FSM.h"
-#include <iostream>
-#include <ostream>
+#include "AbstractESC2.h"
 
-using namespace kickcat::FSM;
-
-State::State(std::string const& name)
-    : name_{name}
+namespace kickcat::FSM
 {
-}
-
-void State::configure(std::function<void(State&)> routine,
-                      std::function<State*(State&)> guard,
-                      std::function<void(State&, State&)> onEntry,
-                      std::function<void(State&, State&)> onExit)
-{
-    routine_ = routine;
-    guard_   = guard;
-    onEntry_ = onEntry;
-    onExit_  = onExit;
-}
-
-void State::routine()
-{
-    log("routine");
-    routine_(*this);
-};
-
-State* State::guard()
-{
-    return guard_(*this);
-}
-
-void State::onEntry(State& oldState)
-{
-    log("Entry from %s", oldState.name().c_str());
-    return onEntry_(oldState, *this);
-}
-
-void State::onExit(State& newState)
-{
-    log("Exiting... going to %s", newState.name().c_str());
-    return onExit_(*this, newState);
-}
-
-std::string const& State::name()
-{
-    return name_;
-}
-
-void State::log(char const* format, ...)
-{
-    char output[1024];
-    int size = sprintf(output, "%s : ", name_.c_str());
-    std::va_list args;
-    va_start(args, format);
-    std::vsprintf(output + size, format, args);
-    va_end(args);
-    std::cout << output << std::endl;
-}
-
-void StateMachine::init(State* initState)
-{
-    currentState_ = initState;
-    currentState_->onEntry(*currentState_);
-}
-
-void StateMachine::routine()
-{
-    currentState_->routine();
-    auto* newState = currentState_->guard();
-    if (newState != nullptr)
+    AbstractState::AbstractState(kickcat::AbstractESC2& esc, std::string const& name)
+        : name_{name}
+        , esc_{esc}
     {
-        currentState_->onExit(*newState);
-        newState->onEntry(*currentState_);
-        currentState_ = newState;
+    }
+
+    std::string const& AbstractState::name()
+    {
+        return name_;
+    }
+
+    void AbstractState::onEntry(uint8_t) {};
+
+    void AbstractState::onExit(uint8_t) {};
+
+    StateMachine::StateMachine(std::map<uint8_t, FSM::AbstractState*>& states, kickcat::State defaultState)
+        : states_{states}
+    {
+        currentState_ = defaultState;
+        defaultState_ = defaultState;
+    }
+
+    void StateMachine::init()
+    {
+        states_[currentState_]->onEntry(currentState_);
+    }
+
+    void StateMachine::play()
+    {
+        states_[currentState_]->routine();
+        uint8_t newState = states_[currentState_]->transition();
+
+        if (newState != currentState_)
+        {
+            if (states_.find(newState) == states_.end())
+            {
+                newState = defaultState_;
+            }
+
+            if (newState != currentState_)
+            {
+                states_[currentState_]->onExit(newState);
+                states_[newState]->onEntry(currentState_);
+                currentState_ = newState;
+            }
+        }
     }
 }
-

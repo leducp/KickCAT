@@ -3,6 +3,7 @@ target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractESC.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractESC2.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/FSM.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/SlaveFSM.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractSPI.cc
 
   ${CMAKE_CURRENT_SOURCE_DIR}/src/EEPROM/EEPROM_factory.cc
