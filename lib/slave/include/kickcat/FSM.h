@@ -2,50 +2,51 @@
 #define SLAVE_STACK_INCLUDE_FSM_H_
 
 #include <cstdarg>
-#include <functional>
+#include <map>
 #include <string>
+#include "kickcat/protocol.h"
 
 
 namespace kickcat
 {
+    class AbstractESC2;
+
     namespace FSM
     {
-        class State final
+        class StateMachine;
+
+        class AbstractState
         {
+            friend StateMachine;
+
         public:
-            State(std::string const& name);
+            AbstractState(AbstractESC2& esc, std::string const& name);
 
-            void configure(
-                std::function<void(State&)> routine,
-                std::function<State*(State&)> guard,
-                std::function<void(State&, State&)> onEntry = [](State&, State&) {},
-                std::function<void(State&, State&)> onExit  = [](State&, State&) {});
-
-            void routine();
-            State* guard();
-            void onEntry(State& oldState);
-            void onExit(State& newState);
             std::string const& name();
 
-            void log(char const* format, ...);
-
         private:
-            std::function<void(State&)> routine_;
-            std::function<State*(State&)> guard_;
-            std::function<void(State&, State&)> onEntry_;
-            std::function<void(State&, State&)> onExit_;
+            virtual void routine()       = 0;
+            virtual uint8_t transition() = 0;
+            virtual void onEntry(uint8_t oldState);
+            virtual void onExit(uint8_t newState);
 
             std::string name_;
+
+        protected:
+            AbstractESC2& esc_;
         };
+
         class StateMachine
         {
         public:
-            StateMachine() = default;
-            void init(State* initState);
-            void routine();
+            StateMachine(std::map<uint8_t, FSM::AbstractState*>& states, kickcat::State defaultState);
+            void init();
+            void play();
 
         private:
-            State* currentState_;
+            uint8_t currentState_;
+            uint8_t defaultState_;
+            std::map<uint8_t, FSM::AbstractState*>& states_;
         };
     }
 }
