@@ -1,10 +1,11 @@
 #include "kickcat/SlaveFSM.h"
 #include "AbstractESC2.h"
+#include "protocol.h"
 
 namespace kickcat::FSM
 {
     Init::Init(AbstractESC2& esc)
-        : AbstractState(esc, "Init")
+        : AbstractState(kickcat::INIT, esc)
     {
     }
 
@@ -35,7 +36,7 @@ namespace kickcat::FSM
     }
 
     PreOP::PreOP(AbstractESC2& esc)
-        : AbstractState(esc, "PreOP")
+        : AbstractState(kickcat::State::PRE_OP, esc)
     {
     }
 

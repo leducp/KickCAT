@@ -20,9 +20,9 @@ namespace kickcat
             friend StateMachine;
 
         public:
-            AbstractState(AbstractESC2& esc, std::string const& name);
+            AbstractState(uint8_t id, AbstractESC2& esc);
 
-            std::string const& name();
+            uint8_t id();
 
         private:
             virtual void routine()       = 0;
@@ -30,7 +30,7 @@ namespace kickcat
             virtual void onEntry(uint8_t oldState);
             virtual void onExit(uint8_t newState);
 
-            std::string name_;
+            uint8_t id_;
 
         protected:
             AbstractESC2& esc_;
@@ -39,14 +39,15 @@ namespace kickcat
         class StateMachine
         {
         public:
-            StateMachine(std::map<uint8_t, FSM::AbstractState*>& states, kickcat::State defaultState);
+            StateMachine(std::array<FSM::AbstractState*, 2>&& states);
             void init();
             void play();
 
         private:
-            uint8_t currentState_;
-            uint8_t defaultState_;
-            std::map<uint8_t, FSM::AbstractState*>& states_;
+            AbstractState* currentState_;
+            std::array<FSM::AbstractState*, 2> states_;
+
+            AbstractState* getState(uint8_t id);
         };
     }
 }

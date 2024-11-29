@@ -1,51 +1,63 @@
 #include "kickcat/FSM.h"
+#include <algorithm>
 #include "AbstractESC2.h"
 
 namespace kickcat::FSM
 {
-    AbstractState::AbstractState(kickcat::AbstractESC2& esc, std::string const& name)
-        : name_{name}
+    AbstractState::AbstractState(uint8_t id, kickcat::AbstractESC2& esc)
+        : id_{id}
         , esc_{esc}
     {
     }
 
-    std::string const& AbstractState::name()
+    uint8_t AbstractState::id()
     {
-        return name_;
+        return id_;
     }
 
     void AbstractState::onEntry(uint8_t) {};
 
     void AbstractState::onExit(uint8_t) {};
 
-    StateMachine::StateMachine(std::map<uint8_t, FSM::AbstractState*>& states, kickcat::State defaultState)
-        : states_{states}
+    StateMachine::StateMachine(std::array<FSM::AbstractState*, 2>&& states)
+        : states_{std::move(states)}
     {
-        currentState_ = defaultState;
-        defaultState_ = defaultState;
+        currentState_ = states_[0];
     }
 
     void StateMachine::init()
     {
-        states_[currentState_]->onEntry(currentState_);
+        currentState_->onEntry(currentState_->id());
+    }
+
+    AbstractState* StateMachine::getState(uint8_t id)
+    {
+        auto it = std::find_if(std::begin(states_), std::end(states_), [&](auto* state) { return state->id() == id; });
+        if (it == states_.end())
+        {
+            return nullptr;
+        }
+
+        return *it;
     }
 
     void StateMachine::play()
     {
-        states_[currentState_]->routine();
-        uint8_t newState = states_[currentState_]->transition();
+        currentState_->routine();
+        uint8_t newStateId = currentState_->transition();
 
-        if (newState != currentState_)
+        if (newStateId != currentState_->id())
         {
-            if (states_.find(newState) == states_.end())
+            AbstractState* newState = getState(newStateId);
+            if (not newState)
             {
-                newState = defaultState_;
+                newState = states_[0];
             }
 
             if (newState != currentState_)
             {
-                states_[currentState_]->onExit(newState);
-                states_[newState]->onEntry(currentState_);
+                currentState_->onExit(newState->id());
+                newState->onEntry(currentState_->id());
                 currentState_ = newState;
             }
         }

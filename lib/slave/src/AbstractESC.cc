@@ -29,8 +29,25 @@ namespace kickcat
                              == (sm_ref.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK))
                         and (sm_read.activate & SM_ACTIVATE_ENABLE);
 
-        // printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
-        // printf("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
+        if (is_valid)
+        {
+        }
+        else
+        {
+            printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n",
+                   sm_ref.index,
+                   sm_read.start_address,
+                   sm_read.length,
+                   sm_read.control,
+                   sm_read.status,
+                   sm_read.activate);
+            printf("SM config %i: start address %x, length %u, control %x \n",
+                   sm_ref.index,
+                   sm_ref.start_address,
+                   sm_ref.length,
+                   sm_ref.control);
+            printf("NOT valid !!\n");
+        }
         return is_valid;
     }
 
@@ -132,6 +149,7 @@ namespace kickcat
 
     void AbstractESC::routine()
     {
+        printf("routine1\n");
         read(reg::AL_CONTROL, &al_control_, sizeof(al_control_));
         read(reg::AL_STATUS, &al_status_, sizeof(al_status_));
         read(reg::WDOG_STATUS, &watchdog_, sizeof(watchdog_));
@@ -140,7 +158,11 @@ namespace kickcat
         {
             set_al_status(State::INIT);
             clear_error();
-            set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);
+            if (mbx_)
+            {
+                set_sm_activate({sm_mbx_input_, sm_mbx_output_}, false);
+            }
+            set_sm_activate({sm_pd_input_, sm_pd_output_}, false);
         }
 
         if ((al_control_ & State::ERROR_ACK))
@@ -154,27 +176,29 @@ namespace kickcat
             return;
         }
 
+        printf("routine2\n");
         // BOOTSTRAP not supported yet. If implemented, need to check the SII to know if enabled.
         if ((al_control_ & State::MASK_STATE) == State::BOOT)
         {
             if ((al_status_ & State::MASK_STATE) == State::INIT)
             {
                 set_error(StatusCode::BOOTSTRAP_NOT_SUPPORTED);
+                printf("routine2.1\n");
             }
             else
             {
                 set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
+                printf("routine2.2\n");
             }
         }
+        printf("routine3\n");
 
         // Handle unsupported state
         uint8_t asked_state = al_control_ & State::MASK_STATE;
-        if (asked_state != State::BOOT and
-            asked_state != State::INIT and
-            asked_state != State::PRE_OP and
-            asked_state != State::SAFE_OP and
-            asked_state != State::OPERATIONAL)
+        if (asked_state != State::BOOT and asked_state != State::INIT and asked_state != State::PRE_OP
+            and asked_state != State::SAFE_OP and asked_state != State::OPERATIONAL)
         {
+            printf("routine3.1\n");
             set_error(StatusCode::UNKNOWN_REQUESTED_STATE);
         }
 
@@ -212,16 +236,20 @@ namespace kickcat
 
         write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_));
         write(reg::AL_STATUS, &al_status_, sizeof(al_status_));
+
+        printf("\n\n");
     }
 
 
     void AbstractESC::routine_init()
     {
+        printf(".");
         // TODO AL_CONTROL device identification flash led 0x0138 RUN LED Override
         if ((al_control_ & State::MASK_STATE) == State::PRE_OP)
         {
-            if (not mbx_)
+            if (mbx_ == nullptr)
             {
+                printf("NOT MAILBOX GO TO PREOP\n");
                 set_al_status(State::PRE_OP);
                 return;
             }
@@ -244,7 +272,8 @@ namespace kickcat
             }
         }
 
-        if (((al_control_ & State::MASK_STATE) == State::SAFE_OP) or ((al_control_ & State::MASK_STATE) == State::OPERATIONAL))
+        if (((al_control_ & State::MASK_STATE) == State::SAFE_OP)
+            or ((al_control_ & State::MASK_STATE) == State::OPERATIONAL))
         {
             set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
@@ -253,7 +282,18 @@ namespace kickcat
 
     void AbstractESC::routine_preop()
     {
-        if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
+        uint8_t esc_config;
+        uint32_t readSize = read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
+        bool is_emulated  = esc_config & PDI_EMULATION;
+        if (is_emulated)
+        {
+            printf("isEmulated : configure pdo\n");
+            configure_pdo_sm();
+        }
+
+
+        printf("preop\n");
+        if (mbx_ and not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
             set_sm_activate({sm_mbx_input_, sm_mbx_output_}, false); //AIE!
             set_al_status(State::INIT);
@@ -262,6 +302,7 @@ namespace kickcat
 
         if ((al_control_ & State::MASK_STATE) == State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
         {
+            printf("preop 2\n");
             if (not configure_pdo_sm())
             {
                 return;
@@ -274,10 +315,12 @@ namespace kickcat
                 {
                     if (sm.type == SyncManagerType::Input)
                     {
+                        printf("INVALID 1\n");
                         set_error(StatusCode::INVALID_INPUT_CONFIGURATION);
                     }
                     else if (sm.type == SyncManagerType::Output)
                     {
+                        printf("INVALID 2\n");
                         set_error(StatusCode::INVALID_OUTPUT_CONFIGURATION);
                     }
                     return;
@@ -290,6 +333,7 @@ namespace kickcat
 
         if ((al_control_ & State::MASK_STATE) == State::OPERATIONAL)
         {
+            printf("preop 3\n");
             set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
     }
@@ -297,10 +341,11 @@ namespace kickcat
 
     void AbstractESC::routine_safeop()
     {
+        printf("safeop\n");
         update_process_data_input();
         update_process_data_output();
 
-        if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
+        if (mbx_ and not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
             set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);
             set_al_status(State::INIT);
@@ -314,12 +359,15 @@ namespace kickcat
             {
                 if (sm.type == SyncManagerType::Input)
                 {
+                    printf("INVALID 3\n");
                     set_error(StatusCode::INVALID_INPUT_CONFIGURATION);
                 }
                 else if (sm.type == SyncManagerType::Output)
                 {
+                    printf("INVALID 4\n");
                     set_error(StatusCode::INVALID_OUTPUT_CONFIGURATION);
                 }
+                printf("INVALID 5\n");
                 is_sm_process_data_invalid = true;
                 break;
             }
@@ -341,7 +389,6 @@ namespace kickcat
                 // error flag
             }
         }
-
     }
 
 
@@ -363,7 +410,7 @@ namespace kickcat
         update_process_data_input();
         update_process_data_output();
 
-        if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
+        if (mbx_ and not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
             set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);
             set_al_status(State::INIT);
@@ -403,6 +450,7 @@ namespace kickcat
 
     bool AbstractESC::configure_pdo_sm()
     {
+        printf("configure pdo try\n");
         try
         {
             auto [indexIn, pdoIn]   = find_sm(SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ);
@@ -416,6 +464,7 @@ namespace kickcat
             return false;
         }
 
+        printf("configure pdo sm ok\n");
         return true;
     }
 

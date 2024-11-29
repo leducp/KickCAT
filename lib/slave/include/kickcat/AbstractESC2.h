@@ -28,13 +28,10 @@ namespace kickcat
         void clear_error();
         FSM::Init init_{*this};
         FSM::PreOP preOp_{*this};
-        std::map<uint8_t, FSM::AbstractState*> states{{kickcat::State::INIT, &init_},
-                                                      {kickcat::State::PRE_OP, &preOp_}};
 
 
-        FSM::StateMachine stateMachine{states, kickcat::State::INIT};
+        FSM::StateMachine stateMachine{{&init_, &preOp_}};
     };
 
 }
 #endif
-
