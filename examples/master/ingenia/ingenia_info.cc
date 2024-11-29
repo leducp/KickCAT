@@ -41,12 +41,13 @@ void printObjectDictionnaryList(Bus& bus, Slave& slave, CoE::SDO::information::L
     }
 
     printf("Data size received %u \n", buffer_size);
-    std::vector<uint16_t> index_list{buffer + sizeof(type), buffer + buffer_size/2};
-    printf("Object dictionnary list: size: %li\n", index_list.size());
 
-    for (auto const& index : index_list)
+    uint16_t index_size = buffer_size / 2 - 1;
+    printf("Object dictionnary list: size: %li\n", index_size);
+
+    for (int i = 0; i < index_size; ++i)
     {
-        printf("index %x \n", index);
+        printf("index %04x \n", buffer[i + 1]);
     }
 }
 
@@ -163,7 +164,10 @@ int main(int argc, char *argv[])
     }
 
     auto& ingenia = bus.slaves().at(0);
-    //printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::ALL);
+    printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::NUMBER);
+    printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::ALL);
+
+    /*
     printObjectDescription(bus, ingenia, 0x2025);
     printEntryDescription(bus, ingenia, 0x2025, 0,
         CoE::SDO::information::ValueInfo::MAXIMUM);
@@ -173,6 +177,7 @@ int main(int argc, char *argv[])
 
     printEntryDescription(bus, ingenia, 0x2373, 0,
         CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
+        */
 
     return 0;
 }

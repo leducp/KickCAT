@@ -28,9 +28,12 @@ namespace kickcat::mailbox::response
             case CoE::Service::RxPDO:
             case CoE::Service::TxPDO_REMOTE_REQUEST:
             case CoE::Service::RxPDO_REMOTE_REQUEST:
-            case CoE::Service::SDO_INFORMATION:
             {
                 return nullptr;
+            }
+            case CoE::Service::SDO_INFORMATION:
+            {
+                return std::make_shared<SDOInformationMessage>(mbx, std::move(raw_message));
             }
 
             default:
@@ -292,13 +295,137 @@ namespace kickcat::mailbox::response
         }
     }
 
-
     void SDOMessage::afterHooks(uint16_t access, CoE::Entry* entry)
     {
         for (auto callback : entry->after_access)
         {
             callback(access, entry);
         }
+    }
+
+
+    SDOInformationMessage::SDOInformationMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message)
+        : AbstractMessage{mbx}
+    {
+        data_ = std::move(raw_message);
+
+        header_  = pointData<mailbox::Header>(data_.data());
+        coe_     = pointData<CoE::Header>(header_);
+        sdo_     = pointData<CoE::ServiceDataInfo>(coe_);
+    }
+
+
+    ProcessingResult SDOInformationMessage::process()
+    {
+        /*
+        if (header_->len < (sizeof(mailbox::Header) + sizeof(CoE::ServiceDataInfo)))
+        {
+            replyError(std::move(data_), mailbox::Error::SIZE_TOO_SHORT);
+            return ProcessingResult::FINALIZE;
+        }
+        */
+
+        switch (sdo_->opcode)
+        {
+            case CoE::SDO::information::GET_OD_LIST_REQ: { return processODList();  }
+            case CoE::SDO::information::GET_OD_REQ:      { return processOD();      }
+            case CoE::SDO::information::GET_ED_REQ:      { return processED();      }
+            default:
+            {
+                //abort(CoE::SDO::abort::UNSUPPORTED_ACCESS); //TODO abort
+                return ProcessingResult::FINALIZE;
+            }
+        }
+    }
+
+
+    ProcessingResult SDOInformationMessage::process(std::vector<uint8_t> const&)
+    {
+        return ProcessingResult::NOOP;
+    }
+
+
+    ProcessingResult SDOInformationMessage::processODList()
+    {
+        using CoE::SDO::information::ListType;
+
+        header_->len = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo) + sizeof(ListType);
+
+        ListType* list_type = pointData<ListType>(sdo_);
+        uint16_t* data = pointData<uint16_t>(list_type);
+
+        auto& dictionary = mailbox_->getDictionary();
+        switch (*list_type)
+        {
+            case ListType::NUMBER:
+            {
+                data[0] = static_cast<uint16_t>(dictionary.size());
+                uint16_t rxpdo_size    = 0;
+                uint16_t txpdo_size    = 0;
+                uint16_t backup_size   = 0;
+                uint16_t settings_size = 0;
+
+                for (auto const& object : dictionary)
+                {
+                    auto const& access = object.entries.at(0).access;
+                    if (access & CoE::Access::RxPDO)
+                    {
+                        ++rxpdo_size;
+                    }
+                    if (access & CoE::Access::TxPDO)
+                    {
+                        ++txpdo_size;
+                    }
+                    if (access & CoE::Access::BACKUP)
+                    {
+                        ++backup_size;
+                    }
+                    if (access & CoE::Access::SETTING)
+                    {
+                        ++settings_size;
+                    }
+                }
+
+                data[1] = rxpdo_size;
+                data[2] = txpdo_size;
+                data[3] = backup_size;
+                data[4] = settings_size;
+                header_->len += sizeof(uint16_t) * 5;
+                printf("yay %d %x %x %x %x %x\n",
+                    header_->len, data[0], data[1], data[2], data[3], data[4]);
+                break;
+            }
+            case ListType::ALL:
+            {
+                printf("ALL ! %d\n", dictionary.size());
+                for (auto const& object : dictionary)
+                {
+                    *data = object.index;
+                    data++;
+                }
+                header_->len += 2 * dictionary.size();
+                break;
+            }
+            case ListType::RxPDO:       { break; }
+            case ListType::TxPDO:       { break; }
+            case ListType::BACKUP:      { break; }
+            case ListType::SETTINGS:    { break; }
+        }
+
+        sdo_->opcode = CoE::SDO::information::GET_OD_LIST_RESP;
+        reply(std::move(data_));
+
+        return ProcessingResult::FINALIZE;
+    }
+
+    ProcessingResult SDOInformationMessage::processOD()
+    {
+        return ProcessingResult::FINALIZE;
+    }
+
+    ProcessingResult SDOInformationMessage::processED()
+    {
+        return ProcessingResult::FINALIZE;
     }
 
     MailboxErrorMessage::MailboxErrorMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, uint16_t error)
@@ -318,6 +445,4 @@ namespace kickcat::mailbox::response
     {
         return ProcessingResult::NOOP;
     }
-
-
 }

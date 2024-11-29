@@ -332,7 +332,7 @@ namespace kickcat
 
         update_process_data_input();
         update_process_data_output();
-        
+
         if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
             set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);
