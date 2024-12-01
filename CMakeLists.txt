@@ -44,6 +44,7 @@ if (GTest_FOUND)
                               unit/slave-t.cc
                               unit/socket-t.cc
                               unit/Time.cc
+                              unit/CoE/protocol-t.cc
   )
 
   target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
