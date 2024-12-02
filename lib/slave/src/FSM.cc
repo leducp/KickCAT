@@ -25,7 +25,7 @@ namespace kickcat::FSM
         currentState_ = states_[0];
     }
 
-    void StateMachine::init()
+    void StateMachine::start()
     {
         currentState_->onEntry(currentState_->id());
     }

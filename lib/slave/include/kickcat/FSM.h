@@ -21,6 +21,7 @@ namespace kickcat
 
         public:
             AbstractState(uint8_t id, AbstractESC2& esc);
+            virtual ~AbstractState() = default;
 
             uint8_t id();
 
@@ -40,7 +41,7 @@ namespace kickcat
         {
         public:
             StateMachine(std::array<FSM::AbstractState*, 2>&& states);
-            void init();
+            void start();
             void play();
 
         private:

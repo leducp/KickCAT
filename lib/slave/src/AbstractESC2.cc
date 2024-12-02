@@ -9,7 +9,7 @@ using namespace kickcat::FSM;
 
 hresult AbstractESC2::init()
 {
-    stateMachine.init();
+    stateMachine.start();
 
     return hresult::OK;
 }
