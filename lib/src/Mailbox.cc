@@ -10,17 +10,24 @@
 #include "Mailbox.h"
 #include "protocol.h"
 
-namespace kickcat::mailbox::request
+namespace kickcat::mailbox
 {
-    uint8_t Mailbox::nextCounter()
+    uint8_t nextCounter(uint8_t& counter)
     {
-        // compute new counter - used as session handle
         counter++;
         if (counter > 7)
         {
             counter = 1;
         }
         return counter;
+    }
+}
+
+namespace kickcat::mailbox::request
+{
+    uint8_t Mailbox::nextCounter()
+    {
+        return mailbox::nextCounter(counter);
     }
 
 

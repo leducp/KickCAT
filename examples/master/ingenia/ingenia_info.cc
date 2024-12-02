@@ -9,9 +9,6 @@
 #include "kickcat/SocketNull.h"
 #include "kickcat/helpers.h"
 
-#include "CanOpenErrors.h"
-#include "CanOpenStateMachine.h"
-#include "IngeniaProtocol.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -167,7 +164,7 @@ int main(int argc, char *argv[])
     printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::NUMBER);
     printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::ALL);
 
-    /*
+/*
     printObjectDescription(bus, ingenia, 0x2025);
     printEntryDescription(bus, ingenia, 0x2025, 0,
         CoE::SDO::information::ValueInfo::MAXIMUM);
@@ -177,7 +174,6 @@ int main(int argc, char *argv[])
 
     printEntryDescription(bus, ingenia, 0x2373, 0,
         CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
-        */
-
+*/
     return 0;
 }

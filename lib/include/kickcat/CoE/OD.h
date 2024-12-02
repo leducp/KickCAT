@@ -167,6 +167,7 @@ namespace kickcat::CoE
         constexpr uint16_t READ     = (Access::READ_PREOP  | Access::READ_SAFEOP  | Access::READ_OP);
         constexpr uint16_t WRITE    = (Access::WRITE_PREOP | Access::WRITE_SAFEOP | Access::WRITE_OP);
         constexpr uint16_t MAPPABLE = (Access::RxPDO | Access::TxPDO);
+        constexpr uint16_t ALL      = 0x03ff;
 
         std::string toString(uint16_t access);
     }

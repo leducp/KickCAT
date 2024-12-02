@@ -349,17 +349,63 @@ namespace kickcat::mailbox::response
     {
         using CoE::SDO::information::ListType;
 
-        header_->len = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo) + sizeof(ListType);
-
-        ListType* list_type = pointData<ListType>(sdo_);
-        uint16_t* data = pointData<uint16_t>(list_type);
+        header_->len = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo);
+        sdo_->opcode = CoE::SDO::information::GET_OD_LIST_RESP;
 
         auto& dictionary = mailbox_->getDictionary();
+        auto fillList = [&](ListType list_type, uint16_t access_check)
+        {
+            // 1. Compute answer
+            std::vector<uint16_t> to_reply;
+            to_reply.push_back(list_type);
+            for (auto const& object : dictionary)
+            {
+                auto const& access = object.entries.at(0).access;
+                if (access & access_check)
+                {
+                    to_reply.push_back(object.index);
+                }
+            }
+
+            // 2. Compute requiered fragments
+            uint16_t requiered_fragments = (to_reply.size() * sizeof(uint16_t)) / data_.size();
+
+            // 3. Start replying the fragments
+            int pos = 0;
+            for (uint16_t fragment = 0; fragment < requiered_fragments; ++fragment)
+            {
+                std::vector<uint8_t> raw_reply = data_; // copy current message to save headers contexts
+
+                auto header = pointData<mailbox::Header>(raw_reply.data());
+                auto coe    = pointData<CoE::Header>(header);
+                auto sdo    = pointData<CoE::ServiceDataInfo>(coe);
+                auto data   = pointData<uint16_t>(sdo);
+
+                // Update SDO info header
+                sdo->fragments_left = requiered_fragments - fragment - 1;
+                if (sdo->fragments_left)
+                {
+                    sdo->incomplete = 1;
+                }
+
+                while (header->len + sizeof(uint16_t) <= (data_.size() - sizeof(mailbox::Header)))
+                {
+                    *(data++) = to_reply[pos++];
+                    header->len += sizeof(uint16_t);
+                }
+                reply(std::move(raw_reply));
+
+                // Update counter handle
+                uint8_t counter = header_->count;
+                header_->count = mailbox::nextCounter(counter);
+            }
+        };
+
+        ListType* list_type = pointData<ListType>(sdo_);
         switch (*list_type)
         {
             case ListType::NUMBER:
             {
-                data[0] = static_cast<uint16_t>(dictionary.size());
                 uint16_t rxpdo_size    = 0;
                 uint16_t txpdo_size    = 0;
                 uint16_t backup_size   = 0;
@@ -368,52 +414,32 @@ namespace kickcat::mailbox::response
                 for (auto const& object : dictionary)
                 {
                     auto const& access = object.entries.at(0).access;
-                    if (access & CoE::Access::RxPDO)
-                    {
-                        ++rxpdo_size;
-                    }
-                    if (access & CoE::Access::TxPDO)
-                    {
-                        ++txpdo_size;
-                    }
-                    if (access & CoE::Access::BACKUP)
-                    {
-                        ++backup_size;
-                    }
-                    if (access & CoE::Access::SETTING)
-                    {
-                        ++settings_size;
-                    }
+                    if (access & CoE::Access::RxPDO)  { ++rxpdo_size;    }
+                    if (access & CoE::Access::TxPDO)  { ++txpdo_size;    }
+                    if (access & CoE::Access::BACKUP) { ++backup_size;   }
+                    if (access & CoE::Access::SETTING){ ++settings_size; }
                 }
 
+                uint16_t* data = pointData<uint16_t>(list_type);
+                data[0] = static_cast<uint16_t>(dictionary.size());
                 data[1] = rxpdo_size;
                 data[2] = txpdo_size;
                 data[3] = backup_size;
                 data[4] = settings_size;
-                header_->len += sizeof(uint16_t) * 5;
-                printf("yay %d %x %x %x %x %x\n",
-                    header_->len, data[0], data[1], data[2], data[3], data[4]);
+                header_->len += sizeof(ListType) + sizeof(uint16_t) * 5;
+                reply(std::move(data_));
                 break;
             }
-            case ListType::ALL:
+            case ListType::ALL:     { fillList(*list_type, CoE::Access::ALL);       break; }
+            case ListType::RxPDO:   { fillList(*list_type, CoE::Access::RxPDO);     break; }
+            case ListType::TxPDO:   { fillList(*list_type, CoE::Access::TxPDO);     break; }
+            case ListType::BACKUP:  { fillList(*list_type, CoE::Access::BACKUP);    break; }
+            case ListType::SETTINGS:{ fillList(*list_type, CoE::Access::SETTING);   break; }
+            default:
             {
-                printf("ALL ! %d\n", dictionary.size());
-                for (auto const& object : dictionary)
-                {
-                    *data = object.index;
-                    data++;
-                }
-                header_->len += 2 * dictionary.size();
-                break;
+                // TODO: unsupported access
             }
-            case ListType::RxPDO:       { break; }
-            case ListType::TxPDO:       { break; }
-            case ListType::BACKUP:      { break; }
-            case ListType::SETTINGS:    { break; }
         }
-
-        sdo_->opcode = CoE::SDO::information::GET_OD_LIST_RESP;
-        reply(std::move(data_));
 
         return ProcessingResult::FINALIZE;
     }

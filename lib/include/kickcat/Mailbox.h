@@ -26,6 +26,10 @@ namespace kickcat::mailbox
         FINALIZE,
         FINALIZE_AND_KEEP
     };
+
+    // Helper to compute new counter - used as session handle
+    // The input counter is increased is roleld from 1 to 7 by one increment and then returned
+    uint8_t nextCounter(uint8_t& currentCounter);
 }
 
 namespace kickcat::mailbox::request
@@ -196,9 +200,6 @@ namespace kickcat::mailbox::response
         SyncManagerConfig mbx_out_;
         uint16_t max_allocated_ram_by_msg_;
         uint16_t max_msgs_;
-
-        // session handle, from 1 to 7, it is used to detect duplicate frame
-        uint8_t counter_{0};
 
         std::vector<std::function<std::shared_ptr<AbstractMessage>(Mailbox*, std::vector<uint8_t>&&)>> factories_;
 
