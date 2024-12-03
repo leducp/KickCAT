@@ -18,7 +18,6 @@ if (NOT NUTTX)
   option(BUILD_TOOLS        "Build tools" ON)
 endif()
 
-add_subdirectory(lib)
 
 if (BUILD_UNIT_TESTS)
   find_package(GTest QUIET CONFIG)
@@ -69,8 +68,16 @@ if (GTest_FOUND)
         EXECUTABLE kickcat_unit
         EXCLUDE ${EXCLUDE_FILES}
         )
+
+    setup_target_for_coverage_lcov(
+        NAME coverage_lcov
+        EXECUTABLE kickcat_unit
+        EXCLUDE ${EXCLUDE_FILES}
+        )
   endif()
 endif()
+
+add_subdirectory(lib)
 
 if (BUILD_EXAMPLES)
   if (NOT NUTTX)

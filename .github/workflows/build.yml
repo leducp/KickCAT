@@ -37,10 +37,10 @@ jobs:
         conan install conan/conanfile_${conan_profile}.txt -of=build/ -pr:b conan/profile_${conan_profile}_x86_64.txt -pr:h conan/profile_${conan_profile}_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
       shell: bash
 
-    - name: Install Gcovr
+    - name: Install Gcovr and Lcov
       if: matrix.os == 'ubuntu-latest'
       run: |
-        sudo apt install gcovr
+        sudo apt install gcovr lcov
 
     - name: Configure CMake
       run: |
