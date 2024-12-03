@@ -18,7 +18,7 @@
         <Type ProductCode="#x00B0CAD0" RevisionNo="#x00000001">Foot</Type>
         <Name LcId="1033">Foot</Name>
         <Mailbox DataLinkLayer="true">
-          <CoE SdoInfo="true" CompleteAccess="true" />
+          <CoE SdoInfo="true" CompleteAccess="true" PdoAssign="false" PdoConfig="false" PdoUpload="false" SegmentedSdo="true" />
         </Mailbox>
         <Info>
           <StateMachine>

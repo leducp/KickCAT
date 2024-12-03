@@ -146,8 +146,8 @@ namespace kickcat::CoE
             constexpr uint32_t CRC_ERROR                    = 0x05040004;
             constexpr uint32_t OUT_OF_MEMORY                = 0x05040005;
             constexpr uint32_t UNSUPPORTED_ACCESS           = 0x06010000;
-            constexpr uint32_t READ_ONLY_ACCESS             = 0x06010001;
-            constexpr uint32_t WRITE_ONLY_ACCESS            = 0x06010002;
+            constexpr uint32_t READ_WRITE_ONLY_ACCESS       = 0x06010001;
+            constexpr uint32_t WRITE_READ_ONLY_ACCESS       = 0x06010002;
             constexpr uint32_t SUBINDEX0_CANNOT_BE_WRITTEN  = 0x06010003;
             constexpr uint32_t COMPLETE_ACCESS_UNSUPPORTED  = 0x06010004;
             constexpr uint32_t OBJECT_TOO_BIG               = 0x06010005;

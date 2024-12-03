@@ -99,6 +99,7 @@ namespace kickcat::CoE
             entry.access = Access::READ;
             entry.bitlen = 8;
             entry.description = "Subindex " + std::to_string(sms_type.entries.size());
+            entry.type = DataType::UNSIGNED8;
             entry.data = malloc(1);
 
             uint8_t sm_type = SM_CONF.at(sm->GetText());

@@ -56,6 +56,8 @@ namespace kickcat::mailbox::response
         ProcessingResult processOD();
         ProcessingResult processED();
 
+        void abort(uint32_t code);
+
         mailbox::Header* header_;
         CoE::Header* coe_;
         CoE::ServiceDataInfo* sdo_;

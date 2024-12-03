@@ -64,7 +64,7 @@ void printObjectDescription(Bus& bus, Slave& slave, uint16_t index)
     CoE::SDO::information::ObjectDescription* description = reinterpret_cast<CoE::SDO::information::ObjectDescription*>(buffer);
     std::string name{buffer + sizeof(CoE::SDO::information::ObjectDescription), buffer_size - sizeof(CoE::SDO::information::ObjectDescription)};
 
-    printf("Received object %s desc: %s ", name.c_str(), toString(*description).c_str());
+    printf("Received object %s\n desc: %s\n", name.c_str(), toString(*description).c_str());
 }
 
 
@@ -81,13 +81,8 @@ void printEntryDescription(Bus& bus, Slave& slave, uint16_t index, uint8_t subin
     }
 
     CoE::SDO::information::EntryDescription* description = reinterpret_cast<CoE::SDO::information::EntryDescription*>(buffer);
-    printf("Received entry desc: %s \n", toString(*description).c_str());
-
-    for (uint32_t i = sizeof(CoE::SDO::information::EntryDescription); i < buffer_size; ++i)
-    {
-        printf("%c", buffer[i]);
-    }
-    printf("\n");
+    std::string name{buffer + sizeof(CoE::SDO::information::EntryDescription), buffer_size - sizeof(CoE::SDO::information::EntryDescription)};
+    printf("Received entry %s\n desc: %s\n", name.c_str(), toString(*description).c_str());
 }
 
 
@@ -161,19 +156,19 @@ int main(int argc, char *argv[])
     }
 
     auto& ingenia = bus.slaves().at(0);
-    printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::NUMBER);
+    //printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::NUMBER);
     printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::ALL);
 
-/*
-    printObjectDescription(bus, ingenia, 0x2025);
-    printEntryDescription(bus, ingenia, 0x2025, 0,
+
+    printObjectDescription(bus, ingenia, 0x1018);
+    printEntryDescription(bus, ingenia, 0x1018, 0,
         CoE::SDO::information::ValueInfo::MAXIMUM);
 
-    printEntryDescription(bus, ingenia, 0x2025, 0,
+    printEntryDescription(bus, ingenia, 0x1600, 0,
         CoE::SDO::information::ValueInfo::DEFAULT);
 
-    printEntryDescription(bus, ingenia, 0x2373, 0,
+    printEntryDescription(bus, ingenia, 0x1600, 0,
         CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
-*/
+
     return 0;
 }

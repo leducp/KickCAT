@@ -18,8 +18,8 @@ namespace kickcat::CoE
             case CRC_ERROR:                     { return "CRC error (block mode only)";                                                                }
             case OUT_OF_MEMORY:                 { return "Out of memory";                                                                              }
             case UNSUPPORTED_ACCESS:            { return "Unsupported access to object";                                                               }
-            case READ_ONLY_ACCESS:              { return "Attempt to read a write only object ";                                                       }
-            case WRITE_ONLY_ACCESS:             { return "Attempt to write a read only object";                                                        }
+            case READ_WRITE_ONLY_ACCESS:        { return "Attempt to read a write only object ";                                                       }
+            case WRITE_READ_ONLY_ACCESS:        { return "Attempt to write a read only object";                                                        }
             case SUBINDEX0_CANNOT_BE_WRITTEN:   { return "Subindex cannot be written, SI0 must be 0 for write access";                                 }
             case COMPLETE_ACCESS_UNSUPPORTED:   { return "SDO Complete access not supported for objects of variable length";                           }
             case OBJECT_TOO_BIG:                { return "Object length exceeds mailbox size";                                                         }

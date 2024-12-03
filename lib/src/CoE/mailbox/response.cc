@@ -58,7 +58,7 @@ namespace kickcat::mailbox::response
 
     void SDOMessage::abort(uint32_t code)
     {
-        coe_->service = CoE::Service::SDO_RESPONSE;
+        coe_->service = CoE::Service::SDO_REQUEST;
         sdo_->command = CoE::SDO::request::ABORT;
         std::memcpy(payload_, &code, sizeof(uint32_t));
 
@@ -130,7 +130,7 @@ namespace kickcat::mailbox::response
     {
         if (not isUploadAuthorized(entry))
         {
-            abort(CoE::SDO::abort::WRITE_ONLY_ACCESS);
+            abort(CoE::SDO::abort::READ_WRITE_ONLY_ACCESS);
             return ProcessingResult::FINALIZE;
         }
 
@@ -177,7 +177,7 @@ namespace kickcat::mailbox::response
             auto* entry = &object->entries.at(i);
             if (not isUploadAuthorized(entry))
             {
-                abort(CoE::SDO::abort::WRITE_ONLY_ACCESS);
+                abort(CoE::SDO::abort::READ_WRITE_ONLY_ACCESS);
                 return ProcessingResult::FINALIZE;
             }
 
@@ -203,7 +203,7 @@ namespace kickcat::mailbox::response
     {
         if (not isDownloadAuthorized(entry))
         {
-            abort(CoE::SDO::abort::READ_ONLY_ACCESS);
+            abort(CoE::SDO::abort::WRITE_READ_ONLY_ACCESS);
             return ProcessingResult::FINALIZE;
         }
 
@@ -266,7 +266,7 @@ namespace kickcat::mailbox::response
             auto* entry = &object->entries.at(subindex);
             if (not isDownloadAuthorized(entry))
             {
-                abort(CoE::SDO::abort::READ_ONLY_ACCESS);
+                abort(CoE::SDO::abort::WRITE_READ_ONLY_ACCESS);
                 return ProcessingResult::FINALIZE;
             }
 
@@ -332,7 +332,7 @@ namespace kickcat::mailbox::response
             case CoE::SDO::information::GET_ED_REQ:      { return processED();      }
             default:
             {
-                //abort(CoE::SDO::abort::UNSUPPORTED_ACCESS); //TODO abort
+                abort(CoE::SDO::abort::COMMAND_SPECIFIER_INVALID);
                 return ProcessingResult::FINALIZE;
             }
         }
@@ -369,9 +369,14 @@ namespace kickcat::mailbox::response
 
             // 2. Compute requiered fragments
             uint16_t requiered_fragments = (to_reply.size() * sizeof(uint16_t)) / data_.size();
+            if (requiered_fragments == 0)
+            {
+                requiered_fragments = 1;
+            }
+            printf("req frags %d\n", requiered_fragments);
 
             // 3. Start replying the fragments
-            int pos = 0;
+            std::size_t pos = 0;
             for (uint16_t fragment = 0; fragment < requiered_fragments; ++fragment)
             {
                 std::vector<uint8_t> raw_reply = data_; // copy current message to save headers contexts
@@ -379,7 +384,7 @@ namespace kickcat::mailbox::response
                 auto header = pointData<mailbox::Header>(raw_reply.data());
                 auto coe    = pointData<CoE::Header>(header);
                 auto sdo    = pointData<CoE::ServiceDataInfo>(coe);
-                auto data   = pointData<uint16_t>(sdo);
+                auto data   = pointData<uint8_t>(sdo);
 
                 // Update SDO info header
                 sdo->fragments_left = requiered_fragments - fragment - 1;
@@ -388,9 +393,11 @@ namespace kickcat::mailbox::response
                     sdo->incomplete = 1;
                 }
 
-                while (header->len + sizeof(uint16_t) <= (data_.size() - sizeof(mailbox::Header)))
+                while ((header->len + sizeof(uint16_t) <= (data_.size() - sizeof(mailbox::Header))) and (pos < to_reply.size()))
                 {
-                    *(data++) = to_reply[pos++];
+                    std::memcpy(data, to_reply.data() + pos, sizeof(uint16_t));
+                    pos += 1;
+                    data += sizeof(uint16_t);
                     header->len += sizeof(uint16_t);
                 }
                 reply(std::move(raw_reply));
@@ -401,11 +408,13 @@ namespace kickcat::mailbox::response
             }
         };
 
-        ListType* list_type = pointData<ListType>(sdo_);
-        switch (*list_type)
+        ListType list_type;
+        std::memcpy(&list_type, sdo_ + 1, sizeof(ListType));
+        switch (list_type)
         {
             case ListType::NUMBER:
             {
+                uint16_t all_size      = static_cast<uint16_t>(dictionary.size());
                 uint16_t rxpdo_size    = 0;
                 uint16_t txpdo_size    = 0;
                 uint16_t backup_size   = 0;
@@ -420,21 +429,21 @@ namespace kickcat::mailbox::response
                     if (access & CoE::Access::SETTING){ ++settings_size; }
                 }
 
-                uint16_t* data = pointData<uint16_t>(list_type);
-                data[0] = static_cast<uint16_t>(dictionary.size());
-                data[1] = rxpdo_size;
-                data[2] = txpdo_size;
-                data[3] = backup_size;
-                data[4] = settings_size;
+                uint8_t* data = reinterpret_cast<uint8_t*>(sdo_ + 1) + 2;
+                std::memcpy(data, &all_size,      sizeof(uint16_t)); data += sizeof(uint16_t);
+                std::memcpy(data, &rxpdo_size,    sizeof(uint16_t)); data += sizeof(uint16_t);
+                std::memcpy(data, &txpdo_size,    sizeof(uint16_t)); data += sizeof(uint16_t);
+                std::memcpy(data, &backup_size,   sizeof(uint16_t)); data += sizeof(uint16_t);
+                std::memcpy(data, &settings_size, sizeof(uint16_t)); data += sizeof(uint16_t);
                 header_->len += sizeof(ListType) + sizeof(uint16_t) * 5;
                 reply(std::move(data_));
                 break;
             }
-            case ListType::ALL:     { fillList(*list_type, CoE::Access::ALL);       break; }
-            case ListType::RxPDO:   { fillList(*list_type, CoE::Access::RxPDO);     break; }
-            case ListType::TxPDO:   { fillList(*list_type, CoE::Access::TxPDO);     break; }
-            case ListType::BACKUP:  { fillList(*list_type, CoE::Access::BACKUP);    break; }
-            case ListType::SETTINGS:{ fillList(*list_type, CoE::Access::SETTING);   break; }
+            case ListType::ALL:     { fillList(list_type, CoE::Access::ALL);       break; }
+            case ListType::RxPDO:   { fillList(list_type, CoE::Access::RxPDO);     break; }
+            case ListType::TxPDO:   { fillList(list_type, CoE::Access::TxPDO);     break; }
+            case ListType::BACKUP:  { fillList(list_type, CoE::Access::BACKUP);    break; }
+            case ListType::SETTINGS:{ fillList(list_type, CoE::Access::SETTING);   break; }
             default:
             {
                 // TODO: unsupported access
@@ -446,12 +455,85 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOInformationMessage::processOD()
     {
+        // check message coherency
+        if ((sdo_->fragments_left != 0) or
+            (sdo_->incomplete     != 0))
+        {
+            //TODO: do something
+        }
+
+        header_->len = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo);
+        sdo_->opcode = CoE::SDO::information::GET_OD_RESP;
+
+        auto desc = pointData<CoE::SDO::information::ObjectDescription>(sdo_);
+        auto& dictionary = mailbox_->getDictionary();
+
+        auto [object, entry] = findObject(dictionary, desc->index, 0);
+        if ((object == nullptr) or (entry == nullptr))
+        {
+            abort(CoE::SDO::abort::OBJECT_DOES_NOT_EXIST);
+            return ProcessingResult::FINALIZE;
+        }
+
+        desc->data_type    = entry->type;
+        desc->max_subindex = object->entries.back().subindex; // TODO: not sure that object entries are ordered
+        desc->object_code  = object->code;
+
+        auto name = pointData<char>(desc);
+        std::memcpy(name, object->name.data(), object->name.size());
+
+        header_->len += sizeof(CoE::SDO::information::ObjectDescription) + object->name.size();
+
+        reply(std::move(data_));
         return ProcessingResult::FINALIZE;
     }
 
     ProcessingResult SDOInformationMessage::processED()
     {
+        // check message coherency
+        if ((sdo_->fragments_left != 0) or
+            (sdo_->incomplete     != 0))
+        {
+            //TODO: do something
+        }
+
+        header_->len = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo);
+        sdo_->opcode = CoE::SDO::information::GET_ED_RESP;
+
+        auto desc = pointData<CoE::SDO::information::EntryDescription>(sdo_);
+        auto& dictionary = mailbox_->getDictionary();
+
+        auto [object, entry] = findObject(dictionary, desc->index, desc->subindex);
+        if ((object == nullptr) or (entry == nullptr))
+        {
+            abort(CoE::SDO::abort::SUBINDEX_DOES_NOT_EXIST);
+            return ProcessingResult::FINALIZE;
+        }
+
+        desc->value_info = 0; // TODO: we do not support any request yet, but it is still a valid answer
+        desc->bit_length = entry->bitlen;
+        desc->access     = entry->access;
+        desc->data_type  = entry->type;
+
+        auto name = pointData<char>(desc);
+        std::memcpy(name, object->name.data(), object->name.size());
+
+        header_->len += sizeof(CoE::SDO::information::EntryDescription) + object->name.size();
+
+        reply(std::move(data_));
         return ProcessingResult::FINALIZE;
+    }
+
+    void SDOInformationMessage::abort(uint32_t code)
+    {
+        sdo_->opcode = CoE::SDO::information::SDO_INFO_ERROR_REQ;
+        sdo_->incomplete = 0;
+        sdo_->fragments_left = 0;
+
+        auto payload = pointData<uint8_t>(sdo_);
+        std::memcpy(payload, &code, sizeof(uint32_t));
+
+        reply(std::move(data_));
     }
 
     MailboxErrorMessage::MailboxErrorMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message, uint16_t error)
