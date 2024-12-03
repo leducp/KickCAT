@@ -188,6 +188,7 @@ namespace kickcat::mailbox::response
 
         hresult configureSm();
         bool is_sm_config_ok();
+        void set_sm_activate(bool is_activated);
 
         void receive();  // Try to receive a message from the ESC
         void process();  // Process a message in the to_process_ queue if any

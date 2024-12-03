@@ -292,6 +292,11 @@ namespace kickcat::mailbox::response
         return valid;
     }
 
+    void Mailbox::set_sm_activate(bool is_activated)
+    {
+        esc_->set_sm_activate({mbx_in_, mbx_out_}, is_activated);
+    }
+
 
     void Mailbox::receive()
     {

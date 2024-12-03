@@ -32,8 +32,7 @@ namespace kickcat
             virtual void startRoutine()  = 0;
             virtual void endRoutine()    = 0;
             virtual uint8_t transition() = 0;
-            virtual void onEntry(uint8_t oldState);
-            virtual void onExit(uint8_t newState);
+            virtual void onEntry();
         };
 
         class StateMachine

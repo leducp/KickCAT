@@ -13,9 +13,7 @@ namespace kickcat::FSM
         return id_;
     }
 
-    void AbstractState::onEntry(uint8_t) {};
-
-    void AbstractState::onExit(uint8_t) {};
+    void AbstractState::onEntry() {};
 
     StateMachine::StateMachine(std::array<FSM::AbstractState*, 4>&& states)
         : states_{std::move(states)}
@@ -25,7 +23,7 @@ namespace kickcat::FSM
 
     void StateMachine::start()
     {
-        currentState_->onEntry(currentState_->id());
+        currentState_->onEntry();
     }
 
     AbstractState* StateMachine::getState(uint8_t id)
@@ -54,10 +52,10 @@ namespace kickcat::FSM
 
             if (newState != currentState_)
             {
-                currentState_->onExit(newState->id());
-                newState->onEntry(currentState_->id());
+                newState->onEntry();
                 currentState_ = newState;
             }
         }
         currentState_->endRoutine();
-    } }
+    }
+}

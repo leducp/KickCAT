@@ -17,7 +17,17 @@ namespace kickcat::FSM
     {
         esc_.read(reg::AL_CONTROL, &al_control_, sizeof(al_control_));
         esc_.read(reg::AL_STATUS, &al_status_, sizeof(al_status_));
-        //esc_.read(reg::WDOG_STATUS, &watchdog_, sizeof(watchdog_));
+
+        if ((al_control_ & State::ERROR_ACK))
+        {
+            clear_error();
+        }
+
+        // Do nothing until error is acknowledged by master.
+        if (al_status_ & State::ERROR_ACK)
+        {
+            return;
+        }
 
         routine();
     }
@@ -28,16 +38,11 @@ namespace kickcat::FSM
         esc_.write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_));
     }
 
-    void SlaveState::onEntry(uint8_t oldState)
+    void SlaveState::onEntry()
     {
         set_al_status(static_cast<kickcat::State>(id_));
 
-        onEntryInternal(oldState);
-    }
-
-    void SlaveState::onExit(uint8_t newState)
-    {
-        onExitInternal(newState);
+        onEntryInternal();
     }
 
     void SlaveState::setMailbox(mailbox::response::Mailbox* mbx)
@@ -48,6 +53,11 @@ namespace kickcat::FSM
     void SlaveState::set_al_status(State state)
     {
         al_status_ = (al_status_ & ~State::MASK_STATE) | state;
+    }
+
+    State SlaveState::getRequestedState()
+    {
+        return static_cast<State>(al_control_ & kickcat::State::MASK_STATE);
     }
 
     void SlaveState::clear_error()
@@ -72,16 +82,19 @@ namespace kickcat::FSM
     {
     }
 
-    void Init::routine()
+    void Init::onEntryInternal()
     {
-        printf("init routine\n");
+        clear_error();
+        if (mbx_)
+        {
+            mbx_->set_sm_activate(false);
+        }
+        pdo_.set_sm_activated(false);
     }
 
     uint8_t Init::transition()
     {
-        uint32_t al_control;
-        esc_.read(reg::AL_CONTROL, &al_control, sizeof(al_control));
-        if ((al_control & kickcat::State::MASK_STATE) == kickcat::State::PRE_OP)
+        if (getRequestedState() == kickcat::State::PRE_OP)
         {
             if (not mbx_)
             {
@@ -91,7 +104,6 @@ namespace kickcat::FSM
             {
                 if (mbx_->is_sm_config_ok())
                 {
-                    //TODO: set_sm_activate
                     return kickcat::State::PRE_OP;
                 }
                 else
@@ -100,15 +112,13 @@ namespace kickcat::FSM
                 }
             }
         }
+
+        if ((getRequestedState() == State::SAFE_OP) or (getRequestedState() == State::OPERATIONAL))
+        {
+            set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
+        }
+
         return kickcat::State::INIT;
-    }
-
-    void Init::onEntryInternal(uint8_t oldState)
-    {
-    }
-
-    void Init::onExitInternal(uint8_t newState)
-    {
     }
 
     PreOP::PreOP(AbstractESC& esc, PDO& pdo)
@@ -116,50 +126,62 @@ namespace kickcat::FSM
     {
     }
 
-    void PreOP::routine()
+    void PreOP::onEntryInternal()
     {
-        printf("preop routine\n");
+        if (mbx_)
+        {
+            mbx_->set_sm_activate(true);
+        }
+        pdo_.set_sm_activated(false);
     }
 
     uint8_t PreOP::transition()
     {
-        if ((al_control_ & kickcat::State::MASK_STATE) == kickcat::State::SAFE_OP)
+        if (mbx_ and not mbx_->is_sm_config_ok())
+        {
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+            return kickcat::State::INIT;
+        }
+
+        if (getRequestedState() == kickcat::State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
         {
             if (pdo_.configure_pdo_sm() != hresult::OK)
             {
-                printf("not ok\n");
                 return kickcat::State::PRE_OP;
             }
 
-            if (not pdo_.is_sm_config_ok())
+            StatusCode pdo_sm_config_status_code = pdo_.is_sm_config_ok();
+            if (pdo_sm_config_status_code != NO_ERROR)
             {
-                printf("CONFIG not ok\n");
-                // TODO: disctinct between input and output
-                set_error(StatusCode::INVALID_INPUT_CONFIGURATION);
-                // set_error(StatusCode::INVALID_OUTPUT_CONFIGURATION);
+                set_error(pdo_sm_config_status_code);
                 return kickcat::State::PRE_OP;
             }
 
-            printf("OK\n");
             return kickcat::State::SAFE_OP;
+        }
+
+        if (getRequestedState() == State::INIT)
+        {
+            return State::INIT;
+        }
+        else if (getRequestedState() == State::OPERATIONAL)
+        {
+            set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
 
         return kickcat::State::PRE_OP;
     }
 
-    void PreOP::onEntryInternal(uint8_t oldState)
-    {
-        uint32_t al_status = kickcat::State::PRE_OP;
-        esc_.write(reg::AL_STATUS, &al_status, sizeof(al_status));
-    }
-
-    void PreOP::onExitInternal(uint8_t newState)
-    {
-    }
 
     SafeOP::SafeOP(AbstractESC& esc, PDO& pdo)
         : SlaveState(kickcat::State::SAFE_OP, esc, pdo)
     {
+    }
+
+
+    void SafeOP::onEntryInternal()
+    {
+        pdo_.set_sm_activated(true);
     }
 
     void SafeOP::routine()
@@ -171,22 +193,30 @@ namespace kickcat::FSM
 
     uint8_t SafeOP::transition()
     {
+        if (mbx_ and not mbx_->is_sm_config_ok())
+        {
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+            return State::INIT;
+        }
+
+        StatusCode pdo_sm_config_status_code = pdo_.is_sm_config_ok();
+        if (pdo_sm_config_status_code != NO_ERROR)
+        {
+            set_error(pdo_sm_config_status_code);
+            return kickcat::State::PRE_OP;
+        }
+
         //TODO: check if valid_ output data
-        if ((al_control_ & kickcat::State::MASK_STATE) == kickcat::State::OPERATIONAL)
+        if (getRequestedState() == kickcat::State::OPERATIONAL)
         {
             return kickcat::State::OPERATIONAL;
         }
+        else if (getRequestedState() == State::PRE_OP or getRequestedState() == State::INIT)
+        {
+            return getRequestedState();
+        }
+
         return kickcat::State::SAFE_OP;
-    }
-
-    void SafeOP::onEntryInternal(uint8_t oldState)
-    {
-        uint32_t al_status = kickcat::State::PRE_OP;
-        esc_.write(reg::AL_STATUS, &al_status, sizeof(al_status));
-    }
-
-    void SafeOP::onExitInternal(uint8_t newState)
-    {
     }
 
     OP::OP(AbstractESC& esc, PDO& pdo)
@@ -196,23 +226,44 @@ namespace kickcat::FSM
 
     void OP::routine()
     {
-        printf("OP Routine !!\n");
         pdo_.update_process_data_input();
         pdo_.update_process_data_output();
     }
 
     uint8_t OP::transition()
     {
-        return kickcat::State::OPERATIONAL;
+        if (has_expired_watchdog())
+        {
+            set_error(StatusCode::SYNC_MANAGER_WATCHDOG);
+        }
+
+        if (al_status_ & State::ERROR_ACK)
+        {
+            // In case of error in OP, go to a lower state, CTT wants safe op; not specified in the norms.
+            return State::SAFE_OP;
+        }
+
+        if (mbx_ and not mbx_->is_sm_config_ok())
+        {
+            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+            return State::INIT;
+        }
+
+        StatusCode pdo_sm_config_status_code = pdo_.is_sm_config_ok();
+        if (pdo_sm_config_status_code != NO_ERROR)
+        {
+            set_error(pdo_sm_config_status_code);
+            return kickcat::State::PRE_OP;
+        }
+
+        return getRequestedState();
     }
 
-    void OP::onEntryInternal(uint8_t oldState)
+    bool OP::has_expired_watchdog()
     {
-        uint32_t al_status = kickcat::State::PRE_OP;
-        esc_.write(reg::AL_STATUS, &al_status, sizeof(al_status));
+        uint16_t watchdog{0};
+        esc_.read(reg::WDOG_STATUS, &watchdog, sizeof(watchdog));
+        return not(watchdog & 0x1);
     }
 
-    void OP::onExitInternal(uint8_t newState)
-    {
-    }
 }

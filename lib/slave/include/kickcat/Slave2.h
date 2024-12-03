@@ -23,6 +23,8 @@ namespace kickcat
             mbx_ = mbx;
             init_.setMailbox(mbx);
             preOp_.setMailbox(mbx);
+            safeOP_.setMailbox(mbx);
+            OP_.setMailbox(mbx);
         }
 
         void start()

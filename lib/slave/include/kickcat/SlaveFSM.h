@@ -25,15 +25,14 @@ namespace kickcat
 
             void startRoutine();
             void endRoutine();
-            void onEntry(uint8_t oldState);
-            void onExit(uint8_t newState);
+            void onEntry();
 
         protected:
-            virtual void routine()                         = 0;
-            virtual void onEntryInternal(uint8_t oldState) = 0;
-            virtual void onExitInternal(uint8_t newState)  = 0;
+            virtual void routine() {};
+            virtual void onEntryInternal() {};
 
             void set_al_status(State state);
+            State getRequestedState();
             void set_error(StatusCode code);
             void clear_error();
 
@@ -51,10 +50,8 @@ namespace kickcat
         public:
             Init(AbstractESC& esc, PDO& pdo);
 
-            void routine();
+            void onEntryInternal();
             uint8_t transition();
-            void onEntryInternal(uint8_t oldState);
-            void onExitInternal(uint8_t newState);
         };
 
         class PreOP : public SlaveState
@@ -62,10 +59,8 @@ namespace kickcat
         public:
             PreOP(AbstractESC& esc, PDO& pdo);
 
-            void routine();
+            void onEntryInternal();
             uint8_t transition();
-            void onEntryInternal(uint8_t oldState);
-            void onExitInternal(uint8_t newState);
         };
 
         class SafeOP : public SlaveState
@@ -73,21 +68,21 @@ namespace kickcat
         public:
             SafeOP(AbstractESC& esc, PDO& pdo);
 
+            void onEntryInternal();
             void routine();
             uint8_t transition();
-            void onEntryInternal(uint8_t oldState);
-            void onExitInternal(uint8_t newState);
         };
 
-        class OP: public SlaveState
+        class OP : public SlaveState
         {
         public:
             OP(AbstractESC& esc, PDO& pdo);
 
             void routine();
             uint8_t transition();
-            void onEntryInternal(uint8_t oldState);
-            void onExitInternal(uint8_t newState);
+
+        private:
+            bool has_expired_watchdog();
         };
 
 

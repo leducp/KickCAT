@@ -1,5 +1,6 @@
 #include "kickcat/PDO.h"
 #include "kickcat/debug.h"
+#include "protocol.h"
 
 
 namespace kickcat
@@ -23,15 +24,25 @@ namespace kickcat
         return hresult::OK;
     }
 
-    bool PDO::is_sm_config_ok()
+    StatusCode PDO::is_sm_config_ok()
     {
-        bool valid = true;
-        for (auto& sm : {sm_pd_input_, sm_pd_output_})
+        if (not esc_->is_valid_sm(sm_pd_input_))
         {
-            valid &= esc_->is_valid_sm(sm);
+            return StatusCode::INVALID_INPUT_CONFIGURATION;
         }
-        return valid;
+        else if (not esc_->is_valid_sm(sm_pd_input_))
+        {
+            return StatusCode::INVALID_OUTPUT_CONFIGURATION;
+        }
+
+        return StatusCode::NO_ERROR;
     }
+
+    void PDO::set_sm_activated(bool is_activated)
+    {
+        esc_->set_sm_activate({sm_pd_input_, sm_pd_output_}, is_activated);
+    }
+
     void PDO::set_process_data_input(uint8_t* buffer)
     {
         process_data_input_ = buffer;

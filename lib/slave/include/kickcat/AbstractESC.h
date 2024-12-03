@@ -55,7 +55,7 @@ namespace kickcat
         AbstractESC()          = default;
         virtual ~AbstractESC() = default;
 
-        virtual hresult init() = 0;
+        virtual hresult init()                                                   = 0;
         virtual int32_t read(uint16_t address, void* data, uint16_t size)        = 0;
         virtual int32_t write(uint16_t address, void const* data, uint16_t size) = 0;
 
@@ -84,11 +84,7 @@ namespace kickcat
 
         bool is_valid_sm(SyncManagerConfig const& sm_ref);
         bool are_valid_sm(std::vector<SyncManagerConfig> const& sm);
-
-    private:
-        void set_error(StatusCode code);
-        void clear_error();
-
+        void set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
     };
 
 }

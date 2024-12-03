@@ -2,6 +2,7 @@
 #define SLAVE_STACK_INCLUDE_PDO_H_
 
 #include "AbstractESC.h"
+#include "kickcat/protocol.h"
 
 namespace kickcat
 {
@@ -14,7 +15,8 @@ namespace kickcat
         }
 
         hresult configure_pdo_sm();
-        bool is_sm_config_ok();
+        StatusCode is_sm_config_ok();
+        void set_sm_activated(bool is_activated);
         void set_process_data_input(uint8_t* buffer);
         void set_process_data_output(uint8_t* buffer);
         void update_process_data_input();
