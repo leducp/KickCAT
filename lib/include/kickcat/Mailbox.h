@@ -186,7 +186,8 @@ namespace kickcat::mailbox::response
         void enableCoE(CoE::Dictionary&& dictionary);
         CoE::Dictionary& getDictionary(){return dictionary_;}
 
-        std::tuple<SyncManagerConfig, SyncManagerConfig> configureSm();
+        hresult configureSm();
+        bool is_sm_config_ok();
 
         void receive();  // Try to receive a message from the ESC
         void process();  // Process a message in the to_process_ queue if any

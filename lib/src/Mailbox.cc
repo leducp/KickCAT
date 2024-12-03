@@ -1,4 +1,3 @@
-#include <cstring>
 #include <algorithm>
 #include <cinttypes>
 
@@ -266,20 +265,31 @@ namespace kickcat::mailbox::response
     {
     }
 
-    std::tuple<SyncManagerConfig, SyncManagerConfig> Mailbox::configureSm()
+
+    hresult Mailbox::configureSm()
     {
         auto [indexIn, mailboxIn]   = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
         auto [indexOut, mailboxOut] = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
 
         if (mailboxIn.length != mailboxOut.length or mailboxIn.length > max_allocated_ram_by_msg_)
         {
-            THROW_ERROR("Mailbox length error");
+            return hresult::E_EOVERFLOW;
         }
 
         mbx_in_  = SYNC_MANAGER_MBX_IN(indexIn, mailboxIn.start_address, mailboxIn.length);
         mbx_out_ = SYNC_MANAGER_MBX_OUT(indexOut, mailboxOut.start_address, mailboxOut.length);
 
-        return std::tuple(mbx_in_, mbx_out_);
+        return hresult::OK;
+    }
+
+    bool Mailbox::is_sm_config_ok()
+    {
+        bool valid = true;
+        for (auto& sm : {mbx_in_, mbx_out_})
+        {
+            valid &= esc_->is_valid_sm(sm);
+        }
+        return valid;
     }
 
 
@@ -434,8 +444,8 @@ namespace kickcat::mailbox::response
 
     void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
     {
-        auto* header  = pointData<mailbox::Header>(raw_message.data());
-        auto* err     = pointData<mailbox::Error::ServiceData>(header);
+        auto* header = pointData<mailbox::Header>(raw_message.data());
+        auto* err    = pointData<mailbox::Error::ServiceData>(header);
 
         header->type = mailbox::ERR;
         header->len  = sizeof(mailbox::Error::ServiceData);

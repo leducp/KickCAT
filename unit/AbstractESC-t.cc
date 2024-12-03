@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <cstring>
-#include "kickcat/AbstractESC2.h"
+#include "kickcat/AbstractESC.h"
+#include "kickcat/Error.h"
 
 using namespace kickcat;
 
@@ -8,9 +9,9 @@ uint32_t alStatus_{};
 uint32_t alStatusCode_{};
 uint32_t alControl_{};
 
-class TestESC : public AbstractESC2
+class TestESC : public AbstractESC
 {
-    using AbstractESC2::AbstractESC2;
+    using AbstractESC::AbstractESC;
     int32_t read(uint16_t address, void* data, uint16_t size)
     {
         std::memcpy(data, &alControl_, size);
@@ -21,16 +22,25 @@ class TestESC : public AbstractESC2
         std::memcpy(&alStatus_, data, size);
         return size;
     };
+
+    hresult initInternal()
+    {
+        return hresult::OK;
+    }
 };
 
 
-class AbstractESC2Test : public testing::Test
+class AbstractESCTest : public testing::Test
 {
 public:
     TestESC esc{};
 };
 
-TEST_F(AbstractESC2Test, initToPreop)
+TEST_F(AbstractESCTest, routine)
+{
+}
+
+TEST_F(AbstractESCTest, initToPreop)
 {
     esc.init();
     ASSERT_EQ(alStatus_, State::INIT);
@@ -44,4 +54,3 @@ TEST_F(AbstractESC2Test, initToPreop)
 
     esc.routine();
 }
-

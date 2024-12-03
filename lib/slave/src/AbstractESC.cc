@@ -1,21 +1,22 @@
-#include <inttypes.h>
-#include "Mailbox.h"
-
 #include "kickcat/AbstractESC.h"
-#include "kickcat/debug.h"
-#include "protocol.h"
-
 
 namespace kickcat
 {
-    void reportError(hresult const& rc)
+    std::tuple<uint8_t, SyncManager> AbstractESC::find_sm(uint16_t controlMode)
     {
-        if (rc != hresult::OK)
+        for (uint8_t i = 0; i < reg::SM_STATS; i++)
         {
-            printf("\nERROR: %s code %" PRIu32 "\n", toString(rc), static_cast<uint32_t>(rc));
+            SyncManager sync;
+            read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, &sync, sizeof(SyncManager));
+            printf("FIND_SM : %i %x\n", i, sync.start_address);
+            if ((sync.control & 0x0F) == (controlMode & 0x0F))
+            {
+                return std::tuple(i, sync);
+            }
         }
-    }
 
+        THROW_ERROR("SyncManager not found");
+    }
 
     bool AbstractESC::is_valid_sm(SyncManagerConfig const& sm_ref)
     {

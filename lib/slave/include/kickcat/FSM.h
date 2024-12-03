@@ -9,7 +9,7 @@
 
 namespace kickcat
 {
-    class AbstractESC2;
+    class AbstractESC;
 
     namespace FSM
     {
@@ -20,35 +20,35 @@ namespace kickcat
             friend StateMachine;
 
         public:
-            AbstractState(uint8_t id, AbstractESC2& esc);
+            AbstractState(uint8_t id);
             virtual ~AbstractState() = default;
 
             uint8_t id();
 
+        protected:
+            uint8_t id_;
+
         private:
-            virtual void routine()       = 0;
+            virtual void startRoutine()  = 0;
+            virtual void endRoutine()    = 0;
             virtual uint8_t transition() = 0;
             virtual void onEntry(uint8_t oldState);
             virtual void onExit(uint8_t newState);
-
-            uint8_t id_;
-
-        protected:
-            AbstractESC2& esc_;
         };
 
         class StateMachine
         {
         public:
-            StateMachine(std::array<FSM::AbstractState*, 2>&& states);
+            StateMachine(std::array<FSM::AbstractState*, 4>&& states);
             void start();
             void play();
 
+        protected:
+            AbstractState* getState(uint8_t id);
+
         private:
             AbstractState* currentState_;
-            std::array<FSM::AbstractState*, 2> states_;
-
-            AbstractState* getState(uint8_t id);
+            std::array<FSM::AbstractState*, 4> states_;
         };
     }
 }

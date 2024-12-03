@@ -1,15 +1,17 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <cstring>
-#include "kickcat/AbstractESC2.h"
+#include "kickcat/AbstractESC.h"
 #include "kickcat/FSM.h"
 #include "kickcat/OS/Time.h"
+#include "kickcat/Error.h"
 
+using namespace kickcat;
 using namespace kickcat::FSM;
 using namespace testing;
 
 
-class MockESC2 : public kickcat::AbstractESC2
+class MockESC2 : public kickcat::AbstractESC
 {
 public:
     virtual int32_t read(uint16_t address, void* data, uint16_t size)
@@ -20,6 +22,11 @@ public:
     virtual int32_t write(uint16_t address, void const* data, uint16_t size)
     {
         return 0;
+    }
+
+    hresult initInternal()
+    {
+        return hresult::OK;
     }
 };
 

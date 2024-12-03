@@ -1,12 +1,10 @@
 #include "kickcat/FSM.h"
 #include <algorithm>
-#include "AbstractESC2.h"
 
 namespace kickcat::FSM
 {
-    AbstractState::AbstractState(uint8_t id, kickcat::AbstractESC2& esc)
+    AbstractState::AbstractState(uint8_t id)
         : id_{id}
-        , esc_{esc}
     {
     }
 
@@ -19,7 +17,7 @@ namespace kickcat::FSM
 
     void AbstractState::onExit(uint8_t) {};
 
-    StateMachine::StateMachine(std::array<FSM::AbstractState*, 2>&& states)
+    StateMachine::StateMachine(std::array<FSM::AbstractState*, 4>&& states)
         : states_{std::move(states)}
     {
         currentState_ = states_[0];
@@ -43,7 +41,7 @@ namespace kickcat::FSM
 
     void StateMachine::play()
     {
-        currentState_->routine();
+        currentState_->startRoutine();
         uint8_t newStateId = currentState_->transition();
 
         if (newStateId != currentState_->id())
@@ -61,5 +59,5 @@ namespace kickcat::FSM
                 currentState_ = newState;
             }
         }
-    }
-}
+        currentState_->endRoutine();
+    } }

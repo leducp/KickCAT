@@ -5,37 +5,92 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include "PDO.h"
+#include "kickcat/AbstractESC.h"
 #include "kickcat/FSM.h"
+#include "kickcat/Mailbox.h"
 #include "kickcat/protocol.h"
 
 
 namespace kickcat
 {
-    class AbstractESC2;
-
     namespace FSM
     {
-        class Init : public AbstractState
+
+        class SlaveState : public AbstractState
         {
         public:
-            Init(AbstractESC2& esc);
+            SlaveState(uint8_t id, AbstractESC& esc, PDO& pdo);
+            void setMailbox(mailbox::response::Mailbox* mbx);
+
+            void startRoutine();
+            void endRoutine();
+            void onEntry(uint8_t oldState);
+            void onExit(uint8_t newState);
+
+        protected:
+            virtual void routine()                         = 0;
+            virtual void onEntryInternal(uint8_t oldState) = 0;
+            virtual void onExitInternal(uint8_t newState)  = 0;
+
+            void set_al_status(State state);
+            void set_error(StatusCode code);
+            void clear_error();
+
+            StatusCode al_status_code_ = {StatusCode::NO_ERROR};
+            uint16_t al_status_        = {0};
+            uint16_t al_control_       = {0};
+
+            AbstractESC& esc_;
+            PDO& pdo_;
+            mailbox::response::Mailbox* mbx_;
+        };
+
+        class Init : public SlaveState
+        {
+        public:
+            Init(AbstractESC& esc, PDO& pdo);
 
             void routine();
             uint8_t transition();
-            void onEntry(uint8_t oldState);
-            void onExit(uint8_t newState);
+            void onEntryInternal(uint8_t oldState);
+            void onExitInternal(uint8_t newState);
         };
 
-        class PreOP : public AbstractState
+        class PreOP : public SlaveState
         {
         public:
-            PreOP(AbstractESC2& esc);
+            PreOP(AbstractESC& esc, PDO& pdo);
 
             void routine();
             uint8_t transition();
-            void onEntry(uint8_t oldState);
-            void onExit(uint8_t newState);
+            void onEntryInternal(uint8_t oldState);
+            void onExitInternal(uint8_t newState);
         };
+
+        class SafeOP : public SlaveState
+        {
+        public:
+            SafeOP(AbstractESC& esc, PDO& pdo);
+
+            void routine();
+            uint8_t transition();
+            void onEntryInternal(uint8_t oldState);
+            void onExitInternal(uint8_t newState);
+        };
+
+        class OP: public SlaveState
+        {
+        public:
+            OP(AbstractESC& esc, PDO& pdo);
+
+            void routine();
+            uint8_t transition();
+            void onEntryInternal(uint8_t oldState);
+            void onExitInternal(uint8_t newState);
+        };
+
+
     }
 }
 #endif
