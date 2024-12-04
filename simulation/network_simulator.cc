@@ -20,6 +20,7 @@
 
 using namespace kickcat;
 
+//TODO: try with multiple slaves
 
 int main(int argc, char* argv[])
 {
@@ -59,6 +60,8 @@ int main(int argc, char* argv[])
     mailbox::response::Mailbox mbx(&esc0, 1024);
     mbx.enableCoE(std::move(coe_dict));
     slave0.set_mailbox(&mbx);
+
+    slave0.start();
 
     while (true)
     {

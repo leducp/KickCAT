@@ -50,7 +50,7 @@ namespace kickcat
         FSM::PreOP preOp_{*esc_, *pdo_};
         FSM::SafeOP safeOP_{*esc_, *pdo_};
         FSM::OP OP_{*esc_, *pdo_};
-        FSM::StateMachine stateMachine{{&init_, &preOp_, &safeOP_, &OP_}};
+        FSM::StateMachine stateMachine{{{&init_, &preOp_, &safeOP_, &OP_}}};
     };
 }
 
