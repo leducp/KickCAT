@@ -368,10 +368,11 @@ namespace kickcat::mailbox::response
             }
 
             // 2. Compute requiered fragments
-            uint16_t requiered_fragments = (to_reply.size() * sizeof(uint16_t)) / data_.size();
-            if (requiered_fragments == 0)
+            std::size_t total_size = to_reply.size() * sizeof(uint16_t);
+            uint16_t requiered_fragments = total_size / data_.size();
+            if (total_size % data_.size())
             {
-                requiered_fragments = 1;
+                requiered_fragments += 1;
             }
             printf("req frags %d\n", requiered_fragments);
 

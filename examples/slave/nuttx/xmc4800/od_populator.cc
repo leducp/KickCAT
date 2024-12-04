@@ -9,10 +9,10 @@ namespace kickcat::CoE
         CoE::Dictionary dictionary;
 
         {
-            static CoE::Object object
+            CoE::Object object
             {
                 0x1018,
-                CoE::ObjectCode::RECORD,
+                CoE::ObjectCode::ARRAY,
                 "Identity Object",
                 {}
             };
@@ -25,10 +25,10 @@ namespace kickcat::CoE
         }
 
         {
-            static CoE::Object object
+            CoE::Object object
             {
                 0x1600,
-                CoE::ObjectCode::RECORD,
+                CoE::ObjectCode::ARRAY,
                 "RxPDO Map 1",
                 {}
             };
@@ -38,10 +38,10 @@ namespace kickcat::CoE
         }
 
         {
-            static CoE::Object object
+            CoE::Object object
             {
                 0x1a00,
-                CoE::ObjectCode::RECORD,
+                CoE::ObjectCode::ARRAY,
                 "TxPDO Map 1",
                 {}
             };
@@ -51,7 +51,7 @@ namespace kickcat::CoE
         }
 
         {
-            static CoE::Object object
+            CoE::Object object
             {
                 0x1c00,
                 CoE::ObjectCode::ARRAY,
@@ -67,7 +67,7 @@ namespace kickcat::CoE
         }
 
         {
-            static CoE::Object object
+            CoE::Object object
             {
                 0x1c12,
                 CoE::ObjectCode::ARRAY,
@@ -80,7 +80,7 @@ namespace kickcat::CoE
         }
 
         {
-            static CoE::Object object
+            CoE::Object object
             {
                 0x1c13,
                 CoE::ObjectCode::ARRAY,
@@ -93,10 +93,10 @@ namespace kickcat::CoE
         }
 
         {
-            static CoE::Object object
+            CoE::Object object
             {
                 0x2000,
-                CoE::ObjectCode::RECORD,
+                CoE::ObjectCode::ARRAY,
                 "FreezeValue",
                 {}
             };
@@ -105,7 +105,20 @@ namespace kickcat::CoE
             CoE::addEntry(object,2,32,63,static_cast<CoE::DataType>(7),"IMU",0x2);
             dictionary.push_back(std::move(object));
         }
-
+/*
+        for (uint16_t i = 0; i < 0x200; ++i)
+        {
+            CoE::Object object
+            {
+                uint16_t(i + 0x2000),
+                CoE::ObjectCode::VAR,
+                "Operation mode",
+                {}
+            };
+            CoE::addEntry(object,0,16,127,static_cast<CoE::DataType>(6),"",0x0);
+            dictionary.push_back(std::move(object));
+        }
+*/
         return dictionary;
     }
 }
