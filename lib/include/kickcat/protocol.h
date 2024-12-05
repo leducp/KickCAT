@@ -352,21 +352,34 @@ namespace kickcat
     } __attribute__((__packed__));
 
 
-    constexpr uint8_t SM_CONTROL_MODE_MASK = 0x03;
-    constexpr uint8_t SM_CONTROL_MODE_BUFFERED = 0x00;
-    constexpr uint8_t SM_CONTROL_MODE_MAILBOX = 0x02;
-    constexpr uint8_t SM_CONTROL_DIRECTION_MASK = 0x0C;
-    constexpr uint8_t SM_CONTROL_DIRECTION_READ = 0x00; // ECAT read access, PDI write access
-    constexpr uint8_t SM_CONTROL_DIRECTION_WRITE = 0x04; // ECAT write access, PDI read access
-    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_MASK = 0x10;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_DISABLED = 0x00;
+    constexpr uint8_t SM_CONTROL_MODE_MASK              = 0x03;
+    constexpr uint8_t SM_CONTROL_MODE_BUFFERED          = 0x00;
+    constexpr uint8_t SM_CONTROL_MODE_MAILBOX           = 0x02;
+    constexpr uint8_t SM_CONTROL_DIRECTION_MASK         = 0x0C;
+    constexpr uint8_t SM_CONTROL_DIRECTION_READ         = 0x00; // ECAT read access, PDI write access
+    constexpr uint8_t SM_CONTROL_DIRECTION_WRITE        = 0x04; // ECAT write access, PDI read access
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_MASK    = 0x10;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_DISABLED= 0x00;
     constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_ENABLED = 0x10;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_MASK = 0x20;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_DISABLED = 0x00;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_ENABLED = 0x20;
-    constexpr uint8_t SM_CONTROL_WATCHDOG_MASK = 0x40;
-    constexpr uint8_t SM_CONTROL_WATCHDOG_DISABLED = 0x00;
-    constexpr uint8_t SM_CONTROL_WATCHDOG_ENABLED = 0x40;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_MASK      = 0x20;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_DISABLED  = 0x00;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_ENABLED   = 0x20;
+    constexpr uint8_t SM_CONTROL_WATCHDOG_MASK          = 0x40;
+    constexpr uint8_t SM_CONTROL_WATCHDOG_DISABLED      = 0x00;
+    constexpr uint8_t SM_CONTROL_WATCHDOG_ENABLED       = 0x40;
+    constexpr uint8_t SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK = (1 << 0);
+    constexpr uint8_t SYNC_MANAGER_CONTROL_DIRECTION_MASK = (1 << 1);
+
+    constexpr uint8_t SM_ACTIVATE_ENABLE        = (1 << 0);
+    constexpr uint8_t SM_ACTIVATE_REPEAT_REQ    = (1 << 1);
+
+    constexpr uint8_t SM_PDI_CTRL_REPEAT_ACK    = (1 << 1);
+
+    constexpr uint8_t SM_STATUS_IRQ_WRITE       = (1 << 0);
+    constexpr uint8_t SM_STATUS_IRQ_READ        = (1 << 1);
+    constexpr uint8_t SM_STATUS_MAILBOX         = (1 << 3);
+    constexpr uint8_t SM_STATUS_READ_IN_USE     = (1 << 3);
+    constexpr uint8_t SM_STATUS_WRITE_IN_USE    = (1 << 3);
 
     enum SyncManagerType
     {
@@ -376,13 +389,8 @@ namespace kickcat
         Output     = 3,
         Input      = 4  // slave to master
     };
-    constexpr uint8_t MAILBOX_STATUS = (1 << 3);
-
-    constexpr uint8_t SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK = (1 << 0);
-    constexpr uint8_t SYNC_MANAGER_CONTROL_DIRECTION_MASK = (1 << 1);
-
-
     char const* toString(SyncManagerType const& type);
+    constexpr uint16_t addressSM(uint8_t index) { return reg::SYNC_MANAGER + index * sizeof(SyncManager); };
 
     struct FMMU
     {

@@ -20,13 +20,13 @@ esac
 
 
 
-nuttx_src=~/wdc_workspace/src/autre/nuttx_dev
-build=~/wdc_workspace/src/autre/KickCAT/nuttx_build
+nuttx_src=~/wdc_workspace/src/nuttxspace/nuttx
+build=~/wdc_workspace/src/KickCAT/build_slave
 src=~/wdc_workspace/src/KickCAT
 
 bin=xmc4800_$project
 
-nuttx_version=nuttx-export-12.7.0
+nuttx_version=nuttx-export-12.5.1
 
 rm -f ${nuttx_src}/${nuttx_version}.tar.gz
 rm -rf ${build}/${nuttx_version}

@@ -317,14 +317,6 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOInformationMessage::process()
     {
-        /*
-        if (header_->len < (sizeof(mailbox::Header) + sizeof(CoE::ServiceDataInfo)))
-        {
-            replyError(std::move(data_), mailbox::Error::SIZE_TOO_SHORT);
-            return ProcessingResult::FINALIZE;
-        }
-        */
-
         switch (sdo_->opcode)
         {
             case CoE::SDO::information::GET_OD_LIST_REQ: { return processODList();  }
@@ -367,14 +359,13 @@ namespace kickcat::mailbox::response
                 }
             }
 
-            // 2. Compute requiered fragments
+            // 2. Compute required fragments
             std::size_t total_size = to_reply.size() * sizeof(uint16_t);
             uint16_t requiered_fragments = total_size / data_.size();
             if (total_size % data_.size())
             {
                 requiered_fragments += 1;
             }
-            printf("req frags %d\n", requiered_fragments);
 
             // 3. Start replying the fragments
             std::size_t pos = 0;
@@ -456,13 +447,6 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOInformationMessage::processOD()
     {
-        // check message coherency
-        if ((sdo_->fragments_left != 0) or
-            (sdo_->incomplete     != 0))
-        {
-            //TODO: do something
-        }
-
         header_->len = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo);
         sdo_->opcode = CoE::SDO::information::GET_OD_RESP;
 
@@ -477,7 +461,7 @@ namespace kickcat::mailbox::response
         }
 
         desc->data_type    = entry->type;
-        desc->max_subindex = object->entries.back().subindex; // TODO: not sure that object entries are ordered
+        desc->max_subindex = object->entries.back().subindex;
         desc->object_code  = object->code;
 
         auto name = pointData<char>(desc);
@@ -491,13 +475,6 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOInformationMessage::processED()
     {
-        // check message coherency
-        if ((sdo_->fragments_left != 0) or
-            (sdo_->incomplete     != 0))
-        {
-            //TODO: do something
-        }
-
         header_->len = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo);
         sdo_->opcode = CoE::SDO::information::GET_ED_RESP;
 

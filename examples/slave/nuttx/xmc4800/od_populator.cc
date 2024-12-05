@@ -105,20 +105,7 @@ namespace kickcat::CoE
             CoE::addEntry(object,2,32,63,static_cast<CoE::DataType>(7),"IMU",0x2);
             dictionary.push_back(std::move(object));
         }
-/*
-        for (uint16_t i = 0; i < 0x200; ++i)
-        {
-            CoE::Object object
-            {
-                uint16_t(i + 0x2000),
-                CoE::ObjectCode::VAR,
-                "Operation mode",
-                {}
-            };
-            CoE::addEntry(object,0,16,127,static_cast<CoE::DataType>(6),"",0x0);
-            dictionary.push_back(std::move(object));
-        }
-*/
+
         return dictionary;
     }
 }
