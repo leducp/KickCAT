@@ -78,6 +78,8 @@ int main(int argc, char* argv[])
                 mbx.receive();
                 mbx.process();
                 mbx.send();
+
+                esc.routine();
             }
         }
 

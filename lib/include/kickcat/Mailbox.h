@@ -26,6 +26,10 @@ namespace kickcat::mailbox
         FINALIZE,
         FINALIZE_AND_KEEP
     };
+
+    // Helper to compute new counter - used as session handle
+    // The input counter is increased is roleld from 1 to 7 by one increment and then returned
+    uint8_t nextCounter(uint8_t& currentCounter);
 }
 
 namespace kickcat::mailbox::request
@@ -186,7 +190,7 @@ namespace kickcat::mailbox::response
 
         void receive();  // Try to receive a message from the ESC
         void process();  // Process a message in the to_process_ queue if any
-        void send();  // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
+        void send();     // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
 
     private:
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
@@ -197,14 +201,14 @@ namespace kickcat::mailbox::response
         uint16_t max_allocated_ram_by_msg_;
         uint16_t max_msgs_;
 
-        // session handle, from 1 to 7, it is used to detect duplicate frame
-        uint8_t counter_{0};
-
         std::vector<std::function<std::shared_ptr<AbstractMessage>(Mailbox*, std::vector<uint8_t>&&)>> factories_;
-
-        std::list<std::shared_ptr<AbstractMessage>>  to_process_;   /// Received messages, waiting to be processed
-        std::queue<std::vector<uint8_t>> to_send_;      /// Messages to send (replies from a received messages)
         CoE::Dictionary dictionary_;
+
+        std::list<std::shared_ptr<AbstractMessage>> to_process_;    /// Received messages, waiting to be processed
+        std::queue<std::vector<uint8_t>> to_send_;                  /// Messages to send (replies from a received messages)
+
+        std::vector<uint8_t> last_sent_{};                          /// store the last sent message in case of repeat requested
+        std::vector<uint8_t> repeat_{};                             /// 'real' repeat, a copy of last sent WHEN the master fetch the mailbox
     };
 }
 

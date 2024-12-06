@@ -9,9 +9,6 @@
 #include "kickcat/SocketNull.h"
 #include "kickcat/helpers.h"
 
-#include "CanOpenErrors.h"
-#include "CanOpenStateMachine.h"
-#include "IngeniaProtocol.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -41,12 +38,13 @@ void printObjectDictionnaryList(Bus& bus, Slave& slave, CoE::SDO::information::L
     }
 
     printf("Data size received %u \n", buffer_size);
-    std::vector<uint16_t> index_list{buffer + sizeof(type), buffer + buffer_size/2};
-    printf("Object dictionnary list: size: %li\n", index_list.size());
 
-    for (auto const& index : index_list)
+    uint16_t index_size = buffer_size / 2 - 1;
+    printf("Object dictionnary list: size: %li\n", index_size);
+
+    for (int i = 0; i < index_size; ++i)
     {
-        printf("index %x \n", index);
+        printf("index %04x \n", buffer[i + 1]);
     }
 }
 
@@ -66,7 +64,7 @@ void printObjectDescription(Bus& bus, Slave& slave, uint16_t index)
     CoE::SDO::information::ObjectDescription* description = reinterpret_cast<CoE::SDO::information::ObjectDescription*>(buffer);
     std::string name{buffer + sizeof(CoE::SDO::information::ObjectDescription), buffer_size - sizeof(CoE::SDO::information::ObjectDescription)};
 
-    printf("Received object %s desc: %s ", name.c_str(), toString(*description).c_str());
+    printf("Received object %s\n desc: %s\n", name.c_str(), toString(*description).c_str());
 }
 
 
@@ -83,13 +81,8 @@ void printEntryDescription(Bus& bus, Slave& slave, uint16_t index, uint8_t subin
     }
 
     CoE::SDO::information::EntryDescription* description = reinterpret_cast<CoE::SDO::information::EntryDescription*>(buffer);
-    printf("Received entry desc: %s \n", toString(*description).c_str());
-
-    for (uint32_t i = sizeof(CoE::SDO::information::EntryDescription); i < buffer_size; ++i)
-    {
-        printf("%c", buffer[i]);
-    }
-    printf("\n");
+    std::string name{buffer + sizeof(CoE::SDO::information::EntryDescription), buffer_size - sizeof(CoE::SDO::information::EntryDescription)};
+    printf("Received entry %s\n desc: %s\n", name.c_str(), toString(*description).c_str());
 }
 
 
@@ -163,15 +156,18 @@ int main(int argc, char *argv[])
     }
 
     auto& ingenia = bus.slaves().at(0);
-    //printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::ALL);
-    printObjectDescription(bus, ingenia, 0x2025);
-    printEntryDescription(bus, ingenia, 0x2025, 0,
+    //printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::NUMBER);
+    printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::ALL);
+
+
+    printObjectDescription(bus, ingenia, 0x1018);
+    printEntryDescription(bus, ingenia, 0x1018, 0,
         CoE::SDO::information::ValueInfo::MAXIMUM);
 
-    printEntryDescription(bus, ingenia, 0x2025, 0,
+    printEntryDescription(bus, ingenia, 0x1600, 0,
         CoE::SDO::information::ValueInfo::DEFAULT);
 
-    printEntryDescription(bus, ingenia, 0x2373, 0,
+    printEntryDescription(bus, ingenia, 0x1600, 0,
         CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
 
     return 0;

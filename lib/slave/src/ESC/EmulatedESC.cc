@@ -78,7 +78,7 @@ namespace kickcat
                     case PDI_READ:
                     case ECAT_READ:
                     {
-                        if (not (sync.registers->status & MAILBOX_STATUS) and (sync.registers->control & 0x3))
+                        if (not (sync.registers->status & SM_STATUS_MAILBOX) and (sync.registers->control & 0x3))
                         {
                             return -1; // Cannot read mailbox: it is empty
                         }
@@ -87,14 +87,14 @@ namespace kickcat
                         if ((address + size - 1) == (sync.address + sync.size - 1))
                         {
                             // Last byte read -> access is done and mailbox is now empty
-                            sync.registers->status &= ~MAILBOX_STATUS;
+                            sync.registers->status &= ~SM_STATUS_MAILBOX;
                         }
                         return to_copy;
                     }
                     case PDI_WRITE:
                     case ECAT_WRITE:
                     {
-                        if ((sync.registers->status & MAILBOX_STATUS) and (sync.registers->control & 0x3))
+                        if ((sync.registers->status & SM_STATUS_MAILBOX) and (sync.registers->control & 0x3))
                         {
                             return -1; // Cannot write mailbox: it is full
                         }
@@ -103,7 +103,7 @@ namespace kickcat
                         if ((address + size - 1) == (sync.address + sync.size - 1))
                         {
                             // Last byte written -> access is done and mailbox is now full
-                            sync.registers->status |= MAILBOX_STATUS;
+                            sync.registers->status |= SM_STATUS_MAILBOX;
                         }
                         return to_copy;
                     }

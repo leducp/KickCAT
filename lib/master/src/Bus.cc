@@ -922,7 +922,7 @@ namespace kickcat
                 bus_error("Invalid working counter\n");
                 return stable_value;
             }
-            return ((state & MAILBOX_STATUS) == MAILBOX_STATUS);
+            return ((state & SM_STATUS_MAILBOX) == SM_STATUS_MAILBOX);
         };
 
         for (auto& slave : slaves_)

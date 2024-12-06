@@ -41,6 +41,30 @@ namespace kickcat::mailbox::response
         uint8_t* payload_;
     };
 
+
+    class SDOInformationMessage final : public AbstractMessage
+    {
+    public:
+        SDOInformationMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message);
+        virtual ~SDOInformationMessage() = default;
+
+        ProcessingResult process() override;
+        ProcessingResult process(std::vector<uint8_t> const& raw_message) override;
+
+    private:
+        ProcessingResult processODList();
+        ProcessingResult processOD();
+        ProcessingResult processED();
+
+        void abort(uint32_t code);
+
+        mailbox::Header* header_;
+        CoE::Header* coe_;
+        CoE::ServiceDataInfo* sdo_;
+
+    };
+
+
     class MailboxErrorMessage final : public AbstractMessage
     {
     public:

@@ -19,18 +19,15 @@ namespace kickcat
 
     bool AbstractESC::is_valid_sm(SyncManagerConfig const& sm_ref)
     {
-        auto create_sm_address = [](uint16_t reg, uint16_t sm_index) { return reg + sm_index * 8; };
-
         SyncManager sm_read;
-
-        read(create_sm_address(reg::SYNC_MANAGER, sm_ref.index), &sm_read, sizeof(sm_read));
+        read(addressSM(sm_ref.index), &sm_read, sizeof(sm_read));
 
         bool is_valid = (sm_read.start_address == sm_ref.start_address) and (sm_read.length == sm_ref.length)
                         and ((sm_read.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK)
                              == (sm_ref.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK))
                         and ((sm_read.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK)
                              == (sm_ref.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK))
-                        and sm_read.activate == 1;
+                        and (sm_read.activate & SM_ACTIVATE_ENABLE);
 
         // printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
         // printf("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
@@ -48,25 +45,58 @@ namespace kickcat
     }
 
 
+    void AbstractESC::sm_activate(SyncManagerConfig const& sm_conf)
+    {
+        auto const address = addressSM(sm_conf.index) + 7;
+
+        uint8_t pdi_control;
+        read(address, &pdi_control, sizeof(uint8_t));
+
+        uint8_t sm_deactivated = 0x1;
+        pdi_control &= ~sm_deactivated;
+        write(address, &pdi_control, sizeof(uint8_t));
+
+        do
+        {
+            read(address, &pdi_control, 1);
+        }
+        while ((pdi_control & 1) == 1);
+    }
+
+    void AbstractESC::sm_deactivate(SyncManagerConfig const& sm_conf)
+    {
+        auto const address = addressSM(sm_conf.index) + 7;
+
+        uint8_t pdi_control;
+        read(address, &pdi_control, sizeof(uint8_t));
+
+        uint8_t sm_deactivated = 0x1;
+        pdi_control |= sm_deactivated;
+        write(address, &pdi_control, sizeof(uint8_t));
+
+        while (true)
+        {
+            read(address, &pdi_control, sizeof(uint8_t));
+            if ((pdi_control & 1) == 1)
+            {
+                break;
+            }
+        }
+    }
+
+
     void AbstractESC::set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated)
     {
-        auto create_sm_address = [](uint16_t reg, uint16_t sm_index) { return reg + sm_index * 8; };
-
         for (auto& sm_conf : sync_managers)
         {
-            SyncManager sm;
-            read(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
-
-            uint8_t sm_deactivated = 0x1;
             if (is_activated)
             {
-                sm.pdi_control &= ~sm_deactivated;
+                sm_activate(sm_conf);
             }
             else
             {
-                sm.pdi_control |= sm_deactivated;
+                sm_deactivate(sm_conf);
             }
-            write(create_sm_address(reg::SYNC_MANAGER, sm_conf.index), &sm, sizeof(sm));
         }
     }
 
@@ -90,7 +120,7 @@ namespace kickcat
         for (uint8_t i = 0; i < reg::SM_STATS; i++)
         {
             SyncManager sync;
-            read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, &sync, sizeof(SyncManager));
+            read(addressSM(i), &sync, sizeof(SyncManager));
             if ((sync.control & 0x0F) == (controlMode & 0x0F))
             {
                 return std::tuple(i, sync);
@@ -225,7 +255,7 @@ namespace kickcat
     {
         if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
-            set_sm_activate({sm_mbx_input_, sm_mbx_output_}, false);
+            set_sm_activate({sm_mbx_input_, sm_mbx_output_}, false); //AIE!
             set_al_status(State::INIT);
             set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
         }
@@ -332,7 +362,7 @@ namespace kickcat
 
         update_process_data_input();
         update_process_data_output();
-        
+
         if (not are_valid_sm({sm_mbx_input_, sm_mbx_output_}))
         {
             set_sm_activate({sm_mbx_input_, sm_mbx_output_, sm_pd_input_, sm_pd_output_}, false);

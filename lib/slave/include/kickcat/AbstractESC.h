@@ -66,6 +66,9 @@ namespace kickcat
 
         bool has_expired_watchdog() { return not (watchdog_ & 0x1); }
 
+        void sm_activate(SyncManagerConfig const& sm);
+        void sm_deactivate(SyncManagerConfig const& sm);
+        void set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
     private:
         bool configure_pdo_sm();
 
@@ -74,7 +77,6 @@ namespace kickcat
 
         bool is_valid_sm(SyncManagerConfig const& sm_ref);
         bool are_valid_sm(std::vector<SyncManagerConfig> const& sm);
-        void set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
 
         void set_error(StatusCode code);
 

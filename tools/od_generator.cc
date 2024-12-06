@@ -76,7 +76,7 @@ namespace kickcat
     {
         std::stringstream result;
         result << "        {\n";
-        result << "            static CoE::Object object\n";
+        result << "            CoE::Object object\n";
         result << "            {\n";
         result << "                0x" << std::hex << objectToAdd.index << std::dec << ",\n";
         result << "                CoE::ObjectCode::" << CoE::toString(objectToAdd.code) << ",\n";
