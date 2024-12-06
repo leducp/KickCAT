@@ -23,22 +23,12 @@ namespace kickcat
             SlaveState(uint8_t id, AbstractESC& esc, PDO& pdo);
             void setMailbox(mailbox::response::Mailbox* mbx);
 
-            void startRoutine();
-            void endRoutine();
-            void onEntry();
-
         protected:
-            virtual void routine() {};
-            virtual void onEntryInternal() {};
-
             void set_al_status(State state);
-            State getRequestedState();
-            void set_error(StatusCode code);
+            State getRequestedState(uint16_t al_control);
+            std::tuple<uint16_t, uint16_t> buildALStatus(uint8_t state, uint8_t statusCode);
             void clear_error();
 
-            StatusCode al_status_code_ = {StatusCode::NO_ERROR};
-            uint16_t al_status_        = {0};
-            uint16_t al_control_       = {0};
 
             AbstractESC& esc_;
             PDO& pdo_;
@@ -50,17 +40,22 @@ namespace kickcat
         public:
             Init(AbstractESC& esc, PDO& pdo);
 
-            void onEntryInternal();
-            uint8_t transition();
+            void onEntry(uint8_t fromState) override;
+            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
+                                                   uint16_t al_status,
+                                                   uint16_t al_status_code) override;
         };
+
 
         class PreOP : public SlaveState
         {
         public:
             PreOP(AbstractESC& esc, PDO& pdo);
 
-            void onEntryInternal();
-            uint8_t transition();
+            void onEntry(uint8_t fromState) override;
+            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
+                                                   uint16_t al_status,
+                                                   uint16_t al_status_code) override;
         };
 
         class SafeOP : public SlaveState
@@ -68,9 +63,10 @@ namespace kickcat
         public:
             SafeOP(AbstractESC& esc, PDO& pdo);
 
-            void onEntryInternal();
-            void routine();
-            uint8_t transition();
+            void onEntry(uint8_t fromState) override;
+            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
+                                                   uint16_t al_status,
+                                                   uint16_t al_status_code) override;
         };
 
         class OP : public SlaveState
@@ -78,8 +74,9 @@ namespace kickcat
         public:
             OP(AbstractESC& esc, PDO& pdo);
 
-            void routine();
-            uint8_t transition();
+            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
+                                                   uint16_t al_status,
+                                                   uint16_t al_status_code) override;
 
         private:
             bool has_expired_watchdog();

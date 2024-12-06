@@ -34,9 +34,13 @@ namespace kickcat
 
         void routine()
         {
-            mbx_->receive();
-            mbx_->process();
-            mbx_->send();
+            if (mbx_)
+            {
+                mbx_->receive();
+                mbx_->process();
+                mbx_->send();
+            }
+
 
             stateMachine.play();
         }
@@ -50,7 +54,7 @@ namespace kickcat
         FSM::PreOP preOp_{*esc_, *pdo_};
         FSM::SafeOP safeOP_{*esc_, *pdo_};
         FSM::OP OP_{*esc_, *pdo_};
-        FSM::StateMachine stateMachine{{{&init_, &preOp_, &safeOP_, &OP_}}};
+        FSM::StateMachine stateMachine{*esc_, {{&init_, &preOp_, &safeOP_, &OP_}}};
     };
 }
 

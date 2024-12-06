@@ -1,5 +1,6 @@
 #include "kickcat/FSM.h"
 #include <algorithm>
+#include "protocol.h"
 
 namespace kickcat::FSM
 {
@@ -13,17 +14,18 @@ namespace kickcat::FSM
         return id_;
     }
 
-    void AbstractState::onEntry() {};
+    void AbstractState::onEntry(uint8_t) {};
 
-    StateMachine::StateMachine(std::array<FSM::AbstractState*, 4>&& states)
-        : states_{std::move(states)}
+    StateMachine::StateMachine(AbstractESC& esc, std::array<FSM::AbstractState*, 4>&& states)
+        : esc_{esc}
+        , states_{std::move(states)}
     {
         currentState_ = states_[0];
     }
 
     void StateMachine::start()
     {
-        currentState_->onEntry();
+        currentState_->onEntry(currentState_->id());
     }
 
     AbstractState* StateMachine::getState(uint8_t id)
@@ -39,8 +41,17 @@ namespace kickcat::FSM
 
     void StateMachine::play()
     {
-        currentState_->startRoutine();
-        uint8_t newStateId = currentState_->transition();
+        uint16_t al_control = {0};
+
+        // Get al control
+        esc_.read(reg::AL_CONTROL, &al_control, sizeof(al_control));
+
+        auto [al_status, al_status_code] = currentState_->routine(al_control, al_status_, al_status_code_);
+
+        al_status_      = al_status;
+        al_status_code_ = al_status_code;
+
+        uint8_t newStateId = al_status & State::MASK_STATE;
 
         if (newStateId != currentState_->id())
         {
@@ -52,10 +63,13 @@ namespace kickcat::FSM
 
             if (newState != currentState_)
             {
-                newState->onEntry();
+                newState->onEntry(currentState_->id());
                 currentState_ = newState;
             }
         }
-        currentState_->endRoutine();
+
+        // TODO: we shouldn't do that every loop
+        esc_.write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_));
+        esc_.write(reg::AL_STATUS, &al_status_, sizeof(al_status_));
     }
 }

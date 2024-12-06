@@ -5,7 +5,6 @@
 
 namespace kickcat::FSM
 {
-
     SlaveState::SlaveState(uint8_t id, AbstractESC& esc, PDO& pdo)
         : AbstractState(id)
         , esc_{esc}
@@ -13,78 +12,35 @@ namespace kickcat::FSM
     {
     }
 
-    void SlaveState::startRoutine()
-    {
-        esc_.read(reg::AL_CONTROL, &al_control_, sizeof(al_control_));
-        esc_.read(reg::AL_STATUS, &al_status_, sizeof(al_status_));
-
-        if ((al_control_ & State::ERROR_ACK))
-        {
-            clear_error();
-        }
-
-        // Do nothing until error is acknowledged by master.
-        if (al_status_ & State::ERROR_ACK)
-        {
-            return;
-        }
-
-        routine();
-    }
-
-    void SlaveState::endRoutine()
-    {
-        esc_.write(reg::AL_STATUS, &al_status_, sizeof(al_status_));
-        esc_.write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_));
-    }
-
-    void SlaveState::onEntry()
-    {
-        set_al_status(static_cast<kickcat::State>(id_));
-
-        onEntryInternal();
-    }
-
     void SlaveState::setMailbox(mailbox::response::Mailbox* mbx)
     {
         mbx_ = mbx;
     }
 
-    void SlaveState::set_al_status(State state)
+    State SlaveState::getRequestedState(uint16_t al_control)
     {
-        al_status_ = (al_status_ & ~State::MASK_STATE) | state;
+        return static_cast<State>(al_control & State::MASK_STATE);
     }
 
-    State SlaveState::getRequestedState()
+    std::tuple<uint16_t, uint16_t> SlaveState::buildALStatus(uint8_t state, uint8_t statusCode)
     {
-        return static_cast<State>(al_control_ & kickcat::State::MASK_STATE);
-    }
-
-    void SlaveState::clear_error()
-    {
-        al_status_code_ = StatusCode::NO_ERROR;
-        al_status_ &= ~AL_STATUS_ERR_IND;
-    }
-
-    void SlaveState::set_error(StatusCode code)
-    {
-        // Don't override non acknowlegded error, demanded by CTT, not specified in the norm.
-        if (not(al_status_ & State::ERROR_ACK))
+        if (statusCode == NO_ERROR)
         {
-            al_status_code_ = code;
-            al_status_ |= State::ERROR_ACK;
+            return std::tuple(state, statusCode);
+        }
+        else
+        {
+            return std::tuple(state | State::ERROR_ACK, statusCode);
         }
     }
 
-
     Init::Init(AbstractESC& esc, PDO& pdo)
-        : SlaveState(kickcat::State::INIT, esc, pdo)
+        : SlaveState(State::INIT, esc, pdo)
     {
     }
 
-    void Init::onEntryInternal()
+    void Init::onEntry(uint8_t)
     {
-        clear_error();
         if (mbx_)
         {
             mbx_->set_sm_activate(false);
@@ -92,42 +48,76 @@ namespace kickcat::FSM
         pdo_.set_sm_activated(false);
     }
 
-    uint8_t Init::transition()
+    std::tuple<uint16_t, uint16_t> Init::routine(uint16_t al_control,
+                                                         uint16_t al_status,
+                                                         uint16_t al_status_code)
     {
-        if (getRequestedState() == kickcat::State::PRE_OP)
+        // If master didn't aknowledge error but asked for the init, aknowledge it
+        // If it didn't ask stay in init and don't aknowledge
+        if (al_status & ERROR_ACK and not(al_control & ERROR_ACK))
+        {
+            if (getRequestedState(al_control) == INIT)
+            {
+                return buildALStatus(INIT, NO_ERROR);
+            }
+            else
+            {
+                return buildALStatus(INIT, al_status_code);
+            }
+        }
+
+        // asked for Next mode ?
+        if (getRequestedState(al_control) == State::PRE_OP)
         {
             if (not mbx_)
             {
-                return kickcat::State::PRE_OP;
+                return buildALStatus(State::PRE_OP, StatusCode::NO_ERROR);
             }
             if (mbx_->configureSm() == hresult::OK)
             {
                 if (mbx_->is_sm_config_ok())
                 {
-                    return kickcat::State::PRE_OP;
+                    printf("go to preop\n");
+                    return buildALStatus(State::PRE_OP, StatusCode::NO_ERROR);
                 }
                 else
                 {
-                    set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+                    return buildALStatus(State::INIT, StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
                 }
             }
         }
 
-        if ((getRequestedState() == State::SAFE_OP) or (getRequestedState() == State::OPERATIONAL))
+        // Invalid state request
+        if ((getRequestedState(al_control) == State::SAFE_OP) or (getRequestedState(al_control) == State::OPERATIONAL))
         {
-            set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
+            return buildALStatus(State::INIT, StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
 
-        return kickcat::State::INIT;
+        // Unknown state request
+        auto requestedState = getRequestedState(al_control);
+        if (requestedState != State::BOOT and requestedState != State::INIT and requestedState != State::PRE_OP
+            and requestedState != State::SAFE_OP and requestedState != State::OPERATIONAL)
+        {
+            return buildALStatus(id_, StatusCode::UNKNOWN_REQUESTED_STATE);
+        }
+
+        // BOOTSTRAP not supported yet. If implemented, need to check the SII to know if enabled.
+        if (getRequestedState(al_control) == State::BOOT)
+        {
+            return std::tuple(id_, StatusCode::BOOTSTRAP_NOT_SUPPORTED);
+        }
+
+        return std::tuple(State::INIT, StatusCode::NO_ERROR);
     }
 
     PreOP::PreOP(AbstractESC& esc, PDO& pdo)
-        : SlaveState(kickcat::State::PRE_OP, esc, pdo)
+        : SlaveState(State::PRE_OP, esc, pdo)
     {
     }
 
-    void PreOP::onEntryInternal()
+    void PreOP::onEntry(uint8_t)
     {
+        printf("Preop::onEntry\n");
         if (mbx_)
         {
             mbx_->set_sm_activate(true);
@@ -135,132 +125,194 @@ namespace kickcat::FSM
         pdo_.set_sm_activated(false);
     }
 
-    uint8_t PreOP::transition()
+    std::tuple<uint16_t, uint16_t> PreOP::routine(uint16_t al_control,
+                                                          uint16_t al_status,
+                                                          uint16_t al_status_code)
     {
-        if (mbx_ and not mbx_->is_sm_config_ok())
+        if (al_status & ERROR_ACK and not(al_control & ERROR_ACK))
         {
-            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
-            return kickcat::State::INIT;
+            if (getRequestedState(al_control) == INIT)
+            {
+                return buildALStatus(INIT, al_status_code);
+            }
+
+            return buildALStatus(al_status, al_status_code);
         }
 
-        if (getRequestedState() == kickcat::State::SAFE_OP and not(al_status_ & State::ERROR_ACK))
+        if (mbx_ and not mbx_->is_sm_config_ok())
+        {
+            return std::tuple(State::INIT, StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
+
+        if (getRequestedState(al_control) == State::SAFE_OP)
         {
             if (pdo_.configure_pdo_sm() != hresult::OK)
             {
-                return kickcat::State::PRE_OP;
+                return std::tuple(id_, StatusCode::NO_ERROR);
             }
 
             StatusCode pdo_sm_config_status_code = pdo_.is_sm_config_ok();
-            if (pdo_sm_config_status_code != NO_ERROR)
+            if (pdo_sm_config_status_code != StatusCode::NO_ERROR)
             {
-                set_error(pdo_sm_config_status_code);
-                return kickcat::State::PRE_OP;
+                return std::tuple(id_, pdo_sm_config_status_code);
             }
 
-            return kickcat::State::SAFE_OP;
+            return std::tuple(State::SAFE_OP, StatusCode::NO_ERROR);
         }
 
-        if (getRequestedState() == State::INIT)
+        if (getRequestedState(al_control) == State::INIT)
         {
-            return State::INIT;
-        }
-        else if (getRequestedState() == State::OPERATIONAL)
-        {
-            set_error(StatusCode::INVALID_REQUESTED_STATE_CHANGE);
+            return std::tuple(INIT, StatusCode::NO_ERROR);
         }
 
-        return kickcat::State::PRE_OP;
+        if (getRequestedState(al_control) == State::OPERATIONAL or getRequestedState(al_control) == State::BOOT)
+        {
+            return std::tuple(id_, StatusCode::INVALID_REQUESTED_STATE_CHANGE);
+        }
+
+        auto requestedState = getRequestedState(al_control);
+        if (requestedState != State::BOOT and requestedState != State::INIT and requestedState != State::PRE_OP
+            and requestedState != State::SAFE_OP and requestedState != State::OPERATIONAL)
+        {
+            return buildALStatus(id_, StatusCode::UNKNOWN_REQUESTED_STATE);
+        }
+
+        return std::tuple(id_, StatusCode::NO_ERROR);
     }
 
 
     SafeOP::SafeOP(AbstractESC& esc, PDO& pdo)
-        : SlaveState(kickcat::State::SAFE_OP, esc, pdo)
+        : SlaveState(State::SAFE_OP, esc, pdo)
     {
     }
 
 
-    void SafeOP::onEntryInternal()
+
+    void SafeOP::onEntry(uint8_t fromState)
     {
-        pdo_.set_sm_activated(true);
+        if (fromState == State::OPERATIONAL)
+        {
+            pdo_.set_sm_output_activated(false);
+        }
+        else
+        {
+            pdo_.set_sm_activated(true);
+        }
     }
 
-    void SafeOP::routine()
+    std::tuple<uint16_t, uint16_t> SafeOP::routine(uint16_t al_control,
+                                                           uint16_t al_status,
+                                                           uint16_t al_status_code)
     {
-        printf("SafeOP ROutine !!\n");
+        if (al_status & ERROR_ACK and not(al_control & ERROR_ACK))
+        {
+            if (getRequestedState(al_control) == INIT)
+            {
+                return buildALStatus(INIT, al_status_code);
+            }
+
+            return buildALStatus(al_status, al_status_code);
+        }
+
         pdo_.update_process_data_input();
         pdo_.update_process_data_output();
-    }
 
-    uint8_t SafeOP::transition()
-    {
         if (mbx_ and not mbx_->is_sm_config_ok())
         {
-            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
-            return State::INIT;
+            return std::tuple(State::INIT, StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
         }
 
         StatusCode pdo_sm_config_status_code = pdo_.is_sm_config_ok();
-        if (pdo_sm_config_status_code != NO_ERROR)
+        if (pdo_sm_config_status_code != StatusCode::NO_ERROR)
         {
-            set_error(pdo_sm_config_status_code);
-            return kickcat::State::PRE_OP;
+            return std::tuple(State::PRE_OP, pdo_sm_config_status_code);
         }
 
         //TODO: check if valid_ output data
-        if (getRequestedState() == kickcat::State::OPERATIONAL)
+        if (getRequestedState(al_control) == State::OPERATIONAL)
         {
-            return kickcat::State::OPERATIONAL;
+            return std::tuple(State::OPERATIONAL, StatusCode::NO_ERROR);
         }
-        else if (getRequestedState() == State::PRE_OP or getRequestedState() == State::INIT)
+        else if (getRequestedState(al_control) == State::PRE_OP or getRequestedState(al_control) == State::INIT)
         {
-            return getRequestedState();
+            return std::tuple(getRequestedState(al_control), StatusCode::NO_ERROR);
         }
 
-        return kickcat::State::SAFE_OP;
+        if (getRequestedState(al_control) == State::BOOT)
+        {
+            return std::tuple(State::SAFE_OP, INVALID_REQUESTED_STATE_CHANGE);
+        }
+
+        auto requestedState = getRequestedState(al_control);
+        if (requestedState != State::BOOT and requestedState != State::INIT and requestedState != State::PRE_OP
+            and requestedState != State::SAFE_OP and requestedState != State::OPERATIONAL)
+        {
+            return buildALStatus(State::SAFE_OP, StatusCode::UNKNOWN_REQUESTED_STATE);
+        }
+
+        return std::tuple(State::SAFE_OP, NO_ERROR);
     }
 
     OP::OP(AbstractESC& esc, PDO& pdo)
-        : SlaveState(kickcat::State::OPERATIONAL, esc, pdo)
+        : SlaveState(State::OPERATIONAL, esc, pdo)
     {
     }
 
-    void OP::routine()
+    std::tuple<uint16_t, uint16_t> OP::routine(uint16_t al_control, uint16_t al_status, uint16_t al_status_code)
     {
-        pdo_.update_process_data_input();
-        pdo_.update_process_data_output();
-    }
-
-    uint8_t OP::transition()
-    {
-        if (has_expired_watchdog())
+        if (al_status & ERROR_ACK and not(al_control & ERROR_ACK))
         {
-            set_error(StatusCode::SYNC_MANAGER_WATCHDOG);
+            if (getRequestedState(al_control) == INIT)
+            {
+                return buildALStatus(INIT, al_status_code);
+            }
+
+            return buildALStatus(al_status, al_status_code);
         }
 
-        if (al_status_ & State::ERROR_ACK)
+
+        pdo_.update_process_data_input();
+        pdo_.update_process_data_output();
+
+        if (has_expired_watchdog())
         {
-            // In case of error in OP, go to a lower state, CTT wants safe op; not specified in the norms.
-            return State::SAFE_OP;
+            return std::tuple(State::SAFE_OP, SYNC_MANAGER_WATCHDOG);
         }
 
         if (mbx_ and not mbx_->is_sm_config_ok())
         {
-            set_error(StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
-            return State::INIT;
+            return std::tuple(INIT, INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
+
+        if (getRequestedState(al_control) == State::BOOT)
+        {
+            return std::tuple(State::SAFE_OP, INVALID_REQUESTED_STATE_CHANGE);
         }
 
         StatusCode pdo_sm_config_status_code = pdo_.is_sm_config_ok();
-        if (pdo_sm_config_status_code != NO_ERROR)
+        if (pdo_sm_config_status_code != StatusCode::NO_ERROR)
         {
-            set_error(pdo_sm_config_status_code);
-            return kickcat::State::PRE_OP;
+            return std::tuple(PRE_OP, pdo_sm_config_status_code);
         }
 
-        return getRequestedState();
+        if (getRequestedState(al_control) == State::BOOT)
+        {
+            return std::tuple(SAFE_OP, INVALID_REQUESTED_STATE_CHANGE);
+        }
+
+        auto requestedState = getRequestedState(al_control);
+        if (requestedState != State::BOOT and requestedState != State::INIT and requestedState != State::PRE_OP
+            and requestedState != State::SAFE_OP and requestedState != State::OPERATIONAL)
+        {
+            return buildALStatus(SAFE_OP, StatusCode::UNKNOWN_REQUESTED_STATE);
+        }
+
+        return std::tuple(getRequestedState(al_control), NO_ERROR);
     }
 
     bool OP::has_expired_watchdog()
     {
+        //TODO should be given in entry of the state
         uint16_t watchdog{0};
         esc_.read(reg::WDOG_STATUS, &watchdog, sizeof(watchdog));
         return not(watchdog & 0x1);

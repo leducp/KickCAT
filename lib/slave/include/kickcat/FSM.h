@@ -4,13 +4,12 @@
 #include <cstdarg>
 #include <map>
 #include <string>
+#include "kickcat/AbstractESC.h"
 #include "kickcat/protocol.h"
 
 
 namespace kickcat
 {
-    class AbstractESC;
-
     namespace FSM
     {
         class StateMachine;
@@ -29,16 +28,17 @@ namespace kickcat
             uint8_t id_;
 
         private:
-            virtual void startRoutine()  = 0;
-            virtual void endRoutine()    = 0;
-            virtual uint8_t transition() = 0;
-            virtual void onEntry();
+            virtual std ::tuple<uint16_t, uint16_t> routine(
+                uint16_t al_control,
+                uint16_t al_status,
+                uint16_t al_status_code) = 0;  //return al_status and al_status_code
+            virtual void onEntry(uint8_t fromState);
         };
 
         class StateMachine
         {
         public:
-            StateMachine(std::array<FSM::AbstractState*, 4>&& states);
+            StateMachine(AbstractESC& esc, std::array<FSM::AbstractState*, 4>&& states);
             void start();
             void play();
 
@@ -46,8 +46,11 @@ namespace kickcat
             AbstractState* getState(uint8_t id);
 
         private:
+            AbstractESC& esc_;
             AbstractState* currentState_;
             std::array<FSM::AbstractState*, 4> states_;
+            uint16_t al_status_{State::INIT};
+            uint16_t al_status_code_{NO_ERROR};
         };
     }
 }
