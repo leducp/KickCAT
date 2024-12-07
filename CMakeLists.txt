@@ -43,6 +43,7 @@ if (GTest_FOUND)
                               unit/protocol-t.cc
                               unit/slave-t.cc
                               unit/socket-t.cc
+                              unit/AbstractESC2-t.cc
                               unit/Time.cc
                               unit/CoE/protocol-t.cc
   )
