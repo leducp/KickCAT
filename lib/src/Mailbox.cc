@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cinttypes>
 #include <exception>
 
 #include "AbstractESC.h"
@@ -327,7 +326,7 @@ namespace kickcat::mailbox::response
     void Mailbox::receive()
     {
         SyncManager sync;
-        esc_->read(addressSM(mbx_out_.index), &sync, sizeof(SyncManager));
+        esc_->read(addressSM(mbx_out_->index), &sync, sizeof(SyncManager));
         if (not (sync.status & SM_STATUS_MAILBOX))
         {
             return;
@@ -416,7 +415,7 @@ namespace kickcat::mailbox::response
     void Mailbox::send()
     {
         SyncManager sync;
-        esc_->read(addressSM(mbx_in_.index), &sync, sizeof(SyncManager));
+        esc_->read(addressSM(mbx_in_->index), &sync, sizeof(SyncManager));
 
         // Save last fetched message for repeat procedure
         if (sync.status & SM_STATUS_IRQ_READ)
@@ -425,7 +424,7 @@ namespace kickcat::mailbox::response
 
             // reset IRQ by writing to the buffer
             uint8_t dummy = 0;
-            esc_->write(mbx_in_.start_address, &dummy, 1);
+            esc_->write(mbx_in_->start_address, &dummy, 1);
         }
 
         // Repeat procedure handling
@@ -434,14 +433,14 @@ namespace kickcat::mailbox::response
             // Write the last sent message - we need to reset the SM to empty it if full
             if (sync.status & SM_STATUS_MAILBOX)
             {
-                esc_->sm_deactivate(mbx_in_);
-                esc_->sm_activate(mbx_in_);
+                esc_->sm_deactivate(mbx_in_.value());
+                esc_->sm_activate(mbx_in_.value());
             }
-            esc_->write(mbx_in_.start_address, repeat_.data(), repeat_.size());
+            esc_->write(mbx_in_->start_address, repeat_.data(), repeat_.size());
 
             // Ack the repeat requested
             uint8_t ack = sync.activate & SM_ACTIVATE_REPEAT_REQ;
-            esc_->write(addressSM(mbx_in_.index) + 7, &ack, sizeof(uint8_t));
+            esc_->write(addressSM(mbx_in_->index) + 7, &ack, sizeof(uint8_t));
 
             // We just fill the mailbox: do not continue for now
             return;

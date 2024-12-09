@@ -19,7 +19,7 @@ namespace kickcat
 
     void Slave::start()
     {
-        stateMachine.start();
+        stateMachine_.start();
     }
 
     void Slave::routine()
@@ -31,6 +31,16 @@ namespace kickcat
             mbx_->send();
         }
 
-        stateMachine.play();
+        stateMachine_.play();
+    }
+
+    State Slave::getState()
+    {
+        return stateMachine_.getState();
+    }
+
+    void Slave::setOutputDataValid(bool isValid)
+    {
+        stateMachine_.setOutputDataValid(isValid);
     }
 }

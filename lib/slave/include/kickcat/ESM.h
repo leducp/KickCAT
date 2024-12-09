@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_FSM_H_
-#define SLAVE_STACK_INCLUDE_FSM_H_
+#ifndef SLAVE_STACK_INCLUDE_ESM_H_
+#define SLAVE_STACK_INCLUDE_ESM_H_
 
 #include <cstdarg>
 #include "PDO.h"
@@ -12,7 +12,7 @@ namespace kickcat
     constexpr uint8_t NUMBER_OF_STATES = 4;
 
     // TODO: to rename ESM
-    namespace FSM
+    namespace ESM
     {
         class StateMachine;
 
@@ -89,17 +89,18 @@ namespace kickcat
         class StateMachine final
         {
         public:
-            StateMachine(AbstractESC& esc, std::array<FSM::AbstractState*, NUMBER_OF_STATES>&& states);
+            StateMachine(AbstractESC& esc, std::array<ESM::AbstractState*, NUMBER_OF_STATES>&& states);
             void setOutputDataValid(bool isValid);
             void start();
             void play();
+            State getState();
 
         private:
             AbstractState* findState(uint8_t id);
 
             AbstractESC& esc_;
             AbstractState* currentState_;
-            std::array<FSM::AbstractState*, NUMBER_OF_STATES> states_;
+            std::array<ESM::AbstractState*, NUMBER_OF_STATES> states_;
             ALStatus status_{};
         };
     }

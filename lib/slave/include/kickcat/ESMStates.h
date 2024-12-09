@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_SLAVE_FSM_H_
-#define SLAVE_STACK_INCLUDE_SLAVE_FSM_H_
+#ifndef SLAVE_STACK_INCLUDE_SLAVE_ESM_H_
+#define SLAVE_STACK_INCLUDE_SLAVE_ESM_H_
 
 #include <cstdarg>
 #include <cstdint>
@@ -7,14 +7,13 @@
 #include <string>
 #include "PDO.h"
 #include "kickcat/AbstractESC.h"
-#include "kickcat/FSM.h"
+#include "kickcat/ESM.h"
 #include "kickcat/Mailbox.h"
 #include "kickcat/protocol.h"
 
-// TODO: to rename file
 namespace kickcat
 {
-    namespace FSM
+    namespace ESM
     {
         class Init : public AbstractState
         {

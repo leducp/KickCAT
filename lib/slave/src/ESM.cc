@@ -1,8 +1,8 @@
-#include "kickcat/FSM.h"
+#include "kickcat/ESM.h"
 #include <algorithm>
 #include "protocol.h"
 
-namespace kickcat::FSM
+namespace kickcat::ESM
 {
     AbstractState::AbstractState(uint8_t id, AbstractESC& esc, PDO& pdo)
         : id_(id)
@@ -21,7 +21,7 @@ namespace kickcat::FSM
         return id_;
     }
 
-    StateMachine::StateMachine(AbstractESC& esc, std::array<FSM::AbstractState*, 4>&& states)
+    StateMachine::StateMachine(AbstractESC& esc, std::array<ESM::AbstractState*, 4>&& states)
         : esc_{esc}
         , states_{std::move(states)}
     {
@@ -32,6 +32,12 @@ namespace kickcat::FSM
     {
         status_.validOutputData = isValid;
     }
+
+    State StateMachine::getState()
+    {
+        return status_.getState();
+    }
+
     void StateMachine::start()
     {
         currentState_->onEntry(currentState_->id());

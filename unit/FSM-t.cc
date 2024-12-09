@@ -2,12 +2,12 @@
 #include <gtest/gtest.h>
 #include <cstring>
 #include "kickcat/AbstractESC.h"
-#include "kickcat/FSM.h"
+#include "kickcat/ESM.h"
 #include "kickcat/OS/Time.h"
 #include "kickcat/Error.h"
 
 using namespace kickcat;
-using namespace kickcat::FSM;
+using namespace kickcat::ESM;
 using namespace testing;
 
 

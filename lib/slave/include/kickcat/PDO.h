@@ -17,7 +17,6 @@ namespace kickcat
 
         hresult configure_pdo_sm();
         StatusCode is_sm_config_ok();
-        void set_sm_activated(bool is_activated);
         void set_sm_output_activated(bool is_activated);
         void set_sm_input_activated(bool is_activated);
         void set_process_data_input(uint8_t* buffer);

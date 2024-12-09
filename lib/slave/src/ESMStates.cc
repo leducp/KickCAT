@@ -1,9 +1,9 @@
-#include "kickcat/SlaveFSM.h"
-#include "FSM.h"
+#include "kickcat/ESMStates.h"
+#include "ESM.h"
 #include "kickcat/AbstractESC.h"
 #include "protocol.h"
 
-namespace kickcat::FSM
+namespace kickcat::ESM
 {
     Init::Init(AbstractESC& esc, PDO& pdo)
         : AbstractState(State::INIT, esc, pdo)
@@ -16,13 +16,13 @@ namespace kickcat::FSM
         {
             mbx_->set_sm_activate(false);
         }
-        pdo_.set_sm_activated(false);
+        pdo_.set_sm_input_activated(false);
+        pdo_.set_sm_output_activated(false);
     }
 
 
     ALStatus AbstractState::routine(ALStatus currentStatus, ALControl control)
     {
-
         // TODO: update the comment
         // If master didn't aknowledge error but asked for the init, aknowledge it
         // If it didn't ask stay in init and don't aknowledge
@@ -43,8 +43,8 @@ namespace kickcat::FSM
 
         // Unknown state request
         auto requestedState = control.getRequestedState();
-        if (currentStatus.getState() != State::OPERATIONAL and requestedState != State::BOOT and requestedState != State::INIT
-            and requestedState != State::PRE_OP and requestedState != State::SAFE_OP
+        if (currentStatus.getState() != State::OPERATIONAL and requestedState != State::BOOT
+            and requestedState != State::INIT and requestedState != State::PRE_OP and requestedState != State::SAFE_OP
             and requestedState != State::OPERATIONAL)
         {
             return ALStatus::build(id_, StatusCode::UNKNOWN_REQUESTED_STATE);
@@ -100,7 +100,8 @@ namespace kickcat::FSM
         {
             mbx_->set_sm_activate(true);
         }
-        pdo_.set_sm_activated(false);
+        pdo_.set_sm_output_activated(false);
+        pdo_.set_sm_input_activated(false);
     }
 
     ALStatus PreOP::routineInternal(ALStatus, ALControl control)
@@ -153,7 +154,8 @@ namespace kickcat::FSM
         }
         else
         {
-            pdo_.set_sm_activated(true);
+            pdo_.set_sm_output_activated(true);
+            pdo_.set_sm_input_activated(true);
         }
     }
 

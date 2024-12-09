@@ -44,30 +44,10 @@ namespace kickcat
         virtual int32_t write(uint16_t address, void const* data, uint16_t size) = 0;
 
         std::tuple<uint8_t, SyncManager> find_sm(uint16_t controlMode);
-
-        void routine_init();
-        void routine_preop();
-        void routine_safeop();
-        void routine_op();
-
-        void set_state_on_error(State state, StatusCode error_code);
-        void clear_error();
-
-        uint16_t al_status() { return al_status_;};
-
-        bool has_expired_watchdog() { return not (watchdog_ & 0x1); }
-
         void sm_activate(SyncManagerConfig const& sm);
         void sm_deactivate(SyncManagerConfig const& sm);
-        void set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
-    private:
-        bool configure_pdo_sm();
-
-        void update_process_data_input();
-        void update_process_data_output();
 
         bool is_valid_sm(SyncManagerConfig const& sm_ref);
-        bool are_valid_sm(std::vector<SyncManagerConfig> const& sm);
         void set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
     };
 

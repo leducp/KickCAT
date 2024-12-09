@@ -54,14 +54,6 @@ namespace kickcat
         }
     }
 
-    void PDO::set_sm_activated(bool is_activated)
-    {
-        if (sm_pd_output_.has_value() and sm_pd_input_.has_value())
-        {
-            esc_->set_sm_activate({sm_pd_input_.value(), sm_pd_output_.value()}, is_activated);
-        }
-    }
-
     void PDO::set_process_data_input(uint8_t* buffer)
     {
         process_data_input_ = buffer;
