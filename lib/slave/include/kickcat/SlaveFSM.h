@@ -11,72 +11,44 @@
 #include "kickcat/Mailbox.h"
 #include "kickcat/protocol.h"
 
-
+// TODO: to rename file
 namespace kickcat
 {
     namespace FSM
     {
-
-        class SlaveState : public AbstractState
-        {
-        public:
-            SlaveState(uint8_t id, AbstractESC& esc, PDO& pdo);
-            void setMailbox(mailbox::response::Mailbox* mbx);
-
-        protected:
-            void set_al_status(State state);
-            State getRequestedState(uint16_t al_control);
-            std::tuple<uint16_t, uint16_t> buildALStatus(uint8_t state, uint8_t statusCode);
-            void clear_error();
-
-
-            AbstractESC& esc_;
-            PDO& pdo_;
-            mailbox::response::Mailbox* mbx_;
-        };
-
-        class Init : public SlaveState
+        class Init : public AbstractState
         {
         public:
             Init(AbstractESC& esc, PDO& pdo);
 
             void onEntry(uint8_t fromState) override;
-            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
-                                                   uint16_t al_status,
-                                                   uint16_t al_status_code) override;
+            ALStatus routineInternal(ALStatus currentStatus, ALControl control) override;
         };
 
-
-        class PreOP : public SlaveState
+        class PreOP : public AbstractState
         {
         public:
             PreOP(AbstractESC& esc, PDO& pdo);
 
             void onEntry(uint8_t fromState) override;
-            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
-                                                   uint16_t al_status,
-                                                   uint16_t al_status_code) override;
+            ALStatus routineInternal(ALStatus currentStatus, ALControl control) override;
         };
 
-        class SafeOP : public SlaveState
+        class SafeOP : public AbstractState
         {
         public:
             SafeOP(AbstractESC& esc, PDO& pdo);
 
             void onEntry(uint8_t fromState) override;
-            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
-                                                   uint16_t al_status,
-                                                   uint16_t al_status_code) override;
+            ALStatus routineInternal(ALStatus currentStatus, ALControl control) override;
         };
 
-        class OP : public SlaveState
+        class OP : public AbstractState
         {
         public:
             OP(AbstractESC& esc, PDO& pdo);
 
-            std::tuple<uint16_t, uint16_t> routine(uint16_t al_control,
-                                                   uint16_t al_status,
-                                                   uint16_t al_status_code) override;
+            ALStatus routineInternal(ALStatus currentStatus, ALControl control) override;
 
         private:
             bool has_expired_watchdog();

@@ -29,25 +29,8 @@ namespace kickcat
                              == (sm_ref.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK))
                         and (sm_read.activate & SM_ACTIVATE_ENABLE);
 
-//        if (is_valid)
-//        {
-//        }
-//        else
-//        {
-//            printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n",
-//                   sm_ref.index,
-//                   sm_read.start_address,
-//                   sm_read.length,
-//                   sm_read.control,
-//                   sm_read.status,
-//                   sm_read.activate);
-//            printf("SM config %i: start address %x, length %u, control %x \n",
-//                   sm_ref.index,
-//                   sm_ref.start_address,
-//                   sm_ref.length,
-//                   sm_ref.control);
-//            printf("NOT valid !!\n");
-//        }
+//      // printf("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
+        // printf("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
         return is_valid;
     }
 

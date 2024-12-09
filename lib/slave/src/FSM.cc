@@ -4,17 +4,22 @@
 
 namespace kickcat::FSM
 {
-    AbstractState::AbstractState(uint8_t id)
-        : id_{id}
+    AbstractState::AbstractState(uint8_t id, AbstractESC& esc, PDO& pdo)
+        : id_(id)
+        , esc_{esc}
+        , pdo_{pdo}
     {
+    }
+
+    void AbstractState::setMailbox(mailbox::response::Mailbox* mbx)
+    {
+        mbx_ = mbx;
     }
 
     uint8_t AbstractState::id()
     {
         return id_;
     }
-
-    void AbstractState::onEntry(uint8_t) {};
 
     StateMachine::StateMachine(AbstractESC& esc, std::array<FSM::AbstractState*, 4>&& states)
         : esc_{esc}
@@ -23,12 +28,16 @@ namespace kickcat::FSM
         currentState_ = states_[0];
     }
 
+    void StateMachine::setOutputDataValid(bool isValid)
+    {
+        status_.validOutputData = isValid;
+    }
     void StateMachine::start()
     {
         currentState_->onEntry(currentState_->id());
     }
 
-    AbstractState* StateMachine::getState(uint8_t id)
+    AbstractState* StateMachine::findState(uint8_t id)
     {
         auto it = std::find_if(std::begin(states_), std::end(states_), [&](auto* state) { return state->id() == id; });
         if (it == states_.end())
@@ -41,21 +50,20 @@ namespace kickcat::FSM
 
     void StateMachine::play()
     {
-        uint16_t al_control = {0};
-
         // Get al control
-        esc_.read(reg::AL_CONTROL, &al_control, sizeof(al_control));
+        ALControl control;
+        esc_.read(reg::AL_CONTROL, &control.value, sizeof(control.value));
 
-        auto [al_status, al_status_code] = currentState_->routine(al_control, al_status_, al_status_code_);
+        // Update watchdog
+        esc_.read(reg::WDOG_STATUS, &status_.al_watchdog, sizeof(status_.al_watchdog));
 
-        al_status_      = al_status;
-        al_status_code_ = al_status_code;
+        auto newStatus = currentState_->routine(status_, control);
 
-        uint8_t newStateId = al_status & State::MASK_STATE;
+        uint8_t newStateId = newStatus.getState();
 
         if (newStateId != currentState_->id())
         {
-            AbstractState* newState = getState(newStateId);
+            AbstractState* newState = findState(newStateId);
             if (not newState)
             {
                 newState = states_[0];
@@ -68,8 +76,13 @@ namespace kickcat::FSM
             }
         }
 
-        // TODO: we shouldn't do that every loop
-        esc_.write(reg::AL_STATUS_CODE, &al_status_code_, sizeof(al_status_code_));
-        esc_.write(reg::AL_STATUS, &al_status_, sizeof(al_status_));
+        if (status_.al_status != newStatus.al_status or status_.al_status_code != newStatus.al_status_code)
+        {
+            status_ = newStatus;
+
+            // Note : StatusCode MUST be set before status
+            esc_.write(reg::AL_STATUS_CODE, &status_.al_status_code, sizeof(status_.al_status_code));
+            esc_.write(reg::AL_STATUS, &status_.al_status, sizeof(status_.al_status));
+        }
     }
 }

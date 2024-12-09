@@ -20,27 +20,11 @@ namespace kickcat
         SyncManagerType type;
     };
 
-#define SYNC_MANAGER_PI_IN(index, address, length)           \
-    SyncManagerConfig                                        \
-    {                                                        \
-        index, address, length, 0x20, SyncManagerType::Input \
-    }
-#define SYNC_MANAGER_PI_OUT(index, address, length)           \
-    SyncManagerConfig                                         \
-    {                                                         \
-        index, address, length, 0x64, SyncManagerType::Output \
-    }
+    #define SYNC_MANAGER_PI_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x20, SyncManagerType::Input}
+    #define SYNC_MANAGER_PI_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x64, SyncManagerType::Output}
 
-#define SYNC_MANAGER_MBX_IN(index, address, length)              \
-    SyncManagerConfig                                            \
-    {                                                            \
-        index, address, length, 0x02, SyncManagerType::MailboxIn \
-    }
-#define SYNC_MANAGER_MBX_OUT(index, address, length)              \
-    SyncManagerConfig                                             \
-    {                                                             \
-        index, address, length, 0x06, SyncManagerType::MailboxOut \
-    }
+    #define SYNC_MANAGER_MBX_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x02, SyncManagerType::MailboxIn}
+    #define SYNC_MANAGER_MBX_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x06, SyncManagerType::MailboxOut}
 
 
     namespace mailbox::response
@@ -48,7 +32,7 @@ namespace kickcat
         class Mailbox;
     }
 
-
+    // Regarding the state machine, see ETG1000.6 6.4.1 AL state machine
     class AbstractESC
     {
     public:

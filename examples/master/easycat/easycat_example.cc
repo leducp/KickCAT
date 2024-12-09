@@ -97,7 +97,6 @@ int main(int argc, char* argv[])
 
             printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
         });
-        printf("HEREEEEEE\n");
 
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
@@ -119,11 +118,8 @@ int main(int argc, char* argv[])
         printInfo(slave);
         printESC(slave);
     }
-    printf("HERE2\n");
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    auto callback_error2 = [](DatagramState const&){ THROW_ERROR("something bad happened2"); };
-    printf("HERE3\n");
 
     // Set valid output to exit safe op.
     auto& easycat = bus.slaves().at(0);
@@ -142,7 +138,7 @@ int main(int argc, char* argv[])
         //TODO: need a way to check expected working counter depending on state
         // -> in safe op write is not working
     }
-    bus.processDataWrite(callback_error2);
+    bus.processDataWrite(callback_error);
 
     try
     {

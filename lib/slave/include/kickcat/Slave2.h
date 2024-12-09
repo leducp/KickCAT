@@ -7,43 +7,18 @@
 #include "kickcat/Mailbox.h"
 #include "kickcat/SlaveFSM.h"
 
+
+// TODO: to rename file
 namespace kickcat
 {
     class Slave final
     {
     public:
-        Slave(AbstractESC* esc, PDO* pdo)
-            : esc_{esc}
-            , pdo_{pdo}
-        {
-        }
+        Slave(AbstractESC* esc, PDO* pdo);
 
-        void set_mailbox(mailbox::response::Mailbox* mbx)
-        {
-            mbx_ = mbx;
-            init_.setMailbox(mbx);
-            preOp_.setMailbox(mbx);
-            safeOP_.setMailbox(mbx);
-            OP_.setMailbox(mbx);
-        }
-
-        void start()
-        {
-            stateMachine.start();
-        }
-
-        void routine()
-        {
-            if (mbx_)
-            {
-                mbx_->receive();
-                mbx_->process();
-                mbx_->send();
-            }
-
-
-            stateMachine.play();
-        }
+        void set_mailbox(mailbox::response::Mailbox* mbx);
+        void start();
+        void routine();
 
     private:
         AbstractESC* esc_;
