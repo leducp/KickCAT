@@ -10,6 +10,7 @@
 
 namespace kickcat
 {
+// LCOV_EXCL_START
     // Host to Network byte order helper (Reminder: EtherCAT is LE, network is BE)
 
     // SPI INSTRUCTIONS
@@ -103,8 +104,7 @@ namespace kickcat
 
         std::shared_ptr<AbstractSPI> spi_interface_; // TODO shared ptr like link in bus.h
     };
-
-
+// LCOV_EXCL_STOP
 }
 
 

@@ -3,7 +3,7 @@
 
 namespace kickcat
 {
-
+// LCOV_EXCL_START
     hresult XMC4800::init()
     {
         return hresult::OK;
@@ -34,4 +34,5 @@ namespace kickcat
         std::memcpy(reinterpret_cast<void*>(ECAT0_BASE_ADDRESS + address), data, size);
         return size;
     }
+// LCOV_EXCL_STOP
 }

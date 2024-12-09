@@ -192,6 +192,9 @@ namespace kickcat::mailbox::response
         void process();  // Process a message in the to_process_ queue if any
         void send();     // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
 
+        // Access on the next message to send: mainly for unit test
+        std::vector<uint8_t> const& readyToSend() const { return to_send_.front(); }
+
     private:
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
 
