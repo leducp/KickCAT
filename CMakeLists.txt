@@ -43,6 +43,8 @@ if (GTest_FOUND)
                               unit/protocol-t.cc
                               unit/slave-t.cc
                               unit/socket-t.cc
+                              unit/AbstractESC-t.cc
+                              unit/FSM-t.cc
                               unit/Time.cc
                               unit/CoE/protocol-t.cc
   )
@@ -56,7 +58,7 @@ if (GTest_FOUND)
     append_coverage_compiler_flags()
     set(GCOVR_ADDITIONAL_ARGS --exclude-unreachable-branches --exclude-throw-branches)
 
-    set(EXCLUDE_FILES "unit/*" ".*gtest.*" "example" ".*gmock.*" ".*/OS/.*" "tools/*" "conan/*")
+    set(EXCLUDE_FILES "unit/*" ".*gtest.*" "examples/*" ".*gmock.*" ".*/OS/.*" "tools/*" "conan/*" "*conan2/*")
     setup_target_for_coverage_gcovr_html(
         NAME coverage
         EXECUTABLE kickcat_unit
