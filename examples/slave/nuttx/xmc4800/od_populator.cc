@@ -16,11 +16,11 @@ namespace kickcat::CoE
                 "Identity Object",
                 {}
             };
-            CoE::addEntry(object,0,8, 7,static_cast<CoE::DataType>(5),"Subindex 000",0x4);
-            CoE::addEntry(object,1,32,7,static_cast<CoE::DataType>(7),"Vendor ID",0x6a5);
-            CoE::addEntry(object,2,32,7,static_cast<CoE::DataType>(7),"Product code",0xb0cad0);
-            CoE::addEntry(object,3,32,7,static_cast<CoE::DataType>(7),"Revision number",0x0);
-            CoE::addEntry(object,4,32,7,static_cast<CoE::DataType>(7),"Serial number",0xcafedeca);
+            CoE::addEntry(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x4);
+            CoE::addEntry(object,1,32,16,7,static_cast<CoE::DataType>(7),"Vendor ID",0x6a5);
+            CoE::addEntry(object,2,32,48,7,static_cast<CoE::DataType>(7),"Product code",0xb0cad0);
+            CoE::addEntry(object,3,32,80,7,static_cast<CoE::DataType>(7),"Revision number",0x0);
+            CoE::addEntry(object,4,32,112,7,static_cast<CoE::DataType>(7),"Serial number",0xcafedeca);
             dictionary.push_back(std::move(object));
         }
 
@@ -32,8 +32,8 @@ namespace kickcat::CoE
                 "RxPDO Map 1",
                 {}
             };
-            CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x10);
+            CoE::addEntry(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
+            CoE::addEntry(object,1,32,16,15,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x10);
             dictionary.push_back(std::move(object));
         }
 
@@ -45,8 +45,8 @@ namespace kickcat::CoE
                 "TxPDO Map 1",
                 {}
             };
-            CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0xe0);
+            CoE::addEntry(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
+            CoE::addEntry(object,1,32,16,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0xe0);
             dictionary.push_back(std::move(object));
         }
 
@@ -58,11 +58,11 @@ namespace kickcat::CoE
                 "Sync manager type",
                 {}
             };
-            CoE::addEntry(object,0,8,7,static_cast<CoE::DataType>(5),"Subindex 0",0x4);
-            CoE::addEntry(object,1,8,7,static_cast<CoE::DataType>(5),"Subindex 1",0x1);
-            CoE::addEntry(object,2,8,7,static_cast<CoE::DataType>(5),"Subindex 2",0x2);
-            CoE::addEntry(object,3,8,7,static_cast<CoE::DataType>(5),"Subindex 3",0x3);
-            CoE::addEntry(object,4,8,7,static_cast<CoE::DataType>(5),"Subindex 4",0x4);
+            CoE::addEntry(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 0",0x4);
+            CoE::addEntry(object,1,8,16,7,static_cast<CoE::DataType>(5),"Subindex 1",0x1);
+            CoE::addEntry(object,2,8,24,7,static_cast<CoE::DataType>(5),"Subindex 2",0x2);
+            CoE::addEntry(object,3,8,32,7,static_cast<CoE::DataType>(5),"Subindex 3",0x3);
+            CoE::addEntry(object,4,8,40,7,static_cast<CoE::DataType>(5),"Subindex 4",0x4);
             dictionary.push_back(std::move(object));
         }
 
@@ -74,8 +74,8 @@ namespace kickcat::CoE
                 "RxPDO assign",
                 {}
             };
-            CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"RxPDO assign Element 1",0x1600);
+            CoE::addEntry(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
+            CoE::addEntry(object,1,32,16,15,static_cast<CoE::DataType>(7),"RxPDO assign Element 1",0x1600);
             dictionary.push_back(std::move(object));
         }
 
@@ -87,8 +87,8 @@ namespace kickcat::CoE
                 "TxPDO assign",
                 {}
             };
-            CoE::addEntry(object,0,8,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry(object,1,32,15,static_cast<CoE::DataType>(7),"TxPDO assign Element 1",0x1a00);
+            CoE::addEntry(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
+            CoE::addEntry(object,1,32,16,15,static_cast<CoE::DataType>(7),"TxPDO assign Element 1",0x1a00);
             dictionary.push_back(std::move(object));
         }
 
@@ -100,12 +100,12 @@ namespace kickcat::CoE
                 "FreezeValue",
                 {}
             };
-            CoE::addEntry(object,0,8,7,static_cast<CoE::DataType>(5),"Subindex 000",0x2);
-            CoE::addEntry(object,1,32,63,static_cast<CoE::DataType>(7),"ForceSensor0",0x2);
-            CoE::addEntry(object,2,32,63,static_cast<CoE::DataType>(7),"IMU",0x2);
+            CoE::addEntry(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x2);
+            CoE::addEntry(object,1,32,16,63,static_cast<CoE::DataType>(7),"ForceSensor0",0x2);
+            CoE::addEntry(object,2,32,48,63,static_cast<CoE::DataType>(7),"IMU",0x2);
             dictionary.push_back(std::move(object));
         }
 
-        return dictionary;
+         return dictionary;
     }
 }

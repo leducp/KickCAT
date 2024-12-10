@@ -38,7 +38,7 @@ namespace kickcat::CoE
 
         uint16_t loadAccess(tinyxml2::XMLNode* node);
 
-        std::tuple<DataType, uint16_t> toType(tinyxml2::XMLNode* node);
+        std::tuple<DataType, uint16_t, uint16_t> parseType(tinyxml2::XMLNode* node);
 
         tinyxml2::XMLNode* findNodeType(tinyxml2::XMLNode* node);
 
@@ -61,7 +61,7 @@ namespace kickcat::CoE
         tinyxml2::XMLElement* dtypes_;
         tinyxml2::XMLElement* objects_;
 
-        static const std::unordered_map<std::string, std::tuple<DataType, uint16_t>> BASIC_TYPES;
+        static const std::unordered_map<std::string, DataType> BASIC_TYPES;
         static const std::unordered_map<std::string, uint8_t> SM_CONF;
     };
 }

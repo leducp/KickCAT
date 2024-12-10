@@ -171,7 +171,8 @@ namespace kickcat::CoE
             result << "  * Subindex " << (int)entry.subindex << '\n';
             result << "      Desc:   " << entry.description << '\n';
             result << "      Type:   " << toString(entry.type) << '\n';
-            result << "      Bitlen: " << entry.bitlen << '\n';
+            result << "      BitLen: " << entry.bitlen << '\n';
+            result << "      BitOff: " << entry.bitoff << '\n';
             result << "      Access: " << Access::toString(entry.access) << '\n';
 
             result << "      Data:   ";
@@ -244,9 +245,10 @@ namespace kickcat::CoE
         return result;
     }
 
-    Entry::Entry(uint8_t subindex_in, uint16_t bitlen_in, uint16_t access_in, DataType type_in, std::string const& description_in)
+    Entry::Entry(uint8_t subindex_in, uint16_t bitlen_in, uint16_t bitoff_in, uint16_t access_in, DataType type_in, std::string const& description_in)
         : subindex{subindex_in}
         , bitlen{bitlen_in}
+        , bitoff{bitoff_in}
         , access{access_in}
         , type{type_in}
         , description{description_in}
@@ -274,6 +276,7 @@ namespace kickcat::CoE
     {
         subindex    = std::move(other.subindex);
         bitlen      = std::move(other.bitlen);
+        bitoff      = std::move(other.bitoff);
         access      = std::move(other.access);
         type        = std::move(other.type);
         description = std::move(other.description);

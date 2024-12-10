@@ -31,11 +31,11 @@ CoE::Dictionary createTestDictionary()
             "Identity Object",
             {}
         };
-        CoE::addEntry(object,0,8, 7,static_cast<CoE::DataType>(5),"Subindex 000",   0x4);
-        CoE::addEntry(object,1,32,7,static_cast<CoE::DataType>(7),"Vendor ID",      0x6a5);
-        CoE::addEntry(object,2,32,7,static_cast<CoE::DataType>(7),"Product code",   0xb0cad0);
-        CoE::addEntry(object,3,32,7,static_cast<CoE::DataType>(7),"Revision number",0x0);
-        CoE::addEntry(object,4,32,7,static_cast<CoE::DataType>(7),"Serial number",  0xcafedeca);
+        CoE::addEntry<uint8_t>(object,0,8,0, 7,static_cast<CoE::DataType>(5),"Subindex 000",   0x4);
+        CoE::addEntry<uint32_t>(object,1,32,8,7,static_cast<CoE::DataType>(7),"Vendor ID",      0x6a5);
+        CoE::addEntry<uint32_t>(object,2,32,40,7,static_cast<CoE::DataType>(7),"Product code",   0xb0cad0);
+        CoE::addEntry<uint32_t>(object,3,32,72,7,static_cast<CoE::DataType>(7),"Revision number",0x0);
+        CoE::addEntry<uint32_t>(object,4,32,104,7,static_cast<CoE::DataType>(7),"Serial number",  0xcafedeca);
         dictionary.push_back(std::move(object));
     }
 
