@@ -223,16 +223,19 @@ namespace kickcat::CoE
                   uint16_t access, DataType type, std::string const& description, T data)
     {
         object.entries.emplace_back(subindex, bitlen, bitoff, access, type, description);
+        auto& alloc = object.entries.back().data;
+        std::size_t size = bitlen / 8;
+        alloc = std::malloc(size);
+
         if constexpr(std::is_same_v<const char*, T>)
         {
-            object.entries.back().data = malloc(bitlen/8);
-            memcpy(object.entries.back().data, data, bitlen/8);
+            std::memcpy(alloc, data, size);
         }
         else
         {
-            T* dataAlloc = new T(data);
-            object.entries.back().data = dataAlloc;
+            std::memcpy(alloc, &data, size);
         }
+
     }
 
     Dictionary createOD();
