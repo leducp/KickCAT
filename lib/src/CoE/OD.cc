@@ -156,6 +156,44 @@ namespace kickcat::CoE
         return result.str();
     }
 
+    std::string toString(Entry const& entry)
+    {
+        std::stringstream result;
+
+        result << "  * Subindex " << (int)entry.subindex << '\n';
+        result << "      Desc:   " << entry.description << '\n';
+        result << "      Type:   " << toString(entry.type) << '\n';
+        result << "      BitLen: " << entry.bitlen << '\n';
+        result << "      BitOff: " << entry.bitoff << '\n';
+        result << "      Access: " << Access::toString(entry.access) << '\n';
+
+        result << "      Data:   ";
+        if (entry.data == nullptr)
+        {
+            result << "nullptr\n";
+        }
+        else
+        {
+            switch (entry.type)
+            {
+                case DataType::BYTE:        { result << (int)*static_cast<uint8_t*> (entry.data); break; }
+                case DataType::INTEGER8:    { result << (int)*static_cast<int8_t*>  (entry.data); break; }
+                case DataType::UNSIGNED8:   { result << (int)*static_cast<uint8_t*> (entry.data); break; }
+                case DataType::INTEGER16:   { result << *static_cast<int16_t*> (entry.data); break; }
+                case DataType::UNSIGNED16:  { result << *static_cast<uint16_t*>(entry.data); break; }
+                case DataType::INTEGER32:   { result << *static_cast<int32_t*> (entry.data); break; }
+                case DataType::UNSIGNED32:  { result << *static_cast<uint32_t*>(entry.data); break; }
+                case DataType::INTEGER64:   { result << *static_cast<int64_t*> (entry.data); break; }
+                case DataType::UNSIGNED64:  { result << *static_cast<uint64_t*>(entry.data); break; }
+                case DataType::REAL64:      { result << *static_cast<double*>  (entry.data); break; }
+                case DataType::REAL32:      { result << *static_cast<float*>   (entry.data); break; }
+                default:                    { result << "no rendered"; }
+            }
+        }
+
+        return result.str();
+    }
+
 
     std::string toString(Object const& object)
     {
@@ -168,37 +206,7 @@ namespace kickcat::CoE
 
         for (auto const& entry : object.entries)
         {
-            result << "  * Subindex " << (int)entry.subindex << '\n';
-            result << "      Desc:   " << entry.description << '\n';
-            result << "      Type:   " << toString(entry.type) << '\n';
-            result << "      BitLen: " << entry.bitlen << '\n';
-            result << "      BitOff: " << entry.bitoff << '\n';
-            result << "      Access: " << Access::toString(entry.access) << '\n';
-
-            result << "      Data:   ";
-            if (entry.data == nullptr)
-            {
-                result << "nullptr\n";
-            }
-            else
-            {
-                switch (entry.type)
-                {
-                    case DataType::BYTE:        { result << (int)*static_cast<uint8_t*> (entry.data); break; }
-                    case DataType::INTEGER8:    { result << (int)*static_cast<int8_t*>  (entry.data); break; }
-                    case DataType::UNSIGNED8:   { result << (int)*static_cast<uint8_t*> (entry.data); break; }
-                    case DataType::INTEGER16:   { result << *static_cast<int16_t*> (entry.data); break; }
-                    case DataType::UNSIGNED16:  { result << *static_cast<uint16_t*>(entry.data); break; }
-                    case DataType::INTEGER32:   { result << *static_cast<int32_t*> (entry.data); break; }
-                    case DataType::UNSIGNED32:  { result << *static_cast<uint32_t*>(entry.data); break; }
-                    case DataType::INTEGER64:   { result << *static_cast<int64_t*> (entry.data); break; }
-                    case DataType::UNSIGNED64:  { result << *static_cast<uint64_t*>(entry.data); break; }
-                    case DataType::REAL64:      { result << *static_cast<double*>  (entry.data); break; }
-                    case DataType::REAL32:      { result << *static_cast<float*>   (entry.data); break; }
-                    default:                    { result << "no rendered"; }
-                }
-            }
-            result << '\n';
+            result << toString(entry) << "\n";
         }
 
         return result.str();

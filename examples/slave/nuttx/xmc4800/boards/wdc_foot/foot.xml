@@ -17,7 +17,7 @@
     <Groups>
       <Group SortOrder="0">
         <Type>XMC4800 Wandercraft</Type>
-        <Name LcId="1033">foot</Name>
+        <Name LcId="1033">Foot</Name>
       </Group>
     </Groups>
     <Devices>
@@ -36,7 +36,8 @@
         </Info>
         <GroupType>XMC4800 Wandercraft</GroupType>
         <Profile>
-          <ProfileNo>402</ProfileNo>
+          <!-- Profile custom -->
+          <ProfileNo>0</ProfileNo>
           <!-- Dictionnary -->
           <Dictionary>
 
@@ -158,6 +159,79 @@
               </DataType>
 
               <DataType>
+                <Name>DT1C12</Name>
+                <BitSize>32</BitSize>
+                <SubItem>
+                  <SubIdx>0</SubIdx>
+                  <Name>Subindex 000</Name>
+                  <Type>USINT</Type>
+                  <BitSize>8</BitSize>
+                  <BitOffs>0</BitOffs>
+                  <Flags>
+                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Category>o</Category>
+                    <Backup>0</Backup>
+                    <Setting>0</Setting>
+                  </Flags>
+                </SubItem>
+                <SubItem>
+                  <Name>Elements</Name>
+                  <Type>DT1C12ARR</Type>
+                  <BitSize>16</BitSize>
+                  <BitOffs>16</BitOffs>
+                  <Flags>
+                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Category>o</Category>
+                  </Flags>
+                </SubItem>
+              </DataType>
+              <DataType>
+                <Name>DT1C12ARR</Name>
+                <BaseType>UINT</BaseType>
+                <BitSize>16</BitSize>
+                <ArrayInfo>
+                  <LBound>1</LBound>
+                  <Elements>1</Elements>
+                </ArrayInfo>
+              </DataType>
+              <DataType>
+                <Name>DT1C13</Name>
+                <BitSize>32</BitSize>
+                <SubItem>
+                  <SubIdx>0</SubIdx>
+                  <Name>Subindex 000</Name>
+                  <Type>USINT</Type>
+                  <BitSize>8</BitSize>
+                  <BitOffs>0</BitOffs>
+                  <Flags>
+                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Category>o</Category>
+                    <Backup>0</Backup>
+                    <Setting>0</Setting>
+                  </Flags>
+                </SubItem>
+                <SubItem>
+                  <Name>Elements</Name>
+                  <Type>DT1C13ARR</Type>
+                  <BitSize>16</BitSize>
+                  <BitOffs>16</BitOffs>
+                  <Flags>
+                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Category>o</Category>
+                  </Flags>
+                </SubItem>
+              </DataType>
+              <DataType>
+                <Name>DT1C13ARR</Name>
+                <BaseType>UINT</BaseType>
+                <BitSize>16</BitSize>
+                <ArrayInfo>
+                  <LBound>1</LBound>
+                  <Elements>1</Elements>
+                </ArrayInfo>
+              </DataType>
+
+              <DataType>
                 <Name>DT2000</Name> <!-- Value ?-->
                 <BitSize>80</BitSize>
                 <SubItem>
@@ -204,7 +278,21 @@
 
             <!-- Objects -->
             <Objects>
-
+              <Object>
+                <Index>#x1000</Index>
+                <Name>Device Type</Name>
+                <Type>UDINT</Type>
+                <BitSize>32</BitSize>
+                <Info>
+                  <DefaultData>00000000</DefaultData>
+                </Info>
+                <Flags>
+                  <Access>ro</Access>
+                  <Category>m</Category>
+                  <Backup>0</Backup>
+                  <Setting>0</Setting>
+                </Flags>
+              </Object>
               <Object>
                 <Index>#x1018</Index>
                 <Name>Identity Object</Name>
@@ -239,6 +327,47 @@
                     <Name>Serial number</Name>
                     <Info>
                       <DefaultData>202ff605</DefaultData>
+                    </Info>
+                  </SubItem>
+                </Info>
+              </Object>
+
+              <Object>
+                <Index>#x1c12</Index>
+                <Name>RxPDO assign</Name>
+                <Type>DT1C12</Type>
+                <BitSize>32</BitSize>
+                <Info>
+                  <SubItem>
+                    <Name>Subindex 000</Name>
+                    <Info>
+                      <DefaultData>01</DefaultData>
+                    </Info>
+                  </SubItem>
+                  <SubItem>
+                    <Name>RxPDO assign Element 1</Name>
+                    <Info>
+                      <DefaultData>0016</DefaultData>
+                    </Info>
+                  </SubItem>
+                </Info>
+              </Object>
+              <Object>
+                <Index>#x1c13</Index>
+                <Name>TxPDO assign</Name>
+                <Type>DT1C13</Type>
+                <BitSize>32</BitSize>
+                <Info>
+                  <SubItem>
+                    <Name>Subindex 000</Name>
+                    <Info>
+                      <DefaultData>01</DefaultData>
+                    </Info>
+                  </SubItem>
+                  <SubItem>
+                    <Name>TxPDO assign Element 1</Name>
+                    <Info>
+                      <DefaultData>001a</DefaultData>
                     </Info>
                   </SubItem>
                 </Info>

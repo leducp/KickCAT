@@ -271,13 +271,12 @@ namespace kickcat::CoE
         auto it = BASIC_TYPES.find(node_type->GetText());
         if (it != BASIC_TYPES.end())
         {
-            uint16_t bitlen = atoi(node->FirstChildElement("BitSize")->GetText());
-
+            uint16_t bitlen = toNumber<uint16_t>(node->FirstChildElement("BitSize"));
             uint16_t bitoff = 0;
             auto node_bitoff = node->FirstChildElement("BitOffs");
             if (node_bitoff)
             {
-                bitoff = atoi(node->FirstChildElement("BitOffs")->GetText());
+                bitoff = toNumber<uint16_t>(node_bitoff);
             }
 
             return {it->second, bitlen, bitoff};
@@ -385,9 +384,14 @@ namespace kickcat::CoE
                 {
                     // array entries are the subindex starting from 1, 0 is the array size
                     uint8_t elements = toNumber<uint8_t>(node_array_info->FirstChildElement("Elements"));
-                    for (uint8_t i = 0; i < elements; ++i)
+                    uint16_t element_bitlen = toNumber<uint16_t>(node_subitem->FirstChildElement("BitSize"));
+                    uint16_t element_bitoff = toNumber<uint16_t>(node_subitem->FirstChildElement("BitOffs"));
+
+                    for (uint8_t i = 1; i <= elements; ++i)
                     {
-                        entry.subindex = i + 1;
+                        entry.bitlen = element_bitlen;
+                        entry.bitoff = element_bitoff * i;
+                        entry.subindex = i;
                         object.entries.push_back(std::move(entry));
                     }
                 }

@@ -10,6 +10,28 @@ namespace kickcat
 {
     constexpr std::string_view OD_POPULATOR_FILE{"od_populator.cc"};
 
+    char const* toStdType(CoE::DataType dataType)
+    {
+        switch (dataType)
+        {
+            case CoE::DataType::UNSIGNED8:      { return "uint8_t";     }
+            case CoE::DataType::UNSIGNED16:     { return "uint16_t";    }
+            case CoE::DataType::UNSIGNED32:     { return "uint32_t";    }
+            case CoE::DataType::UNSIGNED64:     { return "uint64_t";    }
+            case CoE::DataType::INTEGER8:       { return "int8_t";      }
+            case CoE::DataType::INTEGER16:      { return "int16_t";     }
+            case CoE::DataType::INTEGER32:      { return "int32_t";     }
+            case CoE::DataType::INTEGER64:      { return "int64_t";     }
+            case CoE::DataType::VISIBLE_STRING: { return "char const*"; }
+            default:
+            {
+                std::string what = "Unsupported type ";
+                what += toString(dataType);
+                throw std::invalid_argument{what};
+            }
+        }
+    }
+
     CoE::Dictionary loadOD(std::string esiFileName)
     {
         CoE::EsiParser parser;
@@ -49,9 +71,10 @@ namespace kickcat
         }
 
         std::stringstream result;
-        result << "            CoE::addEntry(object,";
+        result << "            CoE::addEntry<" << toStdType(entryToAdd.type) << ">(object,";
         result << std::to_string(entryToAdd.subindex) << ",";
         result << std::to_string(entryToAdd.bitlen) << ",";
+        result << std::to_string(entryToAdd.bitoff) << ",";
         result << std::to_string(entryToAdd.access) << ",";
         result << "static_cast<CoE::DataType>(" << std::to_string(static_cast<uint16_t>(entryToAdd.type)) << "),";
         result << "\"" << entryToAdd.description << "\",";

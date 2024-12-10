@@ -502,9 +502,9 @@ namespace kickcat::mailbox::response
         desc->data_type  = entry->type;
 
         auto name = pointData<char>(desc);
-        std::memcpy(name, object->name.data(), object->name.size());
+        std::memcpy(name, entry->description.data(), entry->description.size());
 
-        header_->len += sizeof(CoE::SDO::information::EntryDescription) + object->name.size();
+        header_->len += sizeof(CoE::SDO::information::EntryDescription) + entry->description.size();
 
         reply(std::move(data_));
         return ProcessingResult::FINALIZE;
