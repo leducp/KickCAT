@@ -5,6 +5,7 @@
 
 namespace kickcat
 {
+// LCOV_EXCL_START
     Lan9252::Lan9252(std::shared_ptr<AbstractSPI> spi_interface)
     : spi_interface_(spi_interface)
     {
@@ -272,4 +273,5 @@ namespace kickcat
 
         return size;
     }
+// LCOV_EXCL_STOP
 }

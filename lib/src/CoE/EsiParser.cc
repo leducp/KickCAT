@@ -9,19 +9,19 @@ using namespace tinyxml2;
 namespace kickcat::CoE
 {
 
-    const std::unordered_map<std::string, std::tuple<DataType, uint16_t>> EsiParser::BASIC_TYPES
+    const std::unordered_map<std::string, DataType> EsiParser::BASIC_TYPES
     {
-        {"BOOL",  {DataType::BOOLEAN,    1  }},
-        {"BYTE",  {DataType::BYTE,       8  }},
-        {"SINT",  {DataType::INTEGER8,   8  }},
-        {"USINT", {DataType::UNSIGNED8,  8  }},
-        {"INT",   {DataType::INTEGER16,  16 }},
-        {"UINT",  {DataType::UNSIGNED16, 16 }},
-        {"DINT",  {DataType::INTEGER32,  32 }},
-        {"UDINT", {DataType::UNSIGNED32, 32 }},
-        {"LINT",  {DataType::INTEGER64,  64 }},
-        {"ULINT", {DataType::UNSIGNED64, 64 }},
-        {"REAL",  {DataType::REAL32,     32 }},
+        {"BOOL",  DataType::BOOLEAN    },
+        {"BYTE",  DataType::BYTE       },
+        {"SINT",  DataType::INTEGER8   },
+        {"USINT", DataType::UNSIGNED8  },
+        {"INT",   DataType::INTEGER16  },
+        {"UINT",  DataType::UNSIGNED16 },
+        {"DINT",  DataType::INTEGER32  },
+        {"UDINT", DataType::UNSIGNED32 },
+        {"LINT",  DataType::INTEGER64  },
+        {"ULINT", DataType::UNSIGNED64 },
+        {"REAL",  DataType::REAL32     },
     };
 
     const std::unordered_map<std::string, uint8_t> EsiParser::SM_CONF
@@ -89,7 +89,7 @@ namespace kickcat::CoE
         sms_type.name = "Sync manager type";
 
         // create first entry (array size)
-        sms_type.entries.push_back(CoE::Entry{0, 8, Access::READ, DataType::UNSIGNED8, "Subindex 0"});
+        sms_type.entries.push_back(CoE::Entry{0, 8, 0, Access::READ, DataType::UNSIGNED8, "Subindex 0"});
 
         auto sm = firstChildElement(device_, "Sm");
         while (sm)
@@ -98,6 +98,7 @@ namespace kickcat::CoE
             entry.subindex = sms_type.entries.size();
             entry.access = Access::READ;
             entry.bitlen = 8;
+            entry.bitoff = sms_type.entries.size() * 8 + 8; // + 8 for padding of the first entry
             entry.description = "Subindex " + std::to_string(sms_type.entries.size());
             entry.type = DataType::UNSIGNED8;
             entry.data = malloc(1);
@@ -257,7 +258,7 @@ namespace kickcat::CoE
         return flags;
     }
 
-    std::tuple<DataType, uint16_t> EsiParser::toType(XMLNode* node)
+    std::tuple<DataType, uint16_t, uint16_t> EsiParser::parseType(XMLNode* node)
     {
         auto node_type = node->FirstChildElement("Type");
         if (not node_type)
@@ -265,19 +266,29 @@ namespace kickcat::CoE
             node_type = node->FirstChildElement("BaseType");
         }
 
+
+
         auto it = BASIC_TYPES.find(node_type->GetText());
         if (it != BASIC_TYPES.end())
         {
-            return it->second;
+            uint16_t bitlen = toNumber<uint16_t>(node->FirstChildElement("BitSize"));
+            uint16_t bitoff = 0;
+            auto node_bitoff = node->FirstChildElement("BitOffs");
+            if (node_bitoff)
+            {
+                bitoff = toNumber<uint16_t>(node_bitoff);
+            }
+
+            return {it->second, bitlen, bitoff};
         }
 
         if(strstr(node_type->GetText(), "STRING"))
         {
             uint32_t bitlen = toNumber<uint32_t>(node->FirstChildElement("BitSize"));
-            return {DataType::VISIBLE_STRING, bitlen};
+            return {DataType::VISIBLE_STRING, bitlen, 0};
         }
 
-        return {DataType::UNKNOWN, 0};
+        return {DataType::UNKNOWN, 0, 0};
     }
 
 
@@ -304,7 +315,7 @@ namespace kickcat::CoE
         Object object;
         object.index = toNumber<uint16_t>(node->FirstChildElement("Index"));
         object.name  = node->FirstChildElement("Name")->GetText();
-        auto [type, bitlen] = toType(node);
+        auto [type, bitlen, bitoff] = parseType(node);
         if (isBasic(type))
         {
             // Basic type: no subindex in the ESI file because it is defined directly in the object node.
@@ -313,6 +324,7 @@ namespace kickcat::CoE
             auto& entry = object.entries.at(0);
             entry.subindex = 0;
             entry.bitlen = bitlen;
+            entry.bitoff = bitoff;
             entry.type = type;
             entry.access = loadAccess(node);
 
@@ -332,13 +344,14 @@ namespace kickcat::CoE
                 entry.description = node_name->GetText();
             }
 
-            auto [subitem_type, subitem_bitlen] = toType(node_subitem);
+            auto [subitem_type, subitem_bitlen, subitem_bitoff] = parseType(node_subitem);
             if (isBasic(subitem_type))
             {
                 object.code  = ObjectCode::RECORD;
 
                 entry.type   = subitem_type;
                 entry.bitlen = subitem_bitlen;
+                entry.bitoff = subitem_bitoff;
                 entry.subindex = toNumber<uint8_t>(node_subitem->FirstChildElement("SubIdx"));
                 entry.access = loadAccess(node_subitem);
 
@@ -349,9 +362,10 @@ namespace kickcat::CoE
                 object.code = ObjectCode::ARRAY;
 
                 auto node_array_type = findNodeType(node_subitem);
-                auto [array_type, array_bitlen] = toType(node_array_type);
+                auto [array_type, array_bitlen, array_bitoff] = parseType(node_array_type);
                 entry.type   = array_type;
                 entry.bitlen = array_bitlen;
+                entry.bitoff = array_bitoff;
                 entry.access = loadAccess(node_subitem);
 
                 auto node_array_info = node_array_type->FirstChildElement("ArrayInfo");
@@ -370,9 +384,14 @@ namespace kickcat::CoE
                 {
                     // array entries are the subindex starting from 1, 0 is the array size
                     uint8_t elements = toNumber<uint8_t>(node_array_info->FirstChildElement("Elements"));
-                    for (uint8_t i = 0; i < elements; ++i)
+                    uint16_t element_bitlen = toNumber<uint16_t>(node_subitem->FirstChildElement("BitSize"));
+                    uint16_t element_bitoff = toNumber<uint16_t>(node_subitem->FirstChildElement("BitOffs"));
+
+                    for (uint8_t i = 1; i <= elements; ++i)
                     {
-                        entry.subindex = i + 1;
+                        entry.bitlen = element_bitlen;
+                        entry.bitoff = element_bitoff * i;
+                        entry.subindex = i;
                         object.entries.push_back(std::move(entry));
                     }
                 }

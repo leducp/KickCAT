@@ -139,12 +139,12 @@ namespace kickcat::mailbox::response
         uint32_t size = entry->bitlen / 8;
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData);
 
+        sdo_->size_indicator = 1;   // always 1 on upload response
         if (size <= 4)
         {
             // expedited
             sdo_->transfer_type  = 1;
             sdo_->block_size     = 4 - size;
-            sdo_->size_indicator = 1;
         }
         else
         {
@@ -152,11 +152,9 @@ namespace kickcat::mailbox::response
             std::memcpy(payload_, &size, 4);
             payload_ += 4;
             header_->len += size;
-            sdo_->size_indicator = 0;
         }
 
         std::memcpy(payload_, entry->data, size);
-
         coe_->service = CoE::Service::SDO_RESPONSE;
         sdo_->command = CoE::SDO::response::UPLOAD;
         reply(std::move(data_));
@@ -168,10 +166,13 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOMessage::uploadComplete(CoE::Object* object)
     {
-        sdo_->transfer_type = 0; // complete access -> not expedited
+        sdo_->size_indicator = 1;   // always 1 on upload response
+        sdo_->transfer_type = 0;    // complete access -> not expedited
 
         uint32_t size = 0;
         uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
+        uint16_t skip_offset = object->entries.at(sdo_->subindex).bitoff / 8;
+
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {
             auto* entry = &object->entries.at(i);
@@ -183,9 +184,10 @@ namespace kickcat::mailbox::response
 
             beforeHooks(CoE::Access::READ, entry);
 
-            uint32_t entry_size = entry->bitlen / 8;
-            std::memcpy(payload_ + 4 + size, entry->data, entry_size);
-            size += entry_size;
+            uint16_t entry_size = entry->bitlen / 8;
+            uint16_t entry_off  = entry->bitoff / 8 - skip_offset;
+            std::memcpy(payload_ + 4 + entry_off, entry->data, entry_size);
+            size = entry_size + entry_off; // only record the last position + last entry size
 
             afterHooks(CoE::Access::READ, entry);
         }
@@ -194,7 +196,7 @@ namespace kickcat::mailbox::response
 
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData) + size;
         coe_->service = CoE::Service::SDO_RESPONSE;
-        sdo_->command = CoE::SDO::response::UPLOAD_SEGMENTED;
+        sdo_->command = CoE::SDO::response::UPLOAD;
         reply(std::move(data_));
         return ProcessingResult::FINALIZE;
     }
@@ -242,25 +244,27 @@ namespace kickcat::mailbox::response
         uint32_t msg_size;
         std::memcpy(&msg_size, payload_, 4);
 
-        uint32_t size = 0;
+        uint8_t* start_offset   = payload_ + 4;
+        uint8_t* current_offset = start_offset;
+        uint16_t skip_offset = object->entries.at(sdo_->subindex).bitoff / 8;
+
         if (sdo_->subindex == 0)
         {
             auto* entry = &object->entries.at(0);
             beforeHooks(CoE::Access::WRITE, entry);
 
             std::memcpy(entry->data, payload_ + 4, 1);
-            size += 2;
+            current_offset += 1;
 
             afterHooks(CoE::Access::WRITE, entry);
         }
 
         uint16_t subindex = 1;
-        while (size < msg_size)
+        while ((current_offset - start_offset) < msg_size)
         {
-            if (subindex > object->entries.size())
+            if (subindex >= object->entries.size())
             {
-                abort(CoE::SDO::abort::SUBINDEX_DOES_NOT_EXIST);
-                return ProcessingResult::FINALIZE;
+                break;
             }
 
             auto* entry = &object->entries.at(subindex);
@@ -273,15 +277,19 @@ namespace kickcat::mailbox::response
             beforeHooks(CoE::Access::WRITE, entry);
 
             uint32_t entry_size = entry->bitlen / 8;
-            std::memcpy(entry->data, payload_ + 4 + size, entry_size);
-            size += entry_size;
+            uint32_t entry_off  = entry->bitoff / 8;
+            current_offset = start_offset + entry_off - skip_offset;
+
+            std::memcpy(entry->data, current_offset, entry_size);
+            current_offset += entry_size;
             subindex++;
 
             afterHooks(CoE::Access::WRITE, entry);
         }
 
+        header_->len = 10;
         coe_->service = CoE::Service::SDO_RESPONSE;
-        sdo_->command = CoE::SDO::response::DOWNLOAD_SEGMENTED;
+        sdo_->command = CoE::SDO::response::DOWNLOAD;
         reply(std::move(data_));
         return ProcessingResult::FINALIZE;
     }
@@ -494,9 +502,9 @@ namespace kickcat::mailbox::response
         desc->data_type  = entry->type;
 
         auto name = pointData<char>(desc);
-        std::memcpy(name, object->name.data(), object->name.size());
+        std::memcpy(name, entry->description.data(), entry->description.size());
 
-        header_->len += sizeof(CoE::SDO::information::EntryDescription) + object->name.size();
+        header_->len += sizeof(CoE::SDO::information::EntryDescription) + entry->description.size();
 
         reply(std::move(data_));
         return ProcessingResult::FINALIZE;

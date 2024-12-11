@@ -38,16 +38,18 @@ if (GTest_FOUND)
                               unit/gateway-t.cc
                               unit/kickcat-t.cc
                               unit/link-t.cc
-                              unit/mailbox-t.cc
                               unit/prints-t.cc
                               unit/protocol-t.cc
                               unit/slave-t.cc
                               unit/socket-t.cc
                               unit/Time.cc
                               unit/CoE/protocol-t.cc
+                              unit/mailbox/request-t.cc
+                              unit/mailbox/response-t.cc
   )
 
   target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
+  target_include_directories(kickcat_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/unit)
   set_kickcat_properties(kickcat_unit)
   add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 

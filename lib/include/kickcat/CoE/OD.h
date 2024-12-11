@@ -175,8 +175,8 @@ namespace kickcat::CoE
     struct Entry    // ETG1000.5 6.1.4.2.1 Formal model
     {
         Entry() = default;
-        Entry(uint8_t subindex, uint16_t bitlen, uint16_t access,
-              DataType type, std::string const& description);
+        Entry(uint8_t subindex, uint16_t bitlen, uint16_t bitoff,
+             uint16_t access, DataType type, std::string const& description);
         ~Entry();
 
         Entry(Entry const&) = delete;
@@ -187,6 +187,7 @@ namespace kickcat::CoE
 
         uint8_t      subindex;
         uint16_t     bitlen;    // For PDO, shall be < 11888
+        uint16_t     bitoff;    // offset in bit
         uint16_t     access{0};
         DataType     type;
         // default value
@@ -204,6 +205,7 @@ namespace kickcat::CoE
 
         std::string dataToString() const;
     };
+    std::string toString(Entry const& entry);
 
     struct Object   // ETG1000.5 6.1.4.2.1 Formal model
     {
@@ -218,20 +220,23 @@ namespace kickcat::CoE
     std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex);
 
     template<typename T>
-    void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t access,
-                  DataType type, std::string const& description, T data)
+    void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t bitoff,
+                  uint16_t access, DataType type, std::string const& description, T data)
     {
-        object.entries.emplace_back(subindex, bitlen, access, type, description);
+        object.entries.emplace_back(subindex, bitlen, bitoff, access, type, description);
+        auto& alloc = object.entries.back().data;
+        std::size_t size = bitlen / 8;
+        alloc = std::malloc(size);
+
         if constexpr(std::is_same_v<const char*, T>)
         {
-            object.entries.back().data = malloc(bitlen/8);
-            memcpy(object.entries.back().data, data, bitlen/8);
+            std::memcpy(alloc, data, size);
         }
         else
         {
-            T* dataAlloc = new T(data);
-            object.entries.back().data = dataAlloc;
+            std::memcpy(alloc, &data, size);
         }
+
     }
 
     Dictionary createOD();

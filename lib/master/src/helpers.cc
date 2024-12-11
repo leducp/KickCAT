@@ -5,6 +5,7 @@
 
 namespace kickcat
 {
+// LCOV_EXCL_START
     void selectInterface(std::string& nominal_if, std::string& redundant_if)
     {
         std::vector<std::pair<char const*, std::string*>> interfaces;
@@ -40,4 +41,5 @@ namespace kickcat
             *ifname.second = netIntefaces[index].name;
         }
     }
+// LCOV_EXCL_STOP
 }
