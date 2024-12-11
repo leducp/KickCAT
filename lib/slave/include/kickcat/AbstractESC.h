@@ -16,7 +16,7 @@ namespace kickcat
         uint8_t index;
         uint16_t start_address;
         uint16_t length;
-        uint8_t control;
+        uint8_t  control;
         SyncManagerType type;
     };
 

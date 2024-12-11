@@ -1,7 +1,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <cstring>
-#include "gmock/gmock.h"
 #include "kickcat/AbstractESC.h"
 #include "kickcat/ESM.h"
 #include "kickcat/Error.h"
@@ -11,7 +10,7 @@ using namespace kickcat;
 using namespace kickcat::ESM;
 using namespace testing;
 
-class MockESC2 : public kickcat::AbstractESC
+class MockESC : public kickcat::AbstractESC
 {
 public:
     MOCK_METHOD(int32_t, read, (uint16_t address, void* data, uint16_t size), (override));
@@ -35,7 +34,7 @@ public:
 class StateMachineTest : public testing::Test
 {
 public:
-    MockESC2 esc_{};
+    MockESC esc_{};
     uint8_t FIRST_STATE_ID{0};
     uint8_t SECOND_STATE_ID{1};
     uint8_t THIRD_STATE_ID{2};

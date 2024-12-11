@@ -43,7 +43,10 @@ if (GTest_FOUND)
                               unit/slave-t.cc
                               unit/socket-t.cc
                               unit/ESM-t.cc
-                              unit/ESMStates-t.cc
+                              unit/ESMStateOP-t.cc
+                              unit/ESMStateInit-t.cc
+                              unit/ESMStatePreOP-t.cc
+                              unit/ESMStateSafeOP-t.cc
                               unit/Time.cc
                               unit/CoE/protocol-t.cc
                               unit/mailbox/request-t.cc

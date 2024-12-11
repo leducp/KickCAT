@@ -123,7 +123,6 @@ int main(int argc, char* argv[])
 
     // Set valid output to exit safe op.
     auto& easycat = bus.slaves().at(0);
-    printf("bsize : %d\n", easycat.output.bsize);
     for (int32_t i = 0; i < easycat.output.bsize; ++i)
     {
         easycat.output.data[i] = 0xBB;

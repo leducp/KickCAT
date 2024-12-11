@@ -309,15 +309,6 @@ namespace kickcat::mailbox::response
     {
         if (mbx_in_.has_value() and mbx_out_.has_value())
         {
-            if (is_activated)
-            {
-                printf("mailbox activate\n");
-            }
-            else
-            {
-                printf("mailbox deactivate\n");
-            }
-
             esc_->set_sm_activate({*mbx_in_, *mbx_out_}, is_activated);
         }
     }

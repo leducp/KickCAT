@@ -1,8 +1,8 @@
 #ifndef KICKCAT_SLAVE_ESC_EMULATED_ESC_H
 #define KICKCAT_SLAVE_ESC_EMULATED_ESC_H
 
-#include "kickcat/AbstractESC.h"
 #include "kickcat/protocol.h"
+#include "kickcat/AbstractESC.h"
 
 #include <functional>
 
@@ -25,7 +25,7 @@ namespace kickcat
 
         void processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
 
-        int32_t read(uint16_t address, void* data, uint16_t size) override;
+        int32_t read (uint16_t address, void* data,       uint16_t size) override;
         int32_t write(uint16_t address, void const* data, uint16_t size) override;
 
     protected:
@@ -155,11 +155,11 @@ namespace kickcat
 
             uint8_t user_ram[128];
 
-            uint8_t process_data_ram[0xf000];  // 60KB max following documentation
-        } __attribute__((__packed__));
+            uint8_t process_data_ram[0xf000];   // 60KB max following documentation
+        }__attribute__((__packed__));
 
         Memory memory_;
-        std::vector<uint16_t> eeprom_;  // EEPPROM addressing is word/16 bits
+        std::vector<uint16_t> eeprom_;      // EEPPROM addressing is word/16 bits
 
         struct SM
         {
@@ -179,13 +179,13 @@ namespace kickcat
         std::vector<PDO> rx_pdos_;
         std::vector<PDO> tx_pdos_;
 
-        std::function<void(State, State)> changeState_{[](State, State) {}};
+        std::function<void(State, State)> changeState_{[](State, State){}};
 
         void processEcatRequest(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
         void processInternalLogic();
 
-        void processReadCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
-        void processWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
+        void processReadCommand     (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
+        void processWriteCommand    (DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
         void processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset);
 
         void processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
@@ -197,9 +197,7 @@ namespace kickcat
         void configurePDOs();
 
         int32_t computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access);
-        std::tuple<uint8_t*, uint8_t*, uint16_t> computeLogicalIntersection(DatagramHeader const* header,
-                                                                            uint8_t* data,
-                                                                            PDO const& pdo);
+        std::tuple<uint8_t*, uint8_t*, uint16_t> computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo);
 
         nanoseconds pdiWatchdog();  // Get configured PDI watchdog
         nanoseconds pdoWatchdog();  // Get configured PDO watchdog

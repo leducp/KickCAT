@@ -12,15 +12,15 @@
 
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
-#include "kickcat/Slave2.h"
+#include "kickcat/slave/Slave.h"
 
 #include "kickcat/CoE/EsiParser.h"
 #include "kickcat/CoE/mailbox/response.h"
 
 
 using namespace kickcat;
+using namespace kickcat::slave;
 
-//TODO: try with multiple slaves
 
 int main(int argc, char* argv[])
 {
@@ -30,18 +30,28 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    size_t slaveCount = argc - 2;
     std::vector<EmulatedESC> escs;
-    std::vector<Slave> slaves;
     std::vector<PDO> pdos;
-    uint8_t input[256]{0};
-    uint8_t output[256]{0};
+    std::vector<Slave> slaves;
+    std::vector<uint8_t*> inputPdo;
+    std::vector<uint8_t*> outputPdo;
+
+    escs.reserve(slaveCount);
+    pdos.reserve(slaveCount);
+    slaves.reserve(slaveCount);
+    inputPdo.reserve(slaveCount);
+    outputPdo.reserve(slaveCount);
     for (int i = 2; i < argc; ++i)
     {
         escs.emplace_back(argv[i]);
         pdos.emplace_back(&escs.back());
         slaves.emplace_back(&escs.back(), &pdos.back());
-        pdos.back().set_process_data_input(input);
-        pdos.back().set_process_data_output(output);
+
+        inputPdo.push_back(new uint8_t[1024]);
+        outputPdo.push_back(new uint8_t[1024]);
+        pdos.back().set_process_data_input(inputPdo.back());
+        pdos.back().set_process_data_output(outputPdo.back());
     }
 
     CoE::EsiParser parser;
@@ -62,7 +72,12 @@ int main(int argc, char* argv[])
     mbx.enableCoE(std::move(coe_dict));
     slave0.set_mailbox(&mbx);
 
-    slave0.start();
+
+    for (auto& slave : slaves)
+    {
+        slave.start();
+    } 
+
 
     while (true)
     {

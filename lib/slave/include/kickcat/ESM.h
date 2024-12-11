@@ -25,11 +25,11 @@ namespace kickcat
             }
         };
 
-        struct Context 
+        struct Context
         {
             uint16_t al_status;
             uint16_t al_status_code;
-            uint16_t al_watchdog_process_data; 
+            uint16_t al_watchdog_process_data;
             bool validOutputData{false};
 
             State get_state()
@@ -63,14 +63,14 @@ namespace kickcat
         public:
             AbstractState(uint8_t id, AbstractESC& esc, PDO& pdo);
             void set_mailbox(mailbox::response::Mailbox* mbx);
+            virtual Context routine(Context currentStatus, ALControl alControl);
 
         protected:
             uint8_t id_;
             AbstractESC& esc_;
             PDO& pdo_;
-            mailbox::response::Mailbox* mbx_;
+            mailbox::response::Mailbox* mbx_{};
 
-            virtual Context routine(Context currentStatus, ALControl alControl);
             virtual Context routine_internal(Context currentStatus, ALControl alControl) = 0;
             virtual void on_entry(Context oldStatus, Context newStatus);
 

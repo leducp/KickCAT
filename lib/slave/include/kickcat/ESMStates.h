@@ -2,7 +2,6 @@
 #define SLAVE_STACK_INCLUDE_SLAVE_ESM_H_
 
 #include <cstdarg>
-#include <cstdint>
 #include "PDO.h"
 #include "kickcat/AbstractESC.h"
 #include "kickcat/ESM.h"
@@ -16,6 +15,7 @@ namespace kickcat
         {
         public:
             Init(AbstractESC& esc, PDO& pdo);
+            virtual ~Init() = default;
 
             void on_entry(Context oldStatus, Context newStatus) override;
             Context routine_internal(Context oldStatus, ALControl control) override;
@@ -25,6 +25,7 @@ namespace kickcat
         {
         public:
             PreOP(AbstractESC& esc, PDO& pdo);
+            virtual ~PreOP() = default;
 
             void on_entry(Context oldStatus, Context newStatus) override;
             Context routine_internal(Context oldStatus, ALControl control) override;
@@ -34,6 +35,7 @@ namespace kickcat
         {
         public:
             SafeOP(AbstractESC& esc, PDO& pdo);
+            virtual ~SafeOP() = default;
 
             void on_entry(Context oldStatus, Context newStatus) override;
             Context routine_internal(Context oldStatus, ALControl control) override;
@@ -43,6 +45,7 @@ namespace kickcat
         {
         public:
             OP(AbstractESC& esc, PDO& pdo);
+            virtual ~OP() = default;
 
             Context routine_internal(Context oldStatus, ALControl control) override;
 

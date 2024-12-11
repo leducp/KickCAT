@@ -7,7 +7,7 @@ namespace kickcat
 {
 // LCOV_EXCL_START
     constexpr uint32_t ECAT0_BASE_ADDRESS = 0x54010000;
-    constexpr uint32_t ECAT0_END_ADDRESS = 0x5401FFFF;
+    constexpr uint32_t ECAT0_END_ADDRESS  = 0x5401FFFF;
 
     class XMC4800 final : public AbstractESC
     {

@@ -2,14 +2,12 @@
 #define SLAVE_STACK_INCLUDE_SLAVE_H_
 
 
-#include "PDO.h"
+#include "kickcat/PDO.h"
 #include "kickcat/AbstractESC.h"
 #include "kickcat/Mailbox.h"
 #include "kickcat/ESMStates.h"
 
-
-// TODO: to rename file => namespace master and slave
-namespace kickcat
+namespace kickcat::slave
 {
     class Slave final
     {

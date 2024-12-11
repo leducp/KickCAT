@@ -1,6 +1,3 @@
-
-add_subdirectory(state_machine)
-
 if (NUTTX)
     add_subdirectory(nuttx/lan9252)
 

@@ -1,4 +1,5 @@
-#include "kickcat/ESMStates.h" #include "ESM.h"
+#include "kickcat/ESMStates.h"
+#include "ESM.h"
 #include "kickcat/AbstractESC.h"
 #include "protocol.h"
 
@@ -26,15 +27,9 @@ namespace kickcat::ESM
         if (currentStatus.al_status & ERROR_ACK and not(control.value & ERROR_ACK))
         {
             // If in INIT and asked for INIT, clear the error
-            if (control.get_requested_state() == INIT and currentStatus.get_state() == INIT)
-            {
-                return Context::build(INIT);
-            }
-
-            // If asked for INIT, go to INIT but don't clear the error
             if (control.get_requested_state() == INIT)
             {
-                return Context::build(INIT, currentStatus.al_status_code);
+                return Context::build(INIT);
             }
 
             // If didn't asked asked for INIT stay where it is and don't do anything
@@ -162,7 +157,6 @@ namespace kickcat::ESM
     Context SafeOP::routine_internal(Context currentStatus, ALControl control)
     {
         pdo_.update_process_data_input();
-        pdo_.update_process_data_output();
 
         if (mbx_ and not mbx_->is_sm_config_ok())
         {
@@ -179,7 +173,8 @@ namespace kickcat::ESM
         {
             return Context::build(State::OPERATIONAL);
         }
-        else if (control.get_requested_state() == State::PRE_OP or control.get_requested_state() == State::INIT)
+
+        if (control.get_requested_state() == State::PRE_OP or control.get_requested_state() == State::INIT)
         {
             return Context::build(control.get_requested_state());
         }
@@ -221,6 +216,12 @@ namespace kickcat::ESM
         if (control.get_requested_state() == State::BOOT)
         {
             return Context::build(State::SAFE_OP, INVALID_REQUESTED_STATE_CHANGE);
+        }
+
+        if (control.get_requested_state() == State::PRE_OP or control.get_requested_state() == State::INIT
+            or control.get_requested_state() == State::SAFE_OP)
+        {
+            return Context::build(control.get_requested_state());
         }
 
         auto requestedState = control.get_requested_state();

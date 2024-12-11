@@ -1,6 +1,6 @@
-#include "kickcat/Slave2.h"
+#include "kickcat/slave/Slave.h"
 
-namespace kickcat
+namespace kickcat::slave
 {
     Slave::Slave(AbstractESC* esc, PDO* pdo)
         : esc_{esc}
