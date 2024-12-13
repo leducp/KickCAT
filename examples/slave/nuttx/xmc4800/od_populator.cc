@@ -44,8 +44,8 @@ namespace kickcat::CoE
                 "RxPDO Map 1",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry<uint32_t>(object,1,32,16,15,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x60000010);
+            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
+            CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x60000010);
             dictionary.push_back(std::move(object));
         }
 
@@ -57,20 +57,21 @@ namespace kickcat::CoE
                 "TxPDO Map 1",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0xc);
-            CoE::addEntry<uint32_t>(object,1,32,16,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0x60000010);
-            CoE::addEntry<uint32_t>(object,2,32,48,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 2",0x60010010);
-            CoE::addEntry<uint32_t>(object,3,32,80,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 3",0x60020010);
-            CoE::addEntry<uint32_t>(object,4,32,112,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 4",0x60030010);
-            CoE::addEntry<uint32_t>(object,5,32,144,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 5",0x60040010);
-            CoE::addEntry<uint32_t>(object,6,32,176,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 6",0x60050010);
-            CoE::addEntry<uint32_t>(object,7,32,208,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 7",0x60060010);
-            CoE::addEntry<uint32_t>(object,8,32,240,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 8",0x60070010);
-            CoE::addEntry<uint32_t>(object,9,32,272,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 9",0x60080010);
-            CoE::addEntry<uint32_t>(object,10,32,304,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 10",0x60090010);
-            CoE::addEntry<uint32_t>(object,11,32,336,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 11",0x600a0010);
-            CoE::addEntry<uint32_t>(object,12,32,368,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 12",0x600b0010);
-            CoE::addEntry<uint32_t>(object,13,32,400,15,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 13",0x600c0010);
+            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0xd);
+            CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0x60000010);
+            CoE::addEntry<uint32_t>(object,2,32,48,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 2",0x60010010);
+            CoE::addEntry<uint32_t>(object,3,32,80,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 3",0x60020010);
+            CoE::addEntry<uint32_t>(object,4,32,112,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 4",0x60030010);
+            CoE::addEntry<uint32_t>(object,5,32,144,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 5",0x60040010);
+            CoE::addEntry<uint32_t>(object,6,32,176,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 6",0x60050010);
+            CoE::addEntry<uint32_t>(object,7,32,208,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 7",0x60060010);
+            CoE::addEntry<uint32_t>(object,8,32,240,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 8",0x60070010);
+            CoE::addEntry<uint32_t>(object,9,32,272,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 9",0x60080010);
+            CoE::addEntry<uint32_t>(object,10,32,304,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 10",0x60090010);
+            CoE::addEntry<uint32_t>(object,11,32,336,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 11",0x600a0010);
+            CoE::addEntry<uint32_t>(object,12,32,368,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 12",0x600b0010);
+            CoE::addEntry<uint32_t>(object,13,32,400,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 13",0x600c0010);
+            CoE::addEntry<uint32_t>(object,14,32,432,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 14",0x600d0010);
             dictionary.push_back(std::move(object));
         }
 
@@ -278,6 +279,18 @@ namespace kickcat::CoE
             CoE::Object object
             {
                 0x600c,
+                CoE::ObjectCode::VAR,
+                "adc_vref",
+                {}
+            };
+            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            dictionary.push_back(std::move(object));
+        }
+
+        {
+            CoE::Object object
+            {
+                0x600d,
                 CoE::ObjectCode::VAR,
                 "board_status",
                 {}
