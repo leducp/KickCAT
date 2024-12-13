@@ -2,6 +2,8 @@
 #include <numeric>
 #include <algorithm>
 
+#include "kickcat/TapSocket.h"
+
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
 #elif __MINGW64__
@@ -38,6 +40,7 @@ int main(int argc, char* argv[])
     auto coe_dict = parser.load("ingenia_esi.xml");
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
+//    auto socket = std::make_shared<TapSocket>(true);
     auto socket = std::make_shared<Socket>();
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
@@ -49,6 +52,11 @@ int main(int argc, char* argv[])
     mailbox::response::Mailbox mbx(&esc0, 1024);
     mbx.enableCoE(std::move(coe_dict));
     esc0.set_mailbox(&mbx);
+
+    uint8_t buffer_in [1024];
+    uint8_t buffer_out[1024];
+    esc0.set_process_data_input(buffer_in);
+    esc0.set_process_data_output(buffer_out);
 
     while (true)
     {
@@ -80,6 +88,11 @@ int main(int argc, char* argv[])
                 mbx.send();
 
                 esc.routine();
+
+                if (esc.al_status() & State::SAFE_OP)
+                {
+                    esc.set_valid_output_data_received(true);
+                }
             }
         }
 
