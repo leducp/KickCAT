@@ -31,7 +31,7 @@ int main(int, char*[])
     // init values
     for (uint32_t i = 0; i < pdo_size; ++i)
     {
-        buffer_in[i]  = 3 * i;
+        buffer_in[i] = 3*i;
         buffer_out[i] = 0xFF;
     }
 

@@ -11,16 +11,16 @@ namespace foot
 {
     struct imu
     {
-        int16_t accelerometerX;  // raw data
+        int16_t accelerometerX; // raw data
         int16_t accelerometerY;
         int16_t accelerometerZ;
 
-        int16_t gyroscopeX;  // raw data.
+        int16_t gyroscopeX; // raw data.
         int16_t gyroscopeY;
         int16_t gyroscopeZ;
 
-        int16_t temperature;  // Celsius degrees
-    } __attribute__((packed));
+        int16_t temperature; // Celsius degrees
+    }__attribute__((packed));
 
     struct Input
     {
@@ -43,7 +43,7 @@ namespace foot
     } __attribute__((packed));
 }
 
-int main(int, char*[])
+int main(int, char *[])
 {
     using namespace kickcat;
 

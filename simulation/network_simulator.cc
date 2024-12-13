@@ -128,13 +128,13 @@ int main(int argc, char* argv[])
         {
             std::sort(stats.begin(), stats.end());
 
-            printf("[%f] frame processing time: \n\t min: %f\n\t max: %f\n\t avg: %f\n",
-                   seconds_f(since_start()).count(),
-                   stats.front().count() / 1000.0,
-                   stats.back().count() / 1000.0,
-                   (std::reduce(stats.begin(), stats.end()) / stats.size()).count() / 1000.0);
+            printf("[%f] frame processing time: \n\t min: %f\n\t max: %f\n\t avg: %f\n", seconds_f(since_start()).count(),
+                stats.front().count() / 1000.0,
+                stats.back().count()  / 1000.0,
+                (std::reduce(stats.begin(), stats.end()) / stats.size()).count() / 1000.0);
             stats.clear();
         }
+
     }
 
     return 0;

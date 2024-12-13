@@ -13,10 +13,10 @@
 using namespace kickcat;
 
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
+    (void) argc;
+    (void) argv;
     std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
     Lan9252 esc                     = Lan9252(spi_driver);
     PDO pdo(&esc);
@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
     // init values
     for (uint32_t i = 0; i < pdo_size; ++i)
     {
-        buffer_in[i]  = i;
+        buffer_in[i] = i;
         buffer_out[i] = 0xFF;
     }
 
@@ -54,11 +54,11 @@ int main(int argc, char* argv[])
     {
         slave.routine();
         // Print received data
-        //    for (uint8_t i = 0; i < pdo_size; ++i)
-        //    {
-        //        printf("%x", buffer_out[i]);
-        //    }
-        //    printf("\n");
+    //    for (uint8_t i = 0; i < pdo_size; ++i)
+    //    {
+    //        printf("%x", buffer_out[i]);
+    //    }
+    //    printf("\n");
 
         if (slave.getState() == State::SAFE_OP)
         {
