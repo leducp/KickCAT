@@ -157,6 +157,7 @@ namespace kickcat::ESM
     Context SafeOP::routine_internal(Context currentStatus, ALControl control)
     {
         pdo_.update_process_data_input();
+        pdo_.update_process_data_output();
 
         if (mbx_ and not mbx_->is_sm_config_ok())
         {

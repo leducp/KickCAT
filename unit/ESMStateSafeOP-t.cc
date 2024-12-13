@@ -46,6 +46,7 @@ TEST_F(ESMStateSafeOPTest, 22_2_ErrSafeOP_to_ErrSafeOP)
 TEST_F(ESMStateSafeOPTest, 23A_SafeOP_to_Init)
 {
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{State::INIT});
 
@@ -61,6 +62,7 @@ TEST_F(ESMStateSafeOPTest, 23A_SafeOP_to_Init)
 TEST_F(ESMStateSafeOPTest, 23B_ErrSafeOP_to_Init)
 {
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE),
                                          ALControl{State::INIT | State::ERROR_ACK});
@@ -77,6 +79,7 @@ TEST_F(ESMStateSafeOPTest, 23B_ErrSafeOP_to_Init)
 TEST_F(ESMStateSafeOPTest, 24A_SafeOP_to_PreOP)
 {
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{State::PRE_OP});
 
@@ -92,6 +95,7 @@ TEST_F(ESMStateSafeOPTest, 24A_SafeOP_to_PreOP)
 TEST_F(ESMStateSafeOPTest, 24B_ErrSafeOP_to_PreOP)
 {
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE),
                                          ALControl{State::PRE_OP | State::ERROR_ACK});
@@ -108,6 +112,7 @@ TEST_F(ESMStateSafeOPTest, 24B_ErrSafeOP_to_PreOP)
 TEST_F(ESMStateSafeOPTest, 25_1_ErrSafeOP_to_SafeOP)
 {
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE),
                                          ALControl{State::SAFE_OP | State::ERROR_ACK});
@@ -118,6 +123,7 @@ TEST_F(ESMStateSafeOPTest, 25_1_ErrSafeOP_to_SafeOP)
 TEST_F(ESMStateSafeOPTest, 29A_SafeOP_to_ErrSafeOP)
 {
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{State::BOOT});
 
@@ -127,6 +133,8 @@ TEST_F(ESMStateSafeOPTest, 29A_SafeOP_to_ErrSafeOP)
 TEST_F(ESMStateSafeOPTest, 29B_ErrSafeOP_to_ErrSafeOP)
 {
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
+
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP, StatusCode::UNKNOWN_REQUESTED_STATE),
                                          ALControl{State::BOOT | kickcat::ERROR_ACK});
@@ -136,8 +144,6 @@ TEST_F(ESMStateSafeOPTest, 29B_ErrSafeOP_to_ErrSafeOP)
 
 TEST_F(ESMStateSafeOPTest, 30A_SafeOP_to_ErrSafeOP)
 {
-    expectUpdatePdoInput();
-
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{UNKNOWN_STATE});
 
     expectAlStatus(newContext, State::SAFE_OP, StatusCode::UNKNOWN_REQUESTED_STATE);
@@ -145,8 +151,6 @@ TEST_F(ESMStateSafeOPTest, 30A_SafeOP_to_ErrSafeOP)
 
 TEST_F(ESMStateSafeOPTest, 30B_ErrSafeOP_to_ErrSafeOP)
 {
-    expectUpdatePdoInput();
-
     Context newContext = safeop->routine(Context::build(State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE),
                                          ALControl{static_cast<uint16_t>(UNKNOWN_STATE | State::ERROR_ACK)});
 
@@ -156,7 +160,6 @@ TEST_F(ESMStateSafeOPTest, 30B_ErrSafeOP_to_ErrSafeOP)
 TEST_F(ESMStateSafeOPTest, 31_2_ErrSafeOP_to_ErrSafeOP)
 {
     pdo_out.activate = ~SM_ACTIVATE_ENABLE;
-    expectUpdatePdoInput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE),
                                          ALControl{State::SAFE_OP});
@@ -168,6 +171,7 @@ TEST_F(ESMStateSafeOPTest, 32A_SafeOP_to_PreOP)
 {
     pdo_out.activate = ~SM_ACTIVATE_ENABLE;
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{State::SAFE_OP});
 
@@ -184,6 +188,7 @@ TEST_F(ESMStateSafeOPTest, 32B_SafeOP_to_PreOP)
 {
     pdo_in.activate = ~SM_ACTIVATE_ENABLE;
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{State::SAFE_OP});
 
@@ -200,6 +205,7 @@ TEST_F(ESMStateSafeOPTest, 33A_SafeOP_to_Init)
 {
     mbx_in.activate = ~SM_ACTIVATE_ENABLE;
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{State::SAFE_OP});
 
@@ -216,6 +222,7 @@ TEST_F(ESMStateSafeOPTest, 33B_SafeOP_to_Init)
 {
     mbx_out.activate = ~SM_ACTIVATE_ENABLE;
     expectUpdatePdoInput();
+    expectUpdatePdoOutput();
 
     Context newContext = safeop->routine(Context::build(State::SAFE_OP), ALControl{State::SAFE_OP});
 

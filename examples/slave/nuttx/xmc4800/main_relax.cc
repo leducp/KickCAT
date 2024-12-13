@@ -1,9 +1,11 @@
 
 #include "kickcat/EEPROM/XMC4800EEPROM.h"
-#include "kickcat/OS/Time.h"
 #include "kickcat/ESC/XMC4800.h"
+#include "kickcat/OS/Time.h"
+#include "kickcat/PDO.h"
+#include "kickcat/slave/Slave.h"
 
-int main(int, char *[])
+int main(int, char*[])
 {
     using namespace kickcat;
 
@@ -11,8 +13,9 @@ int main(int, char *[])
 
     XMC4800 esc;
     XMC4800EEPROM eeprom;
+    PDO pdo(&esc);
+    slave::Slave slave(&esc, &pdo);
 
-    esc.init();
     eeprom.init();
     uint16_t al_status;
     uint16_t al_control;
@@ -26,14 +29,14 @@ int main(int, char *[])
     uint8_t buffer_out[pdo_size];
 
     // init values
-    for (uint32_t i=0; i < pdo_size; ++i)
+    for (uint32_t i = 0; i < pdo_size; ++i)
     {
-        buffer_in[i] = 3*i;
+        buffer_in[i]  = 3 * i;
         buffer_out[i] = 0xFF;
     }
 
-    esc.set_process_data_input(buffer_in);
-    esc.set_process_data_output(buffer_out);
+    pdo.set_process_data_input(buffer_in);
+    pdo.set_process_data_output(buffer_out);
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
@@ -44,15 +47,17 @@ int main(int, char *[])
     esc.read(reg::PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config));
     printf("pdi config 0x%x \n", pdi_config);
 
-    while(true)
+    slave.start();
+
+    while (true)
     {
         eeprom.process();
-        esc.routine();
-        if (esc.al_status() & State::SAFE_OP)
+        slave.routine();
+        if (slave.getState() == State::SAFE_OP)
         {
             if (buffer_out[1] != 0xFF)
             {
-               esc.set_valid_output_data_received(true);
+                slave.setOutputDataValid(true);
             }
         }
     }

@@ -99,12 +99,12 @@ public:
 
     void expectUpdatePdoInput()
     {
-        EXPECT_CALL(*esc_, write(pdo_in.start_address, _, pdo_in.length)).WillRepeatedly(Return(0));
+        EXPECT_CALL(*esc_, write(pdo_in.start_address, _, pdo_in.length)).WillOnce(Return(0));
     }
 
     void expectUpdatePdoOutput()
     {
-        EXPECT_CALL(*esc_, read(pdo_out.start_address, _, pdo_out.length)).WillRepeatedly(Return(0));
+        EXPECT_CALL(*esc_, read(pdo_out.start_address, _, pdo_out.length)).WillOnce(Return(0));
     }
 
     void expectSyncManagerActivate(uint8_t index, bool enable = true)
