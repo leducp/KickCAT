@@ -168,7 +168,7 @@
                   <BitSize>8</BitSize>
                   <BitOffs>0</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -181,7 +181,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>16</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -191,7 +191,7 @@
 
               <DataType>
                 <Name>DT1A00</Name>
-                <BitSize>432</BitSize>
+                <BitSize>464</BitSize>
                 <SubItem>
                   <SubIdx>0</SubIdx>
                   <Name>Subindex 000</Name>
@@ -199,7 +199,7 @@
                   <BitSize>8</BitSize>
                   <BitOffs>0</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -212,7 +212,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>16</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -225,7 +225,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>48</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -238,7 +238,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>80</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -251,7 +251,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>112</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -264,7 +264,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>144</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -277,7 +277,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>176</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -290,7 +290,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>208</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -303,7 +303,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>240</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -316,7 +316,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>272</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -329,7 +329,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>304</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -342,7 +342,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>336</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -355,7 +355,7 @@
                   <BitSize>32</BitSize>
                   <BitOffs>368</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -368,7 +368,20 @@
                   <BitSize>32</BitSize>
                   <BitOffs>400</BitOffs>
                   <Flags>
-                    <Access WriteRestrictions="PreOP">rw</Access>
+                    <Access>ro</Access>
+                    <Category>o</Category>
+                    <Backup>0</Backup>
+                    <Setting>0</Setting>
+                  </Flags>
+                </SubItem>
+                <SubItem>
+                  <SubIdx>14</SubIdx>
+                  <Name>TxPDO Map 1 Element 14</Name>
+                  <Type>UDINT</Type>
+                  <BitSize>32</BitSize>
+                  <BitOffs>432</BitOffs>
+                  <Flags>
+                    <Access>ro</Access>
                     <Category>o</Category>
                     <Backup>0</Backup>
                     <Setting>0</Setting>
@@ -554,12 +567,12 @@
                 <Index>#x1a00</Index>
                 <Name>TxPDO Map 1</Name>
                 <Type>DT1A00</Type>
-                <BitSize>432</BitSize>
+                <BitSize>464</BitSize>
                 <Info>
                   <SubItem>
                     <Name>Subindex 000</Name>
                     <Info>
-                      <DefaultData>0c</DefaultData>
+                      <DefaultData>0d</DefaultData>
                     </Info>
                   </SubItem>
                   <SubItem>
@@ -638,6 +651,12 @@
                     <Name>TxPDO Map 1 Element 13</Name>
                     <Info>
                       <DefaultData>10000c60</DefaultData>
+                    </Info>
+                  </SubItem>
+                  <SubItem>
+                    <Name>TxPDO Map 1 Element 14</Name>
+                    <Info>
+                      <DefaultData>10000d60</DefaultData>
                     </Info>
                   </SubItem>
                 </Info>
@@ -927,6 +946,22 @@
               </Object>
               <Object>
                 <Index>#x600C</Index>
+                <Name>adc_vref</Name>
+                <Type>UINT</Type>
+                <BitSize>16</BitSize>
+                <Info>
+                  <DefaultData>0000</DefaultData>
+                </Info>
+                <Flags>
+                  <Access>ro</Access>
+                  <Category>o</Category>
+                  <PdoMapping>t</PdoMapping>
+                  <Backup>0</Backup>
+                  <Setting>0</Setting>
+                </Flags>
+              </Object>
+              <Object>
+                <Index>#x600D</Index>
                 <Name>board_status</Name>
                 <Type>UINT</Type>
                 <BitSize>16</BitSize>
@@ -958,10 +993,9 @@
         <RxPdo Fixed="1" Mandatory="1" Sm="2">
           <Index>#x1600</Index>
           <Name>Outputs</Name>
-
           <Entry>
-            <Index>#x1601</Index>
-            <SubIndex>1</SubIndex>
+            <Index>#x6000</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>wdg_counter</Name>
             <DataType>UINT</DataType>
@@ -974,99 +1008,99 @@
           <Index>#x1A00</Index>
           <Name>Inputs</Name>
           <Entry>
-            <Index>#x1A10</Index>
-            <SubIndex>1</SubIndex>
+            <Index>#x6000</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>wdg_counter</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A01</Index>
-            <SubIndex>2</SubIndex>
+            <Index>#x6001</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>acc_x</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A02</Index>
-            <SubIndex>3</SubIndex>
+            <Index>#x6002</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>acc_y</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A03</Index>
-            <SubIndex>4</SubIndex>
+            <Index>#x6003</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>acc_z</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A04</Index>
-            <SubIndex>5</SubIndex>
+            <Index>#x6004</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>gyro_x</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A05</Index>
-            <SubIndex>6</SubIndex>
+            <Index>#x6005</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>gyro_y</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A06</Index>
-            <SubIndex>7</SubIndex>
+            <Index>#x6006</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>gyro_z</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A07</Index>
-            <SubIndex>8</SubIndex>
+            <Index>#x6007</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>imu_temperature</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A08</Index>
-            <SubIndex>9</SubIndex>
+            <Index>#x6008</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>force_sensor_0</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A09</Index>
-            <SubIndex>10</SubIndex>
+            <Index>#x6009</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>force_sensor_1</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A0A</Index>
-            <SubIndex>11</SubIndex>
+            <Index>#x600A</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>force_sensor_2</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A0B</Index>
-            <SubIndex>12</SubIndex>
+            <Index>#x600B</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>force_sensor_3</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A0C</Index>
-            <SubIndex>13</SubIndex>
+            <Index>#x600C</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
-            <Name>force_sensor_4</Name>
+            <Name>adc_vref</Name>
             <DataType>UINT</DataType>
           </Entry>
           <Entry>
-            <Index>#x1A0D</Index>
-            <SubIndex>14</SubIndex>
+            <Index>#x600D</Index>
+            <SubIndex>0</SubIndex>
             <BitLen>16</BitLen>
             <Name>board_status</Name>
             <DataType>UINT</DataType>

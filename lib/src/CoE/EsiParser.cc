@@ -384,13 +384,13 @@ namespace kickcat::CoE
                 {
                     // array entries are the subindex starting from 1, 0 is the array size
                     uint8_t elements = toNumber<uint8_t>(node_array_info->FirstChildElement("Elements"));
-                    uint16_t element_bitlen = toNumber<uint16_t>(node_subitem->FirstChildElement("BitSize"));
+                    uint16_t element_bitlen = toNumber<uint16_t>(node_subitem->FirstChildElement("BitSize")) / elements;
                     uint16_t element_bitoff = toNumber<uint16_t>(node_subitem->FirstChildElement("BitOffs"));
 
                     for (uint8_t i = 1; i <= elements; ++i)
                     {
                         entry.bitlen = element_bitlen;
-                        entry.bitoff = element_bitoff * i;
+                        entry.bitoff = element_bitoff + element_bitlen * (i - 1);
                         entry.subindex = i;
                         object.entries.push_back(std::move(entry));
                     }
