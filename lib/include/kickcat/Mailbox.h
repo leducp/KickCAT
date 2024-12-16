@@ -202,8 +202,8 @@ namespace kickcat::mailbox::response
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
 
         AbstractESC* esc_;
-        std::optional<SyncManagerConfig> mbx_in_;
-        std::optional<SyncManagerConfig> mbx_out_;
+        SyncManagerConfig mbx_in_{};
+        SyncManagerConfig mbx_out_{};
  
         uint16_t max_allocated_ram_by_msg_;
         uint16_t max_msgs_;

@@ -292,7 +292,7 @@ namespace kickcat::mailbox::response
 
     bool Mailbox::is_sm_config_ok()
     {
-        if (not mbx_in_.has_value() or not mbx_out_.has_value())
+        if (mbx_in_.type == SyncManagerType::Unused  or mbx_out_.type == SyncManagerType::Unused)
         {
             return false;
         }
@@ -300,16 +300,16 @@ namespace kickcat::mailbox::response
         bool valid = true;
         for (auto& sm : {mbx_in_, mbx_out_})
         {
-            valid &= esc_->is_valid_sm(*sm);
+            valid &= esc_->is_valid_sm(sm);
         }
         return valid;
     }
 
     void Mailbox::set_sm_activate(bool is_activated)
     {
-        if (mbx_in_.has_value() and mbx_out_.has_value())
+        if (mbx_in_.type != SyncManagerType::Unused and mbx_out_.type != SyncManagerType::Unused )
         {
-            esc_->set_sm_activate({*mbx_in_, *mbx_out_}, is_activated);
+            esc_->set_sm_activate({mbx_in_, mbx_out_}, is_activated);
         }
     }
 
@@ -317,16 +317,16 @@ namespace kickcat::mailbox::response
     void Mailbox::receive()
     {
         SyncManager sync;
-        esc_->read(addressSM(mbx_out_->index), &sync, sizeof(SyncManager));
+        esc_->read(addressSM(mbx_out_.index), &sync, sizeof(SyncManager));
         if (not (sync.status & SM_STATUS_MAILBOX))
         {
             return;
         }
 
         std::vector<uint8_t> raw_message;
-        raw_message.resize(mbx_out_->length);
-        int32_t read_bytes = esc_->read(mbx_out_->start_address, raw_message.data(), mbx_out_->length);
-        if (read_bytes != mbx_out_->length)
+        raw_message.resize(mbx_out_.length);
+        int32_t read_bytes = esc_->read(mbx_out_.start_address, raw_message.data(), mbx_out_.length);
+        if (read_bytes != mbx_out_.length)
         {
             return;
         }
@@ -406,7 +406,7 @@ namespace kickcat::mailbox::response
     void Mailbox::send()
     {
         SyncManager sync;
-        esc_->read(addressSM(mbx_in_->index), &sync, sizeof(SyncManager));
+        esc_->read(addressSM(mbx_in_.index), &sync, sizeof(SyncManager));
 
         // Save last fetched message for repeat procedure
         if (sync.status & SM_STATUS_IRQ_READ)
@@ -415,7 +415,7 @@ namespace kickcat::mailbox::response
 
             // reset IRQ by writing to the buffer
             uint8_t dummy = 0;
-            esc_->write(mbx_in_->start_address, &dummy, 1);
+            esc_->write(mbx_in_.start_address, &dummy, 1);
         }
 
         // Repeat procedure handling
@@ -424,14 +424,14 @@ namespace kickcat::mailbox::response
             // Write the last sent message - we need to reset the SM to empty it if full
             if (sync.status & SM_STATUS_MAILBOX)
             {
-                esc_->sm_deactivate(mbx_in_.value());
-                esc_->sm_activate(mbx_in_.value());
+                esc_->sm_deactivate(mbx_in_);
+                esc_->sm_activate(mbx_in_);
             }
-            esc_->write(mbx_in_->start_address, repeat_.data(), repeat_.size());
+            esc_->write(mbx_in_.start_address, repeat_.data(), repeat_.size());
 
             // Ack the repeat requested
             uint8_t ack = sync.activate & SM_ACTIVATE_REPEAT_REQ;
-            esc_->write(addressSM(mbx_in_->index) + 7, &ack, sizeof(uint8_t));
+            esc_->write(addressSM(mbx_in_.index) + 7, &ack, sizeof(uint8_t));
 
             // We just fill the mailbox: do not continue for now
             return;
@@ -449,7 +449,7 @@ namespace kickcat::mailbox::response
         }
 
         auto& msg = to_send_.front();
-        int32_t written_bytes = esc_->write(mbx_in_->start_address, msg.data(), msg.size());
+        int32_t written_bytes = esc_->write(mbx_in_.start_address, msg.data(), msg.size());
         if (written_bytes > 0)
         {
             last_sent_ = std::move(msg);
@@ -484,7 +484,7 @@ namespace kickcat::mailbox::response
 
     uint16_t AbstractMessage::replyExpectedSize()
     {
-        return mailbox_->mbx_out_->length;
+        return mailbox_->mbx_out_.length;
     }
 
     void AbstractMessage::reply(std::vector<uint8_t>&& reply)
