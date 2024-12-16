@@ -57,7 +57,7 @@ int main(int, char*[])
         {
             if (buffer_out[1] != 0xFF)
             {
-                slave.setOutputDataValid(true);
+                slave.validateOutputData();
             }
         }
     }

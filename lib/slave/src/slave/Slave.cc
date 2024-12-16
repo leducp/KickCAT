@@ -39,8 +39,8 @@ namespace kickcat::slave
         return stateMachine_.get_state();
     }
 
-    void Slave::setOutputDataValid(bool isValid)
+    void Slave::validateOutputData()
     {
-        stateMachine_.set_output_data_valid(isValid);
+        stateMachine_.validateOutputData();
     }
 }

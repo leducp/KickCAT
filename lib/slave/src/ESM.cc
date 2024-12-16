@@ -29,9 +29,9 @@ namespace kickcat::ESM
         current_state_ = states_[0];
     }
 
-    void StateMachine::set_output_data_valid(bool isValid)
+    void StateMachine::validateOutputData()
     {
-        status_.validOutputData = isValid;
+        status_.validOutputData = true;
     }
 
     State StateMachine::get_state()

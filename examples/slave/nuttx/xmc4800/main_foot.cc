@@ -92,7 +92,7 @@ int main(int, char *[])
         {
             if (output_PDO.watchdog_counter != 0x00)
             {
-                slave.setOutputDataValid(true);
+                slave.validateOutputData(true);
             }
         }
 

@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
                 slave.routine();
                 if (slave.getState() == State::SAFE_OP)
                 {
-                    slave.setOutputDataValid(true);
+                    slave.validateOutputData();
                 }
             }
         }

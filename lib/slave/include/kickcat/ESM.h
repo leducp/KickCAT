@@ -81,7 +81,7 @@ namespace kickcat
         {
         public:
             StateMachine(AbstractESC& esc, std::array<ESM::AbstractState*, NUMBER_OF_STATES>&& states);
-            void set_output_data_valid(bool isValid);
+            void validateOutputData();
             void start();
             void play();
             State get_state();

@@ -18,7 +18,7 @@ namespace kickcat::slave
         void start();
         void routine();
         State getState();
-        void setOutputDataValid(bool isValid);
+        void validateOutputData();
 
     private:
         AbstractESC* esc_;
