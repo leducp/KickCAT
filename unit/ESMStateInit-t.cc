@@ -66,6 +66,18 @@ TEST_F(ESMStateInitTest, 3A_Init_to_PreOP)
     preop->on_entry(Context::build(State::INIT), newContext);
 }
 
+TEST_F(ESMStateInitTest, 3A_Init_to_PreOP_no_mbx)
+{
+    init->set_mailbox(nullptr);
+
+    Context newContext = init->routine(Context::build(State::INIT), ALControl{State::PRE_OP});
+
+    expectAlStatus(newContext, State::PRE_OP);
+
+    preop->on_entry(Context::build(State::INIT), newContext);
+}
+
+
 TEST_F(ESMStateInitTest, 3B_ErrInit_to_PreOP)
 {
     expectSyncManagerRead(0, mbx_in);
