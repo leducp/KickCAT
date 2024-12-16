@@ -11,7 +11,7 @@ namespace kickcat
 {
     namespace ESM
     {
-        class Init : public AbstractState
+        class Init final : public AbstractState
         {
         public:
             Init(AbstractESC& esc, PDO& pdo);
@@ -21,7 +21,7 @@ namespace kickcat
             Context routine_internal(Context oldStatus, ALControl control) override;
         };
 
-        class PreOP : public AbstractState
+        class PreOP final : public AbstractState
         {
         public:
             PreOP(AbstractESC& esc, PDO& pdo);
@@ -31,7 +31,7 @@ namespace kickcat
             Context routine_internal(Context oldStatus, ALControl control) override;
         };
 
-        class SafeOP : public AbstractState
+        class SafeOP final : public AbstractState
         {
         public:
             SafeOP(AbstractESC& esc, PDO& pdo);
@@ -41,7 +41,7 @@ namespace kickcat
             Context routine_internal(Context oldStatus, ALControl control) override;
         };
 
-        class OP : public AbstractState
+        class OP final : public AbstractState
         {
         public:
             OP(AbstractESC& esc, PDO& pdo);
