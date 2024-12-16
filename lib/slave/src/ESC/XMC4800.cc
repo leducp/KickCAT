@@ -4,12 +4,6 @@
 namespace kickcat
 {
 // LCOV_EXCL_START
-    hresult XMC4800::init()
-    {
-        return hresult::OK;
-    }
-
-
     int32_t XMC4800::read(uint16_t address, void* data, uint16_t size)
     {
         if (ECAT0_BASE_ADDRESS + address + size > ECAT0_END_ADDRESS)

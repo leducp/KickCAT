@@ -198,7 +198,7 @@ namespace kickcat::ESM
         pdo_.updateInput();
         pdo_.updateOutput();
 
-        if (currentStatus.has_expired_watchdog())
+        if (currentStatus.hasExpiredWatchdog())
         {
             return Context::build(State::SAFE_OP, SYNC_MANAGER_WATCHDOG);
         }

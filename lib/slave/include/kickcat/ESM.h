@@ -36,7 +36,7 @@ namespace kickcat
                 return static_cast<State>(al_status & State::MASK_STATE);
             }
 
-            bool has_expired_watchdog()
+            bool hasExpiredWatchdog()
             {
                 return not(al_watchdog_process_data & 0x1);
             }
@@ -70,7 +70,11 @@ namespace kickcat
             mailbox::response::Mailbox* mbx_{};
 
             virtual Context routineInternal(Context currentStatus, ALControl alControl) = 0;
-            virtual void onEntry(Context oldStatus, Context newStatus) {};
+            virtual void onEntry(Context oldStatus, Context newStatus)
+            {
+                (void)oldStatus;
+                (void)newStatus;
+            };
 
             uint8_t id();
         };
@@ -85,7 +89,7 @@ namespace kickcat
             State state();
 
         private:
-            AbstractState* find_state(uint8_t id);
+            AbstractState* findState(uint8_t id);
 
             AbstractESC& esc_;
             AbstractState* current_state_;

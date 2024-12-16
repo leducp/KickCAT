@@ -1,7 +1,6 @@
 #ifndef KICKCAT_MAILBOX_H
 #define KICKCAT_MAILBOX_H
 
-#include <optional>
 #include <queue>
 #include <list>
 #include <memory>

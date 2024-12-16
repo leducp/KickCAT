@@ -21,7 +21,7 @@ namespace kickcat::ESM
         return id_;
     }
 
-    StateMachine::StateMachine(AbstractESC& esc, std::array<ESM::AbstractState*, 4>&& states)
+    StateMachine::StateMachine(AbstractESC& esc, std::array<ESM::AbstractState*, NUMBER_OF_STATES>&& states)
         : esc_{esc}
         , states_{std::move(states)}
     {
@@ -43,7 +43,7 @@ namespace kickcat::ESM
         current_state_->onEntry(status_, status_);
     }
 
-    AbstractState* StateMachine::find_state(uint8_t id)
+    AbstractState* StateMachine::findState(uint8_t id)
     {
         auto it = std::find_if(std::begin(states_), std::end(states_), [&](auto* state) { return state->id() == id; });
         if (it == states_.end())
@@ -69,11 +69,12 @@ namespace kickcat::ESM
 
         if (newStateId != current_state_->id())
         {
-            AbstractState* newState = find_state(newStateId);
+            AbstractState* newState = findState(newStateId);
             if (not newState)
             {
                 newState            = states_[0];
                 newStatus.al_status = newState->id();
+                newStatus.al_status_code = StatusCode::UNKNOWN_REQUESTED_STATE;
             }
 
             if (newState != current_state_)

@@ -12,8 +12,8 @@ namespace kickcat
             auto [indexIn, pdoIn]   = esc_->findSm(SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ);
             auto [indexOut, pdoOut] = esc_->findSm(SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE);
 
-            sm_pd_input_  = SYNC_MANAGER_PI_IN(indexIn, pdoIn.start_address, pdoIn.length);
-            sm_pd_output_ = SYNC_MANAGER_PI_OUT(indexOut, pdoOut.start_address, pdoOut.length);
+            sm_input_  = SYNC_MANAGER_PI_IN(indexIn, pdoIn.start_address, pdoIn.length);
+            sm_output_ = SYNC_MANAGER_PI_OUT(indexOut, pdoOut.start_address, pdoOut.length);
         }
 
         catch (std::exception const& e)
@@ -26,11 +26,11 @@ namespace kickcat
 
     StatusCode PDO::isConfigOk()
     {
-        if (not esc_->isSmValid(*sm_pd_input_))
+        if (not esc_->isSmValid(sm_input_))
         {
             return StatusCode::INVALID_INPUT_CONFIGURATION;
         }
-        else if (not esc_->isSmValid(*sm_pd_output_))
+        else if (not esc_->isSmValid(sm_output_))
         {
             return StatusCode::INVALID_OUTPUT_CONFIGURATION;
         }
@@ -40,34 +40,34 @@ namespace kickcat
 
     void PDO::activateOuput(bool is_activated)
     {
-        if (sm_pd_output_.has_value())
+        if (sm_output_.type != SyncManagerType::Unused)
         {
-            esc_->setSmActivate({sm_pd_output_.value()}, is_activated);
+            esc_->setSmActivate({sm_output_}, is_activated);
         }
     }
 
     void PDO::activateInput(bool is_activated)
     {
-        if (sm_pd_input_.has_value())
+        if (sm_input_.type != SyncManagerType::Unused)
         {
-            esc_->setSmActivate({sm_pd_input_.value()}, is_activated);
+            esc_->setSmActivate({sm_input_}, is_activated);
         }
     }
 
     void PDO::setInput(void* buffer)
     {
-        process_data_input_ = buffer;
+        input_ = buffer;
     }
 
     void PDO::setOutput(void* buffer)
     {
-        process_data_output_ = buffer;
+        output_ = buffer;
     }
 
     void PDO::updateInput()
     {
-        int32_t written = esc_->write(sm_pd_input_->start_address, process_data_input_, sm_pd_input_->length);
-        if (written != sm_pd_input_->length)
+        int32_t written = esc_->write(sm_input_.start_address, input_, sm_input_.length);
+        if (written != sm_input_.length)
         {
             slave_error("\n update_process_data_input ERROR\n");
         }
@@ -75,8 +75,8 @@ namespace kickcat
 
     void PDO::updateOutput()
     {
-        int32_t r = esc_->read(sm_pd_output_->start_address, process_data_output_, sm_pd_output_->length);
-        if (r != sm_pd_output_->length)
+        int32_t r = esc_->read(sm_output_.start_address, output_, sm_output_.length);
+        if (r != sm_output_.length)
         {
             slave_error("\n update_process_data_output ERROR\n");
         }

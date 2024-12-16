@@ -135,9 +135,13 @@ TEST_F(StateMachineTest, play_wrongState_goToDefaultState)
 
     sm->play();
 
-    EXPECT_CALL(firstState, onEntry(StatusMatches(SECOND_STATE_ID, 0), StatusMatches(FIRST_STATE_ID, 0))).Times(1);
+    EXPECT_CALL(firstState,
+                onEntry(StatusMatches(SECOND_STATE_ID, 0), StatusMatches(FIRST_STATE_ID, UNKNOWN_REQUESTED_STATE)))
+        .Times(1);
 
-    EXPECT_CALL(esc_, write(reg::AL_STATUS_CODE, WrittenMatches(0), sizeof(uint16_t))).WillOnce(Return(0));
+    EXPECT_CALL(esc_, write(reg::AL_STATUS_CODE, WrittenMatches(UNKNOWN_REQUESTED_STATE), sizeof(uint16_t)))
+        .WillOnce(Return(0));
+
     EXPECT_CALL(esc_, write(reg::AL_STATUS, WrittenMatches(FIRST_STATE_ID), sizeof(uint16_t))).WillOnce(Return(0));
 
     EXPECT_CALL(secondState, routine(_, _)).WillOnce(Return(Context::build(4)));

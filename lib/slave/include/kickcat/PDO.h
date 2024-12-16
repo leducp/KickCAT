@@ -1,7 +1,6 @@
 #ifndef SLAVE_STACK_INCLUDE_PDO_H_
 #define SLAVE_STACK_INCLUDE_PDO_H_
 
-#include <optional>
 #include "AbstractESC.h"
 #include "kickcat/protocol.h"
 
@@ -26,11 +25,11 @@ namespace kickcat
 
     private:
         AbstractESC* esc_;
-        void* process_data_input_                  = {nullptr};
-        std::optional<SyncManagerConfig> sm_pd_input_ = {};
+        void* input_                = {nullptr};
+        SyncManagerConfig sm_input_ = {};
 
-        void* process_data_output_                  = {nullptr};
-        std::optional<SyncManagerConfig> sm_pd_output_ = {};
+        void* output_                = {nullptr};
+        SyncManagerConfig sm_output_ = {};
     };
 }
 
