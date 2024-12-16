@@ -68,9 +68,9 @@ int main(int, char *[])
     auto dictionary = CoE::createOD();
     mbx.enableCoE(std::move(dictionary));
 
-    slave.set_mailbox(&mbx);
-    pdo.set_process_data_input(reinterpret_cast<uint8_t*>(&input_PDO));
-    pdo.set_process_data_output(reinterpret_cast<uint8_t*>(&output_PDO));
+    slave.setMailbox(&mbx);
+    pdo.setInput(&input_PDO);
+    pdo.setOutput(&output_PDO);
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
@@ -88,11 +88,11 @@ int main(int, char *[])
     {
         eeprom.process();
         slave.routine();
-        if (slave.getState() == State::SAFE_OP)
+        if (slave.state() == State::SAFE_OP)
         {
             if (output_PDO.watchdog_counter != 0x00)
             {
-                slave.validateOutputData(true);
+                slave.validateOutputData();
             }
         }
 

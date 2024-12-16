@@ -8,13 +8,13 @@ namespace kickcat::slave
     {
     }
 
-    void Slave::set_mailbox(mailbox::response::Mailbox* mbx)
+    void Slave::setMailbox(mailbox::response::Mailbox* mbx)
     {
         mbx_ = mbx;
-        init_.set_mailbox(mbx);
-        preOp_.set_mailbox(mbx);
-        safeOP_.set_mailbox(mbx);
-        OP_.set_mailbox(mbx);
+        init_.setMailbox(mbx);
+        preOp_.setMailbox(mbx);
+        safeOP_.setMailbox(mbx);
+        OP_.setMailbox(mbx);
     }
 
     void Slave::start()
@@ -34,9 +34,9 @@ namespace kickcat::slave
         stateMachine_.play();
     }
 
-    State Slave::getState()
+    State Slave::state()
     {
-        return stateMachine_.get_state();
+        return stateMachine_.state();
     }
 
     void Slave::validateOutputData()

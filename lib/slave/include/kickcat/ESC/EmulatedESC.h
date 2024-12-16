@@ -28,12 +28,6 @@ namespace kickcat
         int32_t read (uint16_t address, void* data,       uint16_t size) override;
         int32_t write(uint16_t address, void const* data, uint16_t size) override;
 
-    protected:
-        hresult init() override
-        {
-            return hresult::OK;
-        }
-
     private:
         struct Memory
         {

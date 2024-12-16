@@ -1,5 +1,4 @@
-#include "ESMStateTest.h"
-#include "kickcat/protocol.h"
+#include "mocks/ESMStateTest.h"
 
 
 class ESMStateOPTest : public ESMStateTest
@@ -15,8 +14,8 @@ public:
         expectSyncManagerRead(3, pdo_out);
 
         // In safeop mbx and pdo sync managers need to be configured
-        mbx_->configureSm();
-        pdo_->configure_pdo_sm();
+        mbx_->configure();
+        pdo_->configure();
 
         // Pdo input and output expected to be updated
         expectUpdatePdoInput();
@@ -36,7 +35,7 @@ TEST_F(ESMStateOPTest, 37_OP_to_Init)
     expectSyncManagerActivate(1, false);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    init->on_entry(context, newContext);
+    init->onEntry(context, newContext);
 }
 
 TEST_F(ESMStateOPTest, 38_OP_to_PreOP)
@@ -49,7 +48,7 @@ TEST_F(ESMStateOPTest, 38_OP_to_PreOP)
     expectSyncManagerActivate(1, true);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    preop->on_entry(context, newContext);
+    preop->onEntry(context, newContext);
 }
 
 TEST_F(ESMStateOPTest, 39_OP_to_SafeOP)
@@ -60,7 +59,7 @@ TEST_F(ESMStateOPTest, 39_OP_to_SafeOP)
 
     expectSyncManagerActivate(2, true);
     expectSyncManagerActivate(3, true);
-    safeop->on_entry(context, newContext);
+    safeop->onEntry(context, newContext);
 }
 
 TEST_F(ESMStateOPTest, 40_OP_to_OP)
@@ -77,7 +76,7 @@ TEST_F(ESMStateOPTest, 42_OP_to_SafeOP)
     expectAlStatus(newContext, State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE);
 
     expectSyncManagerActivate(3, false);
-    safeop->on_entry(context, newContext);
+    safeop->onEntry(context, newContext);
 }
 
 TEST_F(ESMStateOPTest, 43_OP_to_SafeOP)
@@ -87,7 +86,7 @@ TEST_F(ESMStateOPTest, 43_OP_to_SafeOP)
     expectAlStatus(newContext, State::SAFE_OP, StatusCode::UNKNOWN_REQUESTED_STATE);
 
     expectSyncManagerActivate(3, false);
-    safeop->on_entry(context, newContext);
+    safeop->onEntry(context, newContext);
 }
 
 TEST_F(ESMStateOPTest, 45A_OP_to_PreOP)

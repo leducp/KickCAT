@@ -34,8 +34,8 @@ int main(int argc, char *argv[])
         buffer_out[i] = 0xFF;
     }
 
-    pdo.set_process_data_input(buffer_in);
-    pdo.set_process_data_output(buffer_out);
+    pdo.setInput(buffer_in);
+    pdo.setOutput(buffer_out);
 
 
     uint8_t esc_config;
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     //    }
     //    printf("\n");
 
-        if (slave.getState() == State::SAFE_OP)
+        if (slave.state() == State::SAFE_OP)
         {
             if (buffer_out[1] != 0xFF)
             {

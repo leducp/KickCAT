@@ -14,10 +14,10 @@ namespace kickcat::slave
     public:
         Slave(AbstractESC* esc, PDO* pdo);
 
-        void set_mailbox(mailbox::response::Mailbox* mbx);
+        void setMailbox(mailbox::response::Mailbox* mbx);
         void start();
         void routine();
-        State getState();
+        State state();
         void validateOutputData();
 
     private:

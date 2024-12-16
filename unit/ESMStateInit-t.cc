@@ -1,11 +1,4 @@
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-#include "ESMStateTest.h"
-#include "gmock/gmock.h"
-#include "kickcat/ESM.h"
-#include "kickcat/ESMStates.h"
-#include "kickcat/Mailbox.h"
-#include "kickcat/protocol.h"
+#include "mocks/ESMStateTest.h"
 
 using namespace kickcat;
 using namespace kickcat::ESM;
@@ -63,18 +56,18 @@ TEST_F(ESMStateInitTest, 3A_Init_to_PreOP)
     expectSyncManagerActivate(0);
     expectSyncManagerActivate(1);
 
-    preop->on_entry(Context::build(State::INIT), newContext);
+    preop->onEntry(Context::build(State::INIT), newContext);
 }
 
 TEST_F(ESMStateInitTest, 3A_Init_to_PreOP_no_mbx)
 {
-    init->set_mailbox(nullptr);
+    init->setMailbox(nullptr);
 
     Context newContext = init->routine(Context::build(State::INIT), ALControl{State::PRE_OP});
 
     expectAlStatus(newContext, State::PRE_OP);
 
-    preop->on_entry(Context::build(State::INIT), newContext);
+    preop->onEntry(Context::build(State::INIT), newContext);
 }
 
 
@@ -91,7 +84,7 @@ TEST_F(ESMStateInitTest, 3B_ErrInit_to_PreOP)
     expectSyncManagerActivate(0);
     expectSyncManagerActivate(1);
 
-    preop->on_entry(Context::build(State::INIT), newContext);
+    preop->onEntry(Context::build(State::INIT), newContext);
 }
 
 TEST_F(ESMStateInitTest, 4A_Init_to_Init_sm_not_match)

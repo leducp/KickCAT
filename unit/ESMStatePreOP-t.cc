@@ -1,5 +1,4 @@
-#include "ESMStateTest.h"
-#include "kickcat/protocol.h"
+#include "mocks/ESMStateTest.h"
 
 
 class ESMStatePreOPTest : public ESMStateTest
@@ -10,7 +9,7 @@ class ESMStatePreOPTest : public ESMStateTest
         expectSyncManagerRead(1, mbx_out);
 
         // In Preop mbx sync managers need to be configured
-        mbx_->configureSm();
+        mbx_->configure();
     }
 };
 
@@ -23,7 +22,7 @@ TEST_F(ESMStatePreOPTest, 11_1_ErrPreOP_to_Init)
 
     expectSyncManagerActivate(0, false);
     expectSyncManagerActivate(1, false);
-    init->on_entry(Context::build(State::PRE_OP), newContext);
+    init->onEntry(Context::build(State::PRE_OP), newContext);
 }
 TEST_F(ESMStatePreOPTest, 11_2_ErrPreOP_to_ErrPreOP)
 {
@@ -78,7 +77,7 @@ TEST_F(ESMStatePreOPTest, 14_1A_PreOP_to_Safeop)
 
     expectSyncManagerActivate(2);
     expectSyncManagerActivate(3);
-    safeop->on_entry(Context::build(State::PRE_OP), newContext);
+    safeop->onEntry(Context::build(State::PRE_OP), newContext);
 }
 
 TEST_F(ESMStatePreOPTest, 14_1B_ErrPreOP_to_Safeop)
@@ -93,7 +92,7 @@ TEST_F(ESMStatePreOPTest, 14_1B_ErrPreOP_to_Safeop)
 
     expectSyncManagerActivate(2);
     expectSyncManagerActivate(3);
-    safeop->on_entry(Context::build(State::PRE_OP), newContext);
+    safeop->onEntry(Context::build(State::PRE_OP), newContext);
 }
 
 TEST_F(ESMStatePreOPTest, 17A_PreOP_to_ErrPreOP)
@@ -192,5 +191,5 @@ TEST_F(ESMStatePreOPTest, 21_PreOP_to_Init)
 
     expectSyncManagerActivate(0, false);
     expectSyncManagerActivate(1, false);
-    init->on_entry(Context::build(State::PRE_OP), newContext);
+    init->onEntry(Context::build(State::PRE_OP), newContext);
 }

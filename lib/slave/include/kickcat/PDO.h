@@ -15,21 +15,21 @@ namespace kickcat
         {
         }
 
-        hresult configure_pdo_sm();
-        StatusCode is_sm_config_ok();
-        void set_sm_output_activated(bool is_activated);
-        void set_sm_input_activated(bool is_activated);
-        void set_process_data_input(uint8_t* buffer);
-        void set_process_data_output(uint8_t* buffer);
-        void update_process_data_input();
-        void update_process_data_output();
+        hresult configure();
+        StatusCode isConfigOk();
+        void activateOuput(bool is_activated);
+        void activateInput(bool is_activated);
+        void setInput(void* buffer);
+        void setOutput(void* buffer);
+        void updateInput();
+        void updateOutput();
 
     private:
         AbstractESC* esc_;
-        uint8_t* process_data_input_                  = {nullptr};
+        void* process_data_input_                  = {nullptr};
         std::optional<SyncManagerConfig> sm_pd_input_ = {};
 
-        uint8_t* process_data_output_                  = {nullptr};
+        void* process_data_output_                  = {nullptr};
         std::optional<SyncManagerConfig> sm_pd_output_ = {};
     };
 }

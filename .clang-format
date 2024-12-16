@@ -1,0 +1,97 @@
+# Wandercraft Coding style
+# Config file for Clang-Format 8
+# see https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+# Checkout config tool: https://zed0.co.uk/clang-format-configurator/
+
+# Based on QSOP001E (april 2019)
+# This is just a helper file, it doesn't enforce all rules
+
+# TO DISABLE FORMATTING ON A SECTION
+# http://releases.llvm.org/6.0.1/tools/clang/docs/ClangFormatStyleOptions.html#disabling-formatting-on-a-piece-of-code
+# int formatted_code;
+# // clang-format off
+#     void    unformatted_code  ;
+# // clang-format on
+# void formatted_code_again;
+
+---
+Language: Cpp
+
+# general style
+BasedOnStyle: Google
+
+# ------------------------
+# Wandercraft Coding style
+# ------------------------
+# Numbers refer to items in the ref coding stylep
+
+# 32
+ColumnLimit: '120'
+# 34: sorted includes
+SortIncludes: 'true'
+IncludeBlocks: Preserve
+# 43
+DerivePointerAlignment: 'false'
+PointerAlignment: Left
+# 52
+BreakBeforeBraces: Allman
+# 58 - 59 - 60
+ContinuationIndentWidth: '4'
+IndentWidth: '4'
+UseTab: Never
+TabWidth: '4'
+# 61
+AccessModifierOffset: '-4'
+# 64-67 (space before condition && general block setting)
+SpaceBeforeParens: ControlStatements
+# 64
+AllowShortIfStatementsOnASingleLine: 'false'
+# 65-66
+AllowShortLoopsOnASingleLine: 'false'
+# 67
+IndentCaseLabels: 'true'
+AllowShortCaseLabelsOnASingleLine: 'false'
+# 69
+ConstructorInitializerAllOnOneLineOrOnePerLine: 'false'
+BreakConstructorInitializers: BeforeComma
+#70
+SpaceBeforeAssignmentOperators: 'true'
+# 76
+AlignTrailingComments: 'true'
+
+# Implicit rules
+# --------------
+# not specifically mapped to an item, but present in the style guide
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: 'false'
+
+# De facto conventions
+# --------------------
+# Not present in the style guide, but observed in the code
+IndentPPDirectives: None
+NamespaceIndentation: All
+AlignAfterOpenBracket: Align
+CompactNamespaces: 'false'
+AlignOperands: 'true'
+BinPackArguments: 'false'
+BinPackParameters: 'false'
+MaxEmptyLinesToKeep: 3
+AlignConsecutiveAssignments: 'true'
+
+# ---------------------
+# Additionnal rules
+# ---------------------
+
+# Good practices & useful features...
+Standard: Auto
+SortUsingDeclarations: 'true'
+Cpp11BracedListStyle: 'true'
+BreakBeforeBinaryOperators: 'NonAssignment'
+# nice to have but will lead to old and wrong comments unless
+# everyone uses the tool
+FixNamespaceComments: 'false'
+
+
+# Conservative settings
+ReflowComments: 'false'
+IndentWrappedFunctionNames: 'false'

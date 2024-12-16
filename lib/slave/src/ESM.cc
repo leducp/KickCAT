@@ -11,7 +11,7 @@ namespace kickcat::ESM
     {
     }
 
-    void AbstractState::set_mailbox(mailbox::response::Mailbox* mbx)
+    void AbstractState::setMailbox(mailbox::response::Mailbox* mbx)
     {
         mbx_ = mbx;
     }
@@ -20,7 +20,6 @@ namespace kickcat::ESM
     {
         return id_;
     }
-    void AbstractState::on_entry(Context, Context){};
 
     StateMachine::StateMachine(AbstractESC& esc, std::array<ESM::AbstractState*, 4>&& states)
         : esc_{esc}
@@ -31,17 +30,17 @@ namespace kickcat::ESM
 
     void StateMachine::validateOutputData()
     {
-        status_.validOutputData = true;
+        status_.is_valid_output_data = true;
     }
 
-    State StateMachine::get_state()
+    State StateMachine::state()
     {
-        return status_.get_state();
+        return status_.state();
     }
 
     void StateMachine::start()
     {
-        current_state_->on_entry(status_, status_);
+        current_state_->onEntry(status_, status_);
     }
 
     AbstractState* StateMachine::find_state(uint8_t id)
@@ -66,7 +65,7 @@ namespace kickcat::ESM
 
         auto newStatus = current_state_->routine(status_, control);
 
-        uint8_t newStateId = newStatus.get_state();
+        uint8_t newStateId = newStatus.state();
 
         if (newStateId != current_state_->id())
         {
@@ -79,7 +78,7 @@ namespace kickcat::ESM
 
             if (newState != current_state_)
             {
-                newState->on_entry(status_, newStatus);
+                newState->onEntry(status_, newStatus);
                 current_state_ = newState;
             }
         }

@@ -266,12 +266,12 @@ namespace kickcat::mailbox::response
     }
 
 
-    hresult Mailbox::configureSm()
+    hresult Mailbox::configure()
     {
         try
         {
-            auto [indexIn, mailboxIn]   = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
-            auto [indexOut, mailboxOut] = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
+            auto [indexIn, mailboxIn]   = esc_->findSm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
+            auto [indexOut, mailboxOut] = esc_->findSm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
 
             if (mailboxIn.length != mailboxOut.length or mailboxIn.length > max_allocated_ram_by_msg_)
             {
@@ -290,7 +290,7 @@ namespace kickcat::mailbox::response
         return hresult::OK;
     }
 
-    bool Mailbox::is_sm_config_ok()
+    bool Mailbox::isConfigOk()
     {
         if (mbx_in_.type == SyncManagerType::Unused  or mbx_out_.type == SyncManagerType::Unused)
         {
@@ -300,16 +300,16 @@ namespace kickcat::mailbox::response
         bool valid = true;
         for (auto& sm : {mbx_in_, mbx_out_})
         {
-            valid &= esc_->is_valid_sm(sm);
+            valid &= esc_->isSmValid(sm);
         }
         return valid;
     }
 
-    void Mailbox::set_sm_activate(bool is_activated)
+    void Mailbox::activate(bool is_activated)
     {
         if (mbx_in_.type != SyncManagerType::Unused and mbx_out_.type != SyncManagerType::Unused )
         {
-            esc_->set_sm_activate({mbx_in_, mbx_out_}, is_activated);
+            esc_->setSmActivate({mbx_in_, mbx_out_}, is_activated);
         }
     }
 
@@ -424,8 +424,8 @@ namespace kickcat::mailbox::response
             // Write the last sent message - we need to reset the SM to empty it if full
             if (sync.status & SM_STATUS_MAILBOX)
             {
-                esc_->sm_deactivate(mbx_in_);
-                esc_->sm_activate(mbx_in_);
+                esc_->deactivateSm(mbx_in_);
+                esc_->activateSm(mbx_in_);
             }
             esc_->write(mbx_in_.start_address, repeat_.data(), repeat_.size());
 

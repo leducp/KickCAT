@@ -50,8 +50,8 @@ int main(int argc, char* argv[])
 
         inputPdo.push_back(new uint8_t[1024]);
         outputPdo.push_back(new uint8_t[1024]);
-        pdos.back().set_process_data_input(inputPdo.back());
-        pdos.back().set_process_data_output(outputPdo.back());
+        pdos.back().setInput(inputPdo.back());
+        pdos.back().setOutput(outputPdo.back());
     }
 
     CoE::EsiParser parser;
@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
     auto& slave0 = slaves.at(0);
     mailbox::response::Mailbox mbx(&esc0, 1024);
     mbx.enableCoE(std::move(coe_dict));
-    slave0.set_mailbox(&mbx);
+    slave0.setMailbox(&mbx);
 
 
     for (auto& slave : slaves)
@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
             for (auto& slave : slaves)
             {
                 slave.routine();
-                if (slave.getState() == State::SAFE_OP)
+                if (slave.state() == State::SAFE_OP)
                 {
                     slave.validateOutputData();
                 }

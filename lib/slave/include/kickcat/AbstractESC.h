@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <vector>
 
-#include <cstdarg>
 #include "kickcat/Error.h"
 #include "kickcat/protocol.h"
 
@@ -39,16 +38,16 @@ namespace kickcat
         AbstractESC()          = default;
         virtual ~AbstractESC() = default;
 
-        virtual hresult init()                                                   = 0;
+        virtual hresult init() { return hresult::OK; }
         virtual int32_t read(uint16_t address, void* data, uint16_t size)        = 0;
         virtual int32_t write(uint16_t address, void const* data, uint16_t size) = 0;
 
-        std::tuple<uint8_t, SyncManager> find_sm(uint16_t controlMode);
-        void sm_activate(SyncManagerConfig const& sm);
-        void sm_deactivate(SyncManagerConfig const& sm);
+        std::tuple<uint8_t, SyncManager> findSm(uint16_t controlMode);
+        void activateSm(SyncManagerConfig const& sm);
+        void deactivateSm(SyncManagerConfig const& sm);
 
-        bool is_valid_sm(SyncManagerConfig const& sm_ref);
-        void set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
+        bool isSmValid(SyncManagerConfig const& sm_ref);
+        void setSmActivate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated);
     };
 
 }

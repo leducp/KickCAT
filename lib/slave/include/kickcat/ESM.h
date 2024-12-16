@@ -1,7 +1,6 @@
 #ifndef SLAVE_STACK_INCLUDE_ESM_H_
 #define SLAVE_STACK_INCLUDE_ESM_H_
 
-#include <cstdarg>
 #include "PDO.h"
 #include "kickcat/AbstractESC.h"
 #include "kickcat/protocol.h"
@@ -19,7 +18,7 @@ namespace kickcat
         {
             uint16_t value;
 
-            State get_requested_state()
+            State requestedState()
             {
                 return static_cast<State>(value & State::MASK_STATE);
             }
@@ -30,9 +29,9 @@ namespace kickcat
             uint16_t al_status;
             uint16_t al_status_code;
             uint16_t al_watchdog_process_data;
-            bool validOutputData{false};
+            bool is_valid_output_data{false};
 
-            State get_state()
+            State state()
             {
                 return static_cast<State>(al_status & State::MASK_STATE);
             }
@@ -56,13 +55,12 @@ namespace kickcat
         };
 
         class AbstractState
-
         {
             friend StateMachine;
 
         public:
             AbstractState(uint8_t id, AbstractESC& esc, PDO& pdo);
-            void set_mailbox(mailbox::response::Mailbox* mbx);
+            void setMailbox(mailbox::response::Mailbox* mbx);
             virtual Context routine(Context currentStatus, ALControl alControl);
 
         protected:
@@ -71,8 +69,8 @@ namespace kickcat
             PDO& pdo_;
             mailbox::response::Mailbox* mbx_{};
 
-            virtual Context routine_internal(Context currentStatus, ALControl alControl) = 0;
-            virtual void on_entry(Context oldStatus, Context newStatus);
+            virtual Context routineInternal(Context currentStatus, ALControl alControl) = 0;
+            virtual void onEntry(Context oldStatus, Context newStatus) {};
 
             uint8_t id();
         };
@@ -84,7 +82,7 @@ namespace kickcat
             void validateOutputData();
             void start();
             void play();
-            State get_state();
+            State state();
 
         private:
             AbstractState* find_state(uint8_t id);

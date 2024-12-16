@@ -27,8 +27,8 @@ public:
         : AbstractState(id, esc, pdo_) {};
 
     MOCK_METHOD(Context, routine, (Context status, ALControl control), (override));
-    MOCK_METHOD(Context, routine_internal, (Context status, ALControl control), (override));
-    MOCK_METHOD(void, on_entry, (Context oldStatus, Context newStatus), (override));
+    MOCK_METHOD(Context, routineInternal, (Context status, ALControl control), (override));
+    MOCK_METHOD(void, onEntry, (Context oldStatus, Context newStatus), (override));
 };
 
 class StateMachineTest : public testing::Test
@@ -70,7 +70,7 @@ MATCHER_P(AlControlMatches, expectedValue, "Matches AL Control")
 
 TEST_F(StateMachineTest, start)
 {
-    EXPECT_CALL(firstState, on_entry(_, StatusMatches(0, 0)));
+    EXPECT_CALL(firstState, onEntry(_, StatusMatches(0, 0)));
 
     sm->start();
 }
@@ -84,7 +84,7 @@ TEST_F(StateMachineTest, play_noTransition)
 
     EXPECT_CALL(firstState, routine(_, _)).Times(2);
 
-    EXPECT_CALL(secondState, on_entry(_, _)).Times(0);
+    EXPECT_CALL(secondState, onEntry(_, _)).Times(0);
 
     sm->play();
     sm->play();
@@ -111,7 +111,7 @@ TEST_F(StateMachineTest, play_transition)
 
     EXPECT_CALL(
         secondState,
-        on_entry(StatusMatches(FIRST_STATE_ID, 0), StatusMatches(SECOND_STATE_ID | State::ERROR_ACK, STATUS_CODE)))
+        onEntry(StatusMatches(FIRST_STATE_ID, 0), StatusMatches(SECOND_STATE_ID | State::ERROR_ACK, STATUS_CODE)))
         .Times(1);
 
     EXPECT_CALL(esc_, write(reg::AL_STATUS_CODE, WrittenMatches(STATUS_CODE), sizeof(uint16_t))).WillOnce(Return(0));
@@ -128,14 +128,14 @@ TEST_F(StateMachineTest, play_wrongState_goToDefaultState)
 
     EXPECT_CALL(firstState, routine(_, _)).WillOnce(Return(Context::build(SECOND_STATE_ID)));
 
-    EXPECT_CALL(secondState, on_entry(StatusMatches(FIRST_STATE_ID, 0), StatusMatches(SECOND_STATE_ID, 0))).Times(1);
+    EXPECT_CALL(secondState, onEntry(StatusMatches(FIRST_STATE_ID, 0), StatusMatches(SECOND_STATE_ID, 0))).Times(1);
 
     EXPECT_CALL(esc_, write(reg::AL_STATUS_CODE, WrittenMatches(0), sizeof(uint16_t))).WillOnce(Return(0));
     EXPECT_CALL(esc_, write(reg::AL_STATUS, WrittenMatches(SECOND_STATE_ID), sizeof(uint16_t))).WillOnce(Return(0));
 
     sm->play();
 
-    EXPECT_CALL(firstState, on_entry(StatusMatches(SECOND_STATE_ID, 0), StatusMatches(FIRST_STATE_ID, 0))).Times(1);
+    EXPECT_CALL(firstState, onEntry(StatusMatches(SECOND_STATE_ID, 0), StatusMatches(FIRST_STATE_ID, 0))).Times(1);
 
     EXPECT_CALL(esc_, write(reg::AL_STATUS_CODE, WrittenMatches(0), sizeof(uint16_t))).WillOnce(Return(0));
     EXPECT_CALL(esc_, write(reg::AL_STATUS, WrittenMatches(FIRST_STATE_ID), sizeof(uint16_t))).WillOnce(Return(0));

@@ -1,5 +1,4 @@
-#include "ESMStateTest.h"
-#include "kickcat/protocol.h"
+#include "mocks/ESMStateTest.h"
 
 class ESMStateSafeOPTest : public ESMStateTest
 {
@@ -12,8 +11,8 @@ public:
         expectSyncManagerRead(3, pdo_out);
 
         // In safeop mbx and pdo sync managers need to be configured
-        mbx_->configureSm();
-        pdo_->configure_pdo_sm();
+        mbx_->configure();
+        pdo_->configure();
     }
 };
 
@@ -28,7 +27,7 @@ TEST_F(ESMStateSafeOPTest, 22_1_SafeOP_to_Init)
     expectSyncManagerActivate(1, false);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    init->on_entry(Context::build(State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE), newContext);
+    init->onEntry(Context::build(State::SAFE_OP, StatusCode::INVALID_REQUESTED_STATE_CHANGE), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 22_2_ErrSafeOP_to_ErrSafeOP)
@@ -56,7 +55,7 @@ TEST_F(ESMStateSafeOPTest, 23A_SafeOP_to_Init)
     expectSyncManagerActivate(1, false);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    init->on_entry(Context::build(State::SAFE_OP), newContext);
+    init->onEntry(Context::build(State::SAFE_OP), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 23B_ErrSafeOP_to_Init)
@@ -73,7 +72,7 @@ TEST_F(ESMStateSafeOPTest, 23B_ErrSafeOP_to_Init)
     expectSyncManagerActivate(1, false);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    init->on_entry(Context::build(State::SAFE_OP), newContext);
+    init->onEntry(Context::build(State::SAFE_OP), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 24A_SafeOP_to_PreOP)
@@ -89,7 +88,7 @@ TEST_F(ESMStateSafeOPTest, 24A_SafeOP_to_PreOP)
     expectSyncManagerActivate(1, true);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    preop->on_entry(Context::build(State::SAFE_OP), newContext);
+    preop->onEntry(Context::build(State::SAFE_OP), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 24B_ErrSafeOP_to_PreOP)
@@ -106,7 +105,7 @@ TEST_F(ESMStateSafeOPTest, 24B_ErrSafeOP_to_PreOP)
     expectSyncManagerActivate(1, true);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    preop->on_entry(Context::build(State::SAFE_OP), newContext);
+    preop->onEntry(Context::build(State::SAFE_OP), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 25_1_ErrSafeOP_to_SafeOP)
@@ -181,7 +180,7 @@ TEST_F(ESMStateSafeOPTest, 32A_SafeOP_to_PreOP)
     expectSyncManagerActivate(1, true);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    preop->on_entry(Context::build(State::SAFE_OP), newContext);
+    preop->onEntry(Context::build(State::SAFE_OP), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 32B_SafeOP_to_PreOP)
@@ -198,7 +197,7 @@ TEST_F(ESMStateSafeOPTest, 32B_SafeOP_to_PreOP)
     expectSyncManagerActivate(1, true);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    preop->on_entry(Context::build(State::SAFE_OP), newContext);
+    preop->onEntry(Context::build(State::SAFE_OP), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 33A_SafeOP_to_Init)
@@ -215,7 +214,7 @@ TEST_F(ESMStateSafeOPTest, 33A_SafeOP_to_Init)
     expectSyncManagerActivate(1, false);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    init->on_entry(Context::build(State::SAFE_OP), newContext);
+    init->onEntry(Context::build(State::SAFE_OP), newContext);
 }
 
 TEST_F(ESMStateSafeOPTest, 33B_SafeOP_to_Init)
@@ -232,5 +231,5 @@ TEST_F(ESMStateSafeOPTest, 33B_SafeOP_to_Init)
     expectSyncManagerActivate(1, false);
     expectSyncManagerActivate(2, false);
     expectSyncManagerActivate(3, false);
-    init->on_entry(Context::build(State::SAFE_OP), newContext);
+    init->onEntry(Context::build(State::SAFE_OP), newContext);
 }

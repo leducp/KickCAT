@@ -1,8 +1,9 @@
 #include "kickcat/AbstractESC.h"
+#include "Error.h"
 
 namespace kickcat
 {
-    std::tuple<uint8_t, SyncManager> AbstractESC::find_sm(uint16_t controlMode)
+    std::tuple<uint8_t, SyncManager> AbstractESC::findSm(uint16_t controlMode)
     {
         for (uint8_t i = 0; i < reg::SM_STATS; i++)
         {
@@ -17,7 +18,7 @@ namespace kickcat
         THROW_ERROR("SyncManager not found");
     }
 
-    bool AbstractESC::is_valid_sm(SyncManagerConfig const& sm_ref)
+    bool AbstractESC::isSmValid(SyncManagerConfig const& sm_ref)
     {
         SyncManager sm_read;
         read(addressSM(sm_ref.index), &sm_read, sizeof(sm_read));
@@ -34,7 +35,7 @@ namespace kickcat
         return is_valid;
     }
 
-    void AbstractESC::sm_activate(SyncManagerConfig const& sm_conf)
+    void AbstractESC::activateSm(SyncManagerConfig const& sm_conf)
     {
         auto const address = addressSM(sm_conf.index) + 7;
 
@@ -48,11 +49,10 @@ namespace kickcat
         do
         {
             read(address, &pdi_control, 1);
-        }
-        while ((pdi_control & 1) == 1);
+        } while ((pdi_control & 1) == 1);
     }
 
-    void AbstractESC::sm_deactivate(SyncManagerConfig const& sm_conf)
+    void AbstractESC::deactivateSm(SyncManagerConfig const& sm_conf)
     {
         auto const address = addressSM(sm_conf.index) + 7;
 
@@ -73,19 +73,18 @@ namespace kickcat
         }
     }
 
-    void AbstractESC::set_sm_activate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated)
+    void AbstractESC::setSmActivate(std::vector<SyncManagerConfig> const& sync_managers, bool is_activated)
     {
         for (auto& sm_conf : sync_managers)
         {
             if (is_activated)
             {
-                sm_activate(sm_conf);
+                activateSm(sm_conf);
             }
             else
             {
-                sm_deactivate(sm_conf);
+                deactivateSm(sm_conf);
             }
         }
     }
 }
-
