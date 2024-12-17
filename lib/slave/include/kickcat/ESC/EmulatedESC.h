@@ -25,7 +25,6 @@ namespace kickcat
 
         void processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc);
 
-        hresult init() override { return hresult::OK; }
         int32_t read (uint16_t address, void* data,       uint16_t size) override;
         int32_t write(uint16_t address, void const* data, uint16_t size) override;
 

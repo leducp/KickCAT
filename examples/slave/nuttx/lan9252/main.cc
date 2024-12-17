@@ -1,11 +1,13 @@
 
-#include "kickcat/nuttx/SPI.h"
 #include "kickcat/ESC/Lan9252.h"
-#include "kickcat/protocol.h"
 #include "kickcat/OS/Time.h"
+#include "kickcat/PDO.h"
+#include "kickcat/nuttx/SPI.h"
+#include "kickcat/protocol.h"
+#include "kickcat/slave/Slave.h"
 
-#include <nuttx/board.h>
 #include <arch/board/board.h>
+#include <nuttx/board.h>
 
 
 using namespace kickcat;
@@ -17,6 +19,8 @@ int main(int argc, char *argv[])
     (void) argv;
     std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
     Lan9252 esc = Lan9252(spi_driver);
+    PDO pdo(&esc);
+    slave::Slave slave(&esc, &pdo);
 
     constexpr uint32_t pdo_size = 32;
 
@@ -24,16 +28,15 @@ int main(int argc, char *argv[])
     uint8_t buffer_out[pdo_size];
 
     // init values
-    for (uint32_t i=0; i < pdo_size; ++i)
+    for (uint32_t i = 0; i < pdo_size; ++i)
     {
         buffer_in[i] = i;
         buffer_out[i] = 0xFF;
     }
 
-    esc.set_process_data_input(buffer_in);
-    esc.set_process_data_output(buffer_out);
+    pdo.setInput(buffer_in);
+    pdo.setOutput(buffer_out);
 
-    esc.init();
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
@@ -45,9 +48,11 @@ int main(int argc, char *argv[])
     esc.read(reg::PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config));
     printf("pdi config 0x%x \n", pdi_config);
 
-    while(true)
+    slave.start();
+
+    while (true)
     {
-        esc.routine();
+        slave.routine();
         // Print received data
     //    for (uint8_t i = 0; i < pdo_size; ++i)
     //    {
@@ -55,14 +60,14 @@ int main(int argc, char *argv[])
     //    }
     //    printf("\n");
 
-       if (esc.al_status() & State::SAFE_OP)
-       {
-           if (buffer_out[1] != 0xFF)
-           {
-               esc.set_valid_output_data_received(true);
-           }
-       }
-       sleep(1ms);
+        if (slave.state() == State::SAFE_OP)
+        {
+            if (buffer_out[1] != 0xFF)
+            {
+                slave.validateOutputData();
+            }
+        }
+        sleep(1ms);
     }
     return 0;
 }

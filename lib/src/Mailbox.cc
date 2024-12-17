@@ -1,6 +1,5 @@
-#include <cstring>
 #include <algorithm>
-#include <cinttypes>
+#include <exception>
 
 #include "AbstractESC.h"
 #include "debug.h"
@@ -266,20 +265,52 @@ namespace kickcat::mailbox::response
     {
     }
 
-    std::tuple<SyncManagerConfig, SyncManagerConfig> Mailbox::configureSm()
-    {
-        auto [indexIn, mailboxIn]   = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
-        auto [indexOut, mailboxOut] = esc_->find_sm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
 
-        if (mailboxIn.length != mailboxOut.length or mailboxIn.length > max_allocated_ram_by_msg_)
+    hresult Mailbox::configure()
+    {
+        try
         {
-            THROW_ERROR("Mailbox length error");
+            auto [indexIn, mailboxIn]   = esc_->findSm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
+            auto [indexOut, mailboxOut] = esc_->findSm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
+
+            if (mailboxIn.length != mailboxOut.length or mailboxIn.length > max_allocated_ram_by_msg_)
+            {
+                return hresult::E_EOVERFLOW;
+            }
+
+            mbx_in_  = SYNC_MANAGER_MBX_IN(indexIn, mailboxIn.start_address, mailboxIn.length);
+            mbx_out_ = SYNC_MANAGER_MBX_OUT(indexOut, mailboxOut.start_address, mailboxOut.length);
+        }
+        catch (std::exception const& e)
+        {
+            return hresult::E_EAGAIN;
         }
 
-        mbx_in_  = SYNC_MANAGER_MBX_IN(indexIn, mailboxIn.start_address, mailboxIn.length);
-        mbx_out_ = SYNC_MANAGER_MBX_OUT(indexOut, mailboxOut.start_address, mailboxOut.length);
 
-        return std::tuple(mbx_in_, mbx_out_);
+        return hresult::OK;
+    }
+
+    bool Mailbox::isConfigOk()
+    {
+        if (mbx_in_.type == SyncManagerType::Unused  or mbx_out_.type == SyncManagerType::Unused)
+        {
+            return false;
+        }
+
+        bool valid = true;
+        for (auto& sm : {mbx_in_, mbx_out_})
+        {
+            valid &= esc_->isSmValid(sm);
+        }
+        return valid;
+    }
+
+    void Mailbox::activate(bool is_activated)
+    {
+        if (mbx_in_.type != SyncManagerType::Unused and mbx_out_.type != SyncManagerType::Unused )
+        {
+            esc_->setSmActivate({mbx_in_, mbx_out_}, is_activated);
+        }
     }
 
 
@@ -393,8 +424,8 @@ namespace kickcat::mailbox::response
             // Write the last sent message - we need to reset the SM to empty it if full
             if (sync.status & SM_STATUS_MAILBOX)
             {
-                esc_->sm_deactivate(mbx_in_);
-                esc_->sm_activate(mbx_in_);
+                esc_->deactivateSm(mbx_in_);
+                esc_->activateSm(mbx_in_);
             }
             esc_->write(mbx_in_.start_address, repeat_.data(), repeat_.size());
 
@@ -434,8 +465,8 @@ namespace kickcat::mailbox::response
 
     void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
     {
-        auto* header  = pointData<mailbox::Header>(raw_message.data());
-        auto* err     = pointData<mailbox::Error::ServiceData>(header);
+        auto* header = pointData<mailbox::Header>(raw_message.data());
+        auto* err    = pointData<mailbox::Error::ServiceData>(header);
 
         header->type = mailbox::ERR;
         header->len  = sizeof(mailbox::Error::ServiceData);

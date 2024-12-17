@@ -186,7 +186,9 @@ namespace kickcat::mailbox::response
         void enableCoE(CoE::Dictionary&& dictionary);
         CoE::Dictionary& getDictionary(){return dictionary_;}
 
-        std::tuple<SyncManagerConfig, SyncManagerConfig> configureSm();
+        hresult configure();
+        bool isConfigOk();
+        void activate(bool is_activated);
 
         void receive();  // Try to receive a message from the ESC
         void process();  // Process a message in the to_process_ queue if any
@@ -199,8 +201,9 @@ namespace kickcat::mailbox::response
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
 
         AbstractESC* esc_;
-        SyncManagerConfig mbx_in_;
-        SyncManagerConfig mbx_out_;
+        SyncManagerConfig mbx_in_{};
+        SyncManagerConfig mbx_out_{};
+ 
         uint16_t max_allocated_ram_by_msg_;
         uint16_t max_msgs_;
 

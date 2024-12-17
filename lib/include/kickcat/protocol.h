@@ -390,7 +390,7 @@ namespace kickcat
         Input      = 4  // slave to master
     };
     char const* toString(SyncManagerType const& type);
-    constexpr uint16_t addressSM(uint8_t index) { return reg::SYNC_MANAGER + index * sizeof(SyncManager); };
+    constexpr uint16_t addressSM(uint8_t index) { return static_cast<uint16_t>(reg::SYNC_MANAGER + index * sizeof(SyncManager)); };
 
     struct FMMU
     {

@@ -1,9 +1,11 @@
-#include "kickcat/EEPROM/XMC4800EEPROM.h"
-#include "kickcat/OS/Time.h"
-#include "kickcat/ESC/XMC4800.h"
 #include "kickcat/CoE/OD.h"
-#include "kickcat/Mailbox.h"
 #include "kickcat/CoE/mailbox/response.h"
+#include "kickcat/EEPROM/XMC4800EEPROM.h"
+#include "kickcat/ESC/XMC4800.h"
+#include "kickcat/Mailbox.h"
+#include "kickcat/OS/Time.h"
+#include "kickcat/PDO.h"
+#include "kickcat/slave/Slave.h"
 
 namespace foot
 {
@@ -49,8 +51,9 @@ int main(int, char *[])
 
     XMC4800 esc;
     XMC4800EEPROM eeprom;
+    PDO pdo(&esc);
+    slave::Slave slave(&esc, &pdo);
 
-    esc.init();
     eeprom.init();
     uint16_t al_status;
     uint16_t al_control;
@@ -65,9 +68,9 @@ int main(int, char *[])
     auto dictionary = CoE::createOD();
     mbx.enableCoE(std::move(dictionary));
 
-    esc.set_mailbox(&mbx);
-    esc.set_process_data_input(reinterpret_cast<uint8_t *>(&input_PDO));
-    esc.set_process_data_output(reinterpret_cast<uint8_t *>(&output_PDO));
+    slave.setMailbox(&mbx);
+    pdo.setInput(&input_PDO);
+    pdo.setOutput(&output_PDO);
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
@@ -78,15 +81,18 @@ int main(int, char *[])
     esc.read(reg::PDI_CONFIGURATION, &pdi_config, sizeof(pdi_config));
     printf("pdi config 0x%x \n", pdi_config);
 
-    while(true)
+
+    slave.start();
+
+    while (true)
     {
         eeprom.process();
-        esc.routine();
-        if (esc.al_status() & State::SAFE_OP)
+        slave.routine();
+        if (slave.state() == State::SAFE_OP)
         {
             if (output_PDO.watchdog_counter != 0x00)
             {
-               esc.set_valid_output_data_received(true);
+                slave.validateOutputData();
             }
         }
 
