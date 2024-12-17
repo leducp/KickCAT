@@ -40,6 +40,7 @@ if (GTest_FOUND)
                               unit/link-t.cc
                               unit/prints-t.cc
                               unit/protocol-t.cc
+                              unit/Ring-t.cc
                               unit/slave-t.cc
                               unit/socket-t.cc
                               unit/ESM-t.cc
