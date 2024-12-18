@@ -18,11 +18,6 @@ public:
         ASSERT_FALSE(ring.isFull());
     }
 
-    void TearDown() override
-    {
-
-    }
-
     Ring<int, RING_TEST_SIZE>::Context ctx;
     Ring<int, RING_TEST_SIZE> ring{ctx};
 };

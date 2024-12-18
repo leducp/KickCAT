@@ -1,8 +1,6 @@
-#include <gtest/gtest.h>
-#include <cstring>
+#include "mocks/Sockets.h"
 
 #include "kickcat/Link.h"
-#include "Mocks.h"
 
 using ::testing::Return;
 using ::testing::_;

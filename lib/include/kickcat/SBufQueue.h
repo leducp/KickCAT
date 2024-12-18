@@ -109,6 +109,7 @@ namespace kickcat
         }
 
         constexpr static std::size_t item_size() { return sizeof(T); }
+        constexpr static uint32_t    depth()     { return N;         }
 
 
     private:
