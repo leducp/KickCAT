@@ -66,19 +66,25 @@ namespace kickcat
 
     void PDO::updateInput()
     {
-        int32_t written = esc_->write(sm_input_.start_address, input_, sm_input_.length);
-        if (written != sm_input_.length)
+        if (input_ != nullptr)
         {
-            slave_error("\n update_process_data_input ERROR\n");
+            int32_t written = esc_->write(sm_input_.start_address, input_, sm_input_.length);
+            if (written != sm_input_.length)
+            {
+                slave_error("\n update_process_data_input ERROR\n");
+            }
         }
     }
 
     void PDO::updateOutput()
     {
-        int32_t r = esc_->read(sm_output_.start_address, output_, sm_output_.length);
-        if (r != sm_output_.length)
+        if (output_ != nullptr)
         {
-            slave_error("\n update_process_data_output ERROR\n");
+            int32_t r = esc_->read(sm_output_.start_address, output_, sm_output_.length);
+            if (r != sm_output_.length)
+            {
+                slave_error("\n update_process_data_output ERROR\n");
+            }
         }
     }
 }
