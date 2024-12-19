@@ -90,10 +90,15 @@ int main(int, char *[])
         slave.routine();
         if (slave.state() == State::SAFE_OP)
         {
-            if (output_PDO.watchdog_counter != 0x00)
+            //if (output_PDO.watchdog_counter != 0x00)
             {
                 slave.validateOutputData();
             }
+        }
+
+        if (esc.al_status() & State::INIT)
+        {
+            mbx.getDictionary() = std::move(CoE::createOD());
         }
 
         mbx.receive();

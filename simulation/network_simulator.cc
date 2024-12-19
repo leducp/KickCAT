@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
     }
 
     CoE::EsiParser parser;
-    auto coe_dict = parser.load("wdc_foot_eve_beta.xml");
+    auto coe_dict = parser.loadFile("wdc_foot_eve_beta.xml");
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
 //    auto socket = std::make_shared<TapSocket>(true);
@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
     for (auto& slave : slaves)
     {
         slave.start();
-    } 
+    }
 
 
     while (true)

@@ -9,6 +9,7 @@
 #include "kickcat/SocketNull.h"
 #include "kickcat/helpers.h"
 
+#include "kickcat/TapSocket.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -112,7 +113,7 @@ int main(int argc, char *argv[])
 
     selectInterface(nom_interface_name, red_interface_name);
 
-    auto socket_nominal = std::make_shared<Socket>();
+    auto socket_nominal = std::make_shared<TapSocket>(false);
     try
     {
         socket_nominal->open(nom_interface_name);

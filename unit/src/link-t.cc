@@ -1110,5 +1110,6 @@ TEST_F(LinkTest, event_callback)
         }
         checkIRQ(false, 0);                         // No IRQ, no trigger (falling edge)
     }
+    checkIRQ(false, EcatEvent::DC_LATCH);           // call default callback -> test that nothing crash
 }
 }
