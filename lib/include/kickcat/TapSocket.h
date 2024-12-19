@@ -13,6 +13,8 @@ namespace kickcat
     class TapSocket final : public AbstractSocket
     {
     public:
+        using QUEUE = SBufQueue<uint8_t[1522], 64>;
+
         TapSocket(bool init=false);
         virtual ~TapSocket();
 
@@ -30,7 +32,6 @@ namespace kickcat
         nanoseconds timeout_;
         SharedMemory shm_{};
 
-        using QUEUE = SBufQueue<uint8_t[1522], 64>;
         std::unique_ptr<QUEUE> in_ {nullptr};
         std::unique_ptr<QUEUE> out_{nullptr};
 

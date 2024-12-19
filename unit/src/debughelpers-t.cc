@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "Mocks.h"
+#include "mocks/Sockets.h"
 #include "kickcat/SocketNull.h"
 #include "kickcat/DebugHelpers.h"
 

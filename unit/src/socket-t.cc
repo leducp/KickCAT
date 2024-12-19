@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
+#include "mocks/Sockets.h"
+
 #include "kickcat/SocketNull.h"
-#include "Mocks.h"
 
 using namespace kickcat;
 
@@ -18,7 +18,7 @@ TEST(DiagSocket, index_rolling)
 {
     MockDiagSocket socket;
 
-    for (int i = 1; i < 65536; ++i)
+    for (int i = 1; i < UINT16_MAX; ++i)
     {
         uint16_t index = socket.nextIndex();
         ASSERT_LT(index, mailbox::GATEWAY_MAX_REQUEST);

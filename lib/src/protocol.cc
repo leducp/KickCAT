@@ -109,16 +109,16 @@ namespace kickcat
             case Command::NOP : { return "No Operation";                                     }
             case Command::APRD: { return "Auto increment Physical Read";                     }
             case Command::APWR: { return "Auto increment Physical Write";                    }
-            case Command::APRW: { return "Auto increment Physical Read Write";               }
+            case Command::APRW: { return "Auto increment Physical Read/Write";               }
             case Command::FPRD: { return "Configured address Physical Read";                 }
             case Command::FPWR: { return "Configured address Physical Write";                }
-            case Command::FPRW: { return "Configured address Physical Read Write";           }
+            case Command::FPRW: { return "Configured address Physical Read/Write";           }
             case Command::BRD : { return "Broadcast Read";                                   }
             case Command::BWR : { return "Broadcast Write";                                  }
-            case Command::BRW : { return "Broadcast Read Write";                             }
-            case Command::LRD : { return "Logical memory Read";                              }
-            case Command::LWR : { return "Logical memory Write";                             }
-            case Command::LRW : { return "Logical memory Read Write";                        }
+            case Command::BRW : { return "Broadcast Read/Write";                             }
+            case Command::LRD : { return "Logical Read";                                     }
+            case Command::LWR : { return "Logical Write";                                    }
+            case Command::LRW : { return "Logical Read/Write";                               }
             case Command::ARMW: { return "Auto increment physical Read Multiple Write";      }
             case Command::FRMW: { return "Configured address Physical Read Multiple Write";  }
             default:            { return "unknown command";                                  }
@@ -204,7 +204,7 @@ namespace kickcat
     {
         std::stringstream os;
         os << "Header \n";
-        os << "  Command :   "  << std::to_string(static_cast<uint8_t>(header.command)) << "\n";
+        os << "  Command :   "  << toString(Command(header.command)) << "\n";
         os << "  index :  "     << std::to_string(header.index) << "\n";
         os << "  length :  "    << std::to_string(header.len) << "\n";
         os << "  circulating  " << std::to_string(header.circulating) << "\n";

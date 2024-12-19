@@ -11,6 +11,8 @@
 #include "CanOpenStateMachine.h"
 #include "IngeniaProtocol.h"
 
+#include "kickcat/TapSocket.h"
+
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
 #elif __PikeOS__
@@ -50,7 +52,7 @@ int main(int argc, char *argv[])
 
     selectInterface(nom_interface_name, red_interface_name);
 
-    auto socket_nominal = std::make_shared<Socket>();
+    auto socket_nominal = std::make_shared<TapSocket>(false);
     try
     {
         socket_nominal->open(nom_interface_name);
@@ -125,6 +127,7 @@ int main(int argc, char *argv[])
 
         bus.createMapping(io_buffer);
 
+        printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
     }
