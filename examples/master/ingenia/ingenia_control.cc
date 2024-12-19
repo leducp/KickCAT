@@ -125,6 +125,7 @@ int main(int argc, char *argv[])
 
         bus.createMapping(io_buffer);
 
+        printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
     }

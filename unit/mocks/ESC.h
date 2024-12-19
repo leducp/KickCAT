@@ -10,11 +10,8 @@ namespace kickcat
     class MockESC : public AbstractESC
     {
     public:
-        MockESC() : AbstractESC()
-        {}
-
-        virtual ~MockESC()
-        {}
+        MockESC() = default;
+        virtual ~MockESC() = default;
 
         MOCK_METHOD(hresult, init, (), (override));
         MOCK_METHOD(int32_t, read,  (uint16_t, void*, uint16_t),       (override));

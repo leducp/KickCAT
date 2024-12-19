@@ -110,7 +110,12 @@ namespace kickcat::CoE
     std::string Entry::dataToString() const
     {
         std::stringstream result;
-        result << "0x" << std::hex;
+        if (data == nullptr)
+        {
+            result << "nullptr\n";
+            return result.str();
+        }
+
         switch (type)
         {
             case CoE::DataType::INTEGER8:
@@ -124,24 +129,17 @@ namespace kickcat::CoE
                 result << uint8Wrapper;
                 break;
             }
-            case CoE::DataType::INTEGER16:
-            case CoE::DataType::UNSIGNED16:
-            {
-                result << *static_cast<int16_t const *>(data);
-                break;
-            }
-            case CoE::DataType::INTEGER32:
-            case CoE::DataType::UNSIGNED32:
-            case CoE::DataType::REAL32:
-            {
-                result << *static_cast<uint32_t const *>(data);
-                break;
-            }
-            case CoE::DataType::INTEGER64:
-            case CoE::DataType::UNSIGNED64:
+            case CoE::DataType::INTEGER16:  { result << *static_cast<int16_t  const *>(data); break; }
+            case CoE::DataType::UNSIGNED16: { result << *static_cast<uint16_t const *>(data); break; }
+            case CoE::DataType::INTEGER32:  { result << *static_cast<int32_t  const *>(data); break; }
+            case CoE::DataType::UNSIGNED32: { result << *static_cast<uint32_t const *>(data); break; }
+            case CoE::DataType::REAL32:     { result << *static_cast<float    const *>(data); break; }
+            case CoE::DataType::INTEGER64:  { result << *static_cast<int64_t  const *>(data); break; }
+            case CoE::DataType::UNSIGNED64: { result << *static_cast<uint64_t const *>(data); break; }
             case CoE::DataType::REAL64:
             {
-                result << *static_cast<int64_t const *>(data);
+                result.precision(16);
+                result << *static_cast<double   const *>(data);
                 break;
             }
             case CoE::DataType::VISIBLE_STRING:
@@ -150,7 +148,10 @@ namespace kickcat::CoE
                 std::string_view strResult{rawString, strnlen(rawString, bitlen/8)};
                 return std::string(strResult);
             }
-            default: {}
+            default:
+            {
+                return "no rendered";
+            }
         }
 
         return result.str();
@@ -166,30 +167,7 @@ namespace kickcat::CoE
         result << "      BitLen: " << entry.bitlen << '\n';
         result << "      BitOff: " << entry.bitoff << '\n';
         result << "      Access: " << Access::toString(entry.access) << '\n';
-
-        result << "      Data:   ";
-        if (entry.data == nullptr)
-        {
-            result << "nullptr\n";
-        }
-        else
-        {
-            switch (entry.type)
-            {
-                case DataType::BYTE:        { result << (int)*static_cast<uint8_t*> (entry.data); break; }
-                case DataType::INTEGER8:    { result << (int)*static_cast<int8_t*>  (entry.data); break; }
-                case DataType::UNSIGNED8:   { result << (int)*static_cast<uint8_t*> (entry.data); break; }
-                case DataType::INTEGER16:   { result << *static_cast<int16_t*> (entry.data); break; }
-                case DataType::UNSIGNED16:  { result << *static_cast<uint16_t*>(entry.data); break; }
-                case DataType::INTEGER32:   { result << *static_cast<int32_t*> (entry.data); break; }
-                case DataType::UNSIGNED32:  { result << *static_cast<uint32_t*>(entry.data); break; }
-                case DataType::INTEGER64:   { result << *static_cast<int64_t*> (entry.data); break; }
-                case DataType::UNSIGNED64:  { result << *static_cast<uint64_t*>(entry.data); break; }
-                case DataType::REAL64:      { result << *static_cast<double*>  (entry.data); break; }
-                case DataType::REAL32:      { result << *static_cast<float*>   (entry.data); break; }
-                default:                    { result << "no rendered"; }
-            }
-        }
+        result << "      Data:   " << entry.dataToString();
 
         return result.str();
     }
@@ -242,7 +220,7 @@ namespace kickcat::CoE
         }
 
         if (access & Access::RxPDO)   { result += "RxPDO, ";   }
-        if (access & Access::TxPDO)   { result += "RxPDO, ";   }
+        if (access & Access::TxPDO)   { result += "TxPDO, ";   }
         if (access & Access::BACKUP)  { result += "Backup, ";  }
         if (access & Access::SETTING) { result += "Setting, "; }
 

@@ -44,10 +44,12 @@ elseif (WIN32)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/ConditionVariable.cc
   )
 
   find_package(npcap CONFIG REQUIRED)
-  set(OS_LIBRARIES npcap::npcap)
+  set(OS_LIBRARIES npcap::npcap pthread)
 endif()
 
 if (ENABLE_ESI_PARSER)

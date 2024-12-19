@@ -117,7 +117,6 @@ namespace kickcat
         // see ETG2010_S_R_v1i0i0_EtherCATSIISpecification
         switch (fmmu_type)
         {
-            case 0:  {return "Unused";}
             case 1:  {return "Outputs (Master to Slave)";}
             case 2:  {return "Inputs  (Slave to Master)";}
             case 3:  {return "SyncM Status (Read Mailbox)";}
@@ -148,11 +147,10 @@ namespace kickcat
     {
         switch (esc_port_desc & 0x3)
         {
-            case 0:   { return "Not implemented";             }
             case 1:   { return "Not configured (SII EEPROM)"; }
             case 2:   { return "EBUS";                        }
             case 3:   { return "MII";                         }
-            default:  { return "Unreachable";                 }
+            default:  { return "Not implemented";             }
         }
     }
 

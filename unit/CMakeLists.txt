@@ -1,6 +1,5 @@
-enable_testing()
-
 add_executable(kickcat_unit src/adler32_sum-t.cc
+                            src/AbstractSPI-t.cc
                             src/bus-t.cc
                             src/debughelpers-t.cc
                             src/diagnostics-t.cc
@@ -15,29 +14,35 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/SBufQueue-t.cc
                             src/slave-t.cc
                             src/socket-t.cc
+                            src/EmulatedESC-t.cc
                             src/ESM-t.cc
                             src/ESMStateOP-t.cc
                             src/ESMStateInit-t.cc
                             src/ESMStatePreOP-t.cc
                             src/ESMStateSafeOP-t.cc
+                            src/Units-t.cc
                             src/CoE/protocol-t.cc
+                            src/CoE/EsiParser-t.cc
+                            src/CoE/OD-t.cc
                             src/mailbox/request-t.cc
                             src/mailbox/response-t.cc
                             src/Time.cc
 )
 
+# Use foor ESI as a dataset for EsiParser
+file(COPY ${CMAKE_SOURCE_DIR}/examples/slave/nuttx/xmc4800/boards/wdc_foot/foot.xml DESTINATION ${CMAKE_BINARY_DIR})
 
 target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
 target_include_directories(kickcat_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_kickcat_properties(kickcat_unit)
+set_target_properties(kickcat_unit
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 if (CODE_COVERAGE)
-  include(CodeCoverage)
-  append_coverage_compiler_flags()
-  set(GCOVR_ADDITIONAL_ARGS --exclude-unreachable-branches --exclude-throw-branches)
-
-  set(EXCLUDE_FILES "unit/*" ".*gtest.*" "examples/*" ".*gmock.*" ".*/OS/.*" "tools/*" "conan/*" "*conan2/*")
+  set(EXCLUDE_FILES "unit/*" ".*gtest.*" "examples/*" ".*gmock.*" ".*/OS/.*" "tools/*"
+                    "conan/*" "*conan2/*" "*simulation/*")
   setup_target_for_coverage_gcovr_html(
       NAME coverage
       EXECUTABLE kickcat_unit

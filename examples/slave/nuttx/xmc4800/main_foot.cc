@@ -95,10 +95,6 @@ int main(int, char *[])
                 slave.validateOutputData();
             }
         }
-
-        mbx.receive();
-        mbx.process();
-        mbx.send();
     }
     return 0;
 }

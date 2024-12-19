@@ -1,13 +1,14 @@
+#include <cstring>
+#include <fstream>
+
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/OS/Time.h"
 #include "kickcat/debug.h"
 
-#include <cstring>
-#include <fstream>
 
 namespace kickcat
 {
-    EmulatedESC::EmulatedESC(std::string const& eeprom)
+    EmulatedESC::EmulatedESC()
         : memory_{}
     {
         // Configure ESC constants
@@ -29,9 +30,20 @@ namespace kickcat
         // eeprom never busy because the data are processed in sync with the request.
         memory_.eeprom_control &= ~0x8000;
 
-        // Load eeprom data
+        // Set default values in registers (TODO: a lot of them are left uninitialized)
+        std::memset(memory_.sync_manager, 0, sizeof(memory_.sync_manager));
+    }
+
+    EmulatedESC::EmulatedESC(std::string const& path)
+        : EmulatedESC()
+    {
+        loadEeprom(path);
+    }
+
+    void EmulatedESC::loadEeprom(std::string const& path)
+    {
         std::ifstream eeprom_file;
-        eeprom_file.open(eeprom, std::ios::binary | std::ios::ate);
+        eeprom_file.open(path, std::ios::binary | std::ios::ate);
         if (not eeprom_file.is_open())
         {
             THROW_ERROR("Cannot load EEPROM");
@@ -42,6 +54,18 @@ namespace kickcat
         eeprom_file.read((char*)eeprom_.data(), size);
         eeprom_file.close();
 
+        loadEeprom();
+    }
+
+    void EmulatedESC::loadEeprom(std::vector<uint16_t> const& eeprom_data)
+    {
+        eeprom_ = eeprom_data;
+        loadEeprom();
+    }
+
+
+    void EmulatedESC::loadEeprom()
+    {
         // Device emulation
         memory_.esc_configuration = eeprom_[0] >> 8;
 
@@ -173,14 +197,14 @@ namespace kickcat
     }
 
 
-    void EmulatedESC::processDatagram(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processDatagram(DatagramHeader* header, void* data, uint16_t* wkc)
     {
         processEcatRequest(header, data, wkc);
         processInternalLogic();
     }
 
 
-    uint16_t EmulatedESC::processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, uint8_t* data)
+    uint16_t EmulatedESC::processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, void* data)
     {
         int wkc = 0;
         for (auto const& pdo : pdos)
@@ -206,17 +230,17 @@ namespace kickcat
     }
 
 
-    void EmulatedESC::processLRD(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processLRD(DatagramHeader* header, void* data, uint16_t* wkc)
     {
         *wkc += processPDO(tx_pdos_, true, header, data);
     }
 
-    void EmulatedESC::processLWR(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processLWR(DatagramHeader* header, void* data, uint16_t* wkc)
     {
         *wkc += processPDO(rx_pdos_, false, header, data);
     }
 
-    void EmulatedESC::processLRW(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processLRW(DatagramHeader* header, void* data, uint16_t* wkc)
     {
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
         std::memcpy(swap, data, header->len);
@@ -226,7 +250,7 @@ namespace kickcat
     }
 
 
-    void EmulatedESC::processEcatRequest(DatagramHeader* header, uint8_t* data, uint16_t* wkc)
+    void EmulatedESC::processEcatRequest(DatagramHeader* header, void* data, uint16_t* wkc)
     {
         auto [position, offset] = extractAddress(header->address);
         switch (header->command)
@@ -348,7 +372,6 @@ namespace kickcat
                 case State::OPERATIONAL: { break; }
                 default: {}
             }
-            changeState_(before, current);
         }
 
         // Mirror AL_STATUS - Device Emulation
@@ -419,7 +442,7 @@ namespace kickcat
     }
 
 
-    void EmulatedESC::processReadCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
+    void EmulatedESC::processReadCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset)
     {
         int32_t read = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_READ);
         if (read > 0)
@@ -429,7 +452,7 @@ namespace kickcat
     }
 
 
-    void EmulatedESC::processWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
+    void EmulatedESC::processWriteCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset)
     {
         int32_t written = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_WRITE);
         if (written > 0)
@@ -439,7 +462,7 @@ namespace kickcat
     }
 
 
-    void EmulatedESC::processReadWriteCommand(DatagramHeader* header, uint8_t* data, uint16_t* wkc, uint16_t offset)
+    void EmulatedESC::processReadWriteCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset)
     {
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
         std::memcpy(swap, data, header->len);
@@ -528,7 +551,7 @@ namespace kickcat
     }
 
 
-    std::tuple<uint8_t*, uint8_t*, uint16_t> EmulatedESC::computeLogicalIntersection(DatagramHeader const* header, uint8_t* data, PDO const& pdo)
+    std::tuple<uint8_t*, uint8_t*, uint16_t> EmulatedESC::computeLogicalIntersection(DatagramHeader const* header, void* data, PDO const& pdo)
     {
         uint32_t start_logical_address = header->address;
         uint32_t end_logical_address = header->address + header->len;
@@ -543,7 +566,7 @@ namespace kickcat
         uint32_t phys_offset = address_min - pdo.logical_address;
         uint32_t frame_offset = address_min - start_logical_address;
 
-        return {data + frame_offset, pdo.physical_address + phys_offset, to_copy};
+        return {static_cast<uint8_t*>(data) + frame_offset, pdo.physical_address + phys_offset, to_copy};
     }
 
 

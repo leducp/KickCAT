@@ -3,11 +3,16 @@
 
 namespace kickcat
 {
-    nanoseconds since_epoch()
+    static nanoseconds mock_now;
+
+    void resetSinceEpoch()
     {
         auto now = time_point_cast<nanoseconds>(system_clock::now());
-        static nanoseconds mock_now = now.time_since_epoch();
+        mock_now = now.time_since_epoch();
+    }
 
+    nanoseconds since_epoch()
+    {
         mock_now += 1ms;
         return mock_now;
     }

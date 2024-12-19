@@ -459,6 +459,7 @@ namespace kickcat::mailbox::response
 
     void Mailbox::enableCoE(CoE::Dictionary&& dictionary)
     {
+        //TODO: take the factory instead to be able to reset the dictionary when going back to init
         dictionary_ = std::move(dictionary);
         factories_.push_back(&createSDOMessage);
     }

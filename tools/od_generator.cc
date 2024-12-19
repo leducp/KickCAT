@@ -35,7 +35,7 @@ namespace kickcat
     CoE::Dictionary loadOD(std::string esiFileName)
     {
         CoE::EsiParser parser;
-        return parser.load(esiFileName);
+        return parser.loadFile(esiFileName);
     }
 
     std::string addBeginning()

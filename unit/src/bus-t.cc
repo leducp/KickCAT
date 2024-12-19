@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "mocks/Sockets.h"
+#include "mocks/Time.h"
 
 #include "kickcat/Link.h"
 #include "kickcat/SocketNull.h"
@@ -28,6 +29,8 @@ class BusTest : public testing::Test
 public:
     void SetUp() override
     {
+        resetSinceEpoch();
+
         EXPECT_CALL(*io_nominal, setTimeout(::testing::_))
             .WillRepeatedly(Return());
         bus.configureWaitLatency(0ns, 0ns);
