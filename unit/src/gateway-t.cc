@@ -1,11 +1,10 @@
-#include <gtest/gtest.h>
+#include "mocks/Sockets.h"
+
 #include "kickcat/Gateway.h"
-#include "Mocks.h"
 
 using ::testing::MockFunction;
 using ::testing::Return;
 using ::testing::_;
-using ::testing::InSequence;
 
 using namespace kickcat;
 using namespace kickcat::mailbox::request;

@@ -1,4 +1,3 @@
-#include <system_error>
 #include <cstring>
 
 #include "kickcat/Units.h"
@@ -6,6 +5,7 @@
 
 namespace kickcat
 {
+// LCOV_EXCL_START
     TapSocket::TapSocket(bool init)
         : init_{init}
     {
@@ -106,4 +106,5 @@ namespace kickcat
 
         return toCopy;
     }
+// LCOV_EXCL_STOP
 }

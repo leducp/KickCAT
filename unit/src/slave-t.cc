@@ -143,3 +143,28 @@ TEST(Slave, countOpenPorts)
         ASSERT_EQ((n & mask0) + ((n & mask1) >> 1) + ((n & mask2) >> 2) + ((n & mask3) >> 3), slave.countOpenPorts());
     }
 }
+
+TEST(Slave, error_counters)
+{
+    ErrorCounters counters;
+    std::memset(&counters, 0, sizeof(ErrorCounters));
+
+    Slave slave;
+    slave.error_counters = counters;
+    ASSERT_EQ(0, slave.computeErrorCounters());
+    ASSERT_EQ(0, slave.computeRelativeErrorCounters());
+
+    counters.rx[0].invalid_frame = 3;
+    counters.rx[1].physical_layer = 13;
+    counters.lost_link[3] = 4;
+    ASSERT_NE(0, std::memcmp(&counters, &slave.errorCounters(), sizeof(ErrorCounters)));
+    slave.error_counters = counters;
+    ASSERT_EQ(0, std::memcmp(&counters, &slave.errorCounters(), sizeof(ErrorCounters)));
+    ASSERT_EQ(20, slave.computeErrorCounters());
+    ASSERT_EQ(20, slave.computeRelativeErrorCounters());
+    ASSERT_EQ(0, slave.computeRelativeErrorCounters());
+
+    ASSERT_TRUE (slave.checkAbsoluteErrorCounters(19));
+    ASSERT_FALSE(slave.checkAbsoluteErrorCounters(21));
+
+}

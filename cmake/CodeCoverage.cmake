@@ -256,43 +256,43 @@ function(setup_target_for_coverage_lcov)
     if(CPPFILT_PATH AND NOT ${Coverage_NO_DEMANGLE})
       set(GENHTML_EXTRA_ARGS "--demangle-cpp")
     endif()
-     
+
     # Setting up commands which will be run to generate coverage data.
     # Cleanup lcov
-    set(LCOV_CLEAN_CMD 
-        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} -directory . 
+    set(LCOV_CLEAN_CMD
+        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} -directory .
         -b ${BASEDIR} --zerocounters
     )
     # Create baseline to make sure untouched files show up in the report
-    set(LCOV_BASELINE_CMD 
-        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} -c -i -d . -b 
+    set(LCOV_BASELINE_CMD
+        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} -c -i -d . -b
         ${BASEDIR} -o ${Coverage_NAME}.base
     )
     # Run tests
-    set(LCOV_EXEC_TESTS_CMD 
+    set(LCOV_EXEC_TESTS_CMD
         ${Coverage_EXECUTABLE} ${Coverage_EXECUTABLE_ARGS}
-    )    
+    )
     # Capturing lcov counters and generating report
-    set(LCOV_CAPTURE_CMD 
-        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} --directory . -b 
+    set(LCOV_CAPTURE_CMD
+        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} --directory . -b
         ${BASEDIR} --capture --output-file ${Coverage_NAME}.capture
     )
     # add baseline counters
     set(LCOV_BASELINE_COUNT_CMD
-        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} -a ${Coverage_NAME}.base 
+        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} -a ${Coverage_NAME}.base
         -a ${Coverage_NAME}.capture --output-file ${Coverage_NAME}.total
-    ) 
+    )
     # filter collected data to final coverage report
-    set(LCOV_FILTER_CMD 
-        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} --remove 
+    set(LCOV_FILTER_CMD
+        ${LCOV_PATH} ${Coverage_LCOV_ARGS} --gcov-tool ${GCOV_PATH} --remove
         ${Coverage_NAME}.total ${LCOV_EXCLUDES} --output-file ${Coverage_NAME}.info
-    )    
+    )
     # Generate HTML output
     set(LCOV_GEN_HTML_CMD
-        ${GENHTML_PATH} ${GENHTML_EXTRA_ARGS} ${Coverage_GENHTML_ARGS} -o 
+        ${GENHTML_PATH} ${GENHTML_EXTRA_ARGS} ${Coverage_GENHTML_ARGS} -o
         ${Coverage_NAME} ${Coverage_NAME}.info
     )
-    
+
 
     if(CODE_COVERAGE_VERBOSE)
         message(STATUS "Executed command report")
@@ -328,11 +328,11 @@ function(setup_target_for_coverage_lcov)
     # Setup target
     add_custom_target(${Coverage_NAME}
         COMMAND ${LCOV_CLEAN_CMD}
-        COMMAND ${LCOV_BASELINE_CMD} 
+        COMMAND ${LCOV_BASELINE_CMD}
         COMMAND ${LCOV_EXEC_TESTS_CMD}
         COMMAND ${LCOV_CAPTURE_CMD}
         COMMAND ${LCOV_BASELINE_COUNT_CMD}
-        COMMAND ${LCOV_FILTER_CMD} 
+        COMMAND ${LCOV_FILTER_CMD}
         COMMAND ${LCOV_GEN_HTML_CMD}
 
         # Set output files as GENERATED (will be removed on 'make clean')
@@ -350,13 +350,13 @@ function(setup_target_for_coverage_lcov)
 
     # Show where to find the lcov info report
     add_custom_command(TARGET ${Coverage_NAME} POST_BUILD
-        COMMAND ;
+        COMMAND "" # NOP
         COMMENT "Lcov code coverage info report saved in ${Coverage_NAME}.info."
     )
 
     # Show info where to find the report
     add_custom_command(TARGET ${Coverage_NAME} POST_BUILD
-        COMMAND ;
+        COMMAND "" # NOP
         COMMENT "Open ./${Coverage_NAME}/index.html in your browser to view the coverage report."
     )
 
@@ -412,7 +412,7 @@ function(setup_target_for_coverage_gcovr_xml)
         list(APPEND GCOVR_EXCLUDE_ARGS "-e")
         list(APPEND GCOVR_EXCLUDE_ARGS "${EXCLUDE}")
     endforeach()
-    
+
     # Set up commands which will be run to generate coverage data
     # Run tests
     set(GCOVR_XML_EXEC_TESTS_CMD
@@ -420,10 +420,10 @@ function(setup_target_for_coverage_gcovr_xml)
     )
     # Running gcovr
     set(GCOVR_XML_CMD
-        ${GCOVR_PATH} --xml -r ${BASEDIR} ${GCOVR_ADDITIONAL_ARGS} ${GCOVR_EXCLUDE_ARGS} 
+        ${GCOVR_PATH} --xml -r ${BASEDIR} ${GCOVR_ADDITIONAL_ARGS} ${GCOVR_EXCLUDE_ARGS}
         --object-directory=${PROJECT_BINARY_DIR} -o ${Coverage_NAME}.xml
     )
-    
+
     if(CODE_COVERAGE_VERBOSE)
         message(STATUS "Executed command report")
 
@@ -439,7 +439,7 @@ function(setup_target_for_coverage_gcovr_xml)
     add_custom_target(${Coverage_NAME}
         COMMAND ${GCOVR_XML_EXEC_TESTS_CMD}
         COMMAND ${GCOVR_XML_CMD}
-        
+
         BYPRODUCTS ${Coverage_NAME}.xml
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
         DEPENDS ${Coverage_DEPENDENCIES}
@@ -449,7 +449,7 @@ function(setup_target_for_coverage_gcovr_xml)
 
     # Show info where to find the report
     add_custom_command(TARGET ${Coverage_NAME} POST_BUILD
-        COMMAND ;
+        COMMAND ""
         COMMENT "Cobertura code coverage report saved in ${Coverage_NAME}.xml."
     )
 endfunction() # setup_target_for_coverage_gcovr_xml
@@ -517,7 +517,7 @@ function(setup_target_for_coverage_gcovr_html)
     # Running gcovr
     set(GCOVR_HTML_CMD
         ${GCOVR_PATH} --html --html-details -r ${BASEDIR} ${GCOVR_ADDITIONAL_ARGS}
-        ${GCOVR_EXCLUDE_ARGS} --object-directory=${PROJECT_BINARY_DIR} 
+        ${GCOVR_EXCLUDE_ARGS} --object-directory=${PROJECT_BINARY_DIR}
         -o ${Coverage_NAME}/index.html
     )
 
@@ -551,7 +551,7 @@ function(setup_target_for_coverage_gcovr_html)
 
     # Show info where to find the report
     add_custom_command(TARGET ${Coverage_NAME} POST_BUILD
-        COMMAND ;
+        COMMAND "" # NOP
         COMMENT "Open ./${Coverage_NAME}/index.html in your browser to view the coverage report."
     )
 

@@ -37,6 +37,7 @@ namespace kickcat
             THROW_SYSTEM_ERROR_CODE("pthread_mutexattr_init()", rc);
         }
 
+#ifndef __MINGW64__
         rc = pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT);
         if (rc != 0)
         {
@@ -51,6 +52,7 @@ namespace kickcat
                 THROW_SYSTEM_ERROR_CODE("pthread_mutexattr_setpshared()", rc);
             }
         }
+#endif
 
         rc = pthread_mutex_init(pmutex_, &attr);
         if (rc != 0)

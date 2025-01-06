@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
+#include "mocks/Sockets.h"
+
 #include "kickcat/Frame.h"
-#include "Mocks.h"
 
 using ::testing::Return;
 using ::testing::_;

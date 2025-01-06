@@ -85,9 +85,9 @@ namespace kickcat
         BRD  = 7,  // Broadcast Read
         BWR  = 8,  // Broadcast Write
         BRW  = 9,  // Broadcast Read Write
-        LRD  = 10, // Logical memory Read
-        LWR  = 11, // Logical memory Write
-        LRW  = 12, // Logical memory Read Write
+        LRD  = 10, // Logical [memory] Read
+        LWR  = 11, // Logical [memory] Write
+        LRW  = 12, // Logical [memory] Read Write
         ARMW = 13, // Auto increment physical Read Multiple Write - DC use
         FRMW = 14  // Configured address Physical Read Multiple Write - DC use
     };

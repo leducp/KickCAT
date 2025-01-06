@@ -32,8 +32,7 @@ namespace kickcat::CoE
         {"Inputs",   4},
     };
 
-
-    Dictionary EsiParser::load(std::string const& file)
+    Dictionary EsiParser::loadFile(std::string const& file)
     {
         XMLError result = doc_.LoadFile(file.c_str());
         if (result != XML_SUCCESS)
@@ -41,6 +40,22 @@ namespace kickcat::CoE
             throw std::runtime_error(doc_.ErrorIDToName(result));
         }
 
+        return parse();
+    }
+
+    Dictionary EsiParser::loadString(std::string const& xml)
+    {
+        XMLError result = doc_.Parse(xml.c_str());
+        if (result != XML_SUCCESS)
+        {
+            throw std::runtime_error(doc_.ErrorIDToName(result));
+        }
+
+        return parse();
+    }
+
+    Dictionary EsiParser::parse()
+    {
         root_ = doc_.RootElement();
 
         // Helper to find and check a child element, throw if not found

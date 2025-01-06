@@ -2,7 +2,7 @@
 os=Linux
 arch=x86_64
 compiler=gcc
-compiler.version=12
+compiler.version=14
 compiler.libcxx=libstdc++11
 compiler.cppstd=17
 build_type=Release
@@ -12,5 +12,5 @@ build_type=Release
 [tool_requires]
 
 [buildenv]
-CC=/usr/bin/gcc-12
-CXX=/usr/bin/g++-12
+CC=/usr/bin/gcc-14
+CXX=/usr/bin/g++-14

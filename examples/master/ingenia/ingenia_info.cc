@@ -9,7 +9,6 @@
 #include "kickcat/SocketNull.h"
 #include "kickcat/helpers.h"
 
-
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
 #elif __PikeOS__

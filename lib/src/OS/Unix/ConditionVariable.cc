@@ -37,6 +37,7 @@ namespace kickcat
             THROW_SYSTEM_ERROR_CODE("pthread_condattr_init()", rc);
         }
 
+#ifndef __MINGW64__
         if (&cond_ != pcond_)
         {
             rc = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
@@ -45,6 +46,7 @@ namespace kickcat
                 THROW_SYSTEM_ERROR_CODE("pthread_condattr_setpshared()", rc);
             }
         }
+#endif
 
         rc = pthread_cond_init(pcond_, &attr);
         if (rc != 0)

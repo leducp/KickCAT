@@ -14,7 +14,8 @@ namespace kickcat::CoE
         EsiParser() = default;
         ~EsiParser() = default;
 
-        CoE::Dictionary load(std::string const& file);
+        CoE::Dictionary loadFile  (std::string const& file);
+        CoE::Dictionary loadString(std::string const& xml);
 
         char const* vendor() const  { return vendor_->FirstChildElement("Name")->GetText();       }
         char const* profile() const { return profile_->FirstChildElement("ProfileNo")->GetText(); }
@@ -31,6 +32,7 @@ namespace kickcat::CoE
             return std::stoi(field, nullptr, 0);
         }
 
+        CoE::Dictionary parse(); // main method
         std::vector<uint8_t> loadHexBinary(tinyxml2::XMLElement* node);
         std::vector<uint8_t> loadString(tinyxml2::XMLElement* node);
 

@@ -14,7 +14,7 @@ namespace kickcat::ESM
     {
         if (mbx_)
         {
-            mbx_->activate(false);
+            mbx_->activate(false); // reset dictionary here?
         }
         pdo_.activateInput(false);
         pdo_.activateOuput(false);
