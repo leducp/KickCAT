@@ -64,8 +64,18 @@ KickCAT project is handled through CMake. To build the project, call CMake to co
   python3 -m venv kickcat_venv
   source kickcat_venv/bin/activate
   pip install conan
+  ```
+
+  With Ubuntu (gcc12) : 
+  ```
+  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_ubuntu_x86_64.txt -pr:b conan/profile_ubuntu_x86_64.txt --build=missing -s build_type=Release
+  ```
+
+  With Debian (gcc14) :
+  ```
   conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_linux_x86_64.txt -pr:b conan/profile_linux_x86_64.txt --build=missing -s build_type=Release
   ```
+
   2. Configure the project (more information on https://cmake.org/cmake/help/latest/)
   ```
   cd build
