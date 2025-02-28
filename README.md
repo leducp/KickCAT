@@ -68,7 +68,7 @@ KickCAT project is handled through CMake. To build the project, call CMake to co
 
   With Ubuntu (gcc12) : 
   ```
-  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_ubuntu_22.04_x86_64.txt -pr:b conan/profile_ubuntu_x86_64.txt --build=missing -s build_type=Release
+  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_ubuntu_22_04_x86_64.txt -pr:b conan/profile_ubuntu_x86_64.txt --build=missing -s build_type=Release
   ```
 
   With Debian (gcc14) :
@@ -102,7 +102,7 @@ Note: you can easily provide GTest via conan package manager:
   ```
   With Ubuntu (gcc12) : 
   ```
-  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_ubuntu_22.04_x86_64.txt -pr:b ../conan/profile_linux_x86_64.txt --build=missing -s build_type=Debug
+  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_ubuntu_22_04_x86_64.txt -pr:b ../conan/profile_linux_x86_64.txt --build=missing -s build_type=Debug
   ```
   With Debian (gcc14) :
   ```
