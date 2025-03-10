@@ -1,12 +1,10 @@
 ### Quick start
 
 #### Environment setup
-- download and build NuttX project (see NuttX documentation for details)
-- copy the `defconfig` file into `nuttxspace/nuttx/boards/arm/xmc4/xmc4800-relax/configs/nsh/defconfig`
-- configure the NuttX project with `./tools/configure.sh -E -l xmc4800-relax:nsh` in NuttX folder.
-- install `arm-none-eabi-objcopy` // TODO more details
-- install `JLinkExe`              // TODO more details
-- use the `export_nuttx_archive.sh` to build and deploy your app. You will need to tweak the paths in the script to match your environment.
+- build your KickCAT project (see KickCAT documentation for details) 
+- use the `export_nuttx_archive.sh` to build and deploy your app.
+
+Note: this setup was tested on Ubuntu version 22.04 using the Nuttx version 12.6.0 and gcc (arm-gmu-toolchaine) version 13.2.1
 
 
 #### Create your own application
