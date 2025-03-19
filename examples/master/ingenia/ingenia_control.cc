@@ -1,3 +1,8 @@
+/*
+NOTE: This ingenia example works with just one slave in the bus, 
+feel free to adapt it if you need to control more than one slave.
+*/
+
 #include <iostream>
 #include <cstring>
 
