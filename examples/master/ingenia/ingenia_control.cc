@@ -189,9 +189,9 @@ int main(int argc, char *argv[])
     ingenia_state_machine.setCommand(CANOpenCommand::ENABLE);
 
     // Setting a small torque
-    output_pdo->mode_of_operation = 0x5;
-    output_pdo->target_torque = 3;
-    output_pdo->max_current = 3990;
+    output_pdo->mode_of_operation = 5;
+    output_pdo->target_torque = 0.03;
+    output_pdo->max_current = 1.7;
     output_pdo->target_position = 0;
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
