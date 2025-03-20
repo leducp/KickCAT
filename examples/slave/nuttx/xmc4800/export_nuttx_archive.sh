@@ -28,9 +28,10 @@ echo "Selected project: $project"
 bin=xmc4800_${project}
 nuttx_version=nuttx-export-12.6.0
 
-cd ../../../../..
+# Directory where this script exists
+HERE="$(dirname "$(realpath "$0")")"
 
-KickCAT_src="$(pwd)/KickCAT"
+KickCAT_src="$HERE/../../../../../KickCAT"
 mkdir -p "${KickCAT_src}/build_for_xmc"
 build="${KickCAT_src}/build_for_xmc"
 cd "${KickCAT_src}/.."
