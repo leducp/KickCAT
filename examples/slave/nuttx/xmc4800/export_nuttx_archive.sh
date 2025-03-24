@@ -69,7 +69,6 @@ cd nuttx
 ## NOTE
 
 ## 1.3.4: Build NuttX with make export (building with 'make' may show an error about an "undefined reference to 'main'")
-#make export -j2
 make export -j$(($(nproc) - 2))
 
 # The export process generates a compressed file (e.g., nuttx-export.tar.gz) in the nuttx folder.
