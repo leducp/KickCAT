@@ -69,7 +69,8 @@ cd nuttx
 ## NOTE
 
 ## 1.3.4: Build NuttX with make export (building with 'make' may show an error about an "undefined reference to 'main'")
-make export -j$(($(nproc) - 2))
+cores=$(($(nproc) - 2))
+make export -j$cores
 
 # The export process generates a compressed file (e.g., nuttx-export.tar.gz) in the nuttx folder.
 # Move it one level up to nuttxspace and decompress it, renaming the decompressed folder to "nuttx-export".
@@ -84,7 +85,7 @@ cd ../KickCAT/build_for_xmc
 
 # 2.1 build and deploy the project
 cmake -B ${build} -S ${KickCAT_src} -DCMAKE_TOOLCHAIN_FILE=${nuttxspace_path}/nuttx-export/scripts/toolchain.cmake
-make ${bin}
+make ${bin} -j$cores
 arm-none-eabi-objcopy -O binary ${build}/examples/slave/nuttx/xmc4800/${bin} ${build}/${bin}.bin
 
 # 3 flash the board
