@@ -1,12 +1,12 @@
 ### Quick start
 
 #### Environment setup
-- download and build NuttX project (see NuttX documentation for details)
-- copy the `defconfig` file into `nuttxspace/nuttx/boards/arm/xmc4/xmc4800-relax/configs/nsh/defconfig`
-- configure the NuttX project with `./tools/configure.sh -E -l xmc4800-relax:nsh` in NuttX folder.
-- install `arm-none-eabi-objcopy` // TODO more details
-- install `JLinkExe`              // TODO more details
-- use the `export_nuttx_archive.sh` to build and deploy your app. You will need to tweak the paths in the script to match your environment.
+- Install the prerequisites for nuttx as shown in their [documentation](https://nuttx.apache.org/docs/latest/quickstart/install.html)
+- Install `JLinkExe` (you can get it from https://www.segger.com/downloads/jlink/#J-LinkSoftwareAndDocumentationPack using the DEB installer)
+- Download the required compressed versions (.tar.gz) of [Nuttx](https://github.com/apache/nuttx/releases/tag/nuttx-12.6.0), [Nuttx-apps](https://github.com/apache/nuttx-apps/releases/tag/nuttx-12.6.0) and [arm-gnu-toolchaine](https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-eabi.tar.xz?rev=e434b9ea4afc4ed7998329566b764309&hash=CA590209F5774EE1C96E6450E14A3E26) and paste them in `kickCAT/examples/slave/nuttx/xmc4800/build_nuttx`.
+- Use the `export_nuttx_archive.sh` to build and deploy your app.
+
+Note: this setup was tested on Ubuntu version 22.04 using the Nuttx version 12.6.0 and gcc (arm-gmu-toolchaine) version 13.2.1
 
 
 #### Create your own application
