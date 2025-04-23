@@ -77,5 +77,9 @@ namespace kickcat
     {
         auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::DOWNLOAD, data, &data_size, timeout);
         waitForMessage(sdo);
+        if (sdo->status() != MessageStatus::SUCCESS)
+        {
+            THROW_ERROR_CODE("Error while writing SDO", sdo->status());
+        }
     }
 }
