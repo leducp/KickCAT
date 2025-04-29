@@ -18,6 +18,11 @@ namespace kickcat
 {
     std::string NetworkInterface::format() const
     {
+        std::string output = name;
+        if (not description.empty())
+        {
+            output += " (" + description + ")";
+        }
         return name;
     }
 

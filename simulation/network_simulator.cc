@@ -2,6 +2,7 @@
 #include <cstring>
 #include <numeric>
 
+#include "kickcat/TapSocket.h"
 #ifdef __linux__
 #include "kickcat/OS/Linux/Socket.h"
 #elif __MINGW64__
@@ -55,11 +56,11 @@ int main(int argc, char* argv[])
     }
 
     CoE::EsiParser parser;
-    auto coe_dict = parser.loadFile("wdc_foot_eve_beta.xml");
+    auto coe_dict = parser.loadFile("foot.xml");
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
-//    auto socket = std::make_shared<TapSocket>(true);
-    auto socket = std::make_shared<Socket>();
+    auto socket = std::make_shared<TapSocket>(true);
+    //auto socket = std::make_shared<Socket>();
     socket->open(argv[1]);
     socket->setTimeout(-1ns);
 
