@@ -14,11 +14,12 @@ public:
         mailbox.recv_size = 256;
         mailbox.send_size = 256;
 
-        header  = pointData<mailbox::Header>(raw_message);
-        coe     = pointData<CoE::Header>(header);
-        sdo     = pointData<CoE::ServiceData>(coe);
-        emg     = pointData<CoE::Emergency>(coe);
-        payload = pointData<void>(sdo);
+        header   = pointData<mailbox::Header>(raw_message);
+        coe      = pointData<CoE::Header>(header);
+        sdo      = pointData<CoE::ServiceData>(coe);
+        emg      = pointData<CoE::Emergency>(coe);
+        sdo_info = pointData<CoE::ServiceDataInfo>(coe);
+        payload  = pointData<void>(sdo);
 
         // Default address is 0 (local processing)
         header->address = 0;
@@ -33,6 +34,7 @@ protected:
     CoE::Header* coe;
     CoE::Emergency* emg;
     CoE::ServiceData* sdo;
+    CoE::ServiceDataInfo* sdo_info;
     void* payload;
 };
 
@@ -265,8 +267,7 @@ TEST_F(MailboxTest, SDO_upload_segmented_OK)
 }
 
 
-
-TEST_F(MailboxTest, SDO_download_OK)
+TEST_F(MailboxTest, SDO_download_expedited_OK)
 {
     int32_t data = 0xCAFEDECA;
     uint32_t data_size = sizeof(data);
@@ -299,6 +300,43 @@ TEST_F(MailboxTest, SDO_download_OK)
     ASSERT_TRUE(mailbox.receive(raw_message));
 }
 
+
+TEST_F(MailboxTest, SDO_download_normal_OK)
+{
+    int64_t data = 0xCAFEDECADECACAFE;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, true, CoE::SDO::request::DOWNLOAD, &data, &data_size);
+
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // check message content
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+    auto const* sdo_payload = pointData<uint32_t>(sdo_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);
+    ASSERT_EQ(CoE::SDO::request::DOWNLOAD,  sdo_section->command);
+    ASSERT_EQ(0x1018,                       sdo_section->index);
+    ASSERT_EQ(1,                            sdo_section->subindex);
+    ASSERT_EQ(true,                         sdo_section->complete_access);
+    ASSERT_EQ(0,                            sdo_section->block_size);
+    ASSERT_EQ(8,                            sdo_payload[0]);
+    ASSERT_EQ(0xDECACAFE,                   sdo_payload[1]);
+    ASSERT_EQ(0xCAFEDECA,                   sdo_payload[2]);
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
+    sdo->command = CoE::SDO::request::DOWNLOAD;
+    sdo->index = 0x1018;
+    sdo->subindex = 1;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+}
+
+
 TEST_F(MailboxTest, SDO_download_abort)
 {
     int32_t data = 0xCAFEDECA;
@@ -321,7 +359,6 @@ TEST_F(MailboxTest, SDO_download_abort)
     ASSERT_EQ(1,                            sdo_section->subindex);
     ASSERT_EQ(false,                        sdo_section->complete_access);
     ASSERT_EQ(0,                            sdo_section->block_size);
-    ASSERT_EQ(0xCAFEDECA,                   *sdo_payload);
 
     // reply
     header->type = mailbox::Type::CoE;
@@ -359,6 +396,57 @@ TEST_F(MailboxTest, SDO_timedout)
 }
 
 
+TEST_F(MailboxTest, SDO_wrong_service)
+{
+    int64_t data = 0;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, true, CoE::SDO::request::DOWNLOAD, &data, &data_size);
+
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_INFORMATION;
+    ASSERT_FALSE(mailbox.receive(raw_message));
+}
+
+
+TEST_F(MailboxTest, SDO_wrong_index)
+{
+    int64_t data = 0;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, true, CoE::SDO::request::DOWNLOAD, &data, &data_size);
+
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
+    sdo->index = 0x2000;
+    ASSERT_FALSE(mailbox.receive(raw_message));
+}
+
+
+TEST_F(MailboxTest, SDO_wrong_subindex)
+{
+    int64_t data = 0;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, true, CoE::SDO::request::DOWNLOAD, &data, &data_size);
+
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
+    sdo->index    = 0x1018;
+    sdo->subindex = 42;
+    ASSERT_FALSE(mailbox.receive(raw_message));
+}
+
+
 TEST_F(MailboxTest, gateway_message)
 {
     constexpr uint16_t GATEWAY_INDEX = 42;
@@ -382,4 +470,165 @@ TEST_F(MailboxTest, gateway_message)
     mailbox.send();
     ASSERT_TRUE(mailbox.receive(gw_msg->data()));
     ASSERT_EQ(1001, gw_msg->address());
+}
+
+
+TEST_F(MailboxTest, sdo_information_OD_list)
+{
+    uint16_t buffer[2048];
+    uint32_t buffer_size = 4096; // in bytes
+
+    mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // check message content
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceDataInfo>(coe_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,                   mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_INFORMATION,        coe_section->service);
+    ASSERT_EQ(CoE::SDO::information::ListType::ALL, sdo_section->opcode);
+    ASSERT_EQ(0,                                    sdo_section->fragments_left);
+    ASSERT_EQ(0,                                    sdo_section->incomplete);
+    ASSERT_EQ(0,                                    sdo_section->reserved);
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_INFORMATION;
+    sdo_info->opcode = CoE::SDO::information::GET_OD_LIST_RESP;
+    sdo_info->fragments_left = 0;
+
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::SUCCESS, message->status());
+}
+
+TEST_F(MailboxTest, sdo_information_OD)
+{
+    uint16_t buffer[2048];
+    uint32_t buffer_size = 4096; // in bytes
+
+    mailbox.createSDOInfoGetOD(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // check message content
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceDataInfo>(coe_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,                   mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_INFORMATION,        coe_section->service);
+    ASSERT_EQ(CoE::SDO::information::GET_OD_REQ,    sdo_section->opcode);
+    ASSERT_EQ(0,                                    sdo_section->fragments_left);
+    ASSERT_EQ(0,                                    sdo_section->incomplete);
+    ASSERT_EQ(0,                                    sdo_section->reserved);
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_INFORMATION;
+    sdo_info->opcode = CoE::SDO::information::GET_OD_RESP;
+    sdo_info->fragments_left = 0;
+
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::SUCCESS, message->status());
+}
+
+TEST_F(MailboxTest, sdo_information_ED)
+{
+    uint16_t buffer[2048];
+    uint32_t buffer_size = 4096; // in bytes
+
+    mailbox.createSDOInfoGetED(
+            0x1018, 0,
+            CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM,
+            &buffer, &buffer_size);
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // check message content
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceDataInfo>(coe_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,                   mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_INFORMATION,        coe_section->service);
+    ASSERT_EQ(CoE::SDO::information::GET_ED_REQ,    sdo_section->opcode);
+    ASSERT_EQ(0,                                    sdo_section->fragments_left);
+    ASSERT_EQ(0,                                    sdo_section->incomplete);
+    ASSERT_EQ(0,                                    sdo_section->reserved);
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_INFORMATION;
+    sdo_info->opcode = CoE::SDO::information::GET_ED_RESP;
+    sdo_info->fragments_left = 0;
+
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::SUCCESS, message->status());
+}
+
+
+TEST_F(MailboxTest, sdo_information_wrong_address_type_service_error)
+{
+    uint16_t buffer[2048];
+    uint32_t buffer_size = 4096; // in bytes
+
+    mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // reply
+    header->address = mailbox::GATEWAY_MESSAGE_MASK;
+    ASSERT_FALSE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    header->address = 0;
+    header->type = mailbox::Type::VoE;
+    ASSERT_FALSE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
+    ASSERT_FALSE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    coe->service = CoE::Service::SDO_INFORMATION;
+    sdo_info->opcode  = CoE::SDO::information::SDO_INFO_ERROR_REQ;
+    std::memcpy(payload, &kickcat::CoE::SDO::abort::GENERAL_ERROR, sizeof(uint32_t));
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(kickcat::CoE::SDO::abort::GENERAL_ERROR, message->status());
+}
+
+
+TEST_F(MailboxTest, sdo_information_wrong_opcode)
+{
+    uint16_t buffer[2048];
+    uint32_t buffer_size = 4096; // in bytes
+
+    mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    // check message content
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceDataInfo>(coe_section);
+
+    ASSERT_EQ(mailbox::Type::CoE,                   mbx_section->type);
+    ASSERT_EQ(CoE::Service::SDO_INFORMATION,        coe_section->service);
+    ASSERT_EQ(CoE::SDO::information::ListType::ALL, sdo_section->opcode);
+    ASSERT_EQ(0,                                    sdo_section->fragments_left);
+    ASSERT_EQ(0,                                    sdo_section->incomplete);
+    ASSERT_EQ(0,                                    sdo_section->reserved);
+
+    // reply
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_INFORMATION;
+    sdo_info->opcode = CoE::SDO::information::ListType::ALL;
+    sdo_info->fragments_left = 0;
+
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::COE_WRONG_SERVICE, message->status());
 }
