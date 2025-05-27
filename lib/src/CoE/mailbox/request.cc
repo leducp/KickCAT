@@ -339,11 +339,16 @@ namespace kickcat::mailbox::request
         int32_t remaining_size = *client_data_size_ - already_received_size_;
 
         coe_info("\nReceived size %i already received %i, remaining_size %i  client_data_ %p \n ", size , already_received_size_, remaining_size, client_data_);
+        if (size < 0)
+        {
+            coe_error("\nMessage size if ill-formed %i\n ", size);
+            status_ = CoE::SDO::abort::GENERAL_ERROR;
+            return ProcessingResult::FINALIZE;
+        }
 
         if(remaining_size < size)
         {
             status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
-
         }
         else
         {

@@ -11,6 +11,8 @@ class MailboxTest : public ::testing::Test
 public:
     void SetUp() override
     {
+        std::memset(raw_message, 0, sizeof(raw_message));
+
         mailbox.recv_size = 256;
         mailbox.send_size = 256;
 
@@ -476,7 +478,7 @@ TEST_F(MailboxTest, gateway_message)
 TEST_F(MailboxTest, sdo_information_OD_list)
 {
     uint16_t buffer[2048];
-    uint32_t buffer_size = 4096; // in bytes
+    uint32_t buffer_size = sizeof(buffer); // in bytes
 
     mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
     auto message = mailbox.send();
@@ -495,6 +497,7 @@ TEST_F(MailboxTest, sdo_information_OD_list)
     ASSERT_EQ(0,                                    sdo_section->reserved);
 
     // reply
+    header->len  = 10;
     header->type = mailbox::Type::CoE;
     coe->service = CoE::Service::SDO_INFORMATION;
     sdo_info->opcode = CoE::SDO::information::GET_OD_LIST_RESP;
@@ -507,9 +510,9 @@ TEST_F(MailboxTest, sdo_information_OD_list)
 TEST_F(MailboxTest, sdo_information_OD)
 {
     uint16_t buffer[2048];
-    uint32_t buffer_size = 4096; // in bytes
+    uint32_t buffer_size = sizeof(buffer); // in bytes
 
-    mailbox.createSDOInfoGetOD(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
+    mailbox.createSDOInfoGetOD(CoE::SDO::information::ListType::ALL, buffer, &buffer_size);
     auto message = mailbox.send();
     ASSERT_EQ(MessageStatus::RUNNING, message->status());
 
@@ -526,6 +529,7 @@ TEST_F(MailboxTest, sdo_information_OD)
     ASSERT_EQ(0,                                    sdo_section->reserved);
 
     // reply
+    header->len  = 10;
     header->type = mailbox::Type::CoE;
     coe->service = CoE::Service::SDO_INFORMATION;
     sdo_info->opcode = CoE::SDO::information::GET_OD_RESP;
@@ -538,7 +542,7 @@ TEST_F(MailboxTest, sdo_information_OD)
 TEST_F(MailboxTest, sdo_information_ED)
 {
     uint16_t buffer[2048];
-    uint32_t buffer_size = 4096; // in bytes
+    uint32_t buffer_size = sizeof(buffer); // in bytes
 
     mailbox.createSDOInfoGetED(
             0x1018, 0,
@@ -560,6 +564,7 @@ TEST_F(MailboxTest, sdo_information_ED)
     ASSERT_EQ(0,                                    sdo_section->reserved);
 
     // reply
+    header->len  = 10;
     header->type = mailbox::Type::CoE;
     coe->service = CoE::Service::SDO_INFORMATION;
     sdo_info->opcode = CoE::SDO::information::GET_ED_RESP;
@@ -573,7 +578,7 @@ TEST_F(MailboxTest, sdo_information_ED)
 TEST_F(MailboxTest, sdo_information_wrong_address_type_service_error)
 {
     uint16_t buffer[2048];
-    uint32_t buffer_size = 4096; // in bytes
+    uint32_t buffer_size = sizeof(buffer); // in bytes
 
     mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
     auto message = mailbox.send();
@@ -605,7 +610,7 @@ TEST_F(MailboxTest, sdo_information_wrong_address_type_service_error)
 TEST_F(MailboxTest, sdo_information_wrong_opcode)
 {
     uint16_t buffer[2048];
-    uint32_t buffer_size = 4096; // in bytes
+    uint32_t buffer_size = sizeof(buffer); // in bytes
 
     mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, &buffer, &buffer_size);
     auto message = mailbox.send();
@@ -624,6 +629,7 @@ TEST_F(MailboxTest, sdo_information_wrong_opcode)
     ASSERT_EQ(0,                                    sdo_section->reserved);
 
     // reply
+    header->len  = 10;
     header->type = mailbox::Type::CoE;
     coe->service = CoE::Service::SDO_INFORMATION;
     sdo_info->opcode = CoE::SDO::information::ListType::ALL;
