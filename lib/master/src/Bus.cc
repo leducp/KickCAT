@@ -179,8 +179,6 @@ namespace kickcat
         {
             background_task();
 
-            sleep(big_wait);
-
             bool is_state_reached = true;
             for (auto& slave : slaves_)
             {
