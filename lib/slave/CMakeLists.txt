@@ -19,7 +19,7 @@ target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PR
 
 if (NUTTX)
   target_sources(kickcat PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/driver/nuttx/src/SPI.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/driver/src/nuttx/SPI.cc
   )
 
   if (NUTTX_ARCH_CHIP STREQUAL "xmc4")
@@ -28,5 +28,5 @@ if (NUTTX)
     )
   endif()
 
-  target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/driver/nuttx/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}driver/nuttx/include/kickcat/nuttx)
+  target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/driver/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/driver/include/kickcat)
 endif()
