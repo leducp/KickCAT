@@ -21,7 +21,7 @@ class KickCATRecipe(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False], "with_esi_parser": [True, False]}
     default_options = {"shared": False, "fPIC": True, "with_esi_parser": False}
 
-    # Sources are located in the same place as this recipe, copy them to the recipe     
+    # Sources are located in the same place as this recipe, copy them to the recipe
     exports_sources = "CMakeLists.txt", "lib/*", "examples/*", "cmake/*"
 
     # def source(self):
@@ -32,13 +32,13 @@ class KickCATRecipe(ConanFile):
             self.options.rm_safe("fPIC")
 
     def layout(self):
-        cmake_layout(self, src_folder="src")
+        cmake_layout(self)
 
     def validate(self):
         if self.settings.compiler.get_safe("cppstd"):
             check_min_cppstd(self, 17)
 
-        if self.settings.os != "Linux":
+        if self.settings.os not in ["Linux", "baremetal"]:
             raise ConanInvalidConfiguration(
                 f"{self.ref} is not supported on {self.settings.os}.")
 
@@ -69,7 +69,7 @@ class KickCATRecipe(ConanFile):
         cmake.build()
 
     def package(self):
-        src_folders = ["lib/include", "lib/slave/include", "lib/slave/driver/include", "lib/master/include", "include"]
+        src_folders = ["lib/include", "lib/slave/include", "lib/slave/driver/include", "lib/master/include"]
         for folder in src_folders:
             copy(self, "*.h", os.path.join(self.source_folder, folder),
                 os.path.join(self.package_folder, "include"))
