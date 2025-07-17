@@ -22,7 +22,7 @@ namespace kickcat::slave
 
     private:
         AbstractESC* esc_;
-        mailbox::response::Mailbox* mbx_;
+        mailbox::response::Mailbox* mbx_{nullptr};
         PDO* pdo_;
 
         ESM::Init init_{*esc_, *pdo_};
