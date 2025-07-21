@@ -19,6 +19,7 @@ int main(int argc, char *argv[])
     (void) argv;
     std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
     Lan9252 esc = Lan9252(spi_driver);
+    esc.init();
     PDO pdo(&esc);
     slave::Slave slave(&esc, &pdo);
 

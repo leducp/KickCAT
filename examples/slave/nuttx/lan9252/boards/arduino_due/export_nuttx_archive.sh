@@ -9,7 +9,7 @@ src=~/wdc_workspace/src/KickCAT/
 
 bin=easycat_slave
 
-nuttx_version=nuttx-export-12.3.0
+nuttx_version=nuttx-export-12.6.0
 
 rm -f ${nuttx_src}/${nuttx_version}.tar.gz
 rm -rf ${build}/${nuttx_version}

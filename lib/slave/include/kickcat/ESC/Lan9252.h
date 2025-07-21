@@ -77,9 +77,9 @@ namespace kickcat
 
         int32_t read(uint16_t address, void* data, uint16_t size) override;
         int32_t write(uint16_t address, void const* data, uint16_t size) override;
+        hresult init() override;
 
     private:
-        hresult init() override;
         template <typename T>
         void readInternalRegister(uint16_t address, T& payload)
         {
