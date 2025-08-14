@@ -25,7 +25,7 @@ namespace kickcat
         file filep_spi_;
         int fd_;
         spi_dev_s** priv_spi_;
-        int SPI_number;
+        int SPI_number_;
     };
 }
 #endif

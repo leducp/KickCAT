@@ -5,15 +5,15 @@
 
 namespace kickcat
 {
-    SPI:: SPI(int spi_number): SPI_number(spi_number)
+    SPI:: SPI(int spi_number): SPI_number_{spi_number}
     {
     }
 
     void SPI::init()
     {
-        std::string path = "/dev/spi" + std::to_string(SPI_number);
+        std::string path = "/dev/spi" + std::to_string(SPI_number_);
         fd_ = file_open(&filep_spi_, path.c_str(), O_RDWR);
-        printf("Open spi%d driver file fd: %d \n", SPI_number, fd_);
+        printf("Open spi%d driver file fd: %d \n", SPI_number_, fd_);
 
         priv_spi_ = static_cast<spi_dev_s**>(filep_spi_.f_inode->i_private);
 
