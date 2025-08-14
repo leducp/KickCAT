@@ -766,7 +766,7 @@ namespace kickcat
 
         for (auto& slave : slaves)
         {
-            auto process = [this, &slave, &apply](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [&slave, &apply](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
                 if (wkc != 1)
                 {
