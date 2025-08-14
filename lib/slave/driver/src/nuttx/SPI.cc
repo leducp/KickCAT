@@ -1,13 +1,19 @@
 #include "kickcat/nuttx/SPI.h"
 
 #include <fcntl.h>
+#include <string>
 
 namespace kickcat
 {
+    SPI:: SPI(int spi_number): SPI_number(spi_number)
+    {
+    }
+
     void SPI::init()
     {
-        fd_ = file_open(&filep_spi_, "/dev/spi0", O_RDWR);
-        printf("Open spi0 driver file fd: %d \n", fd_);
+        std::string path = "/dev/spi" + std::to_string(SPI_number);
+        fd_ = file_open(&filep_spi_, path.c_str(), O_RDWR);
+        printf("Open spi%d driver file fd: %d \n", SPI_number, fd_);
 
         priv_spi_ = static_cast<spi_dev_s**>(filep_spi_.f_inode->i_private);
 
@@ -18,7 +24,6 @@ namespace kickcat
 
         SPI_LOCK(*priv_spi_, true);
     }
-
 
     void SPI::transfer(uint8_t const* data_write, uint8_t* data_read, uint32_t size)
     {

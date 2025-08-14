@@ -12,6 +12,7 @@ namespace kickcat
     class SPI : public AbstractSPI
     {
     public:
+        SPI(int spi_number);
         ~SPI();
 
         void init() override;
@@ -24,6 +25,7 @@ namespace kickcat
         file filep_spi_;
         int fd_;
         spi_dev_s** priv_spi_;
+        int SPI_number;
     };
 }
 #endif
