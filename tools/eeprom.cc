@@ -21,6 +21,32 @@
 
 using namespace kickcat;
 
+bool askContinue()
+{
+    while (true)
+    {
+        printf("Do you want to continue? (y/n): ");
+
+        char input[16];
+        char answer;
+        if (fgets(input, sizeof(input), stdin) != nullptr)
+        {
+            // Parse the first non-whitespace character
+            if (sscanf(input, " %c", &answer) == 1)
+            {
+                if (answer == 'y' || answer == 'Y')
+                {
+                    return true;
+                }
+                else if (answer == 'n' || answer == 'N')
+                {
+                    return false;
+                }
+            }
+        }
+    }
+}
+
 int main(int argc, char* argv[])
 {
     if ((argc != 5) and (argc != 6))
@@ -29,19 +55,18 @@ int main(int argc, char* argv[])
         printf("usage redundancy mode :    ./eeprom [slave_number] [command] [file] NIC_nominal NIC_redundancy\n");
         printf("usage no redundancy mode : ./eeprom [slave_number] [command] [file] NIC_nominal\n");
         printf("Available commands are: \n");
-        printf("\t -dump: read the eeprom of the slave and write it in [file].\n");
-        printf("\t -update: copy the given [file] into the eeprom of the slave.\n");
+        printf("\t * read:  read the eeprom of the slave and write it in [file].\n");
+        printf("\t * write: write the given [file] into the eeprom of the slave.\n");
+        printf("Note: First slave number is 0\n");
         return 1;
     }
 
     std::shared_ptr<AbstractSocket> socket_redundancy;
-    int slave_index     = std::stoi(argv[1]);
-    std::string command = argv[2];
-    std::string file    = argv[3];
+    int slave_index         = std::stoi(argv[1]);
+    std::string order_raw   = argv[2];
+    std::string file        = argv[3];
     std::string red_interface_name = "null";
     std::string nom_interface_name = argv[4];
-    bool shall_update = false;
-    bool shall_dump   = false;
 
     if (argc == 5)
     {
@@ -73,22 +98,29 @@ int main(int argc, char* argv[])
         printf("Redundancy has been activated due to loss of a cable \n");
     };
 
-    if (command == "update")
+    enum Order
     {
-        shall_update = true;
+        READ,
+        WRITE
+    };
+
+    Order order;
+    if (order_raw == "write")
+    {
+        order = Order::WRITE;
     }
-    else if (command == "dump")
+    else if (order_raw == "read")
     {
-        shall_dump = true;
+        order = Order::READ;
     }
     else
     {
-        printf("Invalid command %s \n", command.c_str());
+        printf("Invalid command %s \n", order_raw.c_str());
         return 1;
     }
 
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
+    std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(10ms);
     link->checkRedundancyNeeded();
 
@@ -121,24 +153,43 @@ int main(int argc, char* argv[])
 
     Slave& slave = bus.slaves().at(slave_index);
 
-    if (shall_dump)
+    if (order == Order::READ)
     {
-        auto const& sii = slave.sii.eeprom;
-        char const* raw_data = reinterpret_cast<char const*>(sii.data());
+        char const* raw_data = reinterpret_cast<char const*>(slave.sii.eeprom.data());
         std::ofstream f(file, std::ofstream::binary);
 
-        // Create an eeprom binary file with the right size of empty data
-        std::vector<char> empty(slave.sii.eeprom_size, -1);
-        f.write(empty.data(), empty.size());
-        f.seekp(0);
-
         // Write dumped data
-        f.write(raw_data, sii.size() * 4);
+        f.write(raw_data, slave.sii.eeprom.size() * sizeof(uint32_t));
         f.close();
+        printf("Saving eeprom to %s: done\n", file.c_str());
     }
 
-    if (shall_update)
+    if (order == Order::WRITE)
     {
+        bool addressingScheme2Bytes = false;
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error while fetching eeprom addressing scheme", state);
+        };
+
+        auto process = [&addressingScheme2Bytes](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+            uint16_t answer;
+            std::memcpy(&answer, data, sizeof(uint16_t));
+            if (answer & eeprom::Control::ALGO_SEL)
+            {
+                addressingScheme2Bytes = true;
+            }
+            return DatagramState::OK;
+        };
+
+        link->addDatagram(Command::FPRD, createAddress(slave.address, reg::EEPROM_CONTROL), nullptr, 2, process, error);
+        link->processDatagrams();
+
         // Load eeprom data
         std::vector<uint16_t> buffer;
         std::ifstream eeprom_file;
@@ -147,11 +198,29 @@ int main(int argc, char* argv[])
         {
             THROW_ERROR("Cannot load EEPROM");
         }
-        int size = eeprom_file.tellg();
+        std::size_t size = eeprom_file.tellg();
         eeprom_file.seekg (0, std::ios::beg);
         buffer.resize(size / 2); // vector of uint16_t so / 2 since the size is in byte
         eeprom_file.read((char*)buffer.data(), size);
         eeprom_file.close();
+
+        if (addressingScheme2Bytes == false)
+        {
+            // max eeprom size is 16Kb
+            if (size > 2_KiB)
+            {
+                printf("!!! WARNING !!!\n");
+                printf("Current EEPROM addressing scheme is one byte: max EEPROM size is 16Kbit (2KiB)\n");
+                printf("but the given EEPROM file size is %ldB which exceed the maximum possible target size\n", size);
+                printf("If you wish to continue, the written size will be truncated to 2KiB\n");
+
+                if (not askContinue())
+                {
+                    return 0;
+                }
+                buffer.resize(2_KiB / 2);
+            }
+        }
 
         for (uint32_t i = 0; i < buffer.size(); i++)
         {
