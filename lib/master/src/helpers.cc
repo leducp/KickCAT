@@ -6,6 +6,8 @@
 #include "kickcat/SocketNull.h"
 #ifdef __linux__
 #include "kickcat/OS/Linux/Socket.h"
+#elif __PikeOS__
+    #include "kickcat/OS/PikeOS/Socket.h"
 #elif __MINGW64__
 #include "kickcat/OS/Windows/Socket.h"
 #else

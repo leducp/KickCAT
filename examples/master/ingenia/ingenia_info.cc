@@ -6,18 +6,7 @@
 #include "kickcat/Link.h"
 #include "kickcat/Mailbox.h"
 #include "kickcat/Prints.h"
-#include "kickcat/SocketNull.h"
 #include "kickcat/helpers.h"
-
-#ifdef __linux__
-    #include "kickcat/OS/Linux/Socket.h"
-#elif __PikeOS__
-    #include "kickcat/OS/PikeOS/Socket.h"
-#elif __MINGW64__
-    #include "kickcat/OS/Windows/Socket.h"
-#else
-#error "Unknown platform"
-#endif
 
 
 using namespace kickcat;
@@ -94,30 +83,22 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::shared_ptr<AbstractSocket> socket_redundancy;
-    std::string red_interface_name = "null";
+    std::string red_interface_name = "";
     std::string nom_interface_name = argv[1];
-
-    if (argc == 2)
+    if (argc == 3)
     {
-        printf("No redundancy mode selected \n");
-        socket_redundancy = std::make_shared<SocketNull>();
-    }
-    else
-    {
-        socket_redundancy = std::make_shared<Socket>();
         red_interface_name = argv[2];
     }
 
-    selectInterface(nom_interface_name, red_interface_name);
-
-    auto socket_nominal = std::make_shared<Socket>();
+    std::shared_ptr<AbstractSocket> socket_nominal;
+    std::shared_ptr<AbstractSocket> socket_redundancy;
     try
     {
-        socket_nominal->open(nom_interface_name);
-        socket_redundancy->open(red_interface_name);
+        auto [nominal, redundancy] = createSockets(nom_interface_name, red_interface_name);
+        socket_nominal = nominal;
+        socket_redundancy = redundancy;
     }
-    catch (std::exception const &e)
+    catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
