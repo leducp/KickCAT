@@ -10,6 +10,8 @@
     #include "kickcat/OS/PikeOS/Socket.h"
 #elif __MINGW64__
 #include "kickcat/OS/Windows/Socket.h"
+#elif __NuttX__
+#include "kickcat/OS/NuttX/Socket.h"
 #else
 #error "Unsupported platform"
 #endif
@@ -37,7 +39,7 @@ namespace kickcat
         auto net_interfaces = listInterfaces();
 
         // Add KickCAT tap variation
-        net_interfaces.push_back({"tap:server", "KickCAT TAP socket - server"}); 
+        net_interfaces.push_back({"tap:server", "KickCAT TAP socket - server"});
         net_interfaces.push_back({"tap:client", "KickCAT TAP socket - client"});
         for (std::size_t i = 0; i < net_interfaces.size(); ++i)
         {

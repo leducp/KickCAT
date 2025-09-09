@@ -2,15 +2,6 @@
 #include <cstring>
 #include <numeric>
 
-#include "kickcat/TapSocket.h"
-#ifdef __linux__
-#include "kickcat/OS/Linux/Socket.h"
-#elif __MINGW64__
-#include "kickcat/OS/Windows/Socket.h"
-#else
-#error "Unsupported platform"
-#endif
-
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
 #include "kickcat/slave/Slave.h"
@@ -18,6 +9,14 @@
 #include "kickcat/CoE/EsiParser.h"
 #include "kickcat/CoE/mailbox/response.h"
 
+#ifdef __linux__
+#include "kickcat/OS/Linux/Socket.h"
+#elif __MINGW64__
+#include "kickcat/OS/Windows/Socket.h"
+#else
+#error "Unsupported platform"
+#endif
+#include "kickcat/TapSocket.h" // To be included last to ensure Windows compatibility (thanks to their macro hell API)
 
 using namespace kickcat;
 using namespace kickcat::slave;

@@ -2,6 +2,7 @@
 
 #include "kickcat/Units.h"
 #include "kickcat/TapSocket.h"
+#include "kickcat/Error.h"
 
 namespace kickcat
 {

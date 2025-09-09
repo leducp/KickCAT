@@ -19,6 +19,7 @@ namespace kickcat
     using os_mutex  = P4_mutex_t;
     using os_cond   = P4_cond_t;
     using os_sem    = P4_sem_t;
+    using os_shm    = vm_file_desc_t;
     using os_socket = vm_file_desc_t;
     using os_socket_context = struct socket_context { drv_sbuf_desc_t sbuf; int dontWait; }
     using os_thread = P4_thr_t;

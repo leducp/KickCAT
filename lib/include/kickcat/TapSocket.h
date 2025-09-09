@@ -6,7 +6,6 @@
 #include "kickcat/AbstractSocket.h"
 #include "kickcat/SBufQueue.h"
 #include "kickcat/OS/SharedMemory.h"
-#include "kickcat/OS/Mutex.h"
 
 namespace kickcat
 {

@@ -27,7 +27,7 @@ namespace kickcat
     private:
         std::size_t size_{};    ///< Size in bytes of the shared memory.
         void* address_{};       ///< Address of the shared memory in this processus.
-        os_file fd_{};          ///< File descriptor of the shared memory.
+        os_shm fd_{};           ///< File descriptor of the shared memory.
     };
 }
 
