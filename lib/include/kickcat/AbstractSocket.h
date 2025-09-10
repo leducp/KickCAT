@@ -5,8 +5,6 @@
 #include <chrono>
 #include <vector>
 
-#include "kickcat/Error.h"
-
 namespace kickcat
 {
     using namespace std::chrono;

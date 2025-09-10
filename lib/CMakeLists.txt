@@ -20,6 +20,7 @@ set(KICKCAT_SOURCES
 if (NUTTX)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/NuttX/Socket.cc
   )
   set(OS_LIBRARIES )
 elseif(PIKEOS)
@@ -43,6 +44,7 @@ elseif (UNIX)
 elseif (WIN32)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Socket.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/SharedMemory.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/ConditionVariable.cc
