@@ -352,7 +352,6 @@ TEST_F(MailboxTest, SDO_download_abort)
     auto const* mbx_section = pointData<mailbox::Header>(message->data());
     auto const* coe_section = pointData<CoE::Header>(mbx_section);
     auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
-    auto const* sdo_payload = pointData<uint32_t>(sdo_section);
 
     ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
     ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);

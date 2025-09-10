@@ -307,7 +307,7 @@ namespace kickcat::mailbox::request
         {
             uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
             // TODO: let client display itself the message
-            coe_info("Abort requested for sdo information ! code %08x - %s\n", code, CoE::SDO::abort_to_str(code));
+            coe_info("Abort requested for sdo information ! code %08" PRIx32 " - %s\n", code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;
         }
@@ -338,10 +338,10 @@ namespace kickcat::mailbox::request
         int32_t size = header->len - sizeof(CoE::ServiceDataInfo) - sizeof(CoE::Header);
         int32_t remaining_size = *client_data_size_ - already_received_size_;
 
-        coe_info("\nReceived size %i already received %i, remaining_size %i  client_data_ %p \n ", size , already_received_size_, remaining_size, client_data_);
+        coe_info("\nReceived size %" PRIi32 " already received %" PRIu32 ", remaining_size %" PRIi32 " client_data_ %p \n ", size , already_received_size_, remaining_size, client_data_);
         if (size < 0)
         {
-            coe_error("\nMessage size if ill-formed %i\n ", size);
+            coe_error("\nMessage size if ill-formed %" PRIi32 "\n ", size);
             status_ = CoE::SDO::abort::GENERAL_ERROR;
             return ProcessingResult::FINALIZE;
         }

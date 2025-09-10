@@ -45,7 +45,7 @@ namespace kickcat
         }
     }
 
-    char const* registerToError(uint16_t const& reg)
+    std::string registerToError(uint16_t const& reg)
     {
         std::string result = "GENERIC_ERROR";                           // Generic error is mandatory
 
@@ -58,7 +58,7 @@ namespace kickcat
         if ((reg & (1U << 7)) == (1U << 7)) {result += " + MANUFACTURER_SPECIFIC";}
 
         result += "\n";
-        return result.c_str();
+        return result;
     }
 }
 
