@@ -130,8 +130,7 @@ namespace kickcat
 
         } while (since_epoch() < deadline);
 
-        errno = ETIMEDOUT;
-        return -1;
+        return -ETIMEDOUT;
     }
 
     int32_t Socket::write(void const* frame, int32_t frame_size)
@@ -141,6 +140,6 @@ namespace kickcat
         {
             return frame_size;
         }
-        return -1;
+        return -EIO; // no direct errno equivalent from pcap
     }
 }

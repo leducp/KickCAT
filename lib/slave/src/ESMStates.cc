@@ -56,7 +56,7 @@ namespace kickcat::ESM
             {
                 return Context::build(State::PRE_OP);
             }
-            if (mbx_->configure() == hresult::OK)
+            if (mbx_->configure() == 0)
             {
                 if (mbx_->isConfigOk())
                 {
@@ -108,7 +108,7 @@ namespace kickcat::ESM
 
         if (control.requestedState() == State::SAFE_OP)
         {
-            if (pdo_.configure() != hresult::OK)
+            if (pdo_.configure() != 0)
             {
                 return Context::build(id_);
             }

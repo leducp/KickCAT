@@ -5,7 +5,7 @@
 
 namespace kickcat
 {
-    hresult PDO::configure()
+    int32_t PDO::configure()
     {
         try
         {
@@ -18,10 +18,10 @@ namespace kickcat
 
         catch (std::exception const& e)
         {
-            return hresult::E_EINVAL;
+            return -EINVAL;
         }
 
-        return hresult::OK;
+        return 0;
     }
 
     StatusCode PDO::isConfigOk()

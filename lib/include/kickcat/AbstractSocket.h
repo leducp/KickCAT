@@ -20,7 +20,15 @@ namespace kickcat
         /// Set the timeout to receive a frame. If negative, the timeout is infinite (blocking call).
         virtual void setTimeout(nanoseconds timeout) = 0;
         virtual void close() noexcept = 0;
+
+        /// \param  frame       frame where the data will be stored
+        /// \param  frame_size  max size of the frame to read
+        /// \return Number of bytes read or a negative errno code otherwise
         virtual int32_t read(void* frame, int32_t frame_size) = 0;
+
+        /// \param  frame       frame to write on the network
+        /// \param  frame_size  size of the frame to write on the network
+        /// \return Number of bytes written or a negative errno code otherwise
         virtual int32_t write(void const* frame, int32_t frame_size) = 0;
     };
 

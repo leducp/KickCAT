@@ -104,7 +104,7 @@ namespace kickcat
                     {
                         if (not (sync.registers->status & SM_STATUS_MAILBOX) and (sync.registers->control & 0x3))
                         {
-                            return -1; // Cannot read mailbox: it is empty
+                            return -EAGAIN; // Cannot read mailbox: it is empty
                         }
                         std::memcpy(buffer, pos, to_copy);
 
@@ -120,7 +120,7 @@ namespace kickcat
                     {
                         if ((sync.registers->status & SM_STATUS_MAILBOX) and (sync.registers->control & 0x3))
                         {
-                            return -1; // Cannot write mailbox: it is full
+                            return -EAGAIN; // Cannot write mailbox: it is full
                         }
                         std::memcpy(pos, buffer, to_copy);
 
@@ -161,7 +161,7 @@ namespace kickcat
             }
 
             // No SM nor FFMU enable this access
-            return -1;
+            return -EACCES;
         }
 
         // register access: cannot overlap memory after register space in one access
@@ -182,7 +182,7 @@ namespace kickcat
             }
         }
 
-        return -1; // shall not be possible to be reached
+        return -ENOTSUP; // shall not be possible to be reached
     }
 
 

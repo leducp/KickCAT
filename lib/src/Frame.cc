@@ -233,7 +233,7 @@ namespace kickcat
         if (frame.ethernet()->type != ETH_ETHERCAT_TYPE)
         {
             link_error("Invalid frame type\n");
-            return -1;
+            return -ENOMSG;
         }
 
         int32_t expected = frame.header()->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
@@ -245,7 +245,7 @@ namespace kickcat
         if (read != expected)
         {
             link_error("Wrong number of bytes read\n");
-            return -1;
+            return -EIO;
         }
 
         frame.setIsDatagramAvailable();
@@ -262,13 +262,12 @@ namespace kickcat
 
         if (written < 0)
         {
-            return -1;
+            return written;
         }
 
         if (written != toWrite)
         {
-            errno = EIO;
-            return -1;
+            return -EIO;
         }
 
         return written;

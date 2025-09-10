@@ -11,12 +11,10 @@ namespace kickcat
     {
     }
 
-    hresult Lan9252::init()
+    int32_t Lan9252::init()
     {
         spi_interface_->init();
         spi_interface_->disableChipSelect();
-
-        printf("init lan \n");
 
         writeInternalRegister(RESET_CTL, DIGITAL_RST);
 
@@ -34,8 +32,7 @@ namespace kickcat
 
         if (counter == timeout)
         {
-          printf("Timeout reset \n");
-          return hresult::E_ETIMEDOUT;
+          return -ETIMEDOUT;
         }
 
         // Check SPI interface is ready thanks to BYTE_TEST to test byte order
@@ -49,8 +46,7 @@ namespace kickcat
 
         if (counter == timeout)
         {
-          printf("Timeout get byte test \n");
-          return hresult::E_ETIMEDOUT;
+          return -ETIMEDOUT;
         }
         printf("Byte test read: %" PRIu32 " \n", byte_test_result);
 
@@ -66,13 +62,13 @@ namespace kickcat
         if (counter == timeout)
         {
           printf("Timeout hw cfg ready \n");
-          return hresult::E_ETIMEDOUT;
+          return -ETIMEDOUT;
         }
-        return hresult::OK;
+        return 0;
     }
 
 
-    hresult Lan9252::waitCSR()
+    int32_t Lan9252::waitCSR()
     {
         uint32_t esc_status;
         nanoseconds start_time = since_epoch();
@@ -81,11 +77,11 @@ namespace kickcat
             readInternalRegister(ECAT_CSR_CMD, esc_status);
             if (elapsed_time(start_time) > TIMEOUT)
             {
-                return hresult::E_ETIMEDOUT;
+                return -ETIMEDOUT;
             }
         }
         while(esc_status & ECAT_CSR_BUSY);
-        return hresult::OK;
+        return 0;
     }
 
 
@@ -121,11 +117,10 @@ namespace kickcat
         }
 
         writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, static_cast<uint8_t>(size), CSR_CMD::ESC_READ});
-        hresult rc = waitCSR();
-        if (rc != hresult::OK)
+        int rc = waitCSR();
+        if (rc < 0)
         {
-            printf("Timeout\n");
-            return -1;
+            return rc;
         }
 
         readInternalRegister(ECAT_CSR_DATA, data, size);
@@ -148,14 +143,12 @@ namespace kickcat
                 int32_t readBytes = readData(address + offset, bufferPos + offset, to_read);
                 if (readBytes < 0)
                 {
-                    return -1;
-                    //return hresult::E_ETIMEDOUT;
+                    return readBytes;
                 }
 
                 if (readBytes == 0)
                 {
-                    return -1;
-                    //return hresult::E_ENOMEM;
+                    return -ENOMEM;
                 }
                 to_read -= readBytes;
             }
@@ -175,8 +168,7 @@ namespace kickcat
                 fifo_slot_available = fifo_slot_available >> 8;
                 if (elapsed_time(start_time) > TIMEOUT)
                 {
-                    return -1;
-                    //return hresult::E_ETIMEDOUT;
+                    return -ETIMEDOUT;
                 }
             } while(fifo_slot_available != size / 4);  // beware assumption ESC will transfer 32 bytes.
 
@@ -184,8 +176,7 @@ namespace kickcat
         }
         else
         {
-            return -1;
-            //return hresult::E_ERANGE;
+            return -ERANGE;
         }
 
         return size;
@@ -207,11 +198,10 @@ namespace kickcat
         writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
         writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, static_cast<uint8_t>(size), CSR_CMD::ESC_WRITE});
         // wait for command execution
-        hresult rc = waitCSR();
-        if (rc != hresult::OK)
+        int32_t rc = waitCSR();
+        if (rc < 0)
         {
-            printf("Timeout\n");
-            return -1;
+            return rc;
         }
 
         return size;
@@ -224,8 +214,7 @@ namespace kickcat
         {
             if (size > 2)
             {
-                return -1;
-                //return hresult::E_ERANGE;
+                return -ERANGE;
             }
 
             uint16_t to_write = size;
@@ -234,19 +223,17 @@ namespace kickcat
             while (to_write > 0)
             {
                 uint16_t offset = size - to_write;
-                int32_t writenBytes = writeData(address + offset, bufferPos + offset, to_write);
-                if (writenBytes < 0)
+                int32_t writtenBytes = writeData(address + offset, bufferPos + offset, to_write);
+                if (writtenBytes < 0)
                 {
-                    return -1;
-                    //return hresult::E_ETIMEDOUT;
+                    return writtenBytes;
                 }
 
-                if (writenBytes == 0)
+                if (writtenBytes == 0)
                 {
-                    return -1;
-                    //return hresult::E_ENOMEM;
+                    return -ENOMEM;
                 }
-                to_write -= writenBytes;
+                to_write -= writtenBytes;
             }
         }
         else if (address + size < 0x2000)
@@ -267,8 +254,7 @@ namespace kickcat
         }
         else
         {
-            return -1;
-            //return hresult::E_ERANGE;
+            return -ERANGE;
         }
 
         return size;

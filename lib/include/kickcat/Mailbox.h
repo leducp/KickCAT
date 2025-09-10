@@ -186,7 +186,7 @@ namespace kickcat::mailbox::response
         void enableCoE(CoE::Dictionary&& dictionary);
         CoE::Dictionary& getDictionary(){return dictionary_;}
 
-        hresult configure();
+        int32_t configure();
         bool isConfigOk();
         void activate(bool is_activated);
 
@@ -203,7 +203,7 @@ namespace kickcat::mailbox::response
         AbstractESC* esc_;
         SyncManagerConfig mbx_in_{};
         SyncManagerConfig mbx_out_{};
- 
+
         uint16_t max_allocated_ram_by_msg_;
         uint16_t max_msgs_;
 
