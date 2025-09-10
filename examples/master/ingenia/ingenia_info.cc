@@ -28,7 +28,7 @@ void printObjectDictionnaryList(Bus& bus, Slave& slave, CoE::SDO::information::L
     printf("Data size received %u \n", buffer_size);
 
     uint16_t index_size = buffer_size / 2 - 1;
-    printf("Object dictionnary list: size: %li\n", index_size);
+    printf("Object dictionnary list: size: %u\n", index_size);
 
     for (int i = 0; i < index_size; ++i)
     {

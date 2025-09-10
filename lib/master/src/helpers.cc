@@ -44,7 +44,7 @@ namespace kickcat
         for (std::size_t i = 0; i < net_interfaces.size(); ++i)
         {
             auto const& netIf = net_interfaces[i];
-            printf("%lu. %s\n", i, netIf.format().c_str());
+            printf("%zd. %s\n", i, netIf.format().c_str());
         }
 
         for (auto& ifname : interfaces)
