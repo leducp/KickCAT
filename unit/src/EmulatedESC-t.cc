@@ -37,12 +37,12 @@ TEST(EmulatedESC, pdi_read_write_ram_no_sm)
     {
         uint64_t read_test = 0;
 
-        ASSERT_EQ(esc.read(address, &read_test, sizeof(uint64_t)), -1);
+        ASSERT_EQ(esc.read(address, &read_test, sizeof(uint64_t)), -EACCES);
         ASSERT_NE(read_test, payload);
 
-        ASSERT_EQ(esc.write(address, &payload, sizeof(uint64_t)), -1);
+        ASSERT_EQ(esc.write(address, &payload, sizeof(uint64_t)), -EACCES);
 
-        ASSERT_EQ(esc.read(address, &read_test, sizeof(uint64_t)), -1);
+        ASSERT_EQ(esc.read(address, &read_test, sizeof(uint64_t)), -EACCES);
         ASSERT_NE(read_test, payload);
     }
 }

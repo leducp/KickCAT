@@ -266,7 +266,7 @@ namespace kickcat::mailbox::response
     }
 
 
-    hresult Mailbox::configure()
+    int32_t Mailbox::configure()
     {
         try
         {
@@ -275,7 +275,7 @@ namespace kickcat::mailbox::response
 
             if (mailboxIn.length != mailboxOut.length or mailboxIn.length > max_allocated_ram_by_msg_)
             {
-                return hresult::E_EOVERFLOW;
+                return -EOVERFLOW;
             }
 
             mbx_in_  = SYNC_MANAGER_MBX_IN(indexIn, mailboxIn.start_address, mailboxIn.length);
@@ -283,11 +283,10 @@ namespace kickcat::mailbox::response
         }
         catch (std::exception const& e)
         {
-            return hresult::E_EAGAIN;
+            return -EAGAIN;
         }
 
-
-        return hresult::OK;
+        return 0;
     }
 
     bool Mailbox::isConfigOk()

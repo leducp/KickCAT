@@ -14,7 +14,7 @@ namespace kickcat
         {
         }
 
-        hresult configure();
+        int32_t configure();
         StatusCode isConfigOk();
         void activateOuput(bool is_activated);
         void activateInput(bool is_activated);

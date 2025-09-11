@@ -96,8 +96,7 @@ namespace kickcat
             void* rxbuf = (void*)vm_io_sbuf_rx_buf_addr(&sbuf_, rx);
             if (rxbuf == nullptr)
             {
-                errno = ENOMEM;
-                return -1;
+                return -ENOMEM;
             }
 
             int32_t len = static_cast<int32_t>(vm_io_sbuf_rx_buf_size(&sbuf_, rx));
@@ -107,8 +106,7 @@ namespace kickcat
             return to_copy;
         } while (since_epoch() < deadline);
 
-        errno = EIO; // ETIMEDOUT or ETIME code unavailable on PikeOS
-        return -1;
+        return -EIO; // ETIMEDOUT or ETIME code unavailable on PikeOS
     }
 
     int32_t Socket::write(uint8_t const* void, int32_t frame_size)
@@ -116,15 +114,13 @@ namespace kickcat
         vm_io_buf_id_t tx = vm_io_sbuf_tx_alloc(&sbuf_, 1); // 1 = non block
         if (tx == VM_IO_BUF_ID_INVALID)
         {
-            errno = EAGAIN;
-            return -1;
+            return -EAGAIN;
         }
 
         void* txbuf = (void*)vm_io_sbuf_tx_buf_addr(&sbuf_, tx);
         if (txbuf == nullptr)
         {
-            errno = ENOMEM;
-            return -1;
+            return -ENOMEM;
         }
 
         // Write data and finalize operation

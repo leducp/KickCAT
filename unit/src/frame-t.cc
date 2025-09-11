@@ -145,7 +145,7 @@ TEST(Frame, read_error)
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
 
     EXPECT_CALL(*io_nominal, read(_,_))
-        .WillOnce(Return(-1))
+        .WillOnce(Return(-789))
         .WillOnce(Return(0))
         .WillOnce(Invoke([&](void* frame_in, int32_t frame_size)
         {
@@ -154,14 +154,14 @@ TEST(Frame, read_error)
             return frame_size;
         }))
         .WillOnce(Return(MAX_ETHERCAT_PAYLOAD_SIZE / 2));
-    ASSERT_EQ(readFrame(io_nominal, frame), -1);
+    ASSERT_EQ(readFrame(io_nominal, frame), -789);
     ASSERT_EQ(readFrame(io_nominal, frame), 0);
-    ASSERT_EQ(readFrame(io_nominal, frame), -1);
+    ASSERT_EQ(readFrame(io_nominal, frame), -ENOMSG);
     ASSERT_FALSE(frame.isDatagramAvailable());
 
     frame.resetContext();
     frame.addDatagram(0, Command::BRD, 0, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
-    ASSERT_EQ(readFrame(io_nominal, frame), -1);
+    ASSERT_EQ(readFrame(io_nominal, frame), -ENOMSG);
 }
 
 TEST(Frame, read_garbage)
@@ -295,9 +295,9 @@ TEST(Frame, write_error)
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
 
     EXPECT_CALL(*io_nominal, write(_,_))
-        .WillOnce(Return(-1))
+        .WillOnce(Return(-789))
         .WillOnce(Return(0));
-    ASSERT_EQ(-1, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
-    ASSERT_EQ(-1, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
+    ASSERT_EQ(-789, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
+    ASSERT_EQ(-EIO, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
 }
 

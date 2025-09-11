@@ -184,17 +184,25 @@ namespace kickcat
                     sleep(polling_period_);
                     continue;
                 }
+                else
+                {
+                    return -errno;
+                }
             }
 
             return static_cast<int32_t>(read_size);
         } while (since_epoch() < deadline);
 
-        errno = ETIMEDOUT;
-        return -1;
+        return -ETIMEDOUT;
     }
 
     int32_t Socket::write(void const* frame, int32_t frame_size)
     {
-        return static_cast<int32_t>(::send(fd_, frame, frame_size, MSG_DONTWAIT));
+        ssize_t written_size = ::send(fd_, frame, frame_size, MSG_DONTWAIT);
+        if (written_size < 0)
+        {
+            return -errno;
+        }
+        return static_cast<int32_t>(written_size);
     }
 }

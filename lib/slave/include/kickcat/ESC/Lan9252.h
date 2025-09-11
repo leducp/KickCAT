@@ -75,9 +75,9 @@ namespace kickcat
         ~Lan9252() = default;
 
 
+        int32_t init() override;
         int32_t read(uint16_t address, void* data, uint16_t size) override;
         int32_t write(uint16_t address, void const* data, uint16_t size) override;
-        hresult init() override;
 
     private:
         template <typename T>
@@ -96,7 +96,7 @@ namespace kickcat
 
         void writeInternalRegister(uint16_t address, void const* payload, uint16_t size);
 
-        hresult waitCSR();
+        int32_t waitCSR();
 
         int32_t readData(uint16_t address, void* data, uint16_t to_read);
 

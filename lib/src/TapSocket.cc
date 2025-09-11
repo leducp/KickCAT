@@ -80,7 +80,7 @@ namespace kickcat
         auto item = in_->get(timeout_);
         if (item.address == nullptr)
         {
-            return -1;
+            return -EAGAIN;
         }
 
         int32_t toCopy = std::min(static_cast<int32_t>(item.len), frame_size);
@@ -96,7 +96,7 @@ namespace kickcat
         auto item = out_->allocate(timeout_);
         if (item.address == nullptr)
         {
-            return -1;
+            return -EAGAIN;
         }
 
         int32_t toCopy = std::min(static_cast<int32_t>(QUEUE::item_size()), frame_size);

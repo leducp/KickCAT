@@ -70,7 +70,7 @@ namespace kickcat
         ssize_t sent = ::sendto(fd_, frame, frame_size, MSG_DONTWAIT, (struct sockaddr*)&requests_[index], sizeof(struct sockaddr_in));
         if (sent < 0)
         {
-            return -1;
+            return -errno;
         }
 
         return static_cast<int32_t>(sent);

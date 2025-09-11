@@ -13,7 +13,7 @@ namespace kickcat
         MockESC() = default;
         virtual ~MockESC() = default;
 
-        MOCK_METHOD(hresult, init, (), (override));
+        MOCK_METHOD(int32_t, init, (), (override));
         MOCK_METHOD(int32_t, read,  (uint16_t, void*, uint16_t),       (override));
         MOCK_METHOD(int32_t, write, (uint16_t, void const*, uint16_t), (override));
     };

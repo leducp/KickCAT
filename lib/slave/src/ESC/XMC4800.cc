@@ -8,8 +8,7 @@ namespace kickcat
     {
         if (ECAT0_BASE_ADDRESS + address + size > ECAT0_END_ADDRESS)
         {
-            return -1;
-            //return hresult::E_ERANGE;
+            return -EINVAL;
         }
 
         std::memcpy(data, reinterpret_cast<void*>(ECAT0_BASE_ADDRESS + address), size);
@@ -21,8 +20,7 @@ namespace kickcat
     {
         if (ECAT0_BASE_ADDRESS + address + size > ECAT0_END_ADDRESS)
         {
-            return -1;
-            //return hresult::E_ERANGE;
+            return -EINVAL;
         }
 
         std::memcpy(reinterpret_cast<void*>(ECAT0_BASE_ADDRESS + address), data, size);

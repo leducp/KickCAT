@@ -38,8 +38,19 @@ namespace kickcat
         AbstractESC()          = default;
         virtual ~AbstractESC() = default;
 
-        virtual hresult init() { return hresult::OK; }
+        /// \return 0 if success, a negative errno otherwise
+        virtual int32_t init() { return 0; }
+
+        /// \param  address Address to read to
+        /// \param  data    Buffer to store the data to
+        /// \param  size    Size of the data to read
+        /// \return Number of bytes read or a negative errno code otherwise
         virtual int32_t read(uint16_t address, void* data, uint16_t size)        = 0;
+
+        /// \param  address Address to write to
+        /// \param  data    Buffer that contains the data to write
+        /// \param  size    Size of the data to write
+        /// \return Number of bytes written or a negative errno code otherwise
         virtual int32_t write(uint16_t address, void const* data, uint16_t size) = 0;
 
         std::tuple<uint8_t, SyncManager> findSm(uint16_t controlMode);
