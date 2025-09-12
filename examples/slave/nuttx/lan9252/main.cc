@@ -17,7 +17,13 @@ int main(int argc, char *argv[])
 {
     (void) argc;
     (void) argv;
+
     std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
+    spi_driver->setDevice("/dev/spi0");
+    spi_driver->setBaudRate(10000000);
+    spi_driver->setMode(SPIDEV_MODE0);
+    spi_driver->setChipSelect(0);
+
     Lan9252 esc = Lan9252(spi_driver);
     esc.init();
     PDO pdo(&esc);
@@ -55,11 +61,11 @@ int main(int argc, char *argv[])
     {
         slave.routine();
         // Print received data
-    //    for (uint8_t i = 0; i < pdo_size; ++i)
-    //    {
-    //        printf("%x", buffer_out[i]);
-    //    }
-    //    printf("\n");
+        // for (uint8_t i = 0; i < pdo_size; ++i)
+        // {
+        //     printf("%x", buffer_out[i]);
+        // }
+        // printf("\n");
 
         if (slave.state() == State::SAFE_OP)
         {
