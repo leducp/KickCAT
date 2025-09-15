@@ -66,9 +66,14 @@ KickCAT project is handled through CMake. To build the project, call CMake to co
   pip install conan
   ```
 
-  With Ubuntu (gcc12) : 
+  With Ubuntu 22.04 (gcc12) : 
   ```
   conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_ubuntu_22_04_x86_64.txt -pr:b conan/profile_ubuntu_22_04_x86_64.txt --build=missing -s build_type=Release
+  ```
+
+  With Ubuntu 24.04 (gcc13) : 
+  ```
+  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_ubuntu_24_04_x86_64.txt -pr:b conan/profile_ubuntu_24_04_x86_64.txt --build=missing -s build_type=Release
   ```
 
   With Debian (gcc14) :
