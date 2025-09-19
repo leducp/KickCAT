@@ -7,7 +7,7 @@ namespace kickcat
     {
         for (uint8_t i = 0; i < reg::SM_STATS; i++)
         {
-            SyncManager sync;
+            SyncManager sync{};
             read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, &sync, sizeof(SyncManager));
             if ((sync.control & 0x0F) == (controlMode & 0x0F))
             {

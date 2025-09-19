@@ -15,7 +15,6 @@ namespace kickcat
             sm_input_  = SYNC_MANAGER_PI_IN(indexIn, pdoIn.start_address, pdoIn.length);
             sm_output_ = SYNC_MANAGER_PI_OUT(indexOut, pdoOut.start_address, pdoOut.length);
         }
-
         catch (std::exception const& e)
         {
             return -EINVAL;

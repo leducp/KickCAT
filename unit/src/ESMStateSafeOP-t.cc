@@ -233,3 +233,15 @@ TEST_F(ESMStateSafeOPTest, 33B_SafeOP_to_Init)
     expectSyncManagerActivate(3, false);
     init.onEntry(Context::build(State::SAFE_OP), newContext);
 }
+
+TEST_F(ESMStateSafeOPTest, xx_SafeOP_to_Op)
+{
+    expectUpdatePdoInput();
+    expectUpdatePdoOutput();
+
+    Context context = Context::build(State::SAFE_OP);
+    context.is_valid_output_data = true;
+    Context newContext = safeop.routine(context, ALControl{State::OPERATIONAL});
+
+    expectAlStatus(newContext, State::OPERATIONAL, StatusCode::NO_ERROR);
+}

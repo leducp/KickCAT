@@ -40,6 +40,13 @@ protected:
     void* payload;
 };
 
+TEST_F(MailboxTest, inactive)
+{
+    mailbox.recv_size = 0;
+    ASSERT_THROW(mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, nullptr, nullptr), Error);
+    ASSERT_THROW(mailbox.createSDOInfoGetOD(0x1018, nullptr, nullptr), Error);
+    ASSERT_THROW(mailbox.createSDOInfoGetED(0x1018, 0, 0, nullptr, nullptr), Error);
+}
 
 TEST_F(MailboxTest, SyncManager_configuration)
 {

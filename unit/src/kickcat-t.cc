@@ -5,10 +5,9 @@ using namespace kickcat;
 
 TEST(KickCAT, datagram_state_to_string)
 {
-    ASSERT_STREQ("LOST"       , toString(DatagramState::LOST));
-    ASSERT_STREQ("SEND_ERROR" , toString(DatagramState::SEND_ERROR));
-    ASSERT_STREQ("INVALID_WKC", toString(DatagramState::INVALID_WKC));
-    ASSERT_STREQ("NO_HANDLER" , toString(DatagramState::NO_HANDLER));
-    ASSERT_STREQ("OK"         , toString(DatagramState::OK));
-    ASSERT_STREQ("Unknown"    , toString(static_cast<DatagramState>(42)));
+    std::array<char const*, 6> TO_CHECK = {"LOST", "SEND_ERROR", "INVALID_WKC", "NO_HANDLER", "OK", "Unknown"};
+    for (int i = 0; i < 6; ++i)
+    {
+        ASSERT_STREQ(TO_CHECK.at(i), toString(static_cast<DatagramState>(i)));
+    }
 }

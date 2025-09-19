@@ -67,6 +67,7 @@ TEST_F(ESMStateOPTest, 40_OP_to_OP)
     Context newContext = op.routine(context, ALControl{State::OPERATIONAL});
 
     expectAlStatus(newContext, State::OPERATIONAL);
+    op.onEntry(context, newContext);
 }
 
 TEST_F(ESMStateOPTest, 42_OP_to_SafeOP)

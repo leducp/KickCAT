@@ -69,3 +69,63 @@ TEST(CoE, SDO_request_command_to_string)
         ASSERT_STREQ(SDO::request::toString(i), "Unknown command");
     }
 }
+
+
+TEST(CoE, SDO_Information_ValueInfo_to_string)
+{
+    using namespace SDO::information;
+
+    ASSERT_EQ(ValueInfo::toString(0), "None");
+
+    ASSERT_EQ(ValueInfo::toString(ValueInfo::UNIT_TYPE), "Unit Type");
+    ASSERT_EQ(ValueInfo::toString(ValueInfo::DEFAULT), "Default");
+    ASSERT_EQ(ValueInfo::toString(ValueInfo::MINIMUM), "Minimum");
+    ASSERT_EQ(ValueInfo::toString(ValueInfo::MAXIMUM), "Maximum");
+
+    ASSERT_EQ(ValueInfo::toString(ValueInfo::UNIT_TYPE | ValueInfo::DEFAULT | ValueInfo::MINIMUM | ValueInfo::MAXIMUM),
+        "Unit Type, Default, Minimum, Maximum");
+}
+
+
+TEST(CoE, SDO_Information_ObjectDescription_to_string)
+{
+    using namespace SDO::information;
+    ObjectDescription desc;
+    desc.index = 0x1018;
+    desc.data_type = DataType::DWORD;
+    desc.max_subindex = 1;
+    desc.object_code = ObjectCode::VAR;
+
+    char const* EXPECTED =
+    "Object Description \n"
+    "  index:        0x1018\n"
+    "  data type:    dword\n"
+    "  max subindex: 1\n"
+    "  object code:  VAR\n";
+
+    ASSERT_EQ(toString(desc), EXPECTED);
+}
+
+
+TEST(CoE, SDO_Information_EntryDescription_to_string)
+{
+    using namespace SDO::information;
+    EntryDescription desc;
+    desc.index = 0x1018;
+    desc.subindex = 42;
+    desc.value_info = 0;
+    desc.data_type = DataType::BYTE;
+    desc.bit_length = 8;
+    desc.access = Access::ALL;
+
+    char const* EXPECTED =
+    "Entry Description \n"
+    "  index:         0x1018\n"
+    "  subindex:      0x2a\n"
+    "  value info:    None\n"
+    "  data type:     byte\n"
+    "  bit length:    8\n"
+    "  object access:read(PreOP,SafeOP,OP), write(PreOP,SafeOP,OP), RxPDO, TxPDO, Backup, Setting\n";
+
+    ASSERT_EQ(toString(desc), EXPECTED);
+}
