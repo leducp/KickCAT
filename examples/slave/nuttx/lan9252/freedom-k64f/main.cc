@@ -9,7 +9,6 @@
 #include <arch/board/board.h>
 #include <nuttx/board.h>
 
-
 using namespace kickcat;
 
 
@@ -17,13 +16,20 @@ int main(int argc, char *argv[])
 {
     (void) argc;
     (void) argv;
+
     std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
+    spi_driver->open("/dev/spi0", 0, 0, 10000000);
+
     Lan9252 esc = Lan9252(spi_driver);
-    esc.init();
+    int32_t rc = esc.init();
+    if (rc < 0)
+    {
+        printf("error init %ld - %s\n", rc, strerror(-rc));
+    }
     PDO pdo(&esc);
     slave::Slave slave(&esc, &pdo);
 
-    constexpr uint32_t pdo_size = 32;
+    constexpr uint32_t pdo_size = 16;
 
     uint8_t buffer_in[pdo_size];
     uint8_t buffer_out[pdo_size];
@@ -35,9 +41,13 @@ int main(int argc, char *argv[])
         buffer_out[i] = 0xFF;
     }
 
+    mailbox::response::Mailbox mbx(&esc, 1024);
+    auto dictionary = CoE::createOD();
+    mbx.enableCoE(std::move(dictionary));
+
+    slave.setMailbox(&mbx);
     pdo.setInput(buffer_in);
     pdo.setOutput(buffer_out);
-
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
@@ -55,11 +65,11 @@ int main(int argc, char *argv[])
     {
         slave.routine();
         // Print received data
-    //    for (uint8_t i = 0; i < pdo_size; ++i)
-    //    {
-    //        printf("%x", buffer_out[i]);
-    //    }
-    //    printf("\n");
+        //for (uint8_t i = 0; i < pdo_size; ++i)
+        //{
+        //    printf("%x", buffer_out[i]);
+        //}
+        //printf("\r");
 
         if (slave.state() == State::SAFE_OP)
         {
@@ -68,7 +78,10 @@ int main(int argc, char *argv[])
                 slave.validateOutputData();
             }
         }
-        sleep(1ms);
+
+        //TODO: update with freedom sensors
+        buffer_in[0]++;
     }
+
     return 0;
 }

@@ -163,6 +163,24 @@ namespace kickcat
     #define esi_info    _none
 #endif
 
+#ifdef DEBUG_SPI_ERROR
+    #define spi_error   _error
+#else
+    #define spi_error   _none
+#endif
+
+#ifdef DEBUG_SPI_WARNING
+    #define spi_warning _warning
+#else
+    #define spi_warning _none
+#endif
+
+#ifdef DEBUG_SPI_INFO
+    #define spi_info    _info
+#else
+    #define spi_info    _none
+#endif
+
 
 }
 
