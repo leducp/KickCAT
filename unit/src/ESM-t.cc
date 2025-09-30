@@ -73,6 +73,7 @@ TEST_F(StateMachineTest, start)
     EXPECT_CALL(firstState, onEntry(_, StatusMatches(0, 0)));
 
     sm->start();
+    ASSERT_EQ(sm->state(), FIRST_STATE_ID);
 }
 
 TEST_F(StateMachineTest, play_noTransition)

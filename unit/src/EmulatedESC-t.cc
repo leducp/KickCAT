@@ -4,6 +4,12 @@
 
 using namespace kickcat;
 
+TEST(EmulatedESC, init)
+{
+    EmulatedESC esc;
+    ASSERT_EQ(esc.init(), 0);
+}
+
 TEST(EmulatedESC, pdi_read_write_registers)
 {
     EmulatedESC esc;
@@ -47,7 +53,7 @@ TEST(EmulatedESC, pdi_read_write_ram_no_sm)
     }
 }
 
-TEST(EmulatedESC, ecat_aprd_apwr__egisters)
+TEST(EmulatedESC, ecat_aprd_apwr_registers)
 {
     EmulatedESC esc;
 
@@ -57,7 +63,7 @@ TEST(EmulatedESC, ecat_aprd_apwr__egisters)
     // Test that the ECAT APxx can read/write any address below 0x1000
     for (uint16_t address = 0; address < 0x1000; address += sizeof(uint64_t))
     {
-        uint64_t read_test;
+        uint64_t read_test = 0;
         uint16_t wkc = 0;
 
         header.command = Command::APRD;
@@ -73,12 +79,64 @@ TEST(EmulatedESC, ecat_aprd_apwr__egisters)
         ASSERT_EQ(wkc, 2);
         ASSERT_EQ(header.address, createAddress(1, address)); // +1 on address position for each ESC processing
 
+        read_test = 0xDEAD0000BEEF0000;
+        header.command = Command::APRW;
+        header.address = createAddress(0, address);
+        esc.processDatagram(&header, &read_test, &wkc);
+        ASSERT_EQ(wkc, 5);
+        ASSERT_EQ(header.address, createAddress(1, address)); // +1 on address position for each ESC processing
+        ASSERT_EQ(read_test, payload);
+
         header.command = Command::APRD;
         header.address = createAddress(0, address);
         esc.processDatagram(&header, &read_test, &wkc);
-        ASSERT_EQ(wkc, 3);
+        ASSERT_EQ(wkc, 6);
         ASSERT_EQ(header.address, createAddress(1, address)); // +1 on address position for each ESC processing
+        ASSERT_EQ(read_test, 0xDEAD0000BEEF0000);
+    }
+}
+
+TEST(EmulatedESC, ecat_fprd_fpwr_registers)
+{
+    EmulatedESC esc;
+
+    uint16_t slave_address = 0x1000;
+    uint16_t wkc = 0;
+    DatagramHeader header{Command::APWR, 0, 0, sizeof(uint16_t), 0, 0, 0, 0};
+
+    header.address = createAddress(0, reg::STATION_ADDR);
+    esc.processDatagram(&header, &slave_address, &wkc);
+    ASSERT_EQ(wkc, 1);
+
+    // Test that the ECAT FPxx can read/write any address below 0x1000 when addressed
+    // Note that we skip the first 0x0020 area to avoid messing with the station address
+    uint64_t payload = 0xCAFE0000DECA0000;
+    for (uint16_t address = 0x0020; address < 0x1000; address += sizeof(uint64_t))
+    {
+        header.address = createAddress(slave_address, address);
+        header.len = sizeof(uint64_t);
+        uint64_t read_test = 0;
+        wkc = 0;
+
+        header.command = Command::FPRD;
+        esc.processDatagram(&header, &read_test, &wkc);
+        ASSERT_EQ(wkc, 1);
+        ASSERT_NE(read_test, payload);
+
+        header.command = Command::FPWR;
+        esc.processDatagram(&header, &payload, &wkc);
+        ASSERT_EQ(wkc, 2);
+
+        read_test = 0xDEAD0000BEEF0000;
+        header.command = Command::FPRW;
+        esc.processDatagram(&header, &read_test, &wkc);
+        ASSERT_EQ(wkc, 5);
         ASSERT_EQ(read_test, payload);
+
+        header.command = Command::FPRD;
+        esc.processDatagram(&header, &read_test, &wkc);
+        ASSERT_EQ(wkc, 6);
+        ASSERT_EQ(read_test, 0xDEAD0000BEEF0000);
     }
 }
 
@@ -89,7 +147,7 @@ TEST(EmulatedESC, ecat_apxx_fpxx_not_addressed)
 
     // Test that the ECAT APxx and FPxx does nothing when the esc is not addressed
     uint16_t const address = reg::SYNC_MANAGER;
-    uint64_t read_test;
+    uint64_t read_test = 0;
     uint16_t wkc = 0;
     header.address = createAddress(1, address);
 
@@ -123,3 +181,106 @@ TEST(EmulatedESC, ecat_apxx_fpxx_not_addressed)
     ASSERT_EQ(wkc, 0);
     ASSERT_EQ(header.address, createAddress(4, address));
 }
+
+TEST(EmulatedESC, ecat_bxx_registers)
+{
+    EmulatedESC esc;
+
+    uint64_t payload = 0xCAFE0000DECA0000;
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+
+    // Test that the ECAT Bxx can read/write any address below 0x1000
+    for (uint16_t address = 0; address < 0x1000; address += sizeof(uint64_t))
+    {
+        header.address = createAddress(0, address);
+
+        uint64_t read_test = 0;
+        uint16_t wkc = 0;
+
+        header.command = Command::BRD;
+        esc.processDatagram(&header, &read_test, &wkc);
+        ASSERT_EQ(wkc, 1);
+        ASSERT_NE(read_test, payload);
+
+        header.command = Command::BWR;
+        esc.processDatagram(&header, &payload, &wkc);
+        ASSERT_EQ(wkc, 2);
+
+        read_test = 0xDEAD0000BEEF0000;
+        header.command = Command::BRW;
+        esc.processDatagram(&header, &read_test, &wkc);
+        ASSERT_EQ(wkc, 5);
+        ASSERT_EQ(read_test, payload);
+
+        header.command = Command::BRD;
+        esc.processDatagram(&header, &read_test, &wkc);
+        ASSERT_EQ(wkc, 6);
+        ASSERT_EQ(read_test, 0xDEAD0000BEEF0000);
+    }
+}
+
+TEST(EmulatedESC, ecat_PDOs)
+{
+    EmulatedESC esc;
+
+
+    //Note: the PDO conf from PDI is possible here because the emulator do not implement control accesses on a per register basis (yet)
+    uint8_t current = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &current, 1);
+
+    uint8_t next = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &next, 1);
+
+    FMMU fmmu;
+    memset(&fmmu, 0, sizeof(FMMU));
+
+    fmmu.type  = 2;                // write access
+    fmmu.logical_address    = 0x2000;
+    fmmu.length             = 10;
+    fmmu.logical_start_bit  = 0;   // we map every bits
+    fmmu.logical_stop_bit   = 0x7; // we map every bits
+    fmmu.physical_address   = 0x3000;
+    fmmu.physical_start_bit = 0;
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(FMMU));
+
+    fmmu.type  = 1;                 // read access
+    fmmu.logical_address    = 0x200A;
+    fmmu.length             = 10;
+    fmmu.logical_start_bit  = 0;   // we map every bits
+    fmmu.logical_stop_bit   = 0x7; // we map every bits
+    fmmu.physical_address   = 0x300A;
+    fmmu.physical_start_bit = 0;
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x10, &fmmu, sizeof(FMMU));
+
+    // run internal logic
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+    uint64_t read_test;
+    uint16_t wkc;
+    esc.processDatagram(&header, &read_test, &wkc);
+
+    // slave -> master
+    uint64_t payload = 0xCAFE0000DECA0000;
+    esc.write(0x300A, &payload, sizeof(uint64_t));
+
+    header.command = Command::LRD;
+    header.address = 0x200A;
+    wkc = 0;
+    esc.processDatagram(&header, &read_test, &wkc);
+    ASSERT_EQ(wkc, 1);
+    ASSERT_EQ(read_test, payload);
+
+    // master -> slave
+    payload = 0xDEAD0000BEEF0000;
+
+    header.command = Command::LWR;
+    header.address = 0x2000;
+    wkc = 0;
+    esc.processDatagram(&header, &payload, &wkc);
+    ASSERT_EQ(wkc, 1);
+
+    esc.read(0x3000, &read_test, sizeof(uint64_t));
+    ASSERT_EQ(read_test, payload);
+}
+

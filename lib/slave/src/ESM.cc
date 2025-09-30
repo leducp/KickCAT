@@ -16,6 +16,8 @@ namespace kickcat::ESM
         mbx_ = mbx;
     }
 
+    void AbstractState::onEntry(Context, Context) {};
+
     uint8_t AbstractState::id()
     {
         return id_;

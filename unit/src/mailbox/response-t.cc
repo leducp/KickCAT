@@ -9,6 +9,11 @@
 using namespace kickcat;
 using namespace kickcat::mailbox::response;
 
+using ::testing::Return;
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::InSequence;
+
 std::vector<uint8_t> createTestReadSDO(uint16_t index, uint8_t subindex, bool CA=false)
 {
     uint32_t data;
@@ -80,6 +85,32 @@ public:
     kickcat::MockESC esc;
     Mailbox mbx{&esc, 256, 1};
 };
+
+TEST_F(Response, not_configured)
+{
+    for (uint8_t i = 0; i < reg::SM_STATS; ++i)
+    {
+        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, _, sizeof(SyncManager))).WillOnce(Return(0));
+    }
+    ASSERT_EQ(-EAGAIN, mbx.configure());
+}
+
+TEST_F(Response, badly_configured)
+{
+    for (int i = 0; i < reg::SM_STATS; ++i)
+    {
+        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, _, sizeof(SyncManager)))
+            .WillOnce(Invoke([&](uint16_t, void* data, uint16_t)
+            {
+                SyncManager sm{}; // a non configured SM
+                std::memset(&sm, 0, sizeof(SyncManager));
+                std::memcpy(data, &sm, sizeof(SyncManager));
+                return sizeof(SyncManager);
+            }));
+    }
+
+    ASSERT_EQ(-EAGAIN, mbx.configure());
+}
 
 TEST_F(Response, SDO_read_expedited_OK)
 {

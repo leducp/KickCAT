@@ -62,6 +62,7 @@ namespace kickcat
             AbstractState(uint8_t id, AbstractESC& esc, PDO& pdo);
             void setMailbox(mailbox::response::Mailbox* mbx);
             virtual Context routine(Context currentStatus, ALControl alControl);
+            virtual void onEntry(Context oldStatus, Context newStatus);
 
         protected:
             uint8_t id_;
@@ -70,11 +71,6 @@ namespace kickcat
             mailbox::response::Mailbox* mbx_{};
 
             virtual Context routineInternal(Context currentStatus, ALControl alControl) = 0;
-            virtual void onEntry(Context oldStatus, Context newStatus)
-            {
-                (void)oldStatus;
-                (void)newStatus;
-            };
 
             uint8_t id();
         };
