@@ -647,7 +647,7 @@ namespace kickcat
             std::memset(&fmmu, 0, sizeof(FMMU));
 
             uint16_t targeted_fmmu = reg::FMMU; // FMMU0 - outputs
-            sm.control = sii_sm->control_register;
+            sm.control = 0x64;                  // 3 buffers - write acces - PDI IRQ ON - Watchdog trigger
             fmmu.type  = 2;                     // write access
             if (type == SyncManagerType::Input)
             {

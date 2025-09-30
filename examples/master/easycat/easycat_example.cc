@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
-        bus.init();
+        bus.init(100ms);  // to adapt to your use case
 
         printf("Init done \n");
         print_current_state();
@@ -78,10 +78,6 @@ int main(int argc, char* argv[])
 
             printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
         });
-
-        bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 1s);
-        print_current_state();
     }
     catch (ErrorCode const& e)
     {
@@ -100,30 +96,33 @@ int main(int argc, char* argv[])
         printESC(slave);
     }
 
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-
-    // Set valid output to exit safe op.
+    // Get ref on the first slave to work with it
     auto& easycat = bus.slaves().at(0);
-    for (int32_t i = 0; i < easycat.output.bsize; ++i)
-    {
-        easycat.output.data[i] = 0xBB;
-    }
 
     try
     {
-        bus.processDataRead(callback_error);
-    }
-    catch (...)
-    {
-        //TODO: need a way to check expected working counter depending on state
-        // -> in safe op write is not working
-    }
-    bus.processDataWrite(callback_error);
+        auto cyclic_process_data = [&]()
+        {
+            auto noop =[](DatagramState const&){};
+            bus.processDataRead (noop);
+            bus.processDataWrite(noop);
+        };
 
-    try
-    {
-        bus.requestState(State::OPERATIONAL);
-        bus.waitForState(State::OPERATIONAL, 100ms);
+        printf("Going to SAFE OP\n");
+        bus.requestState(State::SAFE_OP);
+        bus.waitForState(State::SAFE_OP, 1s);
+        print_current_state();
+
+        // Set valid output to exit safe op.
+        for (int32_t i = 0; i < easycat.output.bsize; ++i)
+        {
+            easycat.output.data[i] = 0xBB;
+        }
+        cyclic_process_data();
+
+        printf("Going to OPERATIONAL\n");
+        bus.requestState(kickcat::State::OPERATIONAL);
+        bus.waitForState(kickcat::State::OPERATIONAL, 1s, cyclic_process_data);
         print_current_state();
     }
     catch (ErrorCode const& e)
@@ -137,7 +136,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    link->setTimeout(500us);
+    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+    link->setTimeout(10ms);  // Adapt to your use case (RT loop)
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     FILE* stat_file = fopen("stats.csv", "w");
@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(1ms);
+        sleep(4ms);
 
         try
         {
@@ -181,10 +181,14 @@ int main(int argc, char* argv[])
             if ((i % 50) < 25)
             {
                 easycat.output.data[0] = 1;
+                easycat.output.data[1] = 2;
+                easycat.output.data[2] = 3;
             }
             else
             {
                 easycat.output.data[0] = 0;
+                easycat.output.data[1] = 0;
+                easycat.output.data[2] = 0;
             }
 
             if ((i % 1000) == 0)

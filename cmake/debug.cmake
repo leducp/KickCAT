@@ -109,3 +109,35 @@ option(DEBUG_SIMU_INFO    "Enable simulator debug info level traces" OFF)
 if (DEBUG_SIMU_INFO)
   add_compile_definitions(DEBUG_SIMU_INFO)
 endif()
+
+#### ESI debug management
+option(DEBUG_ESI_ERROR   "Enable ESI debug error level traces" OFF)
+if (DEBUG_ESI_ERROR)
+  add_compile_definitions(DEBUG_ESI_ERROR)
+endif()
+
+option(DEBUG_ESI_WARNING "Enable simulator debug warning level traces" OFF)
+if (DEBUG_ESI_WARNING)
+  add_compile_definitions(DEBUG_ESI_WARNING)
+endif()
+
+option(DEBUG_ESI_INFO    "Enable simulator debug info level traces" OFF)
+if (DEBUG_ESI_INFO)
+  add_compile_definitions(DEBUG_ESI_INFO)
+endif()
+
+#### SPI debug management
+option(DEBUG_SPI_ERROR   "Enable spi debug error level traces" OFF)
+if (DEBUG_SPI_ERROR)
+  add_compile_definitions(DEBUG_SPI_ERROR)
+endif()
+
+option(DEBUG_SPI_WARNING "Enable spi debug warning level traces" OFF)
+if (DEBUG_SPI_WARNING)
+  add_compile_definitions(DEBUG_SPI_WARNING)
+endif()
+
+option(DEBUG_SPI_INFO    "Enable spi debug info level traces" OFF)
+if (DEBUG_SPI_INFO)
+  add_compile_definitions(DEBUG_SPI_INFO)
+endif()

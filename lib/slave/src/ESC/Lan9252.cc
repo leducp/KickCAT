@@ -13,7 +13,6 @@ namespace kickcat
 
     int32_t Lan9252::init()
     {
-        spi_interface_->init();
         spi_interface_->disableChipSelect();
 
         writeInternalRegister(RESET_CTL, DIGITAL_RST);
@@ -160,6 +159,9 @@ namespace kickcat
             writeInternalRegister(ECAT_PRAM_RD_ADDR_LEN, addr_len);
             writeInternalRegister(ECAT_PRAM_RD_CMD, PRAM_BUSY);  // order start read
 
+            uint16_t to_read = size;
+            uint8_t* buffer_pos = static_cast<uint8_t*>(data);
+
             uint16_t fifo_slot_available; // slot of 4 bytes
             nanoseconds start_time = since_epoch();
             do
@@ -170,9 +172,16 @@ namespace kickcat
                 {
                     return -ETIMEDOUT;
                 }
-            } while(fifo_slot_available != size / 4);  // beware assumption ESC will transfer 32 bytes.
 
-            readInternalRegister(ECAT_PRAM_RD_DATA, data, size);
+                if (fifo_slot_available > 0)
+                {
+                    uint16_t available = fifo_slot_available * 4;    // FIFO entry size is 32bits
+                    uint16_t to_do = std::min(available, to_read);
+                    readInternalRegister(ECAT_PRAM_RD_DATA, buffer_pos, to_do);
+                    buffer_pos += to_do;
+                    to_read -= to_do;
+                }
+            } while(to_read > 0);
         }
         else
         {
@@ -197,6 +206,7 @@ namespace kickcat
         std::memcpy(&padding, data, size);
         writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
         writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, static_cast<uint8_t>(size), CSR_CMD::ESC_WRITE});
+
         // wait for command execution
         int32_t rc = waitCSR();
         if (rc < 0)
@@ -243,14 +253,25 @@ namespace kickcat
             writeInternalRegister(ECAT_PRAM_WR_ADDR_LEN, addr_len);
             writeInternalRegister(ECAT_PRAM_WR_CMD, PRAM_BUSY);  // order start write
 
+            uint16_t to_write = size;
+            uint8_t const* buffer_pos = static_cast<uint8_t const*>(data);
+
             uint16_t fifo_slot_available; // slot of 4 bytes
             do
             {
                 readInternalRegister(ECAT_PRAM_WR_CMD, fifo_slot_available);
                 fifo_slot_available = fifo_slot_available >> 8;
-            } while(fifo_slot_available < size / 4);  // beware assumption all the data fit in the the 64 bytes fifo.
 
-            writeInternalRegister(ECAT_PRAM_WR_DATA, data, size);
+                if (fifo_slot_available > 0)
+                {
+                    uint16_t available = fifo_slot_available * 4;    // FIFO entry size is 32bits
+                    uint16_t to_do = std::min(available, to_write);
+                    writeInternalRegister(ECAT_PRAM_WR_DATA, buffer_pos, to_do);
+                    buffer_pos += to_do;
+                    to_write -= to_do;
+                }
+
+            } while(to_write > 0);
         }
         else
         {
