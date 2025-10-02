@@ -97,6 +97,12 @@ int main(int argc, char *argv[])
         // Read sensor data
         if (read(fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
         {
+            // printf("{\"accel\":[%d, %d, %d],\"magn\":[%d, %d, %d]}\n",
+            //         sensor_data.accel.x, sensor_data.accel.y, sensor_data.accel.z,
+            //         sensor_data.magn.x, sensor_data.magn.y, sensor_data.magn.z
+            //     );
+            // fflush(stdout);
+
             // Convert to int16_t and fill PDO buffer
             buffer_in[0] = sensor_data.accel.x & 0xFF;
             buffer_in[1] = (sensor_data.accel.x >> 8) & 0xFF;
