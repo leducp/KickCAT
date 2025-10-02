@@ -27,7 +27,9 @@ namespace freedom
 
     struct Output
     {
-        // currently no mapped outputs
+        uint8_t LED_R; // mapped 0x7000
+        uint8_t LED_G; // mapped 0x7001
+        uint8_t LED_B; // mapped 0x7002
     } __attribute__((packed));
 }
 
@@ -119,7 +121,6 @@ int main(int argc, char* argv[])
         printESC(slave);
     }
 
-    // Get ref on the first slave to work with it
     auto& easycat = bus.slaves().at(0);
 
     try
@@ -174,6 +175,9 @@ int main(int argc, char* argv[])
         easycat.output.data[i] = 0xAA;
     }
 
+    constexpr int16_t THRESHOLD_ACCEL = 1000;
+    constexpr int16_t THRESHOLD_MAG   = 1000;
+
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
         sleep(4ms);
@@ -190,15 +194,24 @@ int main(int argc, char* argv[])
             bus.finalizeDatagrams();
             bus.processAwaitingFrames();
 
-            printf("Accel [X:%d Y:%d Z:%d] | Mag [X:%d Y:%d Z:%d]\n",
-                input->sensor.accelerometerX,
-                input->sensor.accelerometerY,
-                input->sensor.accelerometerZ,
-                input->sensor.magnetometerX,
-                input->sensor.magnetometerY,
-                input->sensor.magnetometerZ
+            int16_t ax = input->sensor.accelerometerX;
+            int16_t ay = input->sensor.accelerometerY;
+            int16_t az = input->sensor.accelerometerZ;
+
+            int16_t mx = input->sensor.magnetometerX;
+            int16_t my = input->sensor.magnetometerY;
+            int16_t mz = input->sensor.magnetometerZ;
+
+            // LED toggle logic
+            output->LED_R = (ax > THRESHOLD_ACCEL || ax < -THRESHOLD_ACCEL) ? 1 : 0;
+            output->LED_G = (ay > THRESHOLD_ACCEL || ay < -THRESHOLD_ACCEL) ? 1 : 0;
+            output->LED_B = (mz > THRESHOLD_MAG || mz < -THRESHOLD_MAG) ? 1 : 0;
+
+            printf("Accel [X:%d Y:%d Z:%d] | Mag [X:%d Y:%d Z:%d] | LED [R:%u G:%u B:%u]\n",
+                ax, ay, az,
+                mx, my, mz,
+                output->LED_R, output->LED_G, output->LED_B
             );
-            
         }
         catch (std::exception const& e)
         {
