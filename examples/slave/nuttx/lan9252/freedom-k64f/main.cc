@@ -8,6 +8,10 @@
 
 #include <arch/board/board.h>
 #include <nuttx/board.h>
+#include <nuttx/sensors/fxos8700cq.h>
+
+#include <fcntl.h>
+#include <cstdio>
 
 using namespace kickcat;
 
@@ -61,6 +65,17 @@ int main(int argc, char *argv[])
 
     slave.start();
 
+    // init sensor
+    int fd = open("/dev/accel0", O_RDONLY);
+    if (fd < 0)
+    {
+        printf("Failed to open sensor device\n");
+        return -1;
+    }
+
+    fxos8700cq_data sensor_data;
+
+
     while (true)
     {
         slave.routine();
@@ -79,9 +94,31 @@ int main(int argc, char *argv[])
             }
         }
 
-        //TODO: update with freedom sensors
-        buffer_in[0]++;
+        // Read sensor data
+        if (read(fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
+        {
+            // Convert to int16_t and fill PDO buffer
+            buffer_in[0] = sensor_data.accel.x & 0xFF;
+            buffer_in[1] = (sensor_data.accel.x >> 8) & 0xFF;
+
+            buffer_in[2] = sensor_data.accel.y & 0xFF;
+            buffer_in[3] = (sensor_data.accel.y >> 8) & 0xFF;
+
+            buffer_in[4] = sensor_data.accel.z & 0xFF;
+            buffer_in[5] = (sensor_data.accel.z >> 8) & 0xFF;
+
+            buffer_in[6] = sensor_data.magn.x & 0xFF;
+            buffer_in[7] = (sensor_data.magn.x >> 8) & 0xFF;
+
+            buffer_in[8] = sensor_data.magn.y & 0xFF;
+            buffer_in[9] = (sensor_data.magn.y >> 8) & 0xFF;
+
+            buffer_in[10] = sensor_data.magn.z & 0xFF;
+            buffer_in[11] = (sensor_data.magn.z >> 8) & 0xFF;
+        }
     }
+
+    close(fd);
 
     return 0;
 }
