@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
     slave.start();
 
     // Init sensor
-    int fd = open("/dev/accel0", O_RDONLY);
-    if (fd < 0)
+    int sensor_fd = open("/dev/accel0", O_RDONLY);
+    if (sensor_fd < 0)
     {
         printf("Failed to open sensor device\n");
         return -1;
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
         }
 
         // Read sensors and fill buffer_in
-        if (read(fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
+        if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
         {
             buffer_in[0] = sensor_data.accel.x & 0xFF;
             buffer_in[1] = (sensor_data.accel.x >> 8) & 0xFF;
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    close(fd);
+    close(sensor_fd);
     close(led_fd);
 
     return 0;
