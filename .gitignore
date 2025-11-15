@@ -1,5 +1,4 @@
-build/
-build_slave/
+build*/
 .vscode
 .project
 .cproject

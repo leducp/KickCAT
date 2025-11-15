@@ -80,14 +80,24 @@ jobs:
         name: coverage
         path: build/coverage_xml.xml
 
-  build_NuttX:
+  build_NuttX_stable:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          - xmc4800-relax
+          - arduino-due
+          - freedom-k64f
+
     env:
-          nuttx_version: 3dc6b4c9bd9624ed259e676f8e9761dbf660c1bb
-          nuttx_apps_version: nuttx-12.5.0-RC0
-          arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
+      nuttx_version: 6161fececfb2e510cd947131634d8fa352657886
+      nuttx_apps_version: c7ac7171673c5e8c12945b0c89d7a2537fd88745
+      arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
+
     steps:
-      - name: checkout KickCAT
+      - name: Checkout KickCAT
         uses: actions/checkout@v4
         with:
           path: 'KickCAT'
@@ -96,37 +106,95 @@ jobs:
         id: cache-nuttx
         uses: actions/cache@v4
         with:
-          path: ${{GITHUB.WORKSPACE}}/nuttxspace/nuttx
-          key: nuttx_${{env.nuttx_version}}
+          path: ${{ github.workspace }}/nuttxspace/nuttx
+          key: nuttx_${{ env.nuttx_version }}
 
       - if: ${{ steps.cache-nuttx.outputs.cache-hit != 'true' }}
-        name: checkout NuttX
+        name: Checkout NuttX
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx
           path: 'nuttxspace/nuttx'
-          ref: '${{env.nuttx_version}}'
+          ref: '${{ env.nuttx_version }}'
 
       - name: Cache NuttX Apps
         id: cache-nuttx-apps
         uses: actions/cache@v4
         with:
-          path: ${{GITHUB.WORKSPACE}}/nuttxspace/apps
-          key: nuttx-apps_${{env.nuttx_apps_version}}
+          path: ${{ github.workspace }}/nuttxspace/apps
+          key: nuttx-apps_${{ env.nuttx_apps_version }}
 
       - if: ${{ steps.cache-nuttx-apps.outputs.cache-hit != 'true' }}
-        name: checkout NuttX Apps
+        name: Checkout NuttX Apps
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx-apps
           path: 'nuttxspace/apps'
-          ref: '${{env.nuttx_apps_version}}'
+          ref: '${{ env.nuttx_apps_version }}'
 
-      - name: apt update
-        run: sudo apt update
+      - name: Install Kconfig dependencies
+        run: sudo apt-get update && sudo apt-get install -y kconfig-frontends
 
-      - name: Install Kconfig
-        run: sudo apt install kconfig-frontends
+      - name: Cache ARM GCC Toolchain
+        id: cache-arm-none-eabi
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/gcc-arm-none-eabi
+          key: ${{ env.arm_none_eabi_version }}
+
+      - if: ${{ steps.cache-arm-none-eabi.outputs.cache-hit != 'true' }}
+        name: Download ARM GCC Toolchain
+        run: |
+          mkdir gcc-arm-none-eabi
+          curl -s -L  "https://developer.arm.com/-/media/Files/downloads/gnu/${{env.arm_none_eabi_version}}.tar.xz" \
+          | tar -C gcc-arm-none-eabi --strip-components=1 -xJ
+
+      - name: Build ${{ matrix.board }}
+        run: |
+          export PATH="${{ github.workspace }}/gcc-arm-none-eabi/bin:$PATH"
+          KickCAT/scripts/build_slave_bin.sh \
+            ${{ matrix.board }} \
+            ${{ github.workspace }}/nuttxspace/nuttx
+
+
+  build_NuttX_master:
+    runs-on: ubuntu-latest
+    
+    continue-on-error: true
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          - xmc4800-relax
+          - arduino-due
+          - freedom-k64f
+    env:
+          arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
+    steps:
+      - name: checkout KickCAT
+        uses: actions/checkout@v4
+        with:
+          path: 'KickCAT'
+
+      - name: checkout NuttX (master)
+        uses: actions/checkout@v4
+        with:
+          repository: apache/nuttx
+          path: 'nuttxspace/nuttx'
+          ref: 'master'
+
+      - name: checkout NuttX Apps (master)
+        uses: actions/checkout@v4
+        with:
+          repository: apache/nuttx-apps
+          path: 'nuttxspace/apps'
+          ref: 'master'
+
+      - name: apt update + Kconfig
+        run: |
+          sudo apt update
+          sudo apt install -y kconfig-frontends
 
       - name: Cache Arm None Eabi
         id: cache-arm-none-eabi
@@ -143,20 +211,9 @@ jobs:
           curl -s -L  "https://developer.arm.com/-/media/Files/downloads/gnu/${{env.arm_none_eabi_version}}.tar.xz" \
           | tar -C gcc-arm-none-eabi --strip-components 1 -xJ
 
-      - name: Build
+      - name: Build ${{ matrix.board }}
         run: |
-          set -x
-          export PATH="${{GITHUB.WORKSPACE}}/gcc-arm-none-eabi/bin:$PATH"
-
-          mkdir build_slave
-          nuttx_src=${{GITHUB.WORKSPACE}}/nuttxspace/nuttx
-          build=${{GITHUB.WORKSPACE}}/build_slave
-          src=${{GITHUB.WORKSPACE}}/KickCAT
-
-          cp ${src}/examples/slave/nuttx/xmc4800/boards/relax/defconfig ${nuttx_src}/boards/arm/xmc4/xmc4800-relax/configs/nsh/defconfig
-          ${nuttx_src}/tools/configure.sh -l xmc4800-relax:nsh
-          make -C ${nuttx_src} export
-          mkdir ${build}/nuttx-export
-          tar xf ${nuttx_src}/nuttx-export-*.tar.gz --strip-components=1 -C ${build}/nuttx-export
-          cmake -B ${build} -S ${src}  -DCMAKE_TOOLCHAIN_FILE=${build}/nuttx-export/scripts/toolchain.cmake
-          make -C ${build}
+          export PATH="${{ github.workspace }}/gcc-arm-none-eabi/bin:$PATH"
+          KickCAT/scripts/build_slave_bin.sh \
+            ${{ matrix.board }} \
+            ${{ github.workspace }}/nuttxspace/nuttx
