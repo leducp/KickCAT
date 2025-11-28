@@ -79,13 +79,14 @@ namespace kickcat
         }
         else if (nominal_if.empty())
         {
+            nominal_if = "None";
             nominal = std::make_shared<SocketNull>();
         }
         else
         {
             nominal = std::make_shared<Socket>();
         }
-        printf("Opening %s\n", nominal_if.c_str());
+        printf("Opening nominal interface:   %s\n", nominal_if.c_str());
         nominal->open(nominal_if);
 
         if (redundant_if == "tap:server")
@@ -100,13 +101,14 @@ namespace kickcat
         }
         else if (redundant_if.empty())
         {
+            redundant_if = "None";
             redundant = std::make_shared<SocketNull>();
         }
         else
         {
             redundant = std::make_shared<Socket>();
         }
-        printf("Opening %s\n", redundant_if.c_str());
+        printf("Opening redundant interface: %s\n", redundant_if.c_str());
         redundant->open(redundant_if);
 
         return {nominal, redundant};
