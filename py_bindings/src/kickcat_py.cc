@@ -2,7 +2,7 @@
 
 namespace nb = nanobind;
 
-namespace rtm
+namespace kickcat
 {
     void create_python_bindings(nb::module_ &m);
 
@@ -10,6 +10,6 @@ namespace rtm
     {
         m.doc() = "KickCAT EtherCAT bindings";
 
-        //create_python_bindings(m);
+        create_python_bindings(m);
     }
 }

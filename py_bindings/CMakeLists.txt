@@ -1,6 +1,8 @@
 if (SKBUILD)
     set(LIB_SRCS
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/kickcat_py.cc)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/kickcat_py.cc
+        ${CMAKE_SOURCE_DIR}/lib/py_bindings/src/lib_py.cc
+        ${CMAKE_SOURCE_DIR}/lib/py_bindings/src/mailbox_py.cc)
 
     find_package(Python
         REQUIRED COMPONENTS Interpreter Development.Module
@@ -15,5 +17,9 @@ if (SKBUILD)
     target_include_directories(kickcat_py PRIVATE ${CMAKE_SOURCE_DIR}/lib/py_bindings/include)
     target_compile_options(kickcat_py PRIVATE -Wno-shadow -Wno-cast-qual -Wno-pedantic)
 
+    # Set the output name to 'kickcat' so Python imports it as 'kickcat'
+    set_target_properties(kickcat_py PROPERTIES
+        OUTPUT_NAME "kickcat"
+    )
     install(TARGETS kickcat_py DESTINATION .)
 endif()
