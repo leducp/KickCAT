@@ -1,0 +1,67 @@
+name: Build Python Wheels
+
+on:
+  push:
+    branches: [ master ]
+    tags:
+      - '*'
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        OS: ["ubuntu-24.04"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v3.1.0
+        with:
+          output-dir: wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheelhouse-kickcat-linux
+          path: wheelhouse/*.whl
+
+  release:
+    needs: build-wheels
+    if: startsWith(github.ref, 'refs/tags/')   # Only run on tag pushes
+    runs-on: ubuntu-24.04
+    environment:
+      name: maintainer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheelhouse-kickcat-linux
+          path: wheelhouse
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+        run: |
+          gh release create "$tag" wheelhouse/*.whl \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
+              --generate-notes
+
+      #- name: Publish the wheels on PyPI
+      #  uses: pypa/gh-action-pypi-publish@v1.12.4
+      #  with:
+      #    packages-dir: wheelhouse
+      #    verify-metadata: true
+      #    attestations: true
+      #    print-hash: true
+      #    skip-existing: true

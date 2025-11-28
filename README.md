@@ -54,6 +54,23 @@ To build the library, you need to install:
 
 
 ### Build:
+#### Easy setup (Linux only)
+  1. Install conan package manager. For instance with uv package manager:
+  ```
+  uv venv
+  source .venv/bin/activate
+  uv pip install conan
+  ```
+
+  2. Launch the script `setup_build.sh path_to_build_folder`.
+  3. Configure CMake project and build:
+  ```
+  cd path_to_build_folder
+  cmake .. -DCMAKE_BUILD_TYPE=Release
+  make
+  ```
+
+#### Manual setup
 KickCAT project is handled through CMake. To build the project, call CMake to configure it and then the build tool (default on Linux is make):
   1. Create the build folder
   ```
@@ -64,21 +81,8 @@ KickCAT project is handled through CMake. To build the project, call CMake to co
   python3 -m venv kickcat_venv
   source kickcat_venv/bin/activate
   pip install conan
-  ```
 
-  With Ubuntu 22.04 (gcc12) : 
-  ```
-  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_ubuntu_22_04_x86_64.txt -pr:b conan/profile_ubuntu_22_04_x86_64.txt --build=missing -s build_type=Release
-  ```
-
-  With Ubuntu 24.04 (gcc13) : 
-  ```
-  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_ubuntu_24_04_x86_64.txt -pr:b conan/profile_ubuntu_24_04_x86_64.txt --build=missing -s build_type=Release
-  ```
-
-  With Debian (gcc14) :
-  ```
-  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/profile_linux_x86_64.txt -pr:b conan/profile_linux_x86_64.txt --build=missing -s build_type=Release
+  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/your_profile_host.txt -pr:b conan/your_profile_target.txt --build=missing -s build_type=Release
   ```
 
   2. Configure the project (more information on https://cmake.org/cmake/help/latest/)
@@ -92,34 +96,26 @@ KickCAT project is handled through CMake. To build the project, call CMake to co
   ```
 
 ### Build unit tests (optional)
-In order to build unit tests, you have to enable the option BUILD_UNIT_TESTS (default to ON) and to provide GTest package through CMake find_package mechanism. You also need gcovr to enable coverage report generation (COVERAGE option).
-Note: you can easily provide GTest via conan package manager:
-  1. Install conan and setup PATH variable (more information on https://docs.conan.io/en/latest/installation.html)
-  ```
-  python3 -m venv kickcat_venv
-  source kickcat_venv/bin/activate
-  pip install gcovr
-  ```
-  2. Install GTest in your build folder:
-  ```
-  mkdir -p build
-  cd build
-  ```
-  With Ubuntu (gcc12) : 
-  ```
-  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_ubuntu_22_04_x86_64.txt -pr:b ../conan/profile_ubuntu_22_04_x86_64.txt --build=missing -s build_type=Debug
-  ```
-  With Debian (gcc14) :
-  ```
-  conan install ../conan/conanfile.txt -of=./ -pr ../conan/profile_linux_x86_64.txt -pr:b ../conan/profile_linux_x86_64.txt --build=missing -s build_type=Debug
-  ```
+Select the BUILD_UNIT_TEST option in CMake, either through ccmake or by calling cmake tool in your build folder like this:
+```
+cd build
+cmake .. -DBUILD_UNIT_TEST=ON
+make
+```
 
-  Beware `-s build_type` must be consistent with `CMAKE_BUILD_TYPE` otherwise gtest will not be found.
+To enable coverage, gcovr shall be isntalled (either through uv/pip or through your distribution package manager).
 
-  3. Configure the project (can be done on an already configured project)
-  ```
-  cmake .. -DCMAKE_BUILD_TYPE=Debug
-  ```
+### Build python bindings
+#### Local
+For efficient build process (to avoid rebuilding from scratch every time), run
+```
+uv pip install --no-build-isolation -Cbuild-dir=/tmp/build -v .
+```
+#### Multi wheel (CI)
+This project use cibuildwheel to generate multiples wheel to support all configurations. To use it locally, call:
+```
+uvx cibuildwheel
+```
 
 ## Slave stack
 
