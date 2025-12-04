@@ -1,6 +1,7 @@
 add_subdirectory(common)
 add_subdirectory(easycat)
 add_subdirectory(elmo)
+add_subdirectory(freedom-k64f)
 add_subdirectory(ingenia)
 add_subdirectory(load_esi)
 add_subdirectory(wdc_foot)

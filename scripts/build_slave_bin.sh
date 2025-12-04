@@ -74,7 +74,8 @@ tar xf "$nuttx_src"/nuttx-export-*.tar.gz \
 cmake \
     -B "${build_dir}" \
     -S "${kickcat_src}" \
-    -DCMAKE_TOOLCHAIN_FILE="${build_dir}/nuttx-export/scripts/toolchain.cmake"
+    -DCMAKE_TOOLCHAIN_FILE="${build_dir}/nuttx-export/scripts/toolchain.cmake" \
+    -DBOARD_NAME="${BOARD}"
 
 cmake --build "${build_dir}" -- -j$(nproc)
 
