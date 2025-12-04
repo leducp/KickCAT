@@ -45,7 +45,6 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
-    link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
     Bus bus(link);
