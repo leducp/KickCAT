@@ -1,15 +1,6 @@
 #include "kickcat/protocol.h"
 #include "kickcat/CoE/mailbox/request.h"
 
-#ifdef __linux__
-    #include "kickcat/OS/Linux/Socket.h"
-#elif __PikeOS__
-    #include "kickcat/OS/PikeOS/Socket.h"
-#else
-    #error "Unknown platform"
-#endif
-
-
 #include <arpa/inet.h>
 #include <cstring>
 

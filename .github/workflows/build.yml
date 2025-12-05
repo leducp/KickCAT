@@ -23,18 +23,16 @@ jobs:
     - name: Conan install
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
-          export conan_profile=linux
+          export conan_profile=${{github.workspace}}/build/profile.txt
+          ./setup_build.sh ${{github.workspace}}/build
         elif [ "$RUNNER_OS" == "Windows" ]; then
-          export conan_profile=windows
+          conan install conan/conanfile_windows.txt -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
+          mkdir -p ${{github.workspace}}/build
         else
           echo "$RUNNER_OS not supported"
           exit 1
         fi
 
-        echo $pwd
-        echo ${{github.workspace}}/build
-        mkdir -p ${{github.workspace}}/build
-        conan install conan/conanfile_${conan_profile}.txt -of=build/ -pr:b conan/profile_${conan_profile}_x86_64.txt -pr:h conan/profile_${conan_profile}_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
       shell: bash
 
     - name: Install Gcovr and Lcov
@@ -159,9 +157,9 @@ jobs:
 
   build_NuttX_master:
     runs-on: ubuntu-latest
-    
+
     continue-on-error: true
-    
+
     strategy:
       fail-fast: false
       matrix:
