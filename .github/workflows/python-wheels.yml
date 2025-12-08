@@ -57,11 +57,11 @@ jobs:
               --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
               --generate-notes
 
-      #- name: Publish the wheels on PyPI
-      #  uses: pypa/gh-action-pypi-publish@v1.12.4
-      #  with:
-      #    packages-dir: wheelhouse
-      #    verify-metadata: true
-      #    attestations: true
-      #    print-hash: true
-      #    skip-existing: true
+      - name: Publish the wheels on PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        with:
+          packages-dir: wheelhouse
+          verify-metadata: true
+          attestations: true
+          print-hash: true
+          skip-existing: true

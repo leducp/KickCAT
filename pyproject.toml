@@ -9,7 +9,7 @@ description = "Thin EtherCAT stack designed to be embedded in a more complex sof
 readme = {file = "README.md", content-type = "text/markdown"}
 license = { text = "CeCILL-C" }
 maintainers = [
-  {name = "Philippe Leduc", email = "philippe.leduc@mailfence.com"}
+  {name = "Philippe Leduc", email = "ledphilippe@gmail.com"}
 ]
 
 [tool.scikit-build]
