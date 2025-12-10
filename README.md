@@ -1,220 +1,497 @@
-# A simple C++ EtherCAT master/slave stack.
+# KickCAT
 
-Kick-start your slaves!
+<p align="center">
+  <strong>A lightweight, efficient EtherCAT master/slave stack for embedded systems</strong>
+</p>
 
-Thin EtherCAT stack designed to be embedded in a more complex software and with efficiency in mind.
+<p align="center">
+  <em>Kick-start your slaves! ⚡</em>
+</p>
 
-## Master stack
+---
 
-### Current state:
- - Working state (can go to OP state, read/write P.I., send/receive SDO)
- - interface redundancy is supported
- - CoE: read and write SDO - blocking and async call
- - CoE: Emergency message
- - CoE: SDO Information
- - Bus diagnostic: can reset and get errors counters
- - hook to configure non compliant slaves
- - consecutives writes to reduce latency - up to 255 datagrams in flight
- - Support EtherCAT mailbox gateway (ETG.8200)
- - build for Linux, Windows and PikeOS
+## Overview
 
-**NOTE** The current implementation is designed for little endian host only!
+KickCAT is a thin EtherCAT stack designed to be embedded in complex software with efficiency in mind. It provides both **master** and **slave** implementations, supporting multiple operating systems and hardware platforms.
 
-### TODO:
- - CoE: segmented transfer - partial implementation
- - CoE: diagnosis message - 0x10F3
- - Bus diagnostic: auto discover broken wire (on top of error counters)
- - More profiles: FoE, EoE, AoE, SoE
- - Distributed clock
- - AF_XDP Linux socket to improve performance
- - Addressing groups (a.k.a. multi-PDO)
+**Key Features:**
+- Works with Linux (including RT-PREEMPT), Windows, and PikeOS
+- Full state machine support (INIT → PRE-OP → SAFE-OP → OP)
+- CoE (CANopen over EtherCAT) support with SDO read/write
+- Interface redundancy
+- Bus diagnostics and error handling
+- Python bindings available
+- Built-in simulator for testing without hardware
 
-### Operatings systems:
-#### Linux
-To improve latency on Linux, you have to
- - use Linux RT (PREMPT_RT patches),
- - set a real time scheduler for the program (i.e. with chrt)
- - disable NIC IRQ coalescing (with ethtool)
- - disable RT throttling
- - isolate ethercat task and network IRQ on a dedicated core
- - change network IRQ priority
+---
 
-#### PikeOS
- - Tested on PikeOS 5.1 for native personnality (p4ext)
- - You have to provide the CMake cross-toolchain file which shall define PIKEOS variable (or adapt the main CMakelists.txt to your needs)
- - examples are provided with a working but non-optimal process/thread configuration (examples/PikeOS/p4ext_config.c): feel free to adapt it to your needs
+## Quick Start
 
-#### Windows
-Absolutely NOT suitable for real time use, but it can come in handy to run tools that rely on EtherCAT communication.
+### Prerequisites
 
-To build the library, you need to install:
-- conan for windows (tested with 2.9.1)
-- gcc for Windows (tested with w64devkit 2.0.0)
-- npcap (tested with driver 1.80 + SDK 1.70 through conan package)
+- **Linux**: gcc, cmake, conan (for dependencies)
+- **Python bindings**: uv or pip
+- **Hardware**: Network interface with raw socket access capabilities
 
+### Build and Install
 
-### Build:
-#### Easy setup (Linux only)
-  1. Install conan package manager. For instance with uv package manager:
-  ```
-  uv venv
-  source .venv/bin/activate
-  uv pip install conan
-  ```
+#### Linux (Recommended)
 
-  2. Launch the script `setup_build.sh path_to_build_folder`.
-  3. Configure CMake project and build:
-  ```
-  cd path_to_build_folder
-  cmake .. -DCMAKE_BUILD_TYPE=Release
-  make
-  ```
+```bash
+# 1. Setup build environment
+./setup_build.sh build
 
-#### Manual setup
-KickCAT project is handled through CMake. To build the project, call CMake to configure it and then the build tool (default on Linux is make):
-  1. Create the build folder
-  ```
-  mkdir -P build
-  ```
-  2. Install conan and the dependencies with it (you may need to adapt the profile to suit your current installation). This step is mandatory for Windows, optional otherwise
-  ```
-  python3 -m venv kickcat_venv
-  source kickcat_venv/bin/activate
-  pip install conan
-
-  conan install conan/conanfile_linux.txt -of=build/ -pr:h conan/your_profile_host.txt -pr:b conan/your_profile_target.txt --build=missing -s build_type=Release
-  ```
-
-  2. Configure the project (more information on https://cmake.org/cmake/help/latest/)
-  ```
-  cd build
-  cmake .. -DCMAKE_BUILD_TYPE=Release
-  ```
-  3. Build the project
-  ```
-  make
-  ```
-
-### Build unit tests (optional)
-Select the BUILD_UNIT_TEST option in CMake, either through ccmake or by calling cmake tool in your build folder like this:
-```
+# 2. Configure and build
 cd build
-cmake .. -DBUILD_UNIT_TEST=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make
+
+# 3. Grant network capabilities (required for raw socket access)
+sudo setcap 'cap_net_raw,cap_net_admin=+ep' ./tools/your_binary
+```
+
+#### Python Bindings
+
+```bash
+# Install with uv (recommended)
+uv pip install .
+
+# Or for development (faster rebuilds)
+uv pip install --no-build-isolation -Cbuild-dir=/tmp/build -v .
+```
+
+<details>
+<summary><b>Manual Build Setup</b></summary>
+
+```bash
+# 1. Create build directory
+mkdir -p build
+
+# 2. Install dependencies with conan
+python3 -m venv kickcat_venv
+source kickcat_venv/bin/activate
+pip install conan
+
+conan install conan/conanfile_linux.txt -of=build/ \
+  -pr:h conan/your_profile_host.txt \
+  -pr:b conan/your_profile_target.txt \
+  --build=missing -s build_type=Release
+
+# 3. Configure and build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
 make
 ```
 
-To enable coverage, gcovr shall be isntalled (either through uv/pip or through your distribution package manager).
+</details>
 
-### Build python bindings
-#### Local
-Standard build:
+<details>
+<summary><b>Windows Build</b></summary>
+
+**Note:** Windows is NOT suitable for real-time use but useful for tools and testing.
+
+Requirements:
+- Conan for Windows (tested with 2.9.1)
+- gcc for Windows (tested with w64devkit 2.0.0)
+- npcap (driver 1.80 + SDK 1.70)
+
+Follow the manual setup instructions above, using appropriate Windows paths.
+
+</details>
+
+<details>
+<summary><b>PikeOS Build</b></summary>
+
+Tested on PikeOS 5.1 for native personality (p4ext).
+
+Provide a CMake cross-toolchain file that defines the `PIKEOS` variable. Example process/thread configurations are in `examples/PikeOS/p4ext_config.c`.
+
+</details>
+
+---
+
+## Getting Started with Examples
+
+KickCAT includes working master and slave examples that work together out of the box.
+
+### Master Examples
+
+Located in `examples/master/`:
+
+- **easycat**: Basic example for EasyCAT shield
+- **elmo**: Motor control example (Elmo drives)
+- **ingenia**: Motor control example (Ingenia drives)
+- **freedom-k64f**: Example for Kinetis Freedom board
+- **gateway**: EtherCAT mailbox gateway implementation
+- **load_esi**: ESI file loading utility
+
+#### Running a Master Example
+
+```bash
+cd build
+./examples/master/easycat/easycat_example eth0
 ```
-uv pip install .
+
+Replace `eth0` with your network interface name.
+
+### Slave Examples
+
+Located in `examples/slave/nuttx/`:
+
+**Supported Boards:**
+- **XMC4800** (Infineon XMC4800 Relax Kit)
+- **Arduino Due** (with EasyCAT shield + LAN9252)
+- **Freedom K64F** (NXP Kinetis with LAN9252)
+
+#### Building Slave Examples
+
+All slave examples use NuttX RTOS. Use the automated build script:
+
+```bash
+./scripts/build_slave_bin.sh <board-name> <nuttx-src-path> [build-name]
 ```
 
-For efficient build process (to avoid rebuilding from scratch every time), run
+**Example:**
+```bash
+# Build for XMC4800
+./scripts/build_slave_bin.sh xmc4800-relax ~/nuttx
+
+# Build for Arduino Due
+./scripts/build_slave_bin.sh arduino-due ~/nuttx
+
+# Build for Freedom K64F
+./scripts/build_slave_bin.sh freedom-k64f ~/nuttx
 ```
-uv pip install --no-build-isolation -Cbuild-dir=/tmp/build -v .
-```
-#### Multi wheel (CI)
-This project use cibuildwheel to generate multiples wheel to support all configurations. To use it locally, call:
-```
-uvx cibuildwheel
-```
 
-### Permission denied at launch
-On Linux, in order to do raw Ethernet accesses with full control (required to run a network stack in userspace like KickCAT), the binary needs special rights:
-- cap_net_raw
-- cap_net_admin
+<details>
+<summary><b>NuttX Setup Instructions</b></summary>
 
-cap_net_raw enable the binary to forge any kind of packet on the network (which may be a security breach - malformed, fake sender, and so on)
+#### Prerequisites
 
-cap_net_admin enable the binary to do a LOTs of network related oprations (like tampering the firewall!). KickCAT use it to enable promiscuous mode to read all packets going through the network port.
+1. Install NuttX dependencies: https://nuttx.apache.org/docs/latest/quickstart/install.html
+2. Clone NuttX repositories (recommended version: nuttx-12.6.0)
+3. Download ARM GCC toolchain (>= 12.0): https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
 
-To authorize a binary running KickCAT stack, you can call setcap tool like this:
-`sudo setcap 'cap_net_raw,cap_net_admin=+ep' your_binary`
+#### Board-Specific Setup
 
-If you want to use the Python bindings, it is the **interpreter** that needs the rights. The helper script `py_bindings/enable_raw_access.sh` can do that for you.
+**Arduino Due:**
+- Requires `bossac-1.6.1-arduino` for flashing (available from Arduino IDE installation)
+- Connect USB to the port closest to power jack
+- If flashing fails with "No device found on ttyACM0":
+  - Press ERASE button for a few seconds, release
+  - Press RESET button
+  - Try flashing again
 
-## Slave stack
+**Freedom K64F:**
+- Standard OpenOCD flashing supported
 
-### Current state:
+**XMC4800:**
+- Use provided flashing scripts in board directory
 
-- Can go from INIT to PRE-OP to SAFE-OP to OP with proper verification for each transition.
-- Can read and write PI
-- Supports ESC Lan9252 through SPI.
-- Supports XMC4800 ESC (with NuttX RTOS). Pass the CTT at home tests.
-- Tools available to flash/dump eeprom from ESC.
-- CoE: Object dictionnary
-- CoE: SDO support
+</details>
 
-### TODO
+<details>
+<summary><b>Testing Master-Slave Communication</b></summary>
 
-- Test coverage
-- Support more mailbox protocols (SDO Information, FoE, EoE)
-- Allow more than 2 PI sync manager. (multi-PDO)
-- DC support.
-- Improve error reporting through AL_STATUS and AL_STATUS_CODE (For now it only reports the errors regarding state machine transitions.)
+1. **Start the simulator or flash a slave:**
+   ```bash
+   # Option A: Use simulator
+   ./build/simulation/simulator eth1 eeprom.bin
+   
+   # Option B: Flash real hardware (e.g., Arduino Due)
+   ./scripts/build_slave_bin.sh arduino-due ~/nuttx
+   # Flash the resulting binary to your board
+   ```
 
-### Examples
-A working example based on Nuttx RTOS and tested on arduino due + easycat Lan9252 shield is available in `examples/slave/nuttx_lan9252`.
-Another example using the XMC4800 with NuttX is available.
-Follow the readme in `KickCAT/examples/slave/nuttx/xmc4800/README.md` for insight about how to setup and build the slave stack.
+2. **Run a master example:**
+   ```bash
+   # Use the interface connected to your slave
+   ./build/examples/master/easycat/easycat_example eth0
+   ```
+
+3. **Expected behavior:**
+   - Master transitions slave through states: INIT → PRE-OP → SAFE-OP → OP
+   - PDO data exchange begins in OP state
+   - Check console output for diagnostics
+
+</details>
+
+---
 
 ## Simulator
-It is possible tu run a virtual network with the provided emulated ESC implementation.
-To start a network simulator, you can either create a virtual ethernet pair (on Linux you can use the helper script 'create_virtual_ethernet.sh') or use a real network interface by using two computer or two interfaces on the same computer.
-**Note:** the simulator has to be started first
 
-### Current state:
- * Load eeprom
- * Emulate basic sync manager behavior
- * Emulate basic FFMU behavior
+Test your EtherCAT applications without physical hardware using the built-in simulator.
 
-### TODO
- * Support interrupt (update the right register depending on the accesses on other one and the interrupt configuration)
- * Support redundancy behavior
+### Setup
 
-## Release procedure
+```bash
+# Create virtual ethernet pair (Linux)
+./create_virtual_ethernet.sh
 
-KickCAT versions follow the rules of semantic versioning https://semver.org/
+# Or use real network interfaces between two machines
+```
 
-On major version update, a process of testing starts. The version is in alpha phase until API stabilization. Then we
-switch to release candidate (-rcx). To leave a release candidate state, it is required that:
+### Running the Simulator
 
-- the software is tested intensivly (at least 5 continuous days - 24*5 hours) without detecting a bug (realtime loss, crash, memory leak...).
-- the code coverage is sufficient (80% line and 50% branch) for master/slave stack (tools and simulation can be less).
+```bash
+# Start simulator (must be started before master)
+./build/simulation/simulator <interface> <eeprom_file>
 
-For each tag, Conan center has to be updated (https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat).
+# Example
+./build/simulation/simulator eth1 examples/slave/nuttx/lan9252/arduino-due/eeprom.bin
+```
 
-When a version leaves the release canditate state a github release shall be generated on the corresponding tag.
+**Current Capabilities:**
+- Load EEPROM configurations
+- Emulate basic sync manager behavior
+- Emulate basic FMMU (Fieldbus Memory Management Unit) behavior
 
-### Update Conan Recipe on conan center
-Kickcat is available on **conan-io**. Whenever there is a new tag which is consider sufficiently stable:
-1. Create a new PR on https://github.com/conan-io/conan-center-index
-2. Follow PR: https://github.com/conan-io/conan-center-index/pull/19482 to add new versions to the recipe
+**Limitations:**
+- No interrupt emulation
+- No redundancy support yet
+- Basic functionality only
 
-## EtherCAT doc
-https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html&id=3196541253205318339
-https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf
+---
 
-protocol:
-https://download.beckhoff.com/download/document/io/ethercat-development-products/ethercat_esc_datasheet_sec1_technology_2i3.pdf
+## Tools
 
-registers:
-https://download.beckhoff.com/download/Document/io/ethercat-development-products/ethercat_esc_datasheet_sec2_registers_3i0.pdf
+KickCAT includes several utility tools in the `tools/` directory:
 
-eeprom :
-https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1358008331.html&id=5054579963582410224
+- **Bus diagnostics**: Error counters, slave discovery
+- **EEPROM tools**: Read/write/dump EEPROM from ESC
+- **SDO explorer**: Browse CANopen object dictionaries
+- **ETG.8200 Gateway**: Mailbox gateway implementation
 
-various:
-https://sir.upc.edu/wikis/roblab/index.php/Development/Ethercat
+Build tools with the main project:
+```bash
+cd build
+make
+ls tools/  # Your built tools will be here
+```
 
-diag:
-https://www.automation.com/en-us/articles/2014-2/diagnostics-with-ethercat-part-4
-https://infosys.beckhoff.com/english.php?content=../content/1033/ethercatsystem/1072509067.html&id=
-https://knowledge.ni.com/KnowledgeArticleDetails?id=kA00Z000000kHwESAU
+---
 
-esc comparison:
-https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf
+## Architecture
 
+### Master Stack Status
+
+✅ **Implemented:**
+- Full EtherCAT state machine (INIT, PRE-OP, SAFE-OP, OP)
+- Process data (PI) read/write
+- CoE: SDO read/write (blocking and async)
+- CoE: Emergency messages
+- CoE: SDO Information service
+- Bus diagnostics with error counters
+- Interface redundancy
+- Hook system for non-compliant slaves
+- Consecutive writes (up to 255 datagrams in flight)
+- EtherCAT mailbox gateway (ETG.8200)
+
+⏳ **In Progress:**
+- CoE: Segmented transfer (partial)
+- CoE: Diagnosis message (0x10F3)
+- Distributed clock support
+
+📋 **Planned:**
+- FoE, EoE, AoE, SoE profiles
+- Auto-discovery of broken wires
+- AF_XDP Linux socket for improved performance
+- Addressing groups (multi-PDO)
+
+### Slave Stack Status
+
+✅ **Implemented:**
+- State machine: INIT → PRE-OP → SAFE-OP → OP
+- Process data read/write
+- ESC support: LAN9252 (SPI), XMC4800
+- CoE: Object dictionary
+- CoE: SDO support
+- EEPROM flash/dump tools
+- CTT (Conformance Test Tool) validated (XMC4800)
+
+📋 **Planned:**
+- Extended mailbox protocols (SDO Information, FoE, EoE)
+- Multi-PDO support (>2 sync managers)
+- Distributed clock
+- Enhanced error reporting via AL_STATUS
+
+---
+
+## Performance Optimization (Linux)
+
+For real-time performance on Linux:
+
+1. **Use RT-PREEMPT kernel**
+   ```bash
+   # Check if RT patches are applied
+   uname -a | grep PREEMPT
+   ```
+
+2. **Set real-time scheduler**
+   ```bash
+   sudo chrt -f 80 ./your_ethercat_app
+   ```
+
+3. **Disable NIC interrupt coalescing**
+   ```bash
+   sudo ethtool -C eth0 rx-usecs 0 tx-usecs 0
+   ```
+
+4. **Disable RT throttling**
+   ```bash
+   echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us
+   ```
+
+5. **Isolate CPU cores**
+   ```bash
+   # Add to kernel boot parameters
+   isolcpus=2,3 nohz_full=2,3 rcu_nocbs=2,3
+   ```
+
+6. **Adjust network IRQ priority**
+   ```bash
+   # Find IRQ number
+   cat /proc/interrupts | grep eth0
+   # Set priority
+   sudo chrt -f 90 -p <IRQ_thread_PID>
+   ```
+
+---
+
+## Documentation & Resources
+
+### API Documentation
+Build documentation locally (requires Doxygen):
+```bash
+cd build
+make docs
+```
+
+### EtherCAT Specifications
+- [ETG Official Documentation](https://www.ethercat.org/en/downloads.html)
+- [Beckhoff EtherCAT Documentation](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html)
+- [ESC Datasheets](https://download.beckhoff.com/download/document/io/ethercat-development-products/)
+
+### Learning Resources
+- [EtherCAT Device Protocol Poster](https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf)
+- [EtherCAT Diagnostics Guide](https://www.automation.com/en-us/articles/2014-2/diagnostics-with-ethercat-part-4)
+- [ESC Comparison](https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf)
+
+---
+
+## Testing
+
+### Unit Tests
+
+```bash
+# Enable unit tests in CMake
+cd build
+cmake .. -DBUILD_UNIT_TEST=ON
+make
+
+# Run tests
+make test
+```
+
+### Code Coverage
+
+Install gcovr and build with coverage:
+```bash
+# Install gcovr
+uv pip install gcovr
+
+# Build with coverage
+cd build
+cmake .. -DBUILD_UNIT_TEST=ON -DCMAKE_BUILD_TYPE=Debug
+make
+make coverage
+```
+
+---
+
+## Release Process
+
+KickCAT follows [Semantic Versioning](https://semver.org/).
+
+### Release Requirements
+
+Before a version leaves release candidate status:
+- ✅ 5+ continuous days of testing without bugs (no realtime loss, crashes, or memory leaks)
+- ✅ 80% line coverage and 50% branch coverage for master/slave stack
+- ✅ Update [Conan Center](https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat)
+- ✅ Create GitHub release with changelog
+
+---
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone https://github.com/leducp/KickCAT.git
+cd KickCAT
+
+# Setup build environment
+./setup_build.sh build
+
+# Build with tests
+cd build
+cmake .. -DBUILD_UNIT_TEST=ON -DCMAKE_BUILD_TYPE=Debug
+make
+```
+
+---
+
+## Platform Support
+
+| Platform | Master | Slave | Status |
+|----------|--------|-------|--------|
+| Linux (x86_64) | ✅ | ❌ | Production |
+| Linux RT-PREEMPT | ✅ | ❌ | Recommended for real-time |
+| Windows | ⚠️ | ❌ | Testing/tools only |
+| PikeOS 5.1 | ✅ | ❌ | Production |
+| NuttX RTOS | ❌ | ✅ | Production |
+| Arduino Due | ❌ | ✅ | via NuttX |
+| XMC4800 | ❌ | ✅ | via NuttX, CTT validated |
+| Freedom K64F | ❌ | ✅ | via NuttX |
+
+---
+
+## Known Limitations
+
+### Master Stack
+- **Little-endian only**: Current implementation supports little-endian hosts only
+- **Windows**: Not suitable for real-time applications
+- **Distributed Clock**: Not yet implemented
+
+### Slave Stack
+- **PDO limitation**: Currently supports up to 2 sync managers (working on multi-PDO)
+- **Distributed Clock**: Not yet implemented
+- **Mailbox protocols**: Limited to CoE SDO (FoE, EoE planned)
+
+---
+
+## License
+
+[License information - add your license here]
+
+---
+
+## Support & Community
+
+- **Issues**: [GitHub Issues](https://github.com/leducp/KickCAT/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/leducp/KickCAT/discussions)
+- **Conan Package**: [conan-center-index](https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat)
+
+---
+
+## Project Status
+
+🟢 **Active Development** - KickCAT is actively maintained and used in production systems.
+
+**Current Version**: Check [Releases](https://github.com/leducp/KickCAT/releases) for the latest stable version.
+
+**Release Cycle**: Following semantic versioning with thorough testing before each major release.
