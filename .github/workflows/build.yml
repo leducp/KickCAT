@@ -2,9 +2,9 @@ name: PR build
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 env:
   BUILD_TYPE: Debug
@@ -17,66 +17,66 @@ jobs:
         os: [ubuntu-latest, windows-latest]
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: ./.github/actions/setup-conan-action
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-conan-action
 
-    - name: Conan install
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          export conan_profile=${{github.workspace}}/build/profile.txt
-          ./setup_build.sh ${{github.workspace}}/build
-        elif [ "$RUNNER_OS" == "Windows" ]; then
-          conan install conan/conanfile_windows.txt -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
-          mkdir -p ${{github.workspace}}/build
-        else
-          echo "$RUNNER_OS not supported"
-          exit 1
-        fi
+      - name: Conan install
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            export conan_profile=${{github.workspace}}/build/profile.txt
+            ./setup_build.sh ${{github.workspace}}/build
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            conan install conan/conanfile_windows.txt -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
+            mkdir -p ${{github.workspace}}/build
+          else
+            echo "$RUNNER_OS not supported"
+            exit 1
+          fi
 
-      shell: bash
+        shell: bash
 
-    - name: Install Gcovr and Lcov
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt install gcovr lcov
+      - name: Install Gcovr and Lcov
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt install gcovr lcov
 
-    - name: Configure CMake
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          export cmake_generator="Unix Makefiles"
-          export cmake_coverage="-DCODE_COVERAGE=ON"
-        elif [ "$RUNNER_OS" == "Windows" ]; then
-          export cmake_generator="MinGW Makefiles"
-          export cmake_coverage="-DCODE_COVERAGE=OFF"
-        else
-          echo "$RUNNER_OS not supported"
-          exit 1
-        fi
-        cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_UNIT_TESTS=ON -G "${cmake_generator}" ${cmake_coverage}
-      shell: bash
+      - name: Configure CMake
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            export cmake_generator="Unix Makefiles"
+            export cmake_coverage="-DCODE_COVERAGE=ON"
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            export cmake_generator="MinGW Makefiles"
+            export cmake_coverage="-DCODE_COVERAGE=OFF"
+          else
+            echo "$RUNNER_OS not supported"
+            exit 1
+          fi
+          cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_UNIT_TESTS=ON -G "${cmake_generator}" ${cmake_coverage}
+        shell: bash
 
-    - name: Build
-      run: cmake --build build --config ${{env.BUILD_TYPE}}
+      - name: Build
+        run: cmake --build build --config ${{env.BUILD_TYPE}}
 
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          make coverage_xml
-        elif [ "$RUNNER_OS" == "Windows" ]; then
-          ctest . --output-on-failure
-        else
-          echo "$RUNNER_OS not supported"
-          exit 1
-        fi
-      shell: bash
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            make coverage_xml
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            ctest . --output-on-failure
+          else
+            echo "$RUNNER_OS not supported"
+            exit 1
+          fi
+        shell: bash
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      if: matrix.os == 'ubuntu-latest'
-      with:
-        name: coverage
-        path: build/coverage_xml.xml
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: coverage
+          path: build/coverage_xml.xml
 
   build_NuttX_stable:
     runs-on: ubuntu-latest
@@ -98,7 +98,7 @@ jobs:
       - name: Checkout KickCAT
         uses: actions/checkout@v4
         with:
-          path: 'KickCAT'
+          path: "KickCAT"
 
       - name: Cache NuttX
         id: cache-nuttx
@@ -112,8 +112,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx
-          path: 'nuttxspace/nuttx'
-          ref: '${{ env.nuttx_version }}'
+          path: "nuttxspace/nuttx"
+          ref: "${{ env.nuttx_version }}"
 
       - name: Cache NuttX Apps
         id: cache-nuttx-apps
@@ -127,8 +127,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx-apps
-          path: 'nuttxspace/apps'
-          ref: '${{ env.nuttx_apps_version }}'
+          path: "nuttxspace/apps"
+          ref: "${{ env.nuttx_apps_version }}"
 
       - name: Install Kconfig dependencies
         run: sudo apt-get update && sudo apt-get install -y kconfig-frontends
@@ -154,6 +154,13 @@ jobs:
             ${{ matrix.board }} \
             ${{ github.workspace }}/nuttxspace/nuttx
 
+      - name: Upload firmware binary for ${{ matrix.board }} nuttx stable version
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}
+          path: build_${{ matrix.board }}/*.bin
+          if-no-files-found: error
+          retention-days: 1
 
   build_NuttX_master:
     runs-on: ubuntu-latest
@@ -168,26 +175,26 @@ jobs:
           - arduino-due
           - freedom-k64f
     env:
-          arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
+      arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
     steps:
       - name: checkout KickCAT
         uses: actions/checkout@v4
         with:
-          path: 'KickCAT'
+          path: "KickCAT"
 
       - name: checkout NuttX (master)
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx
-          path: 'nuttxspace/nuttx'
-          ref: 'master'
+          path: "nuttxspace/nuttx"
+          ref: "master"
 
       - name: checkout NuttX Apps (master)
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx-apps
-          path: 'nuttxspace/apps'
-          ref: 'master'
+          path: "nuttxspace/apps"
+          ref: "master"
 
       - name: apt update + Kconfig
         run: |
@@ -215,3 +222,11 @@ jobs:
           KickCAT/scripts/build_slave_bin.sh \
             ${{ matrix.board }} \
             ${{ github.workspace }}/nuttxspace/nuttx
+
+      - name: Upload firmware binary for ${{ matrix.board }} nuttx master version
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}
+          path: build_${{ matrix.board }}/*.bin
+          if-no-files-found: error
+          retention-days: 1
