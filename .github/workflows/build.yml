@@ -157,7 +157,7 @@ jobs:
       - name: Upload firmware binary for ${{ matrix.board }} nuttx stable version
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-${{ matrix.board }}
+          name: firmware-${{ matrix.board }}-nuttx-stable
           path: KickCAT/build_${{ matrix.board }}/*.bin
           if-no-files-found: error
           retention-days: 1
@@ -226,7 +226,7 @@ jobs:
       - name: Upload firmware binary for ${{ matrix.board }} nuttx master version
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-${{ matrix.board }}
+          name: firmware-${{ matrix.board }}-nuttx-master
           path: KickCAT/build_${{ matrix.board }}/*.bin
           if-no-files-found: error
           retention-days: 1
