@@ -1,7 +1,25 @@
-add_executable(xmc4800_relax main_relax.cc od_populator.cc)
-target_link_libraries(xmc4800_relax kickcat)
-set_kickcat_properties(xmc4800_relax)
+set(TARGET_NAME xmc4800_relax)
+add_executable(${TARGET_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/main_relax.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/od_populator.cc
+    ${CMAKE_SOURCE_DIR}/examples/slave/common/xpg_strerror_r.cc)
+target_link_libraries(${TARGET_NAME} kickcat)
+set_kickcat_properties(${TARGET_NAME})
 
-add_executable(xmc4800_foot main_foot.cc od_populator.cc)
-target_link_libraries(xmc4800_foot kickcat)
-set_kickcat_properties(xmc4800_foot)
+add_custom_command(
+        TARGET ${TARGET_NAME}
+        POST_BUILD
+        COMMAND ${CMAKE_OBJCOPY} ARGS -S -O binary ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME} ${CMAKE_BINARY_DIR}/${TARGET_NAME}.bin)
+
+set(TARGET_NAME xmc4800_foot)
+add_executable(${TARGET_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/main_foot.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/od_populator.cc
+    ${CMAKE_SOURCE_DIR}/examples/slave/common/xpg_strerror_r.cc)
+target_link_libraries(${TARGET_NAME} kickcat)
+set_kickcat_properties(${TARGET_NAME})
+
+add_custom_command(
+        TARGET ${TARGET_NAME}
+        POST_BUILD
+        COMMAND ${CMAKE_OBJCOPY} ARGS -S -O binary ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME} ${CMAKE_BINARY_DIR}/${TARGET_NAME}.bin)
