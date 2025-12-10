@@ -110,6 +110,100 @@ Provide a CMake cross-toolchain file that defines the `PIKEOS` variable. Example
 
 ---
 
+## Getting Started: Complete Walkthrough
+
+This section provides a complete end-to-end example using the **Freedom K64F board** with LAN9252 EtherCAT slave controller.
+
+### Hardware Requirements
+
+- **NXP Freedom K64F** development board
+- **LAN9252** EtherCAT slave controller (SPI connection)
+- **Ethernet cable** (connects slave to your PC)
+- **USB cable** (for programming the board)
+- **Linux PC** with EtherCAT master
+
+### Step 1: Build the Slave Firmware
+
+```bash
+# Build firmware for Freedom K64F
+./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
+
+# Output will be in: build_freedom-k64f/easycat_frdm_k64f.bin
+```
+
+### Step 2: Flash the Firmware
+
+```bash
+# Deploy to the board (connects via USB)
+./examples/slave/nuttx/lan9252/freedom-k64f/board/deploy.sh \
+    build_freedom-k64f/easycat_frdm_k64f.bin
+```
+
+### Step 3: Program the EEPROM
+
+The EtherCAT slave requires EEPROM configuration with device information:
+
+```bash
+# Connect slave to your PC via Ethernet
+# Write EEPROM (interface ? will be auto-detected)
+sudo ./tools/eeprom 0 write \
+    examples/slave/nuttx/lan9252/freedom-k64f/eeprom.bin \?
+```
+
+**Note:** The `\?` tells the tool to auto-detect the interface where the slave is connected.
+
+### Step 4: Run the Master
+
+Now you can control your slave using either C++ or Python:
+
+**Option A - C++ Master:**
+```bash
+# Run master example (replace enp8s0 with your interface)
+sudo ./build/examples/master/freedom-k64f/freedom_k64f_example enp8s0
+```
+
+**Option B - Python Master:**
+```bash
+# Install KickCAT Python bindings
+pip install kickcat
+
+# Grant raw access to Python interpreter
+./py_bindings/enable_raw_access.sh
+
+# Run Python example
+python py_bindings/examples/freedom-k64f.py -i enp8s0
+```
+
+### Expected Output
+
+![Freedom K64F Master-Slave Communication](doc/freedom-demo.gif)
+
+The master will:
+1. Discover the slave on the network
+2. Transition through states: INIT → PRE-OP → SAFE-OP → OP
+3. Begin exchanging process data (PDOs)
+4. Display diagnostic information
+
+<details>
+<summary><b>Troubleshooting</b></summary>
+
+**Slave not detected:**
+- Check Ethernet cable connection
+- Verify EEPROM was written successfully
+- Check that slave firmware is running (LED indicators)
+
+**Permission denied:**
+- Ensure you're running master with `sudo` or proper capabilities
+- For Python: run `./py_bindings/enable_raw_access.sh`
+
+**Interface not found:**
+- List available interfaces: `ip link show`
+- Use the correct interface name (e.g., `eth0`, `enp8s0`, `eno1`)
+
+</details>
+
+---
+
 ## Getting Started with Examples
 
 KickCAT includes working master and slave examples that work together out of the box.
@@ -127,10 +221,51 @@ Located in `examples/master/`:
 
 #### Running a Master Example
 
+**C++ Examples:**
 ```bash
 cd build
 ./examples/master/easycat/easycat_example eth0
 ```
+
+**Python Examples:**
+
+KickCAT is available on PyPI for easy installation:
+
+```bash
+# Install from PyPI
+pip install kickcat
+
+# Run Python examples
+python py_bindings/examples/freedom-k64f.py --interface eth0
+
+# With redundancy
+python py_bindings/examples/easycat.py -i eth0 -r eth1
+```
+
+<details>
+<summary><b>Python Examples Help</b></summary>
+
+```bash
+$ python py_bindings/examples/freedom-k64f.py --help
+usage: freedom-k64f.py [-h] -i INTERFACE [-r REDUNDANCY]
+
+EtherCAT master for Freedom K64F using EasyCAT
+
+options:
+  -h, --help            show this help message and exit
+  -i INTERFACE, --interface INTERFACE
+                        Primary network interface (e.g., eth0)
+  -r REDUNDANCY, --redundancy REDUNDANCY
+                        Redundancy network interface (e.g., eth1)
+```
+
+**Important:** Python interpreter needs raw socket capabilities:
+```bash
+# Use the helper script to grant permissions
+./py_bindings/enable_raw_access.sh
+```
+
+</details>
 
 Replace `eth0` with your network interface name.
 
@@ -154,13 +289,13 @@ All slave examples use NuttX RTOS. Use the automated build script:
 **Example:**
 ```bash
 # Build for XMC4800
-./scripts/build_slave_bin.sh xmc4800-relax ~/nuttx
+./scripts/build_slave_bin.sh xmc4800-relax ~/nuttxspace/nuttx
 
 # Build for Arduino Due
-./scripts/build_slave_bin.sh arduino-due ~/nuttx
+./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
 
 # Build for Freedom K64F
-./scripts/build_slave_bin.sh freedom-k64f ~/nuttx
+./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
 ```
 
 <details>
@@ -199,7 +334,7 @@ All slave examples use NuttX RTOS. Use the automated build script:
    ./build/simulation/simulator eth1 eeprom.bin
    
    # Option B: Flash real hardware (e.g., Arduino Due)
-   ./scripts/build_slave_bin.sh arduino-due ~/nuttx
+   ./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
    # Flash the resulting binary to your board
    ```
 
@@ -261,6 +396,7 @@ KickCAT includes several utility tools in the `tools/` directory:
 - **EEPROM tools**: Read/write/dump EEPROM from ESC
 - **SDO explorer**: Browse CANopen object dictionaries
 - **ETG.8200 Gateway**: Mailbox gateway implementation
+- **OD Generator**: Generate Object Dictionary code from ESI files
 
 Build tools with the main project:
 ```bash
@@ -268,6 +404,62 @@ cd build
 make
 ls tools/  # Your built tools will be here
 ```
+
+### EEPROM Tool Usage
+
+Read, write, or dump EEPROM content from your EtherCAT Slave Controller:
+
+```bash
+# Write EEPROM to slave at position 0
+sudo ./tools/eeprom 0 write path/to/eeprom.bin <interface>
+
+# Auto-detect interface
+sudo ./tools/eeprom 0 write path/to/eeprom.bin \?
+
+# Read EEPROM from slave
+sudo ./tools/eeprom 0 read output.bin <interface>
+
+# Dump EEPROM contents (human-readable)
+sudo ./tools/eeprom 0 dump <interface>
+```
+
+### Object Dictionary Generator
+
+If your application uses CoE mailbox with SDO, you can generate Object Dictionary code from ESI files.
+
+#### Generate OD from ESI File
+
+```bash
+# Generate od_populator.cc from your ESI file
+./tools/od_generator your_device.esi
+
+# This creates: od_populator.cc
+```
+
+#### Using Generated OD Code
+
+Include the generated file in your slave application:
+
+```cpp
+#include "od_populator.h"
+
+int main() {
+    // Initialize your slave
+    // ...
+    
+    // Populate Object Dictionary
+    auto dictionary = CoE::createOD();
+    
+    // Continue with slave operation
+    // ...
+}
+```
+
+#### Custom OD Population
+
+You can also manually create `od_populator.cc` by implementing the `CoE::createOD()` function.
+
+**Examples:** See `examples/slave/nuttx/xmc4800/od_populator.cc` and `examples/slave/nuttx/lan9252/freedom-k64f/od_populator.cc` for reference implementations.
 
 ---
 
@@ -357,15 +549,6 @@ For real-time performance on Linux:
    ```
 
 ---
-
-## Documentation & Resources
-
-### API Documentation
-Build documentation locally (requires Doxygen):
-```bash
-cd build
-make docs
-```
 
 ### EtherCAT Specifications
 - [ETG Official Documentation](https://www.ethercat.org/en/downloads.html)
