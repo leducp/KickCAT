@@ -158,7 +158,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.board }}
-          path: build_${{ matrix.board }}/*.bin
+          path: KickCAT/build_${{ matrix.board }}/*.bin
           if-no-files-found: error
           retention-days: 1
 
@@ -227,6 +227,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.board }}
-          path: build_${{ matrix.board }}/*.bin
+          path: KickCAT/build_${{ matrix.board }}/*.bin
           if-no-files-found: error
           retention-days: 1
