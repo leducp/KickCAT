@@ -13,6 +13,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/Ring-t.cc
                             src/SBufQueue-t.cc
                             src/slave-t.cc
+                            src/slave/Slave-t.cc
                             src/socket-t.cc
                             src/EmulatedESC-t.cc
                             src/ESM-t.cc
