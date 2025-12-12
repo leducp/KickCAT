@@ -7,3 +7,4 @@ build*/
 .cache/*
 compile_commands.json
 .clangd
+flashBin.jlink
