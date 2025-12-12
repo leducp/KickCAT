@@ -18,10 +18,11 @@ KickCAT is a thin EtherCAT stack designed to be embedded in complex software wit
 - Works with Linux (including RT-PREEMPT), Windows, and PikeOS
 - Full state machine support (INIT → PRE-OP → SAFE-OP → OP)
 - CoE (CANopen over EtherCAT) support with SDO read/write
+- CoE: SDO Information
 - Interface redundancy
 - Bus diagnostics and error handling
-- Python bindings available
-- Built-in simulator for testing without hardware
+- Master side python bindings
+- Built-in ESC emulator for testing without hardware
 
 ---
 
@@ -58,6 +59,12 @@ uv pip install .
 
 # Or for development (faster rebuilds)
 uv pip install --no-build-isolation -Cbuild-dir=/tmp/build -v .
+```
+
+#### Multi wheel (CI)
+This project use cibuildwheel to generate multiples wheel to support all configurations. To use it locally, call:
+```bash
+uvx cibuildwheel
 ```
 
 <details>
@@ -122,6 +129,8 @@ This section provides a complete end-to-end example using the **Freedom K64F boa
 - **USB cable** (for programming the board)
 - **Linux PC** with EtherCAT master
 
+See the [NuttX Prerequisite section](#nuttx-prerequisite) before starting.
+
 ### Step 1: Build the Slave Firmware
 
 ```bash
@@ -158,8 +167,8 @@ Now you can control your slave using either C++ or Python:
 
 **Option A - C++ Master:**
 ```bash
-# Run master example (replace enp8s0 with your interface)
-sudo ./build/examples/master/freedom-k64f/freedom_k64f_example enp8s0
+# Run master example and follow terminal instructions
+sudo ./build/examples/master/freedom-k64f/freedom_k64f_example \?
 ```
 
 **Option B - Python Master:**
@@ -278,6 +287,32 @@ Located in `examples/slave/nuttx/`:
 - **Arduino Due** (with EasyCAT shield + LAN9252)
 - **Freedom K64F** (NXP Kinetis with LAN9252)
 
+#### NuttX Prerequisite:
+<details>
+<summary><b>NuttX Setup Instructions</b></summary>
+
+1. Install NuttX dependencies: https://nuttx.apache.org/docs/latest/quickstart/install.html
+2. Download ARM GCC toolchain (>= 12.0): https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
+
+#### Board-Specific Setup
+
+**Arduino Due:**
+- Requires `bossac-1.6.1-arduino` for flashing (available from Arduino IDE installation)
+- Connect USB to the port closest to power jack
+- If flashing fails with "No device found on ttyACM0":
+  - Press ERASE button for a few seconds, release
+  - Press RESET button
+  - Try flashing again
+
+**Freedom K64F:**
+- Standard OpenOCD flashing supported
+
+**XMC4800:**
+- Use provided flashing scripts in board directory
+
+</details>
+
+
 #### Building Slave Examples
 
 All slave examples use NuttX RTOS. Use the automated build script:
@@ -297,33 +332,6 @@ All slave examples use NuttX RTOS. Use the automated build script:
 # Build for Freedom K64F
 ./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
 ```
-
-<details>
-<summary><b>NuttX Setup Instructions</b></summary>
-
-#### Prerequisites
-
-1. Install NuttX dependencies: https://nuttx.apache.org/docs/latest/quickstart/install.html
-2. Clone NuttX repositories (recommended version: nuttx-12.6.0)
-3. Download ARM GCC toolchain (>= 12.0): https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
-
-#### Board-Specific Setup
-
-**Arduino Due:**
-- Requires `bossac-1.6.1-arduino` for flashing (available from Arduino IDE installation)
-- Connect USB to the port closest to power jack
-- If flashing fails with "No device found on ttyACM0":
-  - Press ERASE button for a few seconds, release
-  - Press RESET button
-  - Try flashing again
-
-**Freedom K64F:**
-- Standard OpenOCD flashing supported
-
-**XMC4800:**
-- Use provided flashing scripts in board directory
-
-</details>
 
 <details>
 <summary><b>Testing Master-Slave Communication</b></summary>
@@ -392,10 +400,7 @@ Test your EtherCAT applications without physical hardware using the built-in sim
 
 KickCAT includes several utility tools in the `tools/` directory:
 
-- **Bus diagnostics**: Error counters, slave discovery
 - **EEPROM tools**: Read/write/dump EEPROM from ESC
-- **SDO explorer**: Browse CANopen object dictionaries
-- **ETG.8200 Gateway**: Mailbox gateway implementation
 - **OD Generator**: Generate Object Dictionary code from ESI files
 
 Build tools with the main project:
@@ -479,12 +484,11 @@ You can also manually create `od_populator.cc` by implementing the `CoE::createO
 - Consecutive writes (up to 255 datagrams in flight)
 - EtherCAT mailbox gateway (ETG.8200)
 
-⏳ **In Progress:**
+
+📋 **Planned:**
 - CoE: Segmented transfer (partial)
 - CoE: Diagnosis message (0x10F3)
 - Distributed clock support
-
-📋 **Planned:**
 - FoE, EoE, AoE, SoE profiles
 - Auto-discovery of broken wires
 - AF_XDP Linux socket for improved performance
@@ -499,7 +503,7 @@ You can also manually create `od_populator.cc` by implementing the `CoE::createO
 - CoE: Object dictionary
 - CoE: SDO support
 - EEPROM flash/dump tools
-- CTT (Conformance Test Tool) validated (XMC4800)
+- CTT (Conformance Test Tool) validated (WDC_FOOT)
 
 📋 **Planned:**
 - Extended mailbox protocols (SDO Information, FoE, EoE)
@@ -649,6 +653,7 @@ make
 - **Little-endian only**: Current implementation supports little-endian hosts only
 - **Windows**: Not suitable for real-time applications
 - **Distributed Clock**: Not yet implemented
+- **Mailbox protocols**: Limited to CoE SDO (FoE, EoE planned)
 
 ### Slave Stack
 - **PDO limitation**: Currently supports up to 2 sync managers (working on multi-PDO)
