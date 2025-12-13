@@ -411,7 +411,8 @@ namespace kickcat::mailbox::request
             return ProcessingResult::NOOP;
         }
 
-        printf("received a message of type %x %d\n", header->type, toString(header->type));
+        Type type = static_cast<Type>(header->type);
+        printf("received a message of type %x %s\n", type, mailbox::toString(type));
         return ProcessingResult::FINALIZE_AND_KEEP;
     }
 }

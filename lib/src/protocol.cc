@@ -265,7 +265,7 @@ namespace kickcat
         return reinterpret_cast<EthernetHeader const*>(base_address);
     }
 
-    namespace mailbox::
+    namespace mailbox
     {
         char const* toString(mailbox::Type type)
         {   switch (type)
