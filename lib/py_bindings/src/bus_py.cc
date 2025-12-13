@@ -17,6 +17,12 @@ namespace kickcat
 {
     void create_bus_python_bindings(nb::module_ &m)
     {
+        nb::enum_<Bus::Access>(m, "Access")
+            .value("PARTIAL", Bus::Access::PARTIAL)
+            .value("COMPLETE", Bus::Access::COMPLETE)
+            .value("EMULATE_COMPLETE", Bus::Access::EMULATE_COMPLETE)
+            .export_values();
+
         nb::class_<Link>(m, "Link")
             .def("set_timeout", &Link::setTimeout);
 
@@ -159,6 +165,19 @@ namespace kickcat
                 {
                     static std::vector<uint8_t> io_buffer(size);
                     self.createMapping(io_buffer.data());
-                }, "size"_a = 4096);
+                }, "size"_a = 4096)
+            .def("read_sdo", [](Bus &self, Slave& slave, uint16_t index, uint8_t subindex, 
+                               Bus::Access ca, uint32_t max_data_size = 4, 
+                               std::chrono::nanoseconds timeout = std::chrono::seconds(1))
+                {
+                    std::vector<uint8_t> buffer(max_data_size);
+                    uint32_t actual_size = max_data_size;
+                    
+                    self.readSDO(slave, index, subindex, ca, buffer.data(), &actual_size, timeout);
+                    
+                    // Resize to actual data size and return as bytes
+                    buffer.resize(actual_size);
+                    return nb::bytes(reinterpret_cast<const char*>(buffer.data()), actual_size);
+                });
     }
 }
