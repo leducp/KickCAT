@@ -593,6 +593,7 @@ namespace kickcat
             SoE   = 0x05,  // Servo over EtherCAT
             VoE   = 0x0F   // Vendor specific o er EtherCAT
         };
+        char const* toString(Type code);
 
         struct Header
         {

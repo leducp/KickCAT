@@ -140,7 +140,7 @@ int main(int argc, char* argv[])
         bus.setAddresses();
         bus.fetchEeprom();
     }
-    catch (ErrorCode const& e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;

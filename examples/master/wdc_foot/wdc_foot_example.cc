@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
         bus.waitForState(State::SAFE_OP, 1s);
         print_current_state();
     }
-    catch (ErrorCode const& e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
         bus.waitForState(State::OPERATIONAL, 100ms);
         print_current_state();
     }
-    catch (ErrorCode const& e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;

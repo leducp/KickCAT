@@ -396,4 +396,39 @@ namespace kickcat::mailbox::request
         mailbox_.emergencies.push_back(*emg);
         return ProcessingResult::FINALIZE_AND_KEEP;
     }
+
+    CheckMessage::CheckMessage(Mailbox& mailbox)
+        : AbstractMessage(mailbox.recv_size, 0ns)
+        , mailbox_{mailbox}
+    { }
+
+    ProcessingResult CheckMessage::process(uint8_t const* received)
+    {
+        // check message that are not CoE
+        auto const* header = pointData<mailbox::Header>(received);
+
+        if (header->type == mailbox::Type::ERR)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        if (header->type == mailbox::Type::CoE)
+        {
+            auto const* coe = pointData<CoE::Header>(header);
+            if (coe->service == CoE::Service::SDO_REQUEST)
+            {
+                auto repr = CoE::toString(coe);
+                printf("WARNING: slave try to to do an SDO request -> dropping\n");
+                printf("%s\n", repr.c_str());
+                status_ = MessageStatus::SUCCESS;
+                return ProcessingResult::FINALIZE_AND_KEEP;
+            }
+            return ProcessingResult::NOOP;
+        }
+
+        Type type = static_cast<Type>(header->type);
+        printf("received a message of type %x %s\n", type, mailbox::toString(type));
+        status_ = MessageStatus::SUCCESS;
+        return ProcessingResult::FINALIZE_AND_KEEP;
+    }
 }

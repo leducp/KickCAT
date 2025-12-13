@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
     }
-    catch (ErrorCode const& e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
         bus.requestState(State::OPERATIONAL);
         bus.waitForState(State::OPERATIONAL, 100ms);
     }
-    catch (ErrorCode const& e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;

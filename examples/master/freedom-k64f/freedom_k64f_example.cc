@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
             printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
         });
     }
-    catch (ErrorCode const& e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
@@ -149,7 +149,7 @@ int main(int argc, char* argv[])
         bus.waitForState(kickcat::State::OPERATIONAL, 1s, cyclic_process_data);
         print_current_state();
     }
-    catch (ErrorCode const& e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;

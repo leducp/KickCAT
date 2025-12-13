@@ -14,7 +14,8 @@ namespace kickcat
 
     void create_python_bindings(nb::module_ &m)
     {
-        nb::exception<ErrorCode>(m, "KickcatError");
+        nb::exception<ErrorAL>(m,  "ErrorAL");
+        nb::exception<ErrorCoE>(m, "ErrorCoE");
 
         nb::enum_<State>(m, "State")
             .value("INIT",        State::INIT)

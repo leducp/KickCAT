@@ -18,8 +18,39 @@ namespace kickcat
         os << "mailbox out: size " << std::dec << slave.mailbox.send_size << " - offset " << "0x" << std::setfill('0')
             << std::setw(4) << std::hex << slave.mailbox.send_offset << "\n";
 
-        os << "supported mailbox protocol: " << "0x" << std::setfill('0') << std::setw(2)
-            << std::hex << slave.sii.supported_mailbox<< "\n";
+        os << "supported mailbox protocols: ";
+        std::string supported_protocols;
+        if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::AoE)
+        {
+            supported_protocols += "AoE, ";
+        }
+        if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::CoE)
+        {
+            supported_protocols += "CoE, ";
+        }
+        if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::EoE)
+        {
+            supported_protocols += "EoE, ";
+        }
+        if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::FoE)
+        {
+            supported_protocols += "FoE, ";
+        }
+        if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::SoE)
+        {
+            supported_protocols += "SoE, ";
+        }
+        if (supported_protocols.empty())
+        {
+            supported_protocols = "None";
+        }
+        else
+        {
+            // remove last ", "
+            supported_protocols.pop_back();
+            supported_protocols.pop_back();
+        }
+        os << supported_protocols << "\n";
 
         os << "EEPROM: size: " << std::dec << slave.sii.eeprom_size << " - version "<< "0x" << std::setfill('0')
             << std::setw(2) << std::hex << slave.sii.eeprom_version << "\n";

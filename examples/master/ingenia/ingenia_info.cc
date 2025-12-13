@@ -22,7 +22,7 @@ void printObjectDictionnaryList(Bus& bus, Slave& slave, CoE::SDO::information::L
     bus.waitForMessage(sdo);
     if (sdo->status() != mailbox::request::MessageStatus::SUCCESS)
     {
-        THROW_ERROR_CODE("Error while get Object Dictionnary List", sdo->status());
+        THROW_ERROR_CODE("Error while get Object Dictionnary List", error::category::CoE, sdo->status());
     }
 
     printf("Data size received %u \n", buffer_size);
@@ -46,7 +46,7 @@ void printObjectDescription(Bus& bus, Slave& slave, uint16_t index)
     bus.waitForMessage(sdo);
     if (sdo->status() != mailbox::request::MessageStatus::SUCCESS)
     {
-        THROW_ERROR_CODE("Error while get Object Description", sdo->status());
+        THROW_ERROR_CODE("Error while get Object Description", error::category::CoE, sdo->status());
     }
 
     CoE::SDO::information::ObjectDescription* description = reinterpret_cast<CoE::SDO::information::ObjectDescription*>(buffer);
@@ -56,7 +56,7 @@ void printObjectDescription(Bus& bus, Slave& slave, uint16_t index)
 }
 
 
-void printEntryDescription(Bus& bus, Slave& slave, uint16_t index, uint8_t subindex, uint8_t value_info)
+void printEntryDescription(Bus& bus, Slave& slave, uint16_t index, uint8_t subindex, uint8_t value_info = CoE::SDO::information::ValueInfo::DEFAULT)
 {
     char buffer[4096];
     uint32_t buffer_size = 4096; // in bytes
@@ -65,7 +65,7 @@ void printEntryDescription(Bus& bus, Slave& slave, uint16_t index, uint8_t subin
     bus.waitForMessage(sdo);
     if (sdo->status() != mailbox::request::MessageStatus::SUCCESS)
     {
-        THROW_ERROR_CODE("Error while get Entry Description", sdo->status());
+        THROW_ERROR_CODE("Error while get Entry Description", error::category::CoE, sdo->status());
     }
 
     CoE::SDO::information::EntryDescription* description = reinterpret_cast<CoE::SDO::information::EntryDescription*>(buffer);
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
             printESC(slave);
         }
     }
-    catch (ErrorCode const &e)
+    catch (ErrorAL const &e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
@@ -149,6 +149,7 @@ int main(int argc, char *argv[])
 
     printEntryDescription(bus, ingenia, 0x1600, 0,
         CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
+
 
     return 0;
 }

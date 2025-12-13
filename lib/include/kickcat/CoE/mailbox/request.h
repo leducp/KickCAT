@@ -58,6 +58,18 @@ namespace kickcat::mailbox::request
     private:
         request::Mailbox& mailbox_;
     };
+
+    class CheckMessage : public AbstractMessage
+    {
+    public:
+        CheckMessage(Mailbox& mailbox);
+        virtual ~CheckMessage() = default;
+
+        ProcessingResult process(uint8_t const* received) override;
+
+    private:
+        request::Mailbox& mailbox_;
+    };
 }
 
 #endif

@@ -119,7 +119,7 @@ namespace kickcat::CoE
                 "accel_x",
                 {}
             };
-            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"",0);
+            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"accel_x",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -131,7 +131,7 @@ namespace kickcat::CoE
                 "accel_y",
                 {}
             };
-            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"",0);
+            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"accel_y",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -143,7 +143,7 @@ namespace kickcat::CoE
                 "accel_z",
                 {}
             };
-            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"",0);
+            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"accel_z",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -155,7 +155,7 @@ namespace kickcat::CoE
                 "mag_x",
                 {}
             };
-            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"",0);
+            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"mag_x",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -167,7 +167,7 @@ namespace kickcat::CoE
                 "max_y",
                 {}
             };
-            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"",0);
+            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"max_y",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -179,7 +179,7 @@ namespace kickcat::CoE
                 "mag_z",
                 {}
             };
-            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"",0);
+            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"mag_z",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -191,7 +191,7 @@ namespace kickcat::CoE
                 "LED_R",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,184,static_cast<CoE::DataType>(5),"",0);
+            CoE::addEntry<uint8_t>(object,0,8,0,184,static_cast<CoE::DataType>(5),"LED_R",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -203,7 +203,7 @@ namespace kickcat::CoE
                 "LED_G",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,184,static_cast<CoE::DataType>(5),"",0);
+            CoE::addEntry<uint8_t>(object,0,8,0,184,static_cast<CoE::DataType>(5),"LED_G",0);
             dictionary.push_back(std::move(object));
         }
 
@@ -215,7 +215,7 @@ namespace kickcat::CoE
                 "LED_B",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,184,static_cast<CoE::DataType>(5),"",0);
+            CoE::addEntry<uint8_t>(object,0,8,0,184,static_cast<CoE::DataType>(5),"LED_B",0);
             dictionary.push_back(std::move(object));
         }
 

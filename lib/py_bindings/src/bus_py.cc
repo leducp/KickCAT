@@ -3,6 +3,7 @@
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/tuple.h>
 #include <nanobind/stl/vector.h>
 
 #include "kickcat/Link.h"
@@ -166,18 +167,52 @@ namespace kickcat
                     static std::vector<uint8_t> io_buffer(size);
                     self.createMapping(io_buffer.data());
                 }, "size"_a = 4096)
-            .def("read_sdo", [](Bus &self, Slave& slave, uint16_t index, uint8_t subindex, 
-                               Bus::Access ca, uint32_t max_data_size = 4, 
+            .def("read_sdo", [](Bus &self, Slave& slave, uint16_t index, uint8_t subindex,
+                               Bus::Access ca, uint32_t max_data_size = 4,
                                std::chrono::nanoseconds timeout = std::chrono::seconds(1))
                 {
                     std::vector<uint8_t> buffer(max_data_size);
                     uint32_t actual_size = max_data_size;
-                    
+
                     self.readSDO(slave, index, subindex, ca, buffer.data(), &actual_size, timeout);
-                    
+
                     // Resize to actual data size and return as bytes
                     buffer.resize(actual_size);
                     return nb::bytes(reinterpret_cast<const char*>(buffer.data()), actual_size);
+                })
+            .def("read_object_description", [](Bus &self, Slave& slave, uint16_t index) -> std::tuple<std::string, std::string>
+                {
+                    char buffer[4096];
+                    uint32_t buffer_size = 4096; // in bytes
+
+                    auto sdo = slave.mailbox.createSDOInfoGetOD(index, &buffer, &buffer_size, 100ms);
+                    self.waitForMessage(sdo);
+                    if (sdo->status() != mailbox::request::MessageStatus::SUCCESS)
+                    {
+                        THROW_ERROR_CODE("Error while get Object Description", error::category::CoE, sdo->status());
+                    }
+
+                    CoE::SDO::information::ObjectDescription* description = reinterpret_cast<CoE::SDO::information::ObjectDescription*>(buffer);
+                    std::string name{buffer + sizeof(CoE::SDO::information::ObjectDescription), buffer_size - sizeof(CoE::SDO::information::ObjectDescription)};
+
+                    return {name, toString(*description)};
+                })
+            .def("read_entry_description",  [](Bus &self, Slave& slave, uint16_t index, uint8_t subindex) -> std::tuple<std::string, std::string>
+                {
+                    char buffer[4096];
+                    uint32_t buffer_size = 4096; // in bytes
+
+                    auto sdo = slave.mailbox.createSDOInfoGetED(index, subindex, CoE::SDO::information::ValueInfo::DEFAULT, &buffer, &buffer_size, 100ms);
+                    self.waitForMessage(sdo);
+                    if (sdo->status() != mailbox::request::MessageStatus::SUCCESS)
+                    {
+                        THROW_ERROR_CODE("Error while get Entry Description", error::category::CoE, sdo->status());
+                    }
+
+                    CoE::SDO::information::EntryDescription* description = reinterpret_cast<CoE::SDO::information::EntryDescription*>(buffer);
+                    std::string name{buffer + sizeof(CoE::SDO::information::EntryDescription), buffer_size - sizeof(CoE::SDO::information::EntryDescription)};
+
+                    return {name, toString(*description)};
                 });
     }
 }

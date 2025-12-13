@@ -49,6 +49,10 @@ namespace kickcat
 
         for (auto& ifname : interfaces)
         {
+            // enable cin exceptions
+            std::ios::iostate old_exceptions = std::cin.exceptions();
+            std::cin.exceptions(std::ios::failbit | std::ios::badbit | std::ios::eofbit);
+
             uint32_t index = net_interfaces.size();
             while (index >= net_interfaces.size())
             {
@@ -56,6 +60,9 @@ namespace kickcat
                 std::cin >> index;
             }
             *ifname.second = net_interfaces[index].name;
+
+            // restore cin exception state
+            std::cin.exceptions(old_exceptions);
         }
     }
 

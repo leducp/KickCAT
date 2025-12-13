@@ -404,7 +404,7 @@ TEST_F(BusTest, AL_status_error)
     {
         bus.getCurrentState(slave);
     }
-    catch(ErrorCode const & error)
+    catch(ErrorAL const & error)
     {
         ASSERT_EQ(0x0020, error.code());
     }

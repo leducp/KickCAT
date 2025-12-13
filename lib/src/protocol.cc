@@ -265,6 +265,24 @@ namespace kickcat
         return reinterpret_cast<EthernetHeader const*>(base_address);
     }
 
+    namespace mailbox
+    {
+        char const* toString(mailbox::Type type)
+        {   switch (type)
+            {
+                case mailbox::ERR: { return "ERR";      }
+                case mailbox::AoE: { return "AoE";      }
+                case mailbox::EoE: { return "EoE";      }
+                case mailbox::CoE: { return "CoE";      }
+                case mailbox::FoE: { return "FoE";      }
+                case mailbox::SoE: { return "SoE";      }
+                case mailbox::VoE: { return "VoE";      }
+                default:           { return "Unknown";  }
+            }
+
+        }
+    }
+
     namespace mailbox::Error
     {
         char const* toString(uint16_t code)
