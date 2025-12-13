@@ -396,4 +396,22 @@ namespace kickcat::mailbox::request
         mailbox_.emergencies.push_back(*emg);
         return ProcessingResult::FINALIZE_AND_KEEP;
     }
+
+    CheckMessage::CheckMessage(Mailbox& mailbox)
+        : AbstractMessage(mailbox.recv_size, 0ns)
+        , mailbox_{mailbox}
+    { }
+
+    ProcessingResult CheckMessage::process(uint8_t const* received)
+    {
+        // check message that are not CoE
+        auto const* header = pointData<mailbox::Header>(received);
+        if (header->type == mailbox::Type::CoE)
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        printf("received a message of type %x %d\n", header->type, toString(header->type));
+        return ProcessingResult::FINALIZE_AND_KEEP;
+    }
 }

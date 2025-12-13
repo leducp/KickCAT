@@ -105,13 +105,24 @@ namespace kickcat
         checkMailboxes(error_callback);
         processMessages(error_callback);
 
-        // create CoE emergency reception callback
+        // create callbacks reception for mailbox (that do not depends on a request initiated by the master)
         for (auto& slave : slaves_)
         {
             if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::CoE)
             {
+                // CoE emergency callback
                 auto emg = std::make_shared<mailbox::request::EmergencyMessage>(slave.mailbox);
                 slave.mailbox.to_process.push_back(emg);
+            }
+
+            if ((slave.sii.supported_mailbox & eeprom::MailboxProtocol::EoE) or
+                (slave.sii.supported_mailbox & eeprom::MailboxProtocol::FoE) or
+                (slave.sii.supported_mailbox & eeprom::MailboxProtocol::SoE) or
+                (slave.sii.supported_mailbox & eeprom::MailboxProtocol::AoE))
+            {
+                // check callback to display what's missing
+                auto chk = std::make_shared<mailbox::request::CheckMessage>(slave.mailbox);
+                slave.mailbox.to_process.push_back(chk);
             }
         }
     }
