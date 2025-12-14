@@ -340,7 +340,7 @@ All slave examples use NuttX RTOS. Use the automated build script:
    ```bash
    # Option A: Use simulator
    ./build/simulation/simulator eth1 eeprom.bin
-   
+
    # Option B: Flash real hardware (e.g., Arduino Due)
    ./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
    # Flash the resulting binary to your board
@@ -451,10 +451,10 @@ Include the generated file in your slave application:
 int main() {
     // Initialize your slave
     // ...
-    
+
     // Populate Object Dictionary
     auto dictionary = CoE::createOD();
-    
+
     // Continue with slave operation
     // ...
 }
@@ -479,7 +479,7 @@ You can also manually create `od_populator.cc` by implementing the `CoE::createO
 - CoE: Emergency messages
 - CoE: SDO Information service
 - Bus diagnostics with error counters
-- Interface redundancy
+- Cable redundancy
 - Hook system for non-compliant slaves
 - Consecutive writes (up to 255 datagrams in flight)
 - EtherCAT mailbox gateway (ETG.8200)
@@ -605,8 +605,8 @@ KickCAT follows [Semantic Versioning](https://semver.org/).
 Before a version leaves release candidate status:
 - ✅ 5+ continuous days of testing without bugs (no realtime loss, crashes, or memory leaks)
 - ✅ 80% line coverage and 50% branch coverage for master/slave stack
-- ✅ Update [Conan Center](https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat)
-- ✅ Create GitHub release with changelog
+
+Note: integration test is done with the master running on Linux (x86-64) and the slave is the Freedom-K64F
 
 ---
 
@@ -634,16 +634,15 @@ make
 
 ## Platform Support
 
-| Platform | Master | Slave | Status |
-|----------|--------|-------|--------|
-| Linux (x86_64) | ✅ | ❌ | Production |
-| Linux RT-PREEMPT | ✅ | ❌ | Recommended for real-time |
-| Windows | ⚠️ | ❌ | Testing/tools only |
-| PikeOS 5.1 | ✅ | ❌ | Production |
-| NuttX RTOS | ❌ | ✅ | Production |
-| Arduino Due | ❌ | ✅ | via NuttX |
-| XMC4800 | ❌ | ✅ | via NuttX, CTT validated |
-| Freedom K64F | ❌ | ✅ | via NuttX |
+| Platform | Type | Status |
+|----------|--------|-------|
+| Linux (x86_64) | Master | Production - RT_PREEMPT  Recommended for real-time |
+| Windows | Master | ⚠️ Testing/tools only |
+| PikeOS 5.1 (ARMv8) | Master | Production |
+| NuttX RTOS | Slave | Production |
+| Arduino Due | Slave | via NuttX |
+| Infineon XMC4800 | Slave | via NuttX, CTT validated |
+| NXP Freedom K64F | Slave | via NuttX |
 
 ---
 
@@ -664,7 +663,7 @@ make
 
 ## License
 
-[License information - add your license here]
+[CeCILL-C](LICENSE)
 
 ---
 
