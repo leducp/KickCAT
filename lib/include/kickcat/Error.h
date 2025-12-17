@@ -30,11 +30,16 @@ namespace kickcat
     #define STR2(x) STR1(x)
     #define LOCATION(suffix) kickcat::strip_path(__FILE__ ":" STR2(__LINE__) suffix)
     #define THROW_ERROR(msg)                    (throw kickcat::Error{LOCATION(": " msg)})
-    #define THROW_ERROR_CODE(msg, code)         (throw kickcat::ErrorCode{LOCATION(": " msg), static_cast<int32_t>(code)})
+    #define THROW_ERROR_CODE(msg, cat, code)    (throw kickcat::ErrorCode<cat>{LOCATION(": " msg), static_cast<int32_t>(code)})
     #define THROW_ERROR_DATAGRAM(msg, state)    (throw kickcat::ErrorDatagram{LOCATION(": " msg), state})
     #define THROW_SYSTEM_ERROR_CODE(msg, code)  (throw std::system_error(code, std::generic_category(), LOCATION(": " msg)))
     #define THROW_SYSTEM_ERROR(msg)             THROW_SYSTEM_ERROR_CODE(msg, errno)
 
+    namespace error::category
+    {
+        constexpr int32_t AL  = 1;
+        constexpr int32_t CoE = 2;
+    }
 
     struct Error : public std::exception
     {
@@ -51,12 +56,18 @@ namespace kickcat
         char const* message_;
     };
 
+    template<int32_t CAT>
     struct ErrorCode : public Error
     {
         ErrorCode(char const* message, int32_t code)
             : Error(message)
             , code_{code}
         { }
+
+        int32_t category() const noexcept
+        {
+            return CAT;
+        }
 
         int32_t code() const noexcept
         {
@@ -66,6 +77,8 @@ namespace kickcat
     private:
         int32_t code_;
     };
+    using ErrorAL  = ErrorCode<error::category::AL>;
+    using ErrorCoE = ErrorCode<error::category::CoE>;
 
     struct ErrorDatagram : public Error
     {

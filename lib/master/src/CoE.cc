@@ -8,15 +8,20 @@ namespace kickcat
 
     void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message)
     {
-        auto error_callback = [](DatagramState const& state)
+        auto error_callback_check = [](DatagramState const& state)
         {
             THROW_ERROR_DATAGRAM("error while checking mailboxes", state);
         };
 
+        auto error_callback_process = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("error while process mailboxes", state);
+        };
+
         while (message->status() == MessageStatus::RUNNING)
         {
-            checkMailboxes(error_callback);
-            processMessages(error_callback);
+            checkMailboxes(error_callback_check);
+            processMessages(error_callback_process);
             sleep(tiny_wait);
         }
 
@@ -35,7 +40,7 @@ namespace kickcat
             waitForMessage(sdo);
             if (sdo->status() != MessageStatus::SUCCESS)
             {
-                THROW_ERROR_CODE("Error while reading SDO", sdo->status());
+                THROW_ERROR_CODE("Error while reading SDO", error::category::CoE, sdo->status());
             }
             return;
         }
@@ -62,7 +67,7 @@ namespace kickcat
 
             if (sdo->status() != MessageStatus::SUCCESS)
             {
-                THROW_ERROR_CODE("Error while reading SDO - emulated complete access", sdo->status());
+                THROW_ERROR_CODE("Error while reading SDO - emulated complete access", error::category::CoE, sdo->status());
             }
 
             pos += size;
@@ -79,7 +84,7 @@ namespace kickcat
         waitForMessage(sdo);
         if (sdo->status() != MessageStatus::SUCCESS)
         {
-            THROW_ERROR_CODE("Error while writing SDO", sdo->status());
+            THROW_ERROR_CODE("Error while writing SDO", error::category::CoE, sdo->status());
         }
     }
 }
