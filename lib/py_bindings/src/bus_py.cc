@@ -72,6 +72,12 @@ namespace kickcat
                     self.processDataRead(read_error);
                     self.processDataWrite(write_error);
                 })
+            .def("process_data_noop", [](Bus &self)
+                {
+                    auto noop =[](DatagramState const&){};
+                    self.processDataRead(noop);
+                    self.processDataWrite(noop);
+                })
             .def("process_mailboxes", [](Bus &self)
                 {
                     auto check_error = [](DatagramState const& state)
