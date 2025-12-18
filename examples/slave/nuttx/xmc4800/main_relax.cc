@@ -35,6 +35,12 @@ int main(int, char*[])
         buffer_out[i] = 0xFF;
     }
 
+    mailbox::response::Mailbox mbx(&esc, 1024);
+    auto dictionary = CoE::createOD();
+    mbx.enableCoE(std::move(dictionary));
+
+    slave.setMailbox(&mbx);
+
     pdo.setInput(buffer_in);
     pdo.setOutput(buffer_out);
 
