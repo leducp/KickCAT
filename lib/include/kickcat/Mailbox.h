@@ -197,6 +197,8 @@ namespace kickcat::mailbox::response
         // Access on the next message to send: mainly for unit test
         std::vector<uint8_t> const& readyToSend() const { return to_send_.front(); }
 
+        CoE::Dictionary& getObjectDictionary() { return dictionary_; }
+
     private:
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
 
