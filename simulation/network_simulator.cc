@@ -77,8 +77,8 @@ int main(int argc, char* argv[])
 
         inputPdo.push_back(new uint8_t[1024]);
         outputPdo.push_back(new uint8_t[1024]);
-        pdos.back().setInput(inputPdo.back());
-        pdos.back().setOutput(outputPdo.back());
+        pdos.back().setInput(inputPdo.back(), sizeof(inputPdo.back()));
+        pdos.back().setOutput(outputPdo.back(), sizeof(outputPdo.back()));
     }
 
     CoE::EsiParser parser;

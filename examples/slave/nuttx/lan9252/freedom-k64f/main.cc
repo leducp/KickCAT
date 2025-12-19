@@ -19,8 +19,8 @@ using namespace kickcat;
 
 int main(int argc, char *argv[])
 {
-    (void) argc;
-    (void) argv;
+    (void)argc;
+    (void)argv;
 
     std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
     spi_driver->open("/dev/spi0", 0, 0, 10000000);
@@ -34,13 +34,15 @@ int main(int argc, char *argv[])
     PDO pdo(&esc);
     slave::Slave slave(&esc, &pdo);
 
-    constexpr uint32_t pdo_size = 16;
+    // The master can request less inputs/ouputs and these buffers are the space
+    // that the slave app allocated to let the master play with the mapping.
+    constexpr uint32_t PDO_MAX_SIZE = 16;
 
-    uint8_t buffer_in[pdo_size];
-    uint8_t buffer_out[pdo_size];
+    uint8_t buffer_in[PDO_MAX_SIZE];
+    uint8_t buffer_out[PDO_MAX_SIZE];
 
     // init values
-    for (uint32_t i = 0; i < pdo_size; ++i)
+    for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
     {
         buffer_in[i] = i;
         buffer_out[i] = 0xFF;
@@ -51,8 +53,8 @@ int main(int argc, char *argv[])
     mbx.enableCoE(std::move(dictionary));
 
     slave.setMailbox(&mbx);
-    pdo.setInput(buffer_in);
-    pdo.setOutput(buffer_out);
+    pdo.setInput(buffer_in, PDO_MAX_SIZE);
+    pdo.setOutput(buffer_out, PDO_MAX_SIZE);
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
@@ -89,46 +91,75 @@ int main(int argc, char *argv[])
     constexpr uint8_t LED_G_BIT = 1 << 1;
     constexpr uint8_t LED_B_BIT = 1 << 2;
 
+    bool pdo_configured = false;
+
+    int16_t *ax = nullptr;
+    int16_t *ay = nullptr;
+    int16_t *az = nullptr;
+    int16_t *mx = nullptr;
+    int16_t *my = nullptr;
+    int16_t *mz = nullptr;
+
+    uint8_t *led_r = nullptr;
+    uint8_t *led_g = nullptr;
+    uint8_t *led_b = nullptr;
+
     while (true)
     {
         slave.routine();
 
-        if (slave.state() == State::SAFE_OP)
+        const State state = slave.state();
+
+        if (state == State::SAFE_OP)
         {
-            if (buffer_out[0] != 0xFF)
+            auto &dict = mbx.getDictionary();
+
+            slave.bind(0x6000, ax);
+            slave.bind(0x6001, ay);
+            slave.bind(0x6002, az);
+            slave.bind(0x6003, mx);
+            slave.bind(0x6004, my);
+            slave.bind(0x6005, mz);
+            slave.bind(0x7000, led_r);
+            slave.bind(0x7001, led_g);
+            slave.bind(0x7002, led_b);
+
+            if (buffer_out[1] != 0xFF)
             {
                 slave.validateOutputData();
             }
         }
-
-        // Read sensors and fill buffer_in
-        if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
+        else if (state == State::OPERATIONAL)
         {
-            buffer_in[0] = sensor_data.accel.x & 0xFF;
-            buffer_in[1] = (sensor_data.accel.x >> 8) & 0xFF;
-            buffer_in[2] = sensor_data.accel.y & 0xFF;
-            buffer_in[3] = (sensor_data.accel.y >> 8) & 0xFF;
-            buffer_in[4] = sensor_data.accel.z & 0xFF;
-            buffer_in[5] = (sensor_data.accel.z >> 8) & 0xFF;
-            buffer_in[6] = sensor_data.magn.x & 0xFF;
-            buffer_in[7] = (sensor_data.magn.x >> 8) & 0xFF;
-            buffer_in[8] = sensor_data.magn.y & 0xFF;
-            buffer_in[9] = (sensor_data.magn.y >> 8) & 0xFF;
-            buffer_in[10] = sensor_data.magn.z & 0xFF;
-            buffer_in[11] = (sensor_data.magn.z >> 8) & 0xFF;
-        }
 
-        // Update LEDs based on output PDO
-        userled_set_t led_set = 0;
-        if (buffer_out[0]) led_set |= LED_R_BIT;
-        if (buffer_out[1]) led_set |= LED_G_BIT;
-        if (buffer_out[2]) led_set |= LED_B_BIT;
+            if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
+            {
+                *ax = sensor_data.accel.x;
+                *ay = sensor_data.accel.y;
+                *az = sensor_data.accel.z;
+                *mx = sensor_data.magn.x;
+                *my = sensor_data.magn.y;
+                *mz = sensor_data.magn.z;
+            }
 
-        int ret = ioctl(led_fd, ULEDIOC_SETALL, led_set);
-        if (ret < 0)
-        {
-            int errcode = errno;
-            printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errcode);
+            userled_set_t led_set = 0;
+            if (*led_r)
+            {
+                led_set |= LED_R_BIT;
+            }
+            if (*led_g)
+            {
+                led_set |= LED_G_BIT;
+            }
+            if (*led_b)
+            {
+                led_set |= LED_B_BIT;
+            }
+
+            if (ioctl(led_fd, ULEDIOC_SETALL, led_set) < 0)
+            {
+                printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %s\n", strerror(errno));
+            }
         }
     }
 

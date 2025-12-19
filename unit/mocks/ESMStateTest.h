@@ -41,8 +41,8 @@ public:
             state->setMailbox(&mbx_);
         }
 
-        pdo_.setInput(buffer_in_);
-        pdo_.setOutput(buffer_out_);
+        pdo_.setInput(buffer_in_, sizeof(buffer_in_));
+        pdo_.setOutput(buffer_out_, sizeof(buffer_out_));
 
         SetUpSpecific();
     }

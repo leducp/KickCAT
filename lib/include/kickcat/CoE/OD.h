@@ -196,6 +196,7 @@ namespace kickcat::CoE
         std::string  description;
 
         void* data{nullptr};
+        bool is_mapped{false};
 
         /// Called before access
         std::vector<std::function<void(uint16_t access, Entry*)>> before_access;

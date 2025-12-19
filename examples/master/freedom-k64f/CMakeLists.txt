@@ -1,5 +1,11 @@
-set(EXAMPLE_SRCS freedom_k64f_example.cc)
+add_executable(freedom_k64f_static_map_example freedom_k64f_static_map_example.cc)
+target_link_libraries(freedom_k64f_static_map_example kickcat)
+set_kickcat_properties(freedom_k64f_static_map_example)
 
-add_executable(freedom_k64f_example ${EXAMPLE_SRCS})
-target_link_libraries(freedom_k64f_example kickcat argparse::argparse)
-set_kickcat_properties(freedom_k64f_example)
+add_executable(freedom_k64f_accel_map_example freedom_k64f_accel_map_example.cc)
+target_link_libraries(freedom_k64f_accel_map_example kickcat)
+set_kickcat_properties(freedom_k64f_accel_map_example)
+
+add_executable(freedom_k64f_mag_map_example freedom_k64f_mag_map_example.cc)
+target_link_libraries(freedom_k64f_mag_map_example kickcat)
+set_kickcat_properties(freedom_k64f_mag_map_example)

@@ -110,7 +110,16 @@ namespace kickcat::ESM
         {
             if (pdo_.configure() != 0)
             {
-                return Context::build(id_);
+                return Context::build(id_, StatusCode::INVALID_SYNC_MANAGER_CONFIGURATION);
+            }
+
+            if (mbx_)
+            {
+                StatusCode mapping_rc = pdo_.configureMapping(mbx_->getDictionary());
+                if (mapping_rc != StatusCode::NO_ERROR)
+                {
+                    return Context::build(id_, mapping_rc);
+                }
             }
 
             StatusCode pdo_sm_config_status_code = pdo_.isConfigOk();
