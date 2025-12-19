@@ -44,10 +44,11 @@ namespace kickcat::CoE
                 "RxPDO Map 1",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x3);
-            CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x70000008);
-            CoE::addEntry<uint32_t>(object,2,32,16,7,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 2",0x70010008);
-            CoE::addEntry<uint32_t>(object,3,32,16,7,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 3",0x70020008);
+            // CHANGED: Access from 7 (read-only) to 63 (read-write in PRE_OP)
+            CoE::addEntry<uint8_t>(object,0,8,0,63,static_cast<CoE::DataType>(5),"Subindex 000",0x3);
+            CoE::addEntry<uint32_t>(object,1,32,16,63,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x70000008);
+            CoE::addEntry<uint32_t>(object,2,32,48,63,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 2",0x70010008);
+            CoE::addEntry<uint32_t>(object,3,32,80,63,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 3",0x70020008);
             dictionary.push_back(std::move(object));
         }
 
@@ -59,13 +60,15 @@ namespace kickcat::CoE
                 "TxPDO Map 1",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x6);
-            CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0x60000010);
-            CoE::addEntry<uint32_t>(object,2,32,48,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 2",0x60010010);
-            CoE::addEntry<uint32_t>(object,3,32,80,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 3",0x60020010);
-            CoE::addEntry<uint32_t>(object,4,32,112,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 4",0x60030010);
-            CoE::addEntry<uint32_t>(object,5,32,144,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 5",0x60040010);
-            CoE::addEntry<uint32_t>(object,6,32,176,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 6",0x60050010);
+            // CHANGED: Access from 7 (read-only) to 63 (read-write in PRE_OP)
+            // Default to all 6 sensors, but master can change this
+            CoE::addEntry<uint8_t>(object,0,8,0,63,static_cast<CoE::DataType>(5),"Subindex 000",0x6);
+            CoE::addEntry<uint32_t>(object,1,32,16,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0x60000010);
+            CoE::addEntry<uint32_t>(object,2,32,48,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 2",0x60010010);
+            CoE::addEntry<uint32_t>(object,3,32,80,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 3",0x60020010);
+            CoE::addEntry<uint32_t>(object,4,32,112,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 4",0x60030010);
+            CoE::addEntry<uint32_t>(object,5,32,144,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 5",0x60040010);
+            CoE::addEntry<uint32_t>(object,6,32,176,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 6",0x60050010);
             dictionary.push_back(std::move(object));
         }
 
@@ -164,10 +167,10 @@ namespace kickcat::CoE
             {
                 0x6004,
                 CoE::ObjectCode::VAR,
-                "max_y",
+                "mag_y",
                 {}
             };
-            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"max_y",0);
+            CoE::addEntry<int16_t>(object,0,16,0,135,static_cast<CoE::DataType>(3),"mag_y",0);
             dictionary.push_back(std::move(object));
         }
 
