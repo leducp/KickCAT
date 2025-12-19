@@ -314,6 +314,10 @@ int main(int argc, char *argv[])
     SensorData sensor_values = {0};
     LedData led_values = {0};
 
+    // Print buffer_in and buffer_out addresses
+    printf("buffer_in address: %p\n", static_cast<void *>(buffer_in));
+    printf("buffer_out address: %p\n", static_cast<void *>(buffer_out));
+
     while (true)
     {
         slave.routine();
@@ -331,6 +335,10 @@ int main(int argc, char *argv[])
                 printf("=== PDO Configuration Successful ===\n");
                 printf("TxPDO size: %zu bytes\n", pdo_manager.getTxPdoSize());
                 printf("RxPDO size: %zu bytes\n", pdo_manager.getRxPdoSize());
+
+                // Print buffer_in and buffer_out addresses
+                printf("buffer_in address: %p\n", static_cast<void *>(buffer_in));
+                printf("buffer_out address: %p\n", static_cast<void *>(buffer_out));
 
                 pdo_configured = true;
             }
@@ -367,9 +375,12 @@ int main(int argc, char *argv[])
 
         // Update LEDs based on output PDO
         userled_set_t led_set = 0;
-        if (buffer_out[0]) led_set |= LED_R_BIT;
-        if (buffer_out[1]) led_set |= LED_G_BIT;
-        if (buffer_out[2]) led_set |= LED_B_BIT;
+        if (buffer_out[0])
+            led_set |= LED_R_BIT;
+        if (buffer_out[1])
+            led_set |= LED_G_BIT;
+        if (buffer_out[2])
+            led_set |= LED_B_BIT;
 
         int ret = ioctl(led_fd, ULEDIOC_SETALL, led_set);
         if (ret < 0)
