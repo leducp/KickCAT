@@ -50,18 +50,18 @@ echo "- NuttX src:    $nuttx_src"
 echo "- Build dir:    $build_dir"
 
 mkdir -p "$build_dir"
-# make -C "$nuttx_src" distclean || true
+make -C "$nuttx_src" distclean || true
 
-# # Copy configuration file
-# NUTTX_CONFIG_PATH="$nuttx_src/boards/${BOARD_PATH}/configs/${CONFIG_NAME}"
-# mkdir -p "$NUTTX_CONFIG_PATH"
-# cp "$DEFCONFIG_SRC" "$NUTTX_CONFIG_PATH/defconfig"
+# Copy configuration file
+NUTTX_CONFIG_PATH="$nuttx_src/boards/${BOARD_PATH}/configs/${CONFIG_NAME}"
+mkdir -p "$NUTTX_CONFIG_PATH"
+cp "$DEFCONFIG_SRC" "$NUTTX_CONFIG_PATH/defconfig"
 
-# # Configure NuttX
-# "$nuttx_src/tools/configure.sh" -l -E "${BOARD}:${CONFIG_NAME}"
+# Configure NuttX
+"$nuttx_src/tools/configure.sh" -l -E "${BOARD}:${CONFIG_NAME}"
 
-# # Export NuttX
-# make -C "$nuttx_src" export -j$(nproc)
+# Export NuttX
+make -C "$nuttx_src" export -j$(nproc)
 
 rm -rf "${build_dir}/nuttx-export"
 mkdir -p "${build_dir}/nuttx-export"
