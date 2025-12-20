@@ -98,10 +98,18 @@ namespace kickcat
 
     void Lan9252::writeInternalRegister(uint16_t address, void const* payload, uint16_t size)
     {
+        // align write to 32 bits
+        uint16_t to_write = size;
+        uint16_t remaining = size % 4;
+        if (remaining != 0)
+        {
+            to_write += (4 - remaining);
+        }
+
         InternalRegisterControl cmd{WRITE, hton<uint16_t>(address), {}};
         std::memcpy(cmd.payload, payload, size);
         spi_interface_->enableChipSelect();
-        spi_interface_->write(&cmd, CSR_CMD_HEADER_SIZE + size);
+        spi_interface_->write(&cmd, CSR_CMD_HEADER_SIZE + to_write);
         spi_interface_->disableChipSelect();
     }
 
@@ -132,7 +140,6 @@ namespace kickcat
     {
         if (address < 0x1000)
         {
-
             uint16_t to_read = size;
             uint8_t* bufferPos = static_cast<uint8_t*>(data);
 
