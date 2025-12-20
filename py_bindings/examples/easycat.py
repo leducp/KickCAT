@@ -71,14 +71,14 @@ def main():
     else:
         print(f"Error reading serial: {msg.status()}")
 
-    # print("Running loop...")
-    # while True:
-    #     try:
-    #         bus.process_data()
-    #         print(f"input: {easycat.input_data.hex()}", end="\r", flush=True)
-    #         time.sleep(0.004)
-    #     except Exception as e:
-    #         print(f"Error in loop iteration: {e}")
+    print("Running loop...")
+    while True:
+        try:
+            bus.process_data()
+            print(f"input: {easycat.input_data.hex()}", end="\r", flush=True)
+            time.sleep(0.004)
+        except Exception as e:
+            print(f"Error in loop iteration: {e}")
 
 
 if __name__ == "__main__":
