@@ -136,12 +136,6 @@ namespace kickcat
             printf("Checksum Mismatch !! Load default eeprom \n");
             load_default_eeprom_ = true;
         }
-
-        // debug print:
-        for(uint32_t i = 0; i < 20; i++)
-        {
-            printf("EEPROM %" PRIu32 " : %x\n", i, eeprom_[i]);
-        }
     }
 
 
