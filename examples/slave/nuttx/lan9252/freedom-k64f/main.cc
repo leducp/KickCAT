@@ -328,7 +328,7 @@ int main(int argc, char *argv[])
             printf("\n=== Parsing PDO Configuration ===\n");
 
             // Get the actual OD that reflects master's writes
-            auto &od = mbx.getObjectDictionary();
+            auto &od = mbx.getDictionary();
 
             if (pdo_manager.parseTxPdoMapping(od) && pdo_manager.parseRxPdoMapping(od))
             {
