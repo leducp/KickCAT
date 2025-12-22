@@ -5,10 +5,10 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
+#include "kickcat/CoE/CiA/DS402/StateMachine.h"
 
 #include "ElmoProtocol.h"
 #include "CanOpenErrors.h"
-#include "CanOpenStateMachine.h"
 
 
 using namespace kickcat;
@@ -125,9 +125,9 @@ int main(int argc, char* argv[])
     Slave& elmo = bus.slaves().at(0);
     pdo::Output* output_pdo = reinterpret_cast<pdo::Output*>(elmo.output.data);
     pdo::Input* input_pdo = reinterpret_cast<pdo::Input*>(elmo.input.data);
-    CANOpenStateMachine elmo_state_machine;
+    CoE::CiA::DS402::StateMachine elmo_state_machine;
 
-    elmo_state_machine.setCommand(CANOpenCommand::ENABLE);
+    elmo_state_machine.enable();
 
     // Setting a small torque
     output_pdo->mode_of_operation = 4;
@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
 
         // Update Elmo at each step to receive emergencies in case of failure
         elmo_state_machine.update(input_pdo->status_word);
-        output_pdo->control_word = elmo_state_machine.getControlWord();
+        output_pdo->control_word = elmo_state_machine.controlWord();
         if (elmo.mailbox.emergencies.size() > 0)
         {
             for (auto& em : elmo.mailbox.emergencies)

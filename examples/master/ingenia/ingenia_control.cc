@@ -11,9 +11,9 @@ feel free to adapt it if you need to control more than one slave.
 #include "kickcat/Link.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
+#include "kickcat/CoE/CiA/DS402/StateMachine.h"
 
 #include "CanOpenErrors.h"
-#include "CanOpenStateMachine.h"
 #include "IngeniaProtocol.h"
 
 
@@ -122,8 +122,15 @@ int main(int argc, char *argv[])
 
     try
     {
+        auto cyclic_process_data = [&]()
+        {
+            auto noop =[](DatagramState const&){};
+            bus.processDataRead (noop);
+            bus.processDataWrite(noop);
+        };
+
         bus.requestState(State::OPERATIONAL);
-        bus.waitForState(State::OPERATIONAL, 100ms);
+        bus.waitForState(State::OPERATIONAL, 100ms, cyclic_process_data);
     }
     catch (ErrorAL const &e)
     {
@@ -141,11 +148,11 @@ int main(int argc, char *argv[])
     Slave &ingenia = bus.slaves().at(0);
     pdo::Output *output_pdo = reinterpret_cast<pdo::Output *>(ingenia.output.data);
     pdo::Input *input_pdo = reinterpret_cast<pdo::Input *>(ingenia.input.data);
-    CANOpenStateMachine ingenia_state_machine;
+    CoE::CiA::DS402::StateMachine ingenia_state_machine;
 
     printf("mapping: input(%d) output(%d)\n", ingenia.input.bsize, ingenia.output.bsize);
 
-    ingenia_state_machine.setCommand(CANOpenCommand::ENABLE);
+    ingenia_state_machine.enable();
 
     // Setting a small torque
     output_pdo->mode_of_operation = 5;
@@ -184,7 +191,7 @@ int main(int argc, char *argv[])
 
         // Update Ingenia at each step to receive emergencies in case of failure
         ingenia_state_machine.update(input_pdo->status_word);
-        output_pdo->control_word = ingenia_state_machine.getControlWord();
+        output_pdo->control_word = ingenia_state_machine.controlWord();
         if (ingenia.mailbox.emergencies.size() > 0)
         {
             for (auto &em : ingenia.mailbox.emergencies)

@@ -274,14 +274,37 @@ namespace kickcat
         constexpr uint16_t SYNC_MANAGER_3  = SYNC_MANAGER + 8 * 3;
         constexpr uint16_t SM_STATS = 5;
 
-        constexpr uint16_t DC_TIME            = 0x900;
-        constexpr uint16_t DC_SYSTEM_TIME     = 0x910;
-        constexpr uint16_t DC_SPEED_CNT_START = 0x930;
-        constexpr uint16_t DC_TIME_FILTER     = 0x934;
-        constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
-        constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
+        // Distributed clocks registers
+        constexpr uint16_t DC_RECEIVED_TIME             = 0x900;
+        constexpr uint16_t DC_SYSTEM_TIME               = 0x910;
+        constexpr uint16_t DC_ECAT_RECEIVED_TIME        = 0x918;
+        constexpr uint16_t DC_SYSTEM_TIME_OFFSET        = 0x920;
+        constexpr uint16_t DC_SYSTEM_TIME_DELAY         = 0x928;
+        constexpr uint16_t DC_SYSTEM_TIME_DIFF          = 0x92C;
+        constexpr uint16_t DC_SPEED_CNT_START           = 0x930;
+        constexpr uint16_t DC_SPEED_CNT_DIFF            = 0x932;
+        constexpr uint16_t DC_TIME_FILTER               = 0x934;
+        constexpr uint16_t DC_SPEED_CNT_FILTER_DEPTH    = 0x935;
+        constexpr uint16_t DC_CYCLIC_CONTROL            = 0x980;
+        constexpr uint16_t DC_SYNC_ACTIVATION           = 0x981;
+        constexpr uint16_t DC_SYNC_PULSE_LENGTH         = 0x982;
+        constexpr uint16_t DC_ACTIVATION_STATUS         = 0x984;
+        constexpr uint16_t DC_SYNC0_STATUS              = 0x98E;
+        constexpr uint16_t DC_START_TIME                = 0x990;
+        constexpr uint16_t DC_SYNC0_CYCLE_TIME          = 0x9A0;
+        constexpr uint16_t DC_SYNC1_CYCLE_TIME          = 0x9A4;
 
-        constexpr uint16_t LATCH_STATUS = 0x9AE;
+        constexpr uint16_t DC_LATCH0_CONTROL            = 0x9A8;
+        constexpr uint16_t DC_LATCH1_CONTROL            = 0x9A9;
+        constexpr uint16_t DC_LATCH0_STATUS             = 0x9AE;
+        constexpr uint16_t DC_LATCH1_STATUS             = 0x9AF;
+        constexpr uint16_t DC_LATCH0_TIME_POSITIVE_EDGE = 0x9B0;
+        constexpr uint16_t DC_LATCH0_TIME_NEGATIVE_EDGE = 0x9B8;
+        constexpr uint16_t DC_LATCH1_TIME_POSITIVE_EDGE = 0x9C0;
+        constexpr uint16_t DC_LATCH1_TIME_NEGATIVE_EDGE = 0x9C8;
+
+        constexpr uint16_t DC_ECAT_BUFFER_CHANGE_EVENT_TIME = 0x9F0;
+        constexpr uint16_t DC_PDI_BUFFER_CHANGE_EVENT_TIME  = 0x9F8;
     }
 
     constexpr uint8_t  PDI_EMULATION = 0x1; // is PDI config emulated

@@ -24,6 +24,14 @@ namespace kickcat
         // 0ms disables the watchdog
         void init(nanoseconds watchdog = 100ms);
 
+        /// \brief Enable Distributed Clock
+        /// \details  Shall be called in PRE-OP, but some slaves needs a call in INIT
+        /// \param    cycle_time    Duration of the slave cycle time
+        /// \param    shift_cycle   When the DC SYNC0 shall be generated in the cycle
+        /// \param    start_delay   Delay before activating the DC cycle
+        /// \return   an absolute time point that serve as a sync point with the slaves DC cycle
+        nanoseconds enableDC(nanoseconds cycle_time = 1ms, nanoseconds shift_cycle = 500us, nanoseconds start_delay = 100ms);
+
         /// \return the number of slaves detected on the bus
         int32_t detectedSlaves() const;
 
@@ -79,6 +87,16 @@ namespace kickcat
         void checkMailboxes( std::function<void(DatagramState const&)> const& error);
         void processMessages(std::function<void(DatagramState const&)> const& error);
 
+        // DC
+        void sendDriftCompensation(std::function<void(DatagramState const&)> const& error);
+
+        /// \brief  Check if distributed clocks are synchronized
+        /// \details Reads the system time difference register (0x092C) of each DC slave.
+        ///          The value converges to zero when the slave is synchronized with the reference clock.
+        /// \param  threshold  Maximum acceptable time difference in nanoseconds
+        /// \return true if all DC slaves are synchronized within the given threshold
+        bool isDCSynchronized(nanoseconds threshold = 1000ns);
+
 
         enum Access
         {
@@ -119,6 +137,7 @@ namespace kickcat
 
         void resetSlaves(nanoseconds watchdog);
         void fetchESC();
+        void fetchDL();
 
         // mailbox helpers
         void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
@@ -138,6 +157,11 @@ namespace kickcat
         void detectMapping();
         void readMappedPDO(Slave& slave, uint16_t index);
         void configureFMMUs();
+
+        // DC helpers
+        void fetchReceivedTimes();
+        void computePropagationDelay(nanoseconds master_time); // Master time (ref point is EtherCAT epoch, NOT UNIX epoch)
+        void applyMasterTime();
 
         std::shared_ptr<AbstractLink> link_;
         std::vector<Slave> slaves_;
@@ -166,6 +190,8 @@ namespace kickcat
         nanoseconds big_wait{10ms};
 
         uint16_t irq_mask_{0};
+
+        Slave* dc_slave_{nullptr};
     };
 
     /**

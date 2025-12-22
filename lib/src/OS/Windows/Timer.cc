@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <stdexcept>
-#include <unistd.h>
+#include <thread>
+
 #include "kickcat/Error.h"
 #include "kickcat/OS/Timer.h"
 
@@ -62,34 +63,18 @@ namespace kickcat
                        { return not is_stopped_; });
         }
 
-        // Wait to the next working time.
-        timespec const deadline = to_timespec(next_deadline_);
-        int rc = clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
-        if (rc != 0)
+        nanoseconds now = since_epoch();
+        if (next_deadline_ > now)
         {
-            if (rc == EINTR)
-            {
-                // timer interrupted: to be called again if needed by the client
-                return std::error_code{rc, std::system_category()};
-            }
-
-            // no recoverable errors (wrong clock, bad deadline, bad deadline **address**)
-            throw std::system_error(rc, std::system_category(), "clock_nanosleep()");
+            std::this_thread::sleep_for(next_deadline_ - now);
         }
         last_wakeup_ = since_epoch();
 
-        // Calculate next deadline.
         next_deadline_ += period_;
         if (next_deadline_ < last_wakeup_)
         {
             printf("!!! LATE !!!\n");
         }
-        //while (next_deadline_ < last_wakeup_)
-        //{
-        //    // We are late: compute a new deadline that maintain the cycle.
-        //    next_deadline_ += period_;
-        //    printf("!!! LATE !!!\n");
-        //}
 
         return {};
     }

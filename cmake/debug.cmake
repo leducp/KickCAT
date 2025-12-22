@@ -141,3 +141,19 @@ option(DEBUG_SPI_INFO    "Enable spi debug info level traces" OFF)
 if (DEBUG_SPI_INFO)
   add_compile_definitions(DEBUG_SPI_INFO)
 endif()
+
+#### DC debug management
+option(DEBUG_DC_ERROR   "Enable distributed clock error level traces" OFF)
+if (DEBUG_DC_ERROR)
+  add_compile_definitions(DEBUG_DC_ERROR)
+endif()
+
+option(DEBUG_DC_WARNING "Enable distributed clock warning level traces" OFF)
+if (DEBUG_DC_WARNING)
+  add_compile_definitions(DEBUG_DC_WARNING)
+endif()
+
+option(DEBUG_DC_INFO    "Enable distributed clock info level traces" OFF)
+if (DEBUG_DC_INFO)
+  add_compile_definitions(DEBUG_DC_INFO)
+endif()

@@ -19,7 +19,6 @@ namespace kickcat
     /// \param redundant_if Name of the network interface to use. If '?', the user will choose between the system interfaces lists
     /// \return A created socket
     std::tuple<std::shared_ptr<AbstractSocket>, std::shared_ptr<AbstractSocket>> createSockets(std::string nominal_if, std::string redundant_if);
-
 }
 
 #endif
