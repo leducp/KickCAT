@@ -56,7 +56,7 @@ namespace kickcat
         ErrorCounters error_counters;
         int previous_errors_sum{0};
 
-        ESCDescription esc;
+        ESC::Description esc;
     };
 
 }

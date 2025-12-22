@@ -137,8 +137,15 @@ int main(int argc, char *argv[])
 
     try
     {
+        auto cyclic_process_data = [&]()
+        {
+            auto noop =[](DatagramState const&){};
+            bus.processDataRead (noop);
+            bus.processDataWrite(noop);
+        };
+
         bus.requestState(State::OPERATIONAL);
-        bus.waitForState(State::OPERATIONAL, 100ms);
+        bus.waitForState(State::OPERATIONAL, 100ms, cyclic_process_data);
     }
     catch (ErrorAL const &e)
     {

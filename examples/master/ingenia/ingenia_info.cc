@@ -144,11 +144,9 @@ int main(int argc, char *argv[])
     printEntryDescription(bus, ingenia, 0x1018, 0,
         CoE::SDO::information::ValueInfo::MAXIMUM);
 
-    printEntryDescription(bus, ingenia, 0x1600, 0,
-        CoE::SDO::information::ValueInfo::DEFAULT);
-
-    printEntryDescription(bus, ingenia, 0x1600, 0,
-        CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
+    printEntryDescription(bus, ingenia, 0x100A, 0, CoE::SDO::information::ValueInfo::DEFAULT);
+    printEntryDescription(bus, ingenia, 0x3112, 0, CoE::SDO::information::ValueInfo::DEFAULT);
+    printEntryDescription(bus, ingenia, 0x20DA, 0, CoE::SDO::information::ValueInfo::DEFAULT);
 
 
     return 0;

@@ -244,7 +244,8 @@ namespace kickcat
 
         constexpr uint16_t PDI_CONTROL        = 0x140;
         constexpr uint16_t ESC_CONFIG         = 0x141;
-        constexpr uint16_t PDI_CONFIGURATION  = 0x14E;
+        constexpr uint16_t PDI_INFORMATION    = 0x14E;
+        constexpr uint16_t PDI_CONFIGURATION  = 0x150;
 
         constexpr uint16_t ECAT_EVENT_MASK = 0x200;
         constexpr uint16_t AL_EVENT_MASK   = 0x204;      // AL event interrupt mask
@@ -273,31 +274,69 @@ namespace kickcat
         constexpr uint16_t SYNC_MANAGER_3  = SYNC_MANAGER + 8 * 3;
         constexpr uint16_t SM_STATS = 5;
 
-        constexpr uint16_t DC_TIME            = 0x900;
-        constexpr uint16_t DC_SYSTEM_TIME     = 0x910;
-        constexpr uint16_t DC_SPEED_CNT_START = 0x930;
-        constexpr uint16_t DC_TIME_FILTER     = 0x934;
-        constexpr uint16_t DC_CYCLIC_CONTROL  = 0x980;
-        constexpr uint16_t DC_SYNC_ACTIVATION = 0x981;
+        // Distributed clocks registers
+        constexpr uint16_t DC_TIME                      = 0x900;
+        constexpr uint16_t DC_SYSTEM_TIME               = 0x910;
+        constexpr uint16_t DC_SYSTEM_TIME_OFFSET        = 0x920;
+        constexpr uint16_t DC_SYSTEM_TIME_DELAY         = 0x928;
+        constexpr uint16_t DC_SPEED_CNT_START           = 0x930;
+        constexpr uint16_t DC_TIME_FILTER               = 0x934;
+        constexpr uint16_t DC_CYCLIC_CONTROL            = 0x980;
+        constexpr uint16_t DC_SYNC_ACTIVATION           = 0x981;
+        constexpr uint16_t DC_SYNC_PULSE_LENGTH         = 0x982;
+        constexpr uint16_t DC_ACTIVATION_STATUS         = 0x984;
+        constexpr uint16_t DC_SYNC0_STATUS              = 0x98E;
+        constexpr uint16_t DC_START_TIME                = 0x990;
+        constexpr uint16_t DC_SYNC0_CYCLE_TIME          = 0x9A0;
+        constexpr uint16_t DC_SYNC1_CYCLE_TIME          = 0x9A4;
 
-        constexpr uint16_t LATCH_STATUS = 0x9AE;
+        constexpr uint16_t DC_LATCH0_CONTROL            = 0x9A8;
+        constexpr uint16_t DC_LATCH1_CONTROL            = 0x9A9;
+        constexpr uint16_t DC_LATCH0_STATUS             = 0x9AE;
+        constexpr uint16_t DC_LATCH1_STATUS             = 0x9AF;
+        constexpr uint16_t DC_LATCH0_TIME_POSITIVE_EDGE = 0x9B0;
+        constexpr uint16_t DC_LATCH0_TIME_NEGATIVE_EDGE = 0x9B8;
+        constexpr uint16_t DC_LATCH1_TIME_POSITIVE_EDGE = 0x9C0;
+        constexpr uint16_t DC_LATCH1_TIME_NEGATIVE_EDGE = 0x9C8;
+
+        constexpr uint16_t DC_ECAT_BUFFER_CHANGE_EVENT_TIME = 0x9F0;
+        constexpr uint16_t DC_PDI_BUFFER_CHANGE_EVENT_TIME  = 0x9F8;
     }
 
     constexpr uint8_t  PDI_EMULATION = 0x1; // is PDI config emulated
     constexpr uint16_t AL_CONTROL_ERR_ACK = 0x10;
     constexpr uint16_t AL_STATUS_ERR_IND = 0x10;
 
-    struct ESCDescription
+    namespace ESC
     {
-        uint8_t type;
-        uint8_t revision;
-        uint16_t build;
-        uint8_t fmmus;
-        uint8_t syncManagers;
-        uint8_t ram_size;
-        uint8_t ports;
-        uint16_t features;
-    }__attribute__((__packed__));
+        struct Description
+        {
+            uint8_t type;
+            uint8_t revision;
+            uint16_t build;
+            uint8_t fmmus;
+            uint8_t syncManagers;
+            uint8_t ram_size;
+            uint8_t ports;
+            uint16_t features;
+        }__attribute__((__packed__));
+
+        namespace feature
+        {
+            constexpr uint16_t FMMU_BYTE_ORIENTED            = (1 << 0);
+            constexpr uint16_t UNUSED_REG_ACCESS             = (1 << 1);
+            constexpr uint16_t DC_AVAILABLE                  = (1 << 2);
+            constexpr uint16_t DC_64_BITS                    = (1 << 3);
+            constexpr uint16_t EBUS_LOW_JITTER               = (1 << 4);
+            constexpr uint16_t EBUS_ENHANCED_LINK_DETECTION  = (1 << 5);
+            constexpr uint16_t MII_ENHANCED_LINK_DETECTION   = (1 << 6);
+            constexpr uint16_t FCS_ERROR_SEPARATE_HANDLING   = (1 << 7);
+            constexpr uint16_t DC_ENHANCED_SYNC_ACTIVATION   = (1 << 8);
+            constexpr uint16_t ECAT_LRW                      = (1 << 9);
+            constexpr uint16_t ECAT_B_A_F_RW                 = (1 << 10);
+            constexpr uint16_t FIXED_FMMU_SYNC_CONF          = (1 << 11);
+        }
+    }
 
     struct DLStatus
     {
