@@ -7,6 +7,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/OS/Timer.h"
 
 using namespace kickcat;
 
@@ -61,6 +62,7 @@ int main(int argc, char* argv[])
     link->checkRedundancyNeeded();
 
     Bus bus(link);
+    nanoseconds sync_point = 0ns;
 
     auto print_current_state = [&]()
     {
@@ -77,8 +79,21 @@ int main(int argc, char* argv[])
         printf("Initializing Bus...\n");
         bus.init(100ms);  // to adapt to your use case
 
-        printf("Init done\n");
         printf("Detected slaves: %zu\n", bus.slaves().size());
+
+        printf("Enabling DC...\n");
+        bus.requestState(State::INIT);
+        bus.waitForState(State::INIT, 5s);
+        sync_point = bus.enableDC(1ms, 500us, 100ms);
+        printf("DC sync point: %f, now: %f, delta: %f\n", 
+            seconds_f(sync_point).count(),
+            seconds_f(since_epoch()).count(),
+            seconds_f(sync_point - since_epoch()).count());
+
+        bus.requestState(State::PRE_OP);
+        bus.waitForState(State::PRE_OP, 3s);
+
+        printf("Init done\n");
         for (auto& slave : bus.slaves())
         {
             printf(" - Slave %d\n", slave.address);
@@ -158,14 +173,20 @@ int main(int argc, char* argv[])
     link->setTimeout(10ms); // Adapt to your use case (RT loop)
     MailboxSequencer mailbox_sequencer(bus);
 
+    Timer timer{1ms};
+    timer.start(sync_point);
+
     printf("Running loop...\n");
 
+    int64_t i = 0;
+    bool synced = true;
     while (true)
     {
-        sleep(1ms);
+        timer.wait_next_tick();
 
         try
         {
+            bus.sendDriftCompensation(callback_error);
             bus.sendLogicalRead(callback_error);
             bus.sendLogicalWrite(callback_error);
             bus.sendRefreshErrorCounters(callback_error);
@@ -174,12 +195,19 @@ int main(int argc, char* argv[])
 
             bus.processAwaitingFrames();
 
+            if ((i % 1000) == 0)
+            {
+                synced = bus.isDCSynchronized(1000ns, true);
+            }
+
+            // Clear line and print status
+            printf("\033[KDC status: %s\n", synced ? "SYNCED" : "DRIFT DETECTED");
+
             // Clear line and print all slave inputs
-            printf("\033[K");  // Clear line
             for (size_t idx = 0; idx < bus.slaves().size(); ++idx)
             {
                 auto& slave = bus.slaves().at(idx);
-                printf("input_slave_%zu: ", idx);
+                printf("\033[Kinput_slave_%zu: ", idx);
                 for (int32_t j = 0; j < slave.input.bsize; ++j)
                 {
                     printf("%02x", slave.input.data[j]);
@@ -187,13 +215,14 @@ int main(int argc, char* argv[])
                 printf("\n");
             }
             // Move cursor up
-            printf("\033[%zuA", bus.slaves().size());
+            printf("\033[%zuA", bus.slaves().size() + 1);
             fflush(stdout);
         }
         catch (std::exception const& e)
         {
             printf("\nError in loop iteration: %s\n\n", e.what());
         }
+        i++;
     }
 
     return 0;
