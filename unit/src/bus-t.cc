@@ -134,7 +134,7 @@ public:
 
         // fetch ESC
         checkSendFrameSimple(Command::FPRD);
-        io_nominal->handleReply<ESCDescription>({ESCDescription{0x4, 0, 0, 8, 8, 16, 0xf, 0x1cc}});
+        io_nominal->handleReply<ESC::Description>({ESC::Description{0x4, 0, 0, 8, 8, 16, 0xf, 0x1cc}});
 
         // request state: INIT
         checkSendFrameSimple(Command::BWR);

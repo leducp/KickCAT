@@ -190,7 +190,7 @@ namespace kickcat
         std::string features;
 
         features += " - FMMU:                            ";
-        if (esc_features & (1 << 0))
+        if (esc_features & ESC::feature::FMMU_BYTE_ORIENTED)
         {
             features += "Byte-oriented\n";
         }
@@ -200,7 +200,7 @@ namespace kickcat
         }
 
         features += " - Unused register access:          ";
-        if (esc_features & (1 << 1))
+        if (esc_features & ESC::feature::UNUSED_REG_ACCESS)
         {
             features += "not supported\n";
         }
@@ -210,7 +210,7 @@ namespace kickcat
         }
 
         features += " - Distributed clocks:              ";
-        if (esc_features & (1 << 2))
+        if (esc_features & ESC::feature::DC_AVAILABLE)
         {
             features += "available\n";
         }
@@ -220,7 +220,7 @@ namespace kickcat
         }
 
         features += " - Distributed clocks (width):      ";
-        if (esc_features & (1 << 3))
+        if (esc_features & ESC::feature::DC_64_BITS)
         {
             features += "64 bits\n";
         }
@@ -230,7 +230,7 @@ namespace kickcat
         }
 
         features += " - Low jitter EBUS:                 ";
-        if (esc_features & (1 << 4))
+        if (esc_features & ESC::feature::EBUS_LOW_JITTER)
         {
             features += "available, jitter minimized\n";
         }
@@ -240,7 +240,7 @@ namespace kickcat
         }
 
         features += " - Enhanced Link Detection EBUS:    ";
-        if (esc_features & (1 << 5))
+        if (esc_features & ESC::feature::EBUS_ENHANCED_LINK_DETECTION)
         {
             features += "available\n";
         }
@@ -250,7 +250,7 @@ namespace kickcat
         }
 
         features += " - Enhanced Link Detection MII:     ";
-        if (esc_features & (1 << 6))
+        if (esc_features & ESC::feature::MII_ENHANCED_LINK_DETECTION)
         {
             features += "available\n";
         }
@@ -260,7 +260,7 @@ namespace kickcat
         }
 
         features += " - Separate handling of FCS errors: ";
-        if (esc_features & (1 << 7))
+        if (esc_features & ESC::feature::FCS_ERROR_SEPARATE_HANDLING)
         {
             features += "available\n";
         }
@@ -270,7 +270,7 @@ namespace kickcat
         }
 
         features += " - Enhanced DC SYNC Activation:     ";
-        if (esc_features & (1 << 8))
+        if (esc_features & ESC::feature::DC_ENHANCED_SYNC_ACTIVATION)
         {
             features += "available\n";
         }
@@ -280,7 +280,7 @@ namespace kickcat
         }
 
         features += " - EtherCAT LRW support:            ";
-        if (esc_features & (1 << 9))
+        if (esc_features & ESC::feature::ECAT_LRW)
         {
             features += "not available\n";
         }
@@ -290,7 +290,7 @@ namespace kickcat
         }
 
         features += " - EtherCAT read/write support:     ";
-        if (esc_features & (1 << 10))
+        if (esc_features & ESC::feature::ECAT_B_A_F_RW)
         {
             features += "not available\n";
         }
@@ -300,7 +300,7 @@ namespace kickcat
         }
 
         features += " - Fixed FMMU/SM configuration:     ";
-        if (esc_features & (1 << 11))
+        if (esc_features & ESC::feature::FIXED_FMMU_SYNC_CONF)
         {
             features += "fixed\n";
         }

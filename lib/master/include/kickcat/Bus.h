@@ -27,6 +27,8 @@ namespace kickcat
         // 0ms disables the watchdog
         void init(nanoseconds watchdog = 100ms);
 
+        void enableDC();
+
         /// \return the number of slaves detected on the bus
         int32_t detectedSlaves() const;
 
@@ -126,6 +128,34 @@ namespace kickcat
         // mailbox helpers
         void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
 
+        template<typename T>
+        void read_address(uint16_t address)
+        {
+            auto& slave = slaves_.at(0);
+            auto process = [&slave, address](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+
+                T value;
+                std::memcpy(&value, data, sizeof(T));
+                if (sizeof(T) > 4)
+                {
+                    printf("0x%04x -> read 0x%02lx\n", address, value);
+
+                }
+                else
+                {
+                    printf("0x%04x -> read 0x%02x\n", address, value);
+                }
+                return DatagramState::OK;
+            };
+
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, address), nullptr, sizeof(T), process, [](DatagramState const&){});
+        }
+
     protected: // for unit testing
         // helper with trivial bus management (write then read)
         void processFrames();
@@ -169,6 +199,8 @@ namespace kickcat
         nanoseconds big_wait{10ms};
 
         uint16_t irq_mask_{0};
+
+        Slave* dc_slave_{nullptr};
     };
 }
 
