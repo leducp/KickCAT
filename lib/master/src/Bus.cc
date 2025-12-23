@@ -97,7 +97,7 @@ namespace kickcat
         fetchEeprom();
         configureMailboxes();
 
-        enableDC(10ms, 10s); // TODO: to remove, shall be called by the client
+        enableDC(1ms, 10ms);
 
         requestState(State::PRE_OP);
         waitForState(State::PRE_OP, 3000ms);
@@ -629,11 +629,11 @@ namespace kickcat
 
             if (dc_slave_ != nullptr)
             {
-                auto process_dc = [pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+                auto process_dc = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
                 {
                     if (wkc == 0)
                     {
-                        bus_error("Invalid working counter: expected %zu, got %" PRIu16 "\n", pi_frame.outputs.size(), wkc);
+                        bus_error("Invalid working counter:  %" PRIu16 "\n", wkc);
                         return DatagramState::INVALID_WKC;
                     }
                     return DatagramState::OK;
