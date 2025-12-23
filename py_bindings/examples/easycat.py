@@ -32,13 +32,13 @@ def main():
 
     print("Initializing Bus...")
     bus.init(0.1)
-    print(f"Detected slaves: {len(bus.slaves())}")
-    for s in bus.slaves():
+
+    slaves = bus.slaves()
+    print(f"Detected slaves: {len(slaves)}")
+    for s in slaves:
         print(f" - Slave {s.address}")
 
     bus.create_mapping()
-
-    easycat = bus.slaves()[0]
 
     def cyclic_process_data():
         bus.process_data_no_check()
@@ -47,7 +47,10 @@ def main():
     bus.request_state(State.SAFE_OP)
     bus.wait_for_state(State.SAFE_OP, 1.0)
 
-    easycat.set_output_bytes(b"\xbb" * easycat.output_size)
+    # Set output for all slaves
+    for slave in slaves:
+        if slave.output_size > 0:
+            slave.set_output_bytes(b"\xbb" * slave.output_size)
 
     cyclic_process_data()
 
@@ -57,28 +60,34 @@ def main():
     bus.wait_for_state(State.OPERATIONAL, 1.0, cyclic_process_data)
 
     print("After OPERATIONAL - Slave info:")
-    for s in bus.slaves():
+    for s in slaves:
         print(f" - Slave {s.address} input: {s.input_size} output: {s.output_size}")
 
-    # Read serial via mailbox SDO
-    msg = easycat.mailbox.read_sdo(0x1018, 4, False)
-    while msg.status() == MessageStatus.RUNNING:
-        bus.process_mailboxes()
+    # Read serial via mailbox SDO for first slave
+    if len(slaves) > 0:
+        msg = slaves[0].mailbox.read_sdo(0x1018, 4, False)
+        while msg.status() == MessageStatus.RUNNING:
+            bus.process_mailboxes()
 
-    if msg.status() == MessageStatus.SUCCESS:
-        serial = int.from_bytes(msg.data[: msg.size], "little")
-        print(f"Serial: {hex(serial)}")
-    else:
-        print(f"Error reading serial: {msg.status()}")
+        if msg.status() == MessageStatus.SUCCESS:
+            serial = int.from_bytes(msg.data[: msg.size], "little")
+            print(f"Serial: {hex(serial)}")
+        else:
+            print(f"Error reading serial: {msg.status()}")
 
     print("Running loop...")
     while True:
         try:
             bus.process_data()
-            print(f"input: {easycat.input_data.hex()}", end="\r", flush=True)
+
+            print("\033[K", end="")  # Clear line
+            for idx, slave in enumerate(slaves):
+                print(f"input_slave_{idx}: {slave.input_data.hex()}")
+            print(f"\033[{len(slaves)}A", end="", flush=True)  # Move cursor up
+
             time.sleep(0.004)
         except Exception as e:
-            print(f"Error in loop iteration: {e}")
+            print(f"\nError in loop iteration: {e}\n")
 
 
 if __name__ == "__main__":
