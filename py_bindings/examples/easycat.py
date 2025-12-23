@@ -41,7 +41,7 @@ def main():
     easycat = bus.slaves()[0]
 
     def cyclic_process_data():
-        bus.process_data_noop()
+        bus.process_data_no_check()
 
     print("Switching to SAFE_OP...")
     bus.request_state(State.SAFE_OP)
