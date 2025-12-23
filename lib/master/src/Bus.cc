@@ -97,7 +97,7 @@ namespace kickcat
         fetchEeprom();
         configureMailboxes();
 
-        enableDC();
+        enableDC(10ms, 10s); // TODO: to remove, shall be called by the client
 
         requestState(State::PRE_OP);
         waitForState(State::PRE_OP, 3000ms);
@@ -131,7 +131,7 @@ namespace kickcat
     }
 
 
-    void Bus::enableDC()
+    void Bus::enableDC(nanoseconds cycle_time, nanoseconds start_delay)
     {
         for (auto& slave : slaves_)
         {
@@ -149,8 +149,8 @@ namespace kickcat
         }
 
         printf("Found DC slave to use! %d\n", dc_slave_->address);
-        uint32_t cycle_time = static_cast<uint32_t>(nanoseconds(10ms).count());
-        broadcastWrite(reg::DC_SYNC0_CYCLE_TIME, &cycle_time, 4);
+        uint32_t cycle_time_raw = static_cast<uint32_t>(cycle_time.count());
+        broadcastWrite(reg::DC_SYNC0_CYCLE_TIME, &cycle_time_raw, 4);
 
         // get current network time
         uint64_t ecat_time;
@@ -169,12 +169,10 @@ namespace kickcat
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SYSTEM_TIME), nullptr, 8, process, [](DatagramState const&){});
         link_->processDatagrams();
 
-        uint64_t start_time = ecat_time + 10000000000;
+        uint64_t start_time = ecat_time + start_delay.count();
         broadcastWrite(reg::DC_START_TIME, &start_time, sizeof(start_time));
 
-        //uint16_t dc_sync_duration = 10000;
-        //broadcastWrite(reg::DC_SYNC_PULSE_LENGTH, &dc_sync_duration, 2);
-
+        // TODO: use a config in the slave to select the sync method
         uint8_t enable_dc_sync0 = 0x3;
         broadcastWrite(reg::DC_SYNC_ACTIVATION, &enable_dc_sync0, 1);
     }
@@ -693,6 +691,34 @@ namespace kickcat
             };
 
             link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
+
+
+            if (dc_slave_ != nullptr)
+            {
+                auto process_dc = [pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+                {
+                    if (wkc == 0)
+                    {
+                        bus_error("Invalid working counter: expected %zu, got %" PRIu16 "\n", pi_frame.outputs.size(), wkc);
+                        return DatagramState::INVALID_WKC;
+                    }
+                    return DatagramState::OK;
+                };
+
+                //static nanoseconds time = since_epoch();
+                //nanoseconds update = elapsed_time(time);
+                //uint64_t refresh = update.count();
+                //link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &refresh, uint16_t(8),
+                //    process_dc, error);
+
+                uint64_t const clock = 0;
+                link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &clock, uint16_t(8),
+                    process_dc, error);
+
+                //uint8_t const debug_shot = 0x83;
+                //link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYNC_ACTIVATION), &debug_shot, uint16_t(1),
+                //    process_dc, error);
+            }
         }
     }
 
