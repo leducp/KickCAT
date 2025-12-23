@@ -138,6 +138,8 @@ See the [NuttX Prerequisite section](#nuttx-prerequisite) before starting.
 ./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
 
 # Output will be in: build_freedom-k64f/easycat_frdm_k64f.bin
+# We have deployment scripts that are available here is an example:
+./examples/slave/nuttx/lan9252/freedom-k64f/deploy.sh build_freedom-k64f/easycat_frdm_k64f.bin
 ```
 
 ### Step 2: Flash the Firmware
@@ -326,11 +328,20 @@ All slave examples use NuttX RTOS. Use the automated build script:
 # Build for XMC4800
 ./scripts/build_slave_bin.sh xmc4800-relax ~/nuttxspace/nuttx
 
+# Deploy for XMC4800
+./examples/slave/nuttx/xmc4800/deploy.sh build_xmc4800-relax/xmc4800_relax.bin
+
 # Build for Arduino Due
 ./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
 
+# Deploy for Arduino Due
+./examples/slave/nuttx/lan9252/arduino-due/deploy.sh build_arduino-due/easycat_arduino_due.bin
+
 # Build for Freedom K64F
 ./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
+
+# Deploy for Freedom K64F
+/examples/slave/nuttx/lan9252/freedom-k64f/deploy.sh build_freedom-k64f/easycat_frdm_k64f.bin
 ```
 
 <details>
@@ -359,6 +370,44 @@ All slave examples use NuttX RTOS. Use the automated build script:
 
 </details>
 
+---
+
+## Multi-Slave Example
+
+This example demonstrates how to run **multiple EtherCAT slaves** (Freedom and XMC4800) on the same bus and read their data using the EasyCAT Python master.
+
+### 1. Build and deploy the slave firmware
+
+Follow the [Building Slave Examples section](#building-slave-examples) section to build and flash the firmware on both boards:
+- **Freedom board**
+- **XMC4800 board**
+
+Make sure both slaves are running before continuing.
+
+### 2. Connect the hardware
+
+Wire the boards according to the setup below:
+
+![Multi Slave Example Setup](doc/multi-slave-example.png)
+
+Ensure that:
+- All slaves are connected in the correct EtherCAT order
+- The master interface is connected to the first slave
+
+### 3. Run the Python EasyCAT master
+
+Start the EasyCAT Python master to read and display data from each detected slave:
+
+```bash
+python ./py_bindings/examples/easycat.py -i eth0
+```
+Replace eth0 with the network interface connected to your EtherCAT bus if needed
+
+### 3. Expected output
+The master will enumerate all slaves on the bus and continuously print their input/output data.
+
+Expected output:
+![Multi Slave EasyCAT Example Output](doc/multi-slave-easycat-output.gif) 
 ---
 
 ## Simulator
