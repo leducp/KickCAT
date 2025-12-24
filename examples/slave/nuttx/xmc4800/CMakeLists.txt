@@ -1,6 +1,7 @@
 set(TARGET_NAME xmc4800_relax)
 add_executable(${TARGET_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/main_relax.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/od_populator.cc
     ${CMAKE_SOURCE_DIR}/examples/slave/common/xpg_strerror_r.cc)
 target_link_libraries(${TARGET_NAME} kickcat)
 set_kickcat_properties(${TARGET_NAME})

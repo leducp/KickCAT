@@ -30,12 +30,12 @@ namespace pdo
 
 namespace freedom
 {
-    // POC 1: Only magenetometer data
+    // POC 2: Only magnetometer data
     struct fxos8700cq_mag_only
     {
-        int16_t magenetometerX; // mapped 0x6000
-        int16_t magenetometerY; // mapped 0x6001
-        int16_t magenetometerZ; // mapped 0x6002
+        int16_t magnetometerX; // mapped 0x6000
+        int16_t magnetometerY; // mapped 0x6001
+        int16_t magnetometerZ; // mapped 0x6002
     } __attribute__((packed));
 
     struct Input
@@ -242,10 +242,10 @@ int main(int argc, char *argv[])
             bus.finalizeDatagrams();
             bus.processAwaitingFrames();
 
-            // Read magenetometer data
-            int16_t mx = input->sensor.magenetometerX;
-            int16_t my = input->sensor.magenetometerY;
-            int16_t mz = input->sensor.magenetometerZ;
+            // Read magnetometer data
+            int16_t mx = input->sensor.magnetometerX;
+            int16_t my = input->sensor.magnetometerY;
+            int16_t mz = input->sensor.magnetometerZ;
 
             bool active = not (my <= 0 - TOLERANCE) || (my >= 0 + TOLERANCE);
 
