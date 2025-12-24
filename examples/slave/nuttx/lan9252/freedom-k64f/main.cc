@@ -106,6 +106,11 @@ int main(int argc, char *argv[])
     {
         slave.routine();
 
+        if (slave.state() == State::PRE_OP and pdo_configured)
+        {
+            pdo_configured = false;
+        }
+
         if (slave.state() == State::SAFE_OP and not pdo_configured)
         {
             auto &dict = mbx.getDictionary();
