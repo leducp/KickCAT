@@ -19,8 +19,8 @@ using namespace kickcat;
 
 int main(int argc, char *argv[])
 {
-    (void) argc;
-    (void) argv;
+    (void)argc;
+    (void)argv;
 
     std::shared_ptr<SPI> spi_driver = std::make_shared<SPI>();
     spi_driver->open("/dev/spi0", 0, 0, 10000000);
@@ -89,46 +89,89 @@ int main(int argc, char *argv[])
     constexpr uint8_t LED_G_BIT = 1 << 1;
     constexpr uint8_t LED_B_BIT = 1 << 2;
 
+    bool pdo_configured = false;
+
+    int16_t *ax = nullptr;
+    int16_t *ay = nullptr;
+    int16_t *az = nullptr;
+    int16_t *mx = nullptr;
+    int16_t *my = nullptr;
+    int16_t *mz = nullptr;
+
+    uint8_t *led_r = nullptr;
+    uint8_t *led_g = nullptr;
+    uint8_t *led_b = nullptr;
+
     while (true)
     {
         slave.routine();
 
-        if (slave.state() == State::SAFE_OP)
+        if (slave.state() == State::PRE_OP and pdo_configured)
         {
-            if (buffer_out[0] != 0xFF)
+            pdo_configured = false;
+        }
+
+        if (slave.state() == State::SAFE_OP and not pdo_configured)
+        {
+            auto &dict = mbx.getDictionary();
+
+            auto [obj, entry] = CoE::findObject(dict, 0x6000, 0);
+            ax = static_cast<int16_t *>(entry->data);
+            auto [obj1, entry1] = CoE::findObject(dict, 0x6001, 0);
+            ay = static_cast<int16_t *>(entry1->data);
+            auto [obj2, entry2] = CoE::findObject(dict, 0x6002, 0);
+            az = static_cast<int16_t *>(entry2->data);
+            auto [obj3, entry3] = CoE::findObject(dict, 0x6003, 0);
+            mx = static_cast<int16_t *>(entry3->data);
+            auto [obj4, entry4] = CoE::findObject(dict, 0x6004, 0);
+            my = static_cast<int16_t *>(entry4->data);
+            auto [obj5, entry5] = CoE::findObject(dict, 0x6005, 0);
+            mz = static_cast<int16_t *>(entry5->data);
+            auto [obj6, entry6] = CoE::findObject(dict, 0x7000, 0);
+            led_r = static_cast<uint8_t *>(entry6->data);
+            auto [obj7, entry7] = CoE::findObject(dict, 0x7001, 0);
+            led_g = static_cast<uint8_t *>(entry7->data);
+            auto [obj8, entry8] = CoE::findObject(dict, 0x7002, 0);
+            led_b = static_cast<uint8_t *>(entry8->data);
+
+            pdo.configureMapping(dict);
+
+            pdo_configured = true;
+        }
+
+        if (slave.state() == State::SAFE_OP and buffer_out[0] != 0xFF)
+        {
+            slave.validateOutputData();
+        }
+
+        if (pdo_configured)
+        {
+            // Read sensors and fill buffer_in
+            if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
             {
-                slave.validateOutputData();
+                *ax = sensor_data.accel.x;
+                *ay = sensor_data.accel.y;
+                *az = sensor_data.accel.z;
+                *mx = sensor_data.magn.x;
+                *my = sensor_data.magn.y;
+                *mz = sensor_data.magn.z;
             }
-        }
 
-        // Read sensors and fill buffer_in
-        if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
-        {
-            buffer_in[0] = sensor_data.accel.x & 0xFF;
-            buffer_in[1] = (sensor_data.accel.x >> 8) & 0xFF;
-            buffer_in[2] = sensor_data.accel.y & 0xFF;
-            buffer_in[3] = (sensor_data.accel.y >> 8) & 0xFF;
-            buffer_in[4] = sensor_data.accel.z & 0xFF;
-            buffer_in[5] = (sensor_data.accel.z >> 8) & 0xFF;
-            buffer_in[6] = sensor_data.magn.x & 0xFF;
-            buffer_in[7] = (sensor_data.magn.x >> 8) & 0xFF;
-            buffer_in[8] = sensor_data.magn.y & 0xFF;
-            buffer_in[9] = (sensor_data.magn.y >> 8) & 0xFF;
-            buffer_in[10] = sensor_data.magn.z & 0xFF;
-            buffer_in[11] = (sensor_data.magn.z >> 8) & 0xFF;
-        }
+            // Update LEDs based on output PDO
+            userled_set_t led_set = 0;
+            if (*led_r)
+                led_set |= LED_R_BIT;
+            if (*led_g)
+                led_set |= LED_G_BIT;
+            if (*led_b)
+                led_set |= LED_B_BIT;
 
-        // Update LEDs based on output PDO
-        userled_set_t led_set = 0;
-        if (buffer_out[0]) led_set |= LED_R_BIT;
-        if (buffer_out[1]) led_set |= LED_G_BIT;
-        if (buffer_out[2]) led_set |= LED_B_BIT;
-
-        int ret = ioctl(led_fd, ULEDIOC_SETALL, led_set);
-        if (ret < 0)
-        {
-            int errcode = errno;
-            printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errcode);
+            int ret = ioctl(led_fd, ULEDIOC_SETALL, led_set);
+            if (ret < 0)
+            {
+                int errcode = errno;
+                printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errcode);
+            }
         }
     }
 
