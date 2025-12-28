@@ -71,37 +71,30 @@ int main(int argc, char *argv[])
         }
 
         // Prepare mapping for ingenia
-        const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, const uint32_t *data, const uint32_t dataSize, const uint32_t SM_map) -> void
+        const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, uint32_t const* mapping, uint8_t mapping_count, const uint32_t SM_map) -> void
         {
+            auto& slave = bus.slaves().at(slaveId);
             uint8_t zeroU8 = 0;
 
-/*
             // Unmap previous registers, setting 0 in PDO_MAP subindex 0
-            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, false, const_cast<uint8_t *>(&zeroU8), sizeof(zeroU8));
-            // Modify mapping, setting register address in PDO's subindexes from 0x1A00:01
-            for (uint32_t i = 0; i < dataSize; i++)
+            bus.writeSDO(slave, PDO_map, 0, Bus::Access::PARTIAL, &zeroU8, sizeof(zeroU8));
+            // Modify mapping, setting register address in PDO's subindexes
+            for (uint8_t i = 0; i < mapping_count; ++i)
             {
-                uint8_t subIndex = static_cast<uint8_t>(i + 1);
-                bus.writeSDO(bus.slaves().at(slaveId), PDO_map, subIndex, false, const_cast<uint32_t *>(&data[i]), sizeof(data[i]));
+                bus.writeSDO(slave, PDO_map, i + 1, Bus::Access::PARTIAL, mapping + i, sizeof(uint32_t));
             }
             // Enable mapping by setting number of registers in PDO_MAP subindex 0
-            uint8_t pdoMapSize = static_cast<uint8_t>(dataSize);
-            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, false, const_cast<uint8_t *>(&pdoMapSize), sizeof(pdoMapSize));
-*/
+            bus.writeSDO(slave, PDO_map, 0, Bus::Access::PARTIAL, &mapping_count, sizeof(mapping_count));
 
-            uint8_t buffer[1024];
-            std::memcpy(buffer + 2, data, dataSize * 4);
-            buffer[0] = dataSize;
-            bus.writeSDO(bus.slaves().at(slaveId), PDO_map, 0, true, buffer, dataSize * 4 + 2);
 
             // Set PDO mapping to SM
             // Unmap previous mappings, setting 0 in SM_MAP subindex 0
-            bus.writeSDO(bus.slaves().at(slaveId), SM_map, 0, false, const_cast<uint8_t *>(&zeroU8), sizeof(zeroU8));
+            bus.writeSDO(slave, SM_map, 0, Bus::Access::PARTIAL, &zeroU8, sizeof(zeroU8));
             // Write first mapping (PDO_map) address in SM_MAP subindex 1
-            bus.writeSDO(bus.slaves().at(slaveId), SM_map, 1, false, const_cast<uint16_t *>(&PDO_map), sizeof(PDO_map));
+            bus.writeSDO(slave, SM_map, 1, Bus::Access::PARTIAL, &PDO_map, sizeof(PDO_map));
             // Save mapping count in SM (here only one PDO_MAP)
             uint8_t pdoMapSize = 1;
-            bus.writeSDO(bus.slaves().at(slaveId), SM_map, 0, false, const_cast<uint8_t *>(&pdoMapSize), sizeof(pdoMapSize));
+            bus.writeSDO(slave, SM_map, 0, Bus::Access::PARTIAL, &pdoMapSize, sizeof(pdoMapSize));
         };
 
         // Map TXPDO

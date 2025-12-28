@@ -93,7 +93,7 @@ namespace kickcat
         // Note: timeout is used on a per message basis: if complete access is emulated,
         // global call timeout will be at most N * timeout (with N the number of subindex to reached)
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
-        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA,   void* data, uint32_t  data_size, nanoseconds timeout = 1s);
+        void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void const* data, uint32_t data_size, nanoseconds timeout = 1s);
 
         /// \brief  Add a gateway message to the bus
         /// \param  raw_message         A raw EtherCAT mailbox message
