@@ -124,6 +124,7 @@ namespace kickcat
 
         void resetSlaves(nanoseconds watchdog);
         void fetchESC();
+        void fetchDL();
 
         // mailbox helpers
         void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
@@ -170,6 +171,9 @@ namespace kickcat
         void detectMapping();
         void readMappedPDO(Slave& slave, uint16_t index);
         void configureFMMUs();
+
+        // DC helpers
+        void fetchReceivedTimes();
 
         std::shared_ptr<Link> link_;
         std::vector<Slave> slaves_;

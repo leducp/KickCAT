@@ -90,6 +90,7 @@ namespace kickcat
         resetSlaves(watchdogTimePDIO);
         setAddresses();
         fetchESC();
+        fetchDL();
 
         requestState(State::INIT);
         waitForState(State::INIT, 5000ms);
@@ -152,6 +153,9 @@ namespace kickcat
         uint32_t cycle_time_raw = static_cast<uint32_t>(cycle_time.count());
         broadcastWrite(reg::DC_SYNC0_CYCLE_TIME, &cycle_time_raw, 4);
 
+        // Get received time
+        fetchReceivedTimes();
+
         // get current network time
         uint64_t ecat_time;
         auto& slave = *dc_slave_;
@@ -176,6 +180,55 @@ namespace kickcat
         // TODO: use a config in the slave to select the sync method
         uint8_t enable_dc_sync0 = 0x3;
         broadcastWrite(reg::DC_SYNC_ACTIVATION, &enable_dc_sync0, 1);
+    }
+
+
+    void Bus::fetchReceivedTimes()
+    {
+        // Trigger latch time on received registers whenever the frame pass by the port 0-3
+        uint8_t dummy = 0;
+        broadcastWrite(reg::DC_RECEIVED_TIME, &dummy, 1);
+
+        for (auto& slave : slaves_)
+        {
+            auto error = [](DatagramState const& state)
+            {
+                THROW_ERROR_DATAGRAM("Error while fetching slave DC received times", state);
+            };
+
+            auto process = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+
+                for (int i = 0; i < 4; ++i)
+                {
+                    uint32_t raw_timestamp;
+                    std::memcpy(&raw_timestamp, data + i * sizeof(uint32_t), sizeof(uint32_t));
+                    slave.dc_received_time[i] = nanoseconds(raw_timestamp);
+                }
+                return DatagramState::OK;
+            };
+
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_RECEIVED_TIME), nullptr, 16, process, error);
+        }
+        link_->processDatagrams();
+
+        for (auto& slave : slaves_)
+        {
+            printf("Received times %d\n", slave.address);
+            printf(  "Port 0: %ld\n", slave.dc_received_time[0].count());
+            printf(  "Port 1: %ld\n", slave.dc_received_time[1].count());
+            printf(  "Port 2: %ld\n", slave.dc_received_time[2].count());
+            printf(  "Port 3: %ld\n", slave.dc_received_time[3].count());
+
+            printf("Slave : %s\n", toString(slave.dl_status).c_str());
+
+            nanoseconds delta = slave.dc_received_time[1] - slave.dc_received_time[0];
+            printf("  1 - 0 = %ld\n",delta.count());
+        }
     }
 
 
@@ -333,6 +386,20 @@ namespace kickcat
         link_->processDatagrams();
     }
 
+
+    void Bus::fetchDL()
+    {
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error fetching DL status", state);
+        };
+
+        for (auto& slave : slaves_)
+        {
+            sendGetDLStatus(slave, error);
+        }
+        processAwaitingFrames();
+    }
 
     void Bus::setAddresses()
     {
