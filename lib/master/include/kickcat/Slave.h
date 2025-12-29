@@ -57,6 +57,9 @@ namespace kickcat
         int previous_errors_sum{0};
 
         ESC::Description esc;
+
+        // DC received time record - required to compute propagation delay
+        nanoseconds dc_received_time[4];
     };
 
 }
