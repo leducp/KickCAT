@@ -277,6 +277,7 @@ namespace kickcat
         // Distributed clocks registers
         constexpr uint16_t DC_RECEIVED_TIME             = 0x900;
         constexpr uint16_t DC_SYSTEM_TIME               = 0x910;
+        constexpr uint16_t DC_ECAT_RECEIVED_TIME        = 0x918;
         constexpr uint16_t DC_SYSTEM_TIME_OFFSET        = 0x920;
         constexpr uint16_t DC_SYSTEM_TIME_DELAY         = 0x928;
         constexpr uint16_t DC_SPEED_CNT_START           = 0x930;
