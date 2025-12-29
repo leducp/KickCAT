@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <cmath>
 
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
@@ -11,6 +12,9 @@
 #include "CanOpenStateMachine.h"
 #include "MarvinProtocol.h"
 
+#include "rtm/probe.h"
+
+constexpr int SLAVE_ID = 6;
 
 using namespace kickcat;
 
@@ -112,7 +116,7 @@ int main(int argc, char *argv[])
 
         uint8_t mode = 8;
         uint32_t mode_size = 1;
-        bus.writeSDO(bus.slaves().at(0), 0x6060, 0, false, &mode, mode_size);
+        bus.writeSDO(bus.slaves().at(SLAVE_ID), 0x6060, 0, false, &mode, mode_size);
 
         printf("mapping\n");
         bus.createMapping(io_buffer);
@@ -148,10 +152,16 @@ int main(int argc, char *argv[])
         //printf("- previous error was a false alarm - ");
     };
 
-    Slave &motor = bus.slaves().at(0);
-
-    pdo::Output *output_pdo = reinterpret_cast<pdo::Output *>(motor.output.data);
-    pdo::Input *input_pdo = reinterpret_cast<pdo::Input *>(motor.input.data);
+    pdo::Output* output_pdo[7];
+    pdo::Input*  input_pdo[7]; 
+    CANOpenStateMachine state_machine[7];
+    for (int i = 0; i < 7; ++i)
+    {
+        Slave& motor = bus.slaves().at(i);
+        output_pdo[i] = reinterpret_cast<pdo::Output *>(motor.output.data);
+        input_pdo[i] = reinterpret_cast<pdo::Input *>(motor.input.data);
+        state_machine[i].setCommand(CANOpenCommand::DISABLE);
+    }
 
     Timer timer{1ms};
     timer.start();
@@ -177,7 +187,7 @@ int main(int argc, char *argv[])
 //
         //    }
         //    catch (kickcat::ErrorDatagram const& e)
-        //    {
+        //    {()
         //        not_ready = true;
         //        //std::cerr << e.what() << ": " << toString(e.state()) << std::endl;
 //
@@ -224,17 +234,21 @@ int main(int argc, char *argv[])
 
     link->setTimeout(1500us);
 
-    CANOpenStateMachine state_machine;
-
-    printf("mapping: input(%d) output(%d)\n", motor.input.bsize, motor.output.bsize);
-
-    state_machine.setCommand(CANOpenCommand::DISABLE);
+    //printf("mapping: input(%d) output(%d)\n", motor.input.bsize, motor.output.bsize);
 
     // position mode
     //output_pdo->control_word = 6;
     //output_pdo->mode_of_operation = 8;
     //output_pdo->target_position = input_pdo->actual_position;
 
+    auto io = std::make_unique<rtm::FileWrite>("/dev/shm/marvin.tick");
+    rtm::Probe probe;
+    probe.init("marvin", "op",
+            since_epoch(), 1ms, 42,
+            std::move(io));
+
+    int32_t initial_position[7] = {0};
+    nanoseconds start_time = kickcat::since_epoch();
 
     std::shared_ptr<mailbox::request::AbstractMessage> msg = nullptr;
 
@@ -242,42 +256,51 @@ int main(int argc, char *argv[])
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        timer.wait_next_tick();
-
+        probe.log();
 
         try
         {
-/*
-            if (i == 1000)
+            if (i == 500)
             {
-                printf("INIT\n");
-                bus.requestState(State::INIT);
+                for (int j = 0; j < 7; ++j)
+                {
+                    output_pdo[j]->target_position = input_pdo[j]->actual_position;
+                    state_machine[j].setCommand(CANOpenCommand::ENABLE);
+                }
             }
-            if (i == 3000)
-            {
-                printf("PREOP\n");
-                bus.waitForState(State::INIT, 2ms);
-                bus.requestState(State::PRE_OP);
-            }
-            if (i == 5000)
-            {
-                printf("SAFEOP\n");
-                bus.waitForState(State::PRE_OP, 2ms);
-                bus.requestState(State::SAFE_OP);
-            }
-            if (i == 7000)
-            {
-                printf("OP\n");
-                bus.waitForState(State::SAFE_OP, 2ms);
-                bus.requestState(State::OPERATIONAL);
-            }
-                */
 
-            if (i == 1000)
+            if (i == 2000)
             {
-                output_pdo->target_position = input_pdo->actual_position;
-                state_machine.setCommand(CANOpenCommand::ENABLE);
+                for (int j = 0; j < 7; ++j)
+                {
+                    initial_position[j] = input_pdo[j]->actual_position;
+                }
+                start_time = kickcat::since_epoch();
             }
+
+            if (i > 2000)
+            {
+                double time = std::chrono::duration_cast<seconds_f>(kickcat::elapsed_time(start_time)).count();
+
+                constexpr double MOTION_FQ = 0.2; // Hz
+                constexpr double MOTION_AMPLITUDE = 5.0 / 180.0 * M_PI;
+                //constexpr double REDUCTION_RATIO = 100.0;
+                constexpr double REDUCTION_RATIO[7] = {120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0};
+
+                constexpr int ENCODER_TICKS_PER_TURN = 1<<19;
+                double targetSI = MOTION_AMPLITUDE * std::sin(2 * M_PI * MOTION_FQ * time);
+                
+                // Set target
+                // output_pdo->target_position = initial_position;
+                // std::cout << initial_position << " " <<  + static_cast<int32_t>(targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN);
+                for (int j = 0; j < 7; ++j)
+                {
+                    double measureSI = (input_pdo[j]->actual_position - initial_position[j]) / static_cast<double>(ENCODER_TICKS_PER_TURN) / REDUCTION_RATIO[j] * 2.0 * M_PI;
+                    output_pdo[j]->target_position =  initial_position[j] - static_cast<int32_t>(REDUCTION_RATIO[j] * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN);
+                }
+            }
+
+
 
             bus.sendLogicalRead(false_alarm);  // Update inputPDO
             bus.sendLogicalWrite(false_alarm); // Update outputPDO
@@ -285,10 +308,9 @@ int main(int argc, char *argv[])
             bus.finalizeDatagrams();
 
             //bus.sendLogicalReadWrite(callback_error);
-
-            bus.processAwaitingFrames();
-            bus.finalizeDatagrams();
-
+            //bus.processAwaitingFrames();
+            //bus.finalizeDatagrams();
+/*
             bus.sendMailboxesReadChecks(callback_error);
             bus.sendMailboxesWriteChecks(callback_error);
             bus.sendReadMessages(callback_error); // Get emergencies
@@ -296,6 +318,7 @@ int main(int argc, char *argv[])
 
             bus.processAwaitingFrames();
             bus.finalizeDatagrams();
+            */
 /*
             int32_t status;
             uint32_t size = 4;
@@ -335,9 +358,13 @@ int main(int argc, char *argv[])
         }
 
         // Update Ingenia at each step to receive emergencies in case of failure
-        state_machine.update(input_pdo->status_word);
-        output_pdo->control_word = state_machine.getControlWord();
+        for (int j = 0; j<7; ++j)
+        {
+            state_machine[j].update(input_pdo[j]->status_word);
+            output_pdo[j]->control_word = state_machine[j].getControlWord();
+        }
 
+        /*
         if (motor.mailbox.emergencies.size() > 0)
         {
             for (auto const& em : motor.mailbox.emergencies)
@@ -348,8 +375,9 @@ int main(int argc, char *argv[])
             }
             motor.mailbox.emergencies.resize(0);
         }
+            */
 
-        if (i % 100)
+        if ((i % 10) == 0)
         {
 
         //bus.read_address<uint8_t>(reg::DC_SYNC_ACTIVATION);
@@ -366,15 +394,20 @@ int main(int argc, char *argv[])
         //bus.read_address<uint8_t>(reg::SYNC_MANAGER_3 + 5, value_u8);
 
             printf("[%d] {%x} %x (%x) position %d to %d\n",
-                i, input_pdo->error_code,
-                state_machine.getControlWord(), input_pdo->status_word,
-                input_pdo->actual_position, output_pdo->target_position);
+                i, input_pdo[0]->error_code,
+                state_machine[0].getControlWord(), input_pdo[0]->status_word,
+                input_pdo[0]->actual_position, output_pdo[0]->target_position);
             //printf("velocity %d\n", input_pdo->actual_velocity);
             //printf("torque   %d\n", input_pdo->actual_torque);
             //printf("LTor     %d\n", input_pdo->LTor_feedback);
             //printf("temp     %d\n", input_pdo->motor_temperature);
             //printf("RECD     %d\n", input_pdo->RECD);
         }
+
+        probe.log();
+        probe.flush();
+
+        timer.wait_next_tick();
     }
 
     return 0;
