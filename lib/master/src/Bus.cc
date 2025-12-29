@@ -153,11 +153,11 @@ namespace kickcat
         uint32_t cycle_time_raw = static_cast<uint32_t>(cycle_time.count());
         broadcastWrite(reg::DC_SYNC0_CYCLE_TIME, &cycle_time_raw, 4);
 
-        // Apply propagation delay
+        // Apply propagation delay and system time offset
+        nanoseconds now = since_epoch(); // Get master time just before latching time in received time registers of slaves
         fetchReceivedTimes();
-        computePropagationDelay();
-
-        // TODO: apply system time offset
+        computePropagationDelay(now);
+        applyMasterTime();
 
         // Precompute drift
         // 1. reset time control loop filter
@@ -231,8 +231,22 @@ namespace kickcat
                 }
                 return DatagramState::OK;
             };
-
             link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_RECEIVED_TIME), nullptr, 16, process, error);
+
+            auto process_ecat = [&slave](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+
+                uint64_t raw_timestamp;
+                std::memcpy(&raw_timestamp, data, sizeof(uint64_t));
+                slave.dc_ecat_received_time = nanoseconds(raw_timestamp);
+                
+                return DatagramState::OK;
+            };
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_ECAT_RECEIVED_TIME), nullptr, 8, process_ecat, error);
         }
         link_->processDatagrams();
 
@@ -243,6 +257,7 @@ namespace kickcat
             printf(  "Port 1: %ld\n", slave.dc_received_time[1].count());
             printf(  "Port 2: %ld\n", slave.dc_received_time[2].count());
             printf(  "Port 3: %ld\n", slave.dc_received_time[3].count());
+            printf(  "EPU:    %ld\n", slave.dc_ecat_received_time.count());
 
             nanoseconds delta = slave.dc_received_time[1] - slave.dc_received_time[0];
             printf("  T1 - T0 = %ld\n",delta.count());
@@ -250,9 +265,14 @@ namespace kickcat
     }
 
 
-    void Bus::computePropagationDelay()
+    void Bus::computePropagationDelay(nanoseconds master_time)
     {
         // !!! Assume a linear topology for now !!!
+
+        // EtherCAT epoch is 01-01-2020
+        constexpr nanoseconds thirty_years = 30 * 365 * 24h;
+        master_time -= thirty_years; 
+        dc_slave_->dc_time_offset = master_time - dc_slave_->dc_ecat_received_time;
 
         // Start from the DC slave (the first one on the network that have DC capability)
         auto current_dc_slave = dc_slave_;
@@ -283,9 +303,13 @@ namespace kickcat
                 break;
             }
 
+            // Compute time offset from ref clock
+            next->dc_time_offset = master_time - next->dc_ecat_received_time;
+
             // Set the current delay to next as an offset
             next->delay = current_dc_slave->delay;
 
+            // !!! TODO: handle overflow of 32bits registers !!!
             nanoseconds delta_current = current_dc_slave->dc_received_time[1] - current_dc_slave->dc_received_time[0];
             nanoseconds delta_next    = next->dc_received_time[1]             - next->dc_received_time[0];
 
@@ -323,6 +347,37 @@ namespace kickcat
 
             uint32_t raw_delay = static_cast<uint32_t>(slave.delay.count());
             link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::DC_SYSTEM_TIME_DELAY), &raw_delay, sizeof(raw_delay), process, error);
+        }
+        link_->processDatagrams();
+    }
+
+
+    void Bus::applyMasterTime()
+    {
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error while applying slave DC offset", state);
+        };
+
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+
+            return DatagramState::OK;
+        };
+
+        for (auto& slave : slaves_)
+        {
+            uint64_t raw_delay = static_cast<uint32_t>(slave.dc_time_offset.count());
+            if (raw_delay == 0)
+            {
+                continue;
+            }
+            printf("DC slave %d time offset is %ld from DC ref\n", slave.address, slave.dc_time_offset.count());
+            link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::DC_SYSTEM_TIME_OFFSET), &raw_delay, sizeof(uint64_t), process, error);
         }
         link_->processDatagrams();
     }

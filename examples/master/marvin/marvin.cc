@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
                 }
             }
 
-            if (i == 2000)
+            if (i == 4000)
             {
                 for (int j = 0; j < 7; ++j)
                 {
@@ -278,12 +278,12 @@ int main(int argc, char *argv[])
                 start_time = kickcat::since_epoch();
             }
 
-            if (i > 2000)
+            if (i > 4000)
             {
                 double time = std::chrono::duration_cast<seconds_f>(kickcat::elapsed_time(start_time)).count();
 
                 constexpr double MOTION_FQ = 0.2; // Hz
-                constexpr double MOTION_AMPLITUDE = 5.0 / 180.0 * M_PI;
+                constexpr double MOTION_AMPLITUDE = 8.0 / 180.0 * M_PI;
                 //constexpr double REDUCTION_RATIO = 100.0;
                 constexpr double REDUCTION_RATIO[7] = {120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0};
 

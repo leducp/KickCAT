@@ -177,7 +177,8 @@ namespace kickcat
 
         // DC helpers
         void fetchReceivedTimes();
-        void computePropagationDelay();
+        void computePropagationDelay(nanoseconds master_time);
+        void applyMasterTime();
 
         std::shared_ptr<Link> link_;
         std::vector<Slave> slaves_;
