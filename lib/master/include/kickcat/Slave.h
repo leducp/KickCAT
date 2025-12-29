@@ -60,6 +60,7 @@ namespace kickcat
 
         // DC received time record - required to compute propagation delay
         nanoseconds dc_received_time[4];
+        nanoseconds delay = 0ns;
     };
 
 }

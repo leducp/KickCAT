@@ -84,6 +84,9 @@ namespace kickcat
         void checkMailboxes( std::function<void(DatagramState const&)> const& error);
         void processMessages(std::function<void(DatagramState const&)> const& error);
 
+        // DC
+        void sendDriftCompensation(std::function<void(DatagramState const&)> const& error);
+
 
         enum Access
         {
@@ -174,6 +177,7 @@ namespace kickcat
 
         // DC helpers
         void fetchReceivedTimes();
+        void computePropagationDelay();
 
         std::shared_ptr<Link> link_;
         std::vector<Slave> slaves_;
