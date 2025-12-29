@@ -169,6 +169,7 @@ namespace kickcat
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SYSTEM_TIME), nullptr, 8, process, [](DatagramState const&){});
         link_->processDatagrams();
 
+        // set start time (network time + start_delay)
         uint64_t start_time = ecat_time + start_delay.count();
         broadcastWrite(reg::DC_START_TIME, &start_time, sizeof(start_time));
 
