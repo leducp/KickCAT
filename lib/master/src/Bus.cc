@@ -153,8 +153,28 @@ namespace kickcat
         uint32_t cycle_time_raw = static_cast<uint32_t>(cycle_time.count());
         broadcastWrite(reg::DC_SYNC0_CYCLE_TIME, &cycle_time_raw, 4);
 
-        // Get received time
+        // Apply propagation delay
         fetchReceivedTimes();
+        computePropagationDelay();
+
+        // TODO: apply system time offset
+
+        // Precompute drift
+        // 1. reset time control loop filter
+        uint16_t reset = 0x1000;
+        broadcastWrite(reg::DC_SPEED_CNT_START, &reset, sizeof(uint16_t));
+
+        // 2. Send multiple FRMW drift compensation frames (15000 from the doc)
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error while doing static drift compensation", state);
+        };
+        for (int i = 0; i < 15000; ++i)
+        {
+            sendDriftCompensation(error);
+            link_->processDatagrams();
+        }
+
 
         // get current network time
         uint64_t ecat_time;
@@ -224,11 +244,87 @@ namespace kickcat
             printf(  "Port 2: %ld\n", slave.dc_received_time[2].count());
             printf(  "Port 3: %ld\n", slave.dc_received_time[3].count());
 
-            printf("Slave : %s\n", toString(slave.dl_status).c_str());
-
             nanoseconds delta = slave.dc_received_time[1] - slave.dc_received_time[0];
-            printf("  1 - 0 = %ld\n",delta.count());
+            printf("  T1 - T0 = %ld\n",delta.count());
         }
+    }
+
+
+    void Bus::computePropagationDelay()
+    {
+        // !!! Assume a linear topology for now !!!
+
+        // Start from the DC slave (the first one on the network that have DC capability)
+        auto current_dc_slave = dc_slave_;
+        current_dc_slave->delay = 0ns;
+
+        auto next_dc_slave = [&](Slave* current)
+        {
+            int id = current->address - 1001; //TODO create a constant for the slave address offset
+
+            for (auto it = slaves_.begin() + id + 1; it != slaves_.end(); ++it)
+            {
+                if (it->esc.features & ESC::feature::DC_AVAILABLE)
+                {
+                    return &(*it);
+                }
+            }
+
+            // No DC slave past the current one
+            return current;
+        };
+
+        while (true)
+        {
+            auto next = next_dc_slave(current_dc_slave);
+            if (next->address == current_dc_slave->address)
+            {
+                // End of scan
+                break;
+            }
+
+            // Set the current delay to next as an offset
+            next->delay = current_dc_slave->delay;
+
+            nanoseconds delta_current = current_dc_slave->dc_received_time[1] - current_dc_slave->dc_received_time[0];
+            nanoseconds delta_next    = next->dc_received_time[1]             - next->dc_received_time[0];
+
+            if (next->dl_status.PL_port1 == 0)
+            {
+                // End of line
+                next->delay += delta_current / 2;
+            }
+            else
+            {
+                
+                next->delay += delta_current - delta_next;
+            }
+            current_dc_slave = next;
+        }
+
+        // Apply propagation delay to slaves
+        for (auto& slave : slaves_)
+        {
+            printf("DC slave %d delay is %ld from DC ref\n", slave.address, slave.delay.count());
+            auto error = [](DatagramState const& state)
+            {
+                THROW_ERROR_DATAGRAM("Error while applying slave DC delay", state);
+            };
+
+            auto process = [&slave](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+
+                return DatagramState::OK;
+            };
+
+            uint32_t raw_delay = static_cast<uint32_t>(slave.delay.count());
+            link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::DC_SYSTEM_TIME_DELAY), &raw_delay, sizeof(raw_delay), process, error);
+        }
+        link_->processDatagrams();
     }
 
 
@@ -694,34 +790,29 @@ namespace kickcat
                 return DatagramState::OK;
             };
             link_->addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
-
-            if (dc_slave_ != nullptr)
-            {
-                auto process_dc = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
-                {
-                    if (wkc == 0)
-                    {
-                        bus_error("Invalid working counter:  %" PRIu16 "\n", wkc);
-                        return DatagramState::INVALID_WKC;
-                    }
-                    return DatagramState::OK;
-                };
-
-                //static nanoseconds time = since_epoch();
-                //nanoseconds update = elapsed_time(time);
-                //uint64_t refresh = update.count();
-                //link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &refresh, uint16_t(8),
-                //    process_dc, error);
-
-                uint64_t const clock = 0;
-                link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &clock, uint16_t(8),
-                    process_dc, error);
-
-                //uint8_t const debug_shot = 0x83;
-                //link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYNC_ACTIVATION), &debug_shot, uint16_t(1),
-                //    process_dc, error);
-            }
         }
+
+        if (dc_slave_ != nullptr)
+        {
+            sendDriftCompensation(error);
+        }
+    }
+
+
+    void Bus::sendDriftCompensation(std::function<void(DatagramState const&)> const& error)
+    {
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+        {
+            if (wkc == 0)
+            {
+                bus_error("Invalid working counter:  %" PRIu16 "\n", wkc);
+                return DatagramState::INVALID_WKC;
+            }
+            return DatagramState::OK;
+        };
+
+        uint64_t const clock = 0;
+        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &clock, sizeof(clock), process, error);
     }
 
 
@@ -759,34 +850,11 @@ namespace kickcat
             };
 
             link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
+        }
 
-
-            if (dc_slave_ != nullptr)
-            {
-                auto process_dc = [pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
-                {
-                    if (wkc == 0)
-                    {
-                        bus_error("Invalid working counter: expected %zu, got %" PRIu16 "\n", pi_frame.outputs.size(), wkc);
-                        return DatagramState::INVALID_WKC;
-                    }
-                    return DatagramState::OK;
-                };
-
-                //static nanoseconds time = since_epoch();
-                //nanoseconds update = elapsed_time(time);
-                //uint64_t refresh = update.count();
-                //link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &refresh, uint16_t(8),
-                //    process_dc, error);
-
-                uint64_t const clock = 0;
-                link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &clock, uint16_t(8),
-                    process_dc, error);
-
-                //uint8_t const debug_shot = 0x83;
-                //link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYNC_ACTIVATION), &debug_shot, uint16_t(1),
-                //    process_dc, error);
-            }
+        if (dc_slave_ != nullptr)
+        {
+            sendDriftCompensation(error);
         }
     }
 
