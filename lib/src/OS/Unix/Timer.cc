@@ -75,9 +75,14 @@ namespace kickcat
         next_deadline_ += period_;
         if (next_deadline_ < last_wakeup_)
         {
-            // We are late: compute a new deadline starting from now.
-            next_deadline_ = last_wakeup_ + period_;
+            printf("!!! LATE !!!\n");   
         }
+        //while (next_deadline_ < last_wakeup_)
+        //{
+        //    // We are late: compute a new deadline that maintain the cycle.
+        //    next_deadline_ += period_;
+        //    printf("!!! LATE !!!\n");
+        //}
 
         return {};
     }
