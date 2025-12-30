@@ -181,7 +181,23 @@ namespace kickcat
     #define spi_info    _none
 #endif
 
+#ifdef DEBUG_DC_ERROR
+    #define dc_error   _error
+#else
+    #define dc_error   _none
+#endif
 
+#ifdef DEBUG_DC_WARNING
+    #define dc_warning _warning
+#else
+    #define dc_warning _none
+#endif
+
+#ifdef DEBUG_DC_INFO
+    #define dc_info    _info
+#else
+    #define dc_info    _none
+#endif
 }
 
 #endif
