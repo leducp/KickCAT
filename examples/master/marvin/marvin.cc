@@ -64,6 +64,14 @@ int main(int argc, char *argv[])
     {
         bus.init(100ms);
 
+        bus.requestState(State::INIT);
+        bus.waitForState(State::INIT, 5000ms);
+        
+        bus.enableDC(1ms, 500us, 100ms);
+
+        bus.requestState(State::PRE_OP);
+        bus.waitForState(State::PRE_OP, 3000ms);
+
         //TODO
         // remove enableDC from init()
         // go back in INIT, enableDC, go again in PREOP, continue
@@ -252,8 +260,8 @@ int main(int argc, char *argv[])
 
     std::shared_ptr<mailbox::request::AbstractMessage> msg = nullptr;
 
-    //constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
-    constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
+    constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
+    //constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
@@ -285,7 +293,6 @@ int main(int argc, char *argv[])
 
                 constexpr double MOTION_FQ = 0.2; // Hz
                 constexpr double MOTION_AMPLITUDE = 8.0 / 180.0 * M_PI;
-                //constexpr double REDUCTION_RATIO = 100.0;
                 constexpr double REDUCTION_RATIO[7] = {120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0};
 
                 constexpr int ENCODER_TICKS_PER_TURN = 1<<19;

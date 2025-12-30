@@ -27,7 +27,12 @@ namespace kickcat
         // 0ms disables the watchdog
         void init(nanoseconds watchdog = 100ms);
 
-        void enableDC(nanoseconds cycle_time, nanoseconds start_delay);
+        /// \brief Enable Distributed Clock
+        /// \details  Shall be called in PRE-OP, but some slaves needs a call in INIT
+        /// \param    cycle_time    Duration of the slave cycle time
+        /// \param    shift_cycle   When the DC SYNC0 shall be generated in the cycle
+        /// \param    start_delay   Delay before activating the DC cycle
+        void enableDC(nanoseconds cycle_time = 1ms, nanoseconds shift_cycle = 500us, nanoseconds start_delay = 100ms);
 
         /// \return the number of slaves detected on the bus
         int32_t detectedSlaves() const;
@@ -131,33 +136,6 @@ namespace kickcat
 
         // mailbox helpers
         void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
-
-        template<typename T>
-        void read_address(uint16_t address, T& value)
-        {
-            auto& slave = slaves_.at(0);
-            auto process = [&slave, address, &value](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
-            {
-                if (wkc != 1)
-                {
-                    return DatagramState::INVALID_WKC;
-                }
-
-                std::memcpy(&value, data, sizeof(T));
-                if (sizeof(T) > 4)
-                {
-                    printf("0x%04x -> read 0x%02lx\n", address, value);
-
-                }
-                else
-                {
-                    printf("0x%04x -> read 0x%02x\n", address, value);
-                }
-                return DatagramState::OK;
-            };
-
-            link_->addDatagram(Command::FPRD, createAddress(slave.address, address), nullptr, sizeof(T), process, [](DatagramState const&){});
-        }
 
     protected: // for unit testing
         // helper with trivial bus management (write then read)

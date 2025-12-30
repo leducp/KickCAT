@@ -1,8 +1,10 @@
 #ifndef KICKCAT_DIAGNOSTICS_H
 #define KICKCAT_DIAGNOSTICS_H
 
-#include "kickcat/Slave.h"
 #include <unordered_map>
+
+#include "kickcat/Link.h"
+#include "kickcat/Slave.h"
 
 namespace kickcat
 {
@@ -13,6 +15,32 @@ namespace kickcat
     /// \brief Detect network topology using BFS traversal - To be called after DL status is fetched for all slaves
     /// \return Map of [slave address, parent address] pairs. The first slave has itself as parent (connected to master)
     std::unordered_map<uint16_t, uint16_t> detectTopology(std::vector<Slave>& slaves);
+
+    template<typename T>
+    void read_address(Slave& slave, uint16_t address, T& value, std::shared_ptr<Link> link)
+    {
+        auto process = [address, &value](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+
+            std::memcpy(&value, data, sizeof(T));
+            if (sizeof(T) > 4)
+            {
+                printf("0x%04x -> read 0x%02lx\n", address, value);
+
+            }
+            else
+            {
+                printf("0x%04x -> read 0x%02x\n", address, value);
+            }
+            return DatagramState::OK;
+        };
+
+        link->addDatagram(Command::FPRD, createAddress(slave.address, address), nullptr, sizeof(T), process, [](DatagramState const&){});
+    }
 }
 
 #endif
