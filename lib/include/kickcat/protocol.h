@@ -682,6 +682,10 @@ namespace kickcat
     constexpr MAC PRIMARY_IF_MAC   = { 0xCA, 0xDE, 0xCA, 0xDE, 0xDE, 0xFF };
     constexpr MAC SECONDARY_IF_MAC = { 0x03, 0x02, 0x02, 0x02, 0xFF, 0xFF };
 
+    // Return the time since EtherCAT epoch (01-01-2020)
+    // Useful for Distributed Clock
+    nanoseconds since_ecat_epoch();
+
     // helpers
     constexpr uint16_t datagram_size(uint16_t data_size)
     {

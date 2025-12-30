@@ -153,8 +153,12 @@ namespace kickcat
         uint32_t cycle_time_raw = static_cast<uint32_t>(cycle_time.count());
         broadcastWrite(reg::DC_SYNC0_CYCLE_TIME, &cycle_time_raw, 4);
 
-        // Apply propagation delay and system time offset
-        nanoseconds now = since_epoch(); // Get master time just before latching time in received time registers of slaves
+        //-------- Apply propagation delay and system time offset --------//
+        // Trigger latch time on received registers whenever the frame pass by the port 0-3
+        uint8_t dummy = 0;
+        broadcastWrite(reg::DC_RECEIVED_TIME, &dummy, 1);
+        nanoseconds now = since_ecat_epoch();
+
         fetchReceivedTimes();
         computePropagationDelay(now);
         applyMasterTime();
@@ -205,10 +209,6 @@ namespace kickcat
 
     void Bus::fetchReceivedTimes()
     {
-        // Trigger latch time on received registers whenever the frame pass by the port 0-3
-        uint8_t dummy = 0;
-        broadcastWrite(reg::DC_RECEIVED_TIME, &dummy, 1);
-
         for (auto& slave : slaves_)
         {
             auto error = [](DatagramState const& state)
@@ -269,9 +269,6 @@ namespace kickcat
     {
         // !!! Assume a linear topology for now !!!
 
-        // EtherCAT epoch is 01-01-2020
-        constexpr nanoseconds thirty_years = 30 * 365 * 24h;
-        master_time -= thirty_years; 
         dc_slave_->dc_time_offset = master_time - dc_slave_->dc_ecat_received_time;
 
         // Start from the DC slave (the first one on the network that have DC capability)
@@ -856,18 +853,21 @@ namespace kickcat
 
     void Bus::sendDriftCompensation(std::function<void(DatagramState const&)> const& error)
     {
-        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+        auto process = [&](DatagramHeader const*, uint8_t const*, uint16_t wkc)
         {
             if (wkc == 0)
             {
                 bus_error("Invalid working counter:  %" PRIu16 "\n", wkc);
                 return DatagramState::INVALID_WKC;
             }
+
             return DatagramState::OK;
         };
 
-        uint64_t const clock = 0;
-        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &clock, sizeof(clock), process, error);
+        nanoseconds now = since_ecat_epoch();
+        uint64_t raw_now = now.count();
+        link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
+        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr, sizeof(uint64_t), process, error);
     }
 
 

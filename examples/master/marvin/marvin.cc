@@ -252,7 +252,8 @@ int main(int argc, char *argv[])
 
     std::shared_ptr<mailbox::request::AbstractMessage> msg = nullptr;
 
-    constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
+    //constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
+    constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
@@ -299,7 +300,6 @@ int main(int argc, char *argv[])
                     output_pdo[j]->target_position =  initial_position[j] - static_cast<int32_t>(REDUCTION_RATIO[j] * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN);
                 }
             }
-
 
 
             bus.sendLogicalRead(false_alarm);  // Update inputPDO
@@ -377,7 +377,7 @@ int main(int argc, char *argv[])
         }
             */
 
-        if ((i % 10) == 0)
+        if ((i % 1000) == 0)
         {
 
         //bus.read_address<uint8_t>(reg::DC_SYNC_ACTIVATION);
@@ -405,7 +405,7 @@ int main(int argc, char *argv[])
         }
 
         probe.log();
-        probe.flush();
+        //probe.flush();
 
         timer.wait_next_tick();
     }
