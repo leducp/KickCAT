@@ -65,7 +65,7 @@ namespace kickcat
 
     void PDO::updateInput()
     {
-        if (not input_)
+        if (input_ == nullptr)
         {
             return;
         }
@@ -89,7 +89,7 @@ namespace kickcat
 
     void PDO::updateOutput()
     {
-        if (not output_)
+        if (output_ == nullptr)
         {
             return;
         }

@@ -159,12 +159,9 @@ int main(int argc, char *argv[])
 
             // Update LEDs based on output PDO
             userled_set_t led_set = 0;
-            if (*led_r)
-                led_set |= LED_R_BIT;
-            if (*led_g)
-                led_set |= LED_G_BIT;
-            if (*led_b)
-                led_set |= LED_B_BIT;
+            led_set |= LED_R_BIT;
+            led_set |= LED_G_BIT;
+            led_set |= LED_B_BIT;
 
             int ret = ioctl(led_fd, ULEDIOC_SETALL, led_set);
             if (ret < 0)
