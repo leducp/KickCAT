@@ -400,10 +400,11 @@ int main(int argc, char *argv[])
         //bus.read_address<uint8_t>(reg::SYNC_MANAGER_2 + 5);
         //bus.read_address<uint8_t>(reg::SYNC_MANAGER_3 + 5, value_u8);
 
-            printf("[%d] {%x} %x (%x) position %d to %d\n",
+            printf("[%d] {%x} %x (%x) position %d to %d - drift %ld\n",
                 i, input_pdo[0]->error_code,
                 state_machine[0].getControlWord(), input_pdo[0]->status_word,
-                input_pdo[0]->actual_position, output_pdo[0]->target_position);
+                input_pdo[0]->actual_position, output_pdo[0]->target_position, 
+                elapsed_time(start_time).count() / (i + 1));
             //printf("velocity %d\n", input_pdo->actual_velocity);
             //printf("torque   %d\n", input_pdo->actual_torque);
             //printf("LTor     %d\n", input_pdo->LTor_feedback);
