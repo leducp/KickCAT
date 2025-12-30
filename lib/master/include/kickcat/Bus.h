@@ -177,7 +177,7 @@ namespace kickcat
 
         // DC helpers
         void fetchReceivedTimes();
-        void computePropagationDelay(nanoseconds master_time);
+        void computePropagationDelay(nanoseconds master_time); // Master time (ref point is EtherCAT epoch, NOT UNIX epoch)
         void applyMasterTime();
 
         std::shared_ptr<Link> link_;
