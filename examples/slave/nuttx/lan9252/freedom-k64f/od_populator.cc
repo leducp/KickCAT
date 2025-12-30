@@ -44,7 +44,6 @@ namespace kickcat::CoE
                 "RxPDO Map 1",
                 {}
             };
-            // CHANGED: Access from 7 (read-only) to 63 (read-write in PRE_OP)
             CoE::addEntry<uint8_t>(object,0,8,0,63,static_cast<CoE::DataType>(5),"Subindex 000",0x3);
             CoE::addEntry<uint32_t>(object,1,32,16,63,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x70000008);
             CoE::addEntry<uint32_t>(object,2,32,48,63,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 2",0x70010008);
@@ -60,8 +59,6 @@ namespace kickcat::CoE
                 "TxPDO Map 1",
                 {}
             };
-            // CHANGED: Access from 7 (read-only) to 63 (read-write in PRE_OP)
-            // Default to all 6 sensors, but master can change this
             CoE::addEntry<uint8_t>(object,0,8,0,63,static_cast<CoE::DataType>(5),"Subindex 000",0x6);
             CoE::addEntry<uint32_t>(object,1,32,16,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0x60000010);
             CoE::addEntry<uint32_t>(object,2,32,48,63,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 2",0x60010010);
