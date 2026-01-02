@@ -78,13 +78,19 @@ namespace kickcat
     }
 
 
-    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, bool CA, void* data, uint32_t data_size, nanoseconds timeout)
+    void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void const* data, uint32_t data_size, nanoseconds timeout)
     {
-        auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::DOWNLOAD, data, &data_size, timeout);
-        waitForMessage(sdo);
-        if (sdo->status() != MessageStatus::SUCCESS)
+        if ((CA == Access::PARTIAL) or (CA == Access::COMPLETE))
         {
-            THROW_ERROR_CODE("Error while writing SDO", error::category::CoE, sdo->status());
+            auto sdo = slave.mailbox.createSDO(index, subindex, CA, CoE::SDO::request::DOWNLOAD, const_cast<void*>(data), &data_size, timeout);
+            waitForMessage(sdo);
+            if (sdo->status() != MessageStatus::SUCCESS)
+            {
+                THROW_ERROR_CODE("Error while writing SDO", error::category::CoE, sdo->status());
+            }
+            return;
         }
+
+        THROW_SYSTEM_ERROR_CODE("Emulated complete access not supported for write", ENOTSUP);
     }
 }

@@ -479,7 +479,7 @@ TEST_F(BusTest, write_SDO_OK)
     checkSendFrameSimple(Command::FPRD);
     io_nominal->handleReply<SDOAnswer>({answer}); // read answer
 
-    bus.writeSDO(slave, 0x1018, 1, false, &data, data_size);
+    bus.writeSDO(slave, 0x1018, 1, Bus::Access::PARTIAL, &data, data_size);
 }
 
 TEST_F(BusTest, write_SDO_timeout)
@@ -493,7 +493,7 @@ TEST_F(BusTest, write_SDO_timeout)
     checkSendFrameSimple(Command::FPRD, 2);
     io_nominal->handleReply<uint8_t>({0x08, 0});// cannot write, nothing to read
 
-    ASSERT_THROW(bus.writeSDO(slave, 0x1018, 1, false, &data, data_size, 1ms), Error);
+    ASSERT_THROW(bus.writeSDO(slave, 0x1018, 1, Bus::Access::PARTIAL, &data, data_size, 1ms), Error);
 }
 
 TEST_F(BusTest, write_SDO_bad_answer)
@@ -510,7 +510,7 @@ TEST_F(BusTest, write_SDO_bad_answer)
     checkSendFrameSimple(Command::FPWR);  // write to mailbox
     handleReplySimple(0);
 
-    ASSERT_THROW(bus.writeSDO(slave, 0x1018, 1, false, &data, data_size), Error);
+    ASSERT_THROW(bus.writeSDO(slave, 0x1018, 1, Bus::Access::PARTIAL, &data, data_size), Error);
 }
 
 TEST_F(BusTest, read_SDO_OK)
