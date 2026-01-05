@@ -12,9 +12,8 @@
 #include "CanOpenStateMachine.h"
 #include "MarvinProtocol.h"
 
-#include "rtm/probe.h"
-
-constexpr int SLAVE_ID = 6;
+#include <rtm/probe.h>
+#include <rtm/io/posix/local_socket.h>
 
 using namespace kickcat;
 
@@ -25,6 +24,21 @@ int main(int argc, char *argv[])
         printf("usage redundancy mode : ./test NIC_nominal NIC_redundancy\n");
         printf("usage no redundancy mode : ./test NIC_nominal\n");
         return 1;
+    }
+
+    rtm::Probe probe;
+    {
+        auto io = std::make_unique<rtm::LocalSocket>();
+        auto rc = io->open(rtm::access::Mode::READ_WRITE);
+        if (rc)
+        {
+            printf("io open() error: %s\n", rc.message().c_str());
+            return 1;
+        }
+
+        probe.init("marvin", "op",
+                since_epoch(), 1ms, 42,
+                std::move(io));
     }
 
     std::string red_interface_name = "";
@@ -58,6 +72,7 @@ int main(int argc, char *argv[])
     link->checkRedundancyNeeded();
 
     Bus bus(link);
+    nanoseconds sync_point = 0ns;
 
     uint8_t io_buffer[2048];
     try
@@ -66,8 +81,8 @@ int main(int argc, char *argv[])
 
         bus.requestState(State::INIT);
         bus.waitForState(State::INIT, 5000ms);
-        
-        bus.enableDC(1ms, 500us, 100ms);
+
+        sync_point = bus.enableDC(1ms, 500us, 100ms);
 
         bus.requestState(State::PRE_OP);
         bus.waitForState(State::PRE_OP, 3000ms);
@@ -124,7 +139,10 @@ int main(int argc, char *argv[])
 
         uint8_t mode = 8;
         uint32_t mode_size = 1;
-        bus.writeSDO(bus.slaves().at(SLAVE_ID), 0x6060, 0, false, &mode, mode_size);
+        for (int j = 1; j < 8; ++j)
+        {
+            bus.writeSDO(bus.slaves().at(j), 0x6060, 0, false, &mode, mode_size);
+        }
 
         printf("mapping\n");
         bus.createMapping(io_buffer);
@@ -161,18 +179,18 @@ int main(int argc, char *argv[])
     };
 
     pdo::Output* output_pdo[7];
-    pdo::Input*  input_pdo[7]; 
+    pdo::Input*  input_pdo[7];
     CANOpenStateMachine state_machine[7];
     for (int i = 0; i < 7; ++i)
     {
-        Slave& motor = bus.slaves().at(i);
+        Slave& motor = bus.slaves().at(i + 1);
         output_pdo[i] = reinterpret_cast<pdo::Output *>(motor.output.data);
         input_pdo[i] = reinterpret_cast<pdo::Input *>(motor.input.data);
         state_machine[i].setCommand(CANOpenCommand::DISABLE);
     }
 
     Timer timer{1ms};
-    timer.start();
+    timer.start(sync_point);
 
     for (int i = 0; i < 10; ++i)
     {
@@ -249,12 +267,6 @@ int main(int argc, char *argv[])
     //output_pdo->mode_of_operation = 8;
     //output_pdo->target_position = input_pdo->actual_position;
 
-    auto io = std::make_unique<rtm::FileWrite>("/dev/shm/marvin.tick");
-    rtm::Probe probe;
-    probe.init("marvin", "op",
-            since_epoch(), 1ms, 42,
-            std::move(io));
-
     int32_t initial_position[7] = {0};
     nanoseconds start_time = kickcat::since_epoch();
 
@@ -294,17 +306,17 @@ int main(int argc, char *argv[])
                 constexpr double MOTION_FQ = 0.2; // Hz
                 constexpr double MOTION_AMPLITUDE = 8.0 / 180.0 * M_PI;
                 constexpr double REDUCTION_RATIO[7] = {120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0};
+                constexpr double ENCODER_TICKS_PER_TURN[7] = {1<<20, 1<<20, 1<<19, 1<<19, 1<<19, 1<<19, 1<<19};
 
-                constexpr int ENCODER_TICKS_PER_TURN = 1<<19;
                 double targetSI = MOTION_AMPLITUDE * std::sin(2 * M_PI * MOTION_FQ * time);
-                
+
                 // Set target
                 // output_pdo->target_position = initial_position;
                 // std::cout << initial_position << " " <<  + static_cast<int32_t>(targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN);
                 for (int j = 0; j < 7; ++j)
                 {
-                    double measureSI = (input_pdo[j]->actual_position - initial_position[j]) / static_cast<double>(ENCODER_TICKS_PER_TURN) / REDUCTION_RATIO[j] * 2.0 * M_PI;
-                    output_pdo[j]->target_position =  initial_position[j] - static_cast<int32_t>(REDUCTION_RATIO[j] * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN);
+                    double measureSI = (input_pdo[j]->actual_position - initial_position[j]) / ENCODER_TICKS_PER_TURN[j] / REDUCTION_RATIO[j] * 2.0 * M_PI;
+                    output_pdo[j]->target_position =  initial_position[j] - static_cast<int32_t>(REDUCTION_RATIO[j] * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN[j]);
                 }
             }
 
@@ -364,7 +376,6 @@ int main(int argc, char *argv[])
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
 
-        // Update Ingenia at each step to receive emergencies in case of failure
         for (int j = 0; j<7; ++j)
         {
             state_machine[j].update(input_pdo[j]->status_word);
@@ -372,6 +383,7 @@ int main(int argc, char *argv[])
         }
 
         /*
+        // Update Ingenia at each step to receive emergencies in case of failure
         if (motor.mailbox.emergencies.size() > 0)
         {
             for (auto const& em : motor.mailbox.emergencies)
@@ -400,11 +412,11 @@ int main(int argc, char *argv[])
         //bus.read_address<uint8_t>(reg::SYNC_MANAGER_2 + 5);
         //bus.read_address<uint8_t>(reg::SYNC_MANAGER_3 + 5, value_u8);
 
-            printf("[%d] {%x} %x (%x) position %d to %d - drift %ld\n",
+            printf("[%d] {%x} %x (%x) position %d to %d - RECD %d\n",
                 i, input_pdo[0]->error_code,
                 state_machine[0].getControlWord(), input_pdo[0]->status_word,
-                input_pdo[0]->actual_position, output_pdo[0]->target_position, 
-                elapsed_time(start_time).count() / (i + 1));
+                input_pdo[0]->actual_position, output_pdo[0]->target_position,
+                input_pdo[0]->RECD);
             //printf("velocity %d\n", input_pdo->actual_velocity);
             //printf("torque   %d\n", input_pdo->actual_torque);
             //printf("LTor     %d\n", input_pdo->LTor_feedback);

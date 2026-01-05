@@ -16,10 +16,14 @@ namespace kickcat
         return period_;
     }
 
-    void Timer::start()
+    void Timer::start(nanoseconds sync_point)
     {
-        // Start the timer.
-        next_deadline_ = since_epoch() + period_;
+        // Compute the next_deadline according to the sync point (we want to tick such as one of the tick match with the sync point)
+        next_deadline_ = sync_point;
+
+        nanoseconds delta = (since_epoch() - next_deadline_);
+        int64_t missing = (delta / period_);
+        next_deadline_ += missing * period_ + period_;
 
         {
             LockGuard lock(mutex_);
@@ -75,7 +79,7 @@ namespace kickcat
         next_deadline_ += period_;
         if (next_deadline_ < last_wakeup_)
         {
-            printf("!!! LATE !!!\n");   
+            printf("!!! LATE !!!\n");
         }
         //while (next_deadline_ < last_wakeup_)
         //{

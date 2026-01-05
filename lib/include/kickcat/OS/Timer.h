@@ -23,7 +23,7 @@ namespace kickcat
         ~Timer() = default;
 
         /// Start the timer.
-        void start();
+        void start(nanoseconds sync_point = since_epoch());
 
         ///  Stop the timer.
         void stop();

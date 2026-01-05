@@ -4,10 +4,16 @@
 
 namespace kickcat
 {
+    constexpr nanoseconds THIRTY_YEARS = 30 * 365 * 24h;
+
     nanoseconds since_ecat_epoch()
     {
-        constexpr nanoseconds THIRTY_YEARS = 30 * 365 * 24h;
         return since_epoch() - THIRTY_YEARS;
+    }
+
+    nanoseconds to_unix_epoch(nanoseconds ecat_epoch)
+    {
+        return ecat_epoch + THIRTY_YEARS;
     }
 
     // ETG1000.6 and ETG1020 chapter 4 Description of AL Status Codes

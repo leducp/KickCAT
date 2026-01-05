@@ -685,6 +685,7 @@ namespace kickcat
     // Return the time since EtherCAT epoch (01-01-2020)
     // Useful for Distributed Clock
     nanoseconds since_ecat_epoch();
+    nanoseconds to_unix_epoch(nanoseconds ecat_epoch);
 
     // helpers
     constexpr uint16_t datagram_size(uint16_t data_size)

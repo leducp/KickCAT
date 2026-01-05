@@ -5,7 +5,7 @@
 
 namespace kickcat
 {
-    void Bus::enableDC(nanoseconds cycle_time, nanoseconds shift_cycle, nanoseconds start_delay)
+    nanoseconds Bus::enableDC(nanoseconds cycle_time, nanoseconds shift_cycle, nanoseconds start_delay)
     {
         for (auto& slave : slaves_)
         {
@@ -17,6 +17,7 @@ namespace kickcat
                 //TODO: read DC port received times - compute drift depending on topology
             }
         }
+        dc_slave_ = &slaves_.at(1);
         if (dc_slave_ == nullptr)
         {
             THROW_ERROR("No dc slave found");
@@ -72,8 +73,8 @@ namespace kickcat
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SYSTEM_TIME), nullptr, 8, process, [](DatagramState const&){});
         link_->processDatagrams();
 
-        // 2. Convert relative start time to absolute, round it to cycle time and apply a shift in the cycle
-        nanoseconds start_time = ((nanoseconds(network_time) + start_delay) / cycle_time) * cycle_time + cycle_time + shift_cycle;
+        // 2. Convert relative start time to absolute, round it to cycle time and apply a delay and shift in the cycle
+        nanoseconds start_time = (nanoseconds(network_time) / cycle_time) * cycle_time + cycle_time + shift_cycle + start_delay;
         uint64_t start_time_raw = start_time.count();
 
         // 3. Apply start time
@@ -83,6 +84,8 @@ namespace kickcat
         // TODO: use a config in the slave to select the sync method
         uint8_t enable_dc_sync0 = 0x3;
         broadcastWrite(reg::DC_SYNC_ACTIVATION, &enable_dc_sync0, 1);
+
+        return to_unix_epoch(start_time - start_delay - shift_cycle + slave.dc_time_offset);
     }
 
 
@@ -122,7 +125,7 @@ namespace kickcat
                 uint64_t raw_timestamp;
                 std::memcpy(&raw_timestamp, data, sizeof(uint64_t));
                 slave.dc_ecat_received_time = nanoseconds(raw_timestamp);
-                
+
                 return DatagramState::OK;
             };
             link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_ECAT_RECEIVED_TIME), nullptr, 8, process_ecat, error);
@@ -196,7 +199,7 @@ namespace kickcat
             }
             else
             {
-                
+
                 next->delay += delta_current - delta_next;
             }
             current_dc_slave = next;
