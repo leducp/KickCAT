@@ -1,7 +1,9 @@
+#include <sstream>
+
+#include "Error.h"
 #include "protocol.h"
 #include "CoE/protocol.h"
-#include "Error.h"
-#include <sstream>
+#include "CoE/mailbox/request.h"
 
 namespace kickcat::CoE
 {
@@ -10,6 +12,17 @@ namespace kickcat::CoE
         using namespace abort;
         switch (abort_code)
         {
+            // custom/internal status code from mailbox - generic
+            case mailbox::request::MessageStatus::SUCCESS:                     { return "Success";                                                     }
+            case mailbox::request::MessageStatus::RUNNING:                     { return "Running";                                                     }
+            case mailbox::request::MessageStatus::TIMEDOUT:                    { return "Timedout";                                                    }
+
+            // custom/internal status code from mailbox - CoE
+            case mailbox::request::MessageStatus::COE_WRONG_SERVICE:           { return "CoE wrong service";                                           }
+            case mailbox::request::MessageStatus::COE_UNKNOWN_SERVICE:         { return "CoE unknown service";                                         }
+            case mailbox::request::MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL: { return "CoE client buffer too small";                                 }
+            case mailbox::request::MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT:  { return "CoE segment bad toggle bit";                                  }
+
             case TOGGLE_BIT_NOT_ALTERNATED:     { return "Toggle bit not changed";                                                                     }
             case SDO_PROTOCOL_TIMEOUT:          { return "SDO protocol timeout";                                                                       }
             case COMMAND_SPECIFIER_INVALID:     { return "Client/Server command specifier not valid or unknown";                                       }

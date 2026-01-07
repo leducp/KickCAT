@@ -146,6 +146,75 @@ namespace kickcat
         }
     }
 
+/*
+    Slave* Bus::next_slave(Slave* current)
+    {
+        int next_id = current->address - 1001 + 1; //TODO create a constant for the slave address offset
+        if (id >= slaves_.size())
+        {
+            return nullptr;
+        }
+
+        return &slaves_.at(id);
+    }
+
+    Slave* Bus::next_dc_slave_in_branch(Slave* current)
+    {
+        if (current->countOpenPorts() == 1)
+        {
+            // no more slaves past this point in this branch
+            return current;
+        }
+
+        int id = current->address - 1001; //TODO create a constant for the slave address offset
+        for (auto it = slaves_.begin() + id + 1; it != slaves_.end(); ++it)
+        {
+            if (it->isDCSupport())
+            {
+                return &(*it);
+            }
+
+            if (it->countOpenPorts() == 1)
+            {
+                // last slave of the branch, and it was not DC compatible
+                return current;
+            }
+        }
+
+        // No DC slave past the current one
+        return current;
+    };
+
+
+    // Return nullptr if the branch is a dead end, a new root otherwise
+    Slave* Bus::computeBranchPropagationDelay(Slave* branch_root)
+    {
+        Slave* current_slave = branch_root;
+        while (true)
+        {
+            Slave* next = next_slave(current_slave);
+            if (next == nullptr)
+            {
+                // end of slaves
+                return nullptr;
+            }
+
+            // Set the current delay to next as an offset
+            // If the slave is not DC, it enable propagation of the last delay
+            next->delay = current_slave->delay;
+
+            if (next->countOpenPorts() == 1)
+            {
+                // dead end
+                return nullptr;
+            }
+            else
+            {
+
+            }
+        }
+    }
+*/
 
     void Bus::computePropagationDelay(nanoseconds master_time)
     {
@@ -163,7 +232,7 @@ namespace kickcat
 
             for (auto it = slaves_.begin() + id + 1; it != slaves_.end(); ++it)
             {
-                if (it->esc.features & ESC::feature::DC_AVAILABLE)
+                if (it->isDCSupport())
                 {
                     return &(*it);
                 }

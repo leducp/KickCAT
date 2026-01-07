@@ -63,4 +63,9 @@ namespace kickcat
                 dl_status.PL_port2 +
                 dl_status.PL_port3;
     }
+
+    bool Slave::isDCSupport()
+    {
+        return esc.features & ESC::feature::DC_AVAILABLE;
+    }
 }

@@ -14,14 +14,14 @@ namespace kickcat
     {
         std::unordered_map<uint16_t, uint16_t> topology;
 
-        uint16_t lastSeen = slaves.at(0).address;
+        uint16_t last_seen = slaves.at(0).address;
         std::stack<uint16_t> branches;
-        for (auto& slave : slaves) 
-        {   
-            int openPorts = slave.countOpenPorts();
+        for (auto& slave : slaves)
+        {
+            int open_ports = slave.countOpenPorts();
 
-            switch (openPorts)
-            {   
+            switch (open_ports)
+            {
                 case 0:
                 {
                     THROW_ERROR("No open port on a slave - it should not exist in the bus");
@@ -29,26 +29,26 @@ namespace kickcat
                 }
                 case 1:
                 {
-                    topology[slave.address] = lastSeen;
-                    lastSeen = slave.address;
+                    topology[slave.address] = last_seen;
+                    last_seen = slave.address;
                     if (not branches.empty())
                     {
-                        lastSeen = branches.top();
+                        last_seen = branches.top();
                         branches.pop();
                     }
                     break;
                 }
                 case 2:
                 {
-                    topology[slave.address] = lastSeen;
-                    lastSeen = slave.address;
+                    topology[slave.address] = last_seen;
+                    last_seen = slave.address;
                     break;
                 }
                 default:
                 {
-                    topology[slave.address] = lastSeen;
-                    lastSeen = slave.address;
-                    for (int i = 2; i < openPorts; ++i)
+                    topology[slave.address] = last_seen;
+                    last_seen = slave.address;
+                    for (int i = 2; i < open_ports; ++i)
                     {
                         branches.push(slave.address);
                     }
