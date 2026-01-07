@@ -105,28 +105,28 @@ int main(int argc, char *argv[])
             uint8_t uno = 1;
             uint8_t size = 2;
             auto& slave = bus.slaves().at(id);
-            bus.writeSDO(slave, 0x1c12, 0, false, &zero, 1);
-                bus.writeSDO(slave, 0x1601, 0, false, &zero, 1);
+            bus.writeSDO(slave, 0x1c12, 0, Bus::Access::PARTIAL, &zero, 1);
+                bus.writeSDO(slave, 0x1601, 0, Bus::Access::PARTIAL, &zero, 1);
 
                     uint32_t tx_mapping[] = {0x60410010, 0x60640020};
-                    bus.writeSDO(slave, 0x1601, 1, false, &tx_mapping[0], 4);
-                    bus.writeSDO(slave, 0x1601, 2, false, &tx_mapping[1], 4);
+                    bus.writeSDO(slave, 0x1601, 1, Bus::Access::PARTIAL, &tx_mapping[0], 4);
+                    bus.writeSDO(slave, 0x1601, 2, Bus::Access::PARTIAL, &tx_mapping[1], 4);
                     size =2;
-                bus.writeSDO(slave, 0x1601, 0, false, &size, 1);
-            bus.writeSDO(slave, 0x1c12, 0, false, &uno, 1);
+                bus.writeSDO(slave, 0x1601, 0, Bus::Access::PARTIAL, &size, 1);
+            bus.writeSDO(slave, 0x1c12, 0, Bus::Access::PARTIAL, &uno, 1);
 
 
-            bus.writeSDO(slave, 0x1c13, 0, false, &zero, 1);
-                bus.writeSDO(slave, 0x1a01, 0, false, &zero, 1);
+            bus.writeSDO(slave, 0x1c13, 0, Bus::Access::PARTIAL, &zero, 1);
+                bus.writeSDO(slave, 0x1a01, 0, Bus::Access::PARTIAL, &zero, 1);
 
                     uint32_t rx_mapping[] = {0x60400010, 0x60600010, 0x607A0020};
-                    bus.writeSDO(slave, 0x1a01, 1, false, &rx_mapping[0], 4);
-                    bus.writeSDO(slave, 0x1a01, 2, false, &rx_mapping[1], 4);
-                    bus.writeSDO(slave, 0x1a01, 3, false, &rx_mapping[2], 4);
+                    bus.writeSDO(slave, 0x1a01, 1, Bus::Access::PARTIAL, &rx_mapping[0], 4);
+                    bus.writeSDO(slave, 0x1a01, 2, Bus::Access::PARTIAL, &rx_mapping[1], 4);
+                    bus.writeSDO(slave, 0x1a01, 3, Bus::Access::PARTIAL, &rx_mapping[2], 4);
                     size = 3;
 
-                bus.writeSDO(slave, 0x1a01, 0, false, &size, 1);
-            bus.writeSDO(slave, 0x1c13, 0, false, &uno, 1);
+                bus.writeSDO(slave, 0x1a01, 0, Bus::Access::PARTIAL, &size, 1);
+            bus.writeSDO(slave, 0x1c13, 0, Bus::Access::PARTIAL, &uno, 1);
         };
 
         printf("try to map\n");
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
         uint32_t mode_size = 1;
         for (int j = 1; j < 8; ++j)
         {
-            bus.writeSDO(bus.slaves().at(j), 0x6060, 0, false, &mode, mode_size);
+            bus.writeSDO(bus.slaves().at(j), 0x6060, 0, Bus::Access::PARTIAL, &mode, mode_size);
         }
 
         printf("mapping\n");

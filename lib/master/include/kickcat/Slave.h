@@ -25,7 +25,8 @@ namespace kickcat
         /// \return True if too many errors detected since start of the slave. Return false otherwise.
         bool checkAbsoluteErrorCounters(int max_absolute_errors);
 
-        int countOpenPorts();
+        int countOpenPorts() const;
+        bool isDCSupport() const;
 
         uint16_t address;
         uint8_t al_status{State::INVALID};
@@ -57,7 +58,6 @@ namespace kickcat
         int previous_errors_sum{0};
 
         ESC::Description esc;
-        bool isDCSupport();
 
         // DC received time record - required to compute propagation delay
         nanoseconds dc_received_time[4];

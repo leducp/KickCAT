@@ -87,10 +87,13 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
+        printf("INIT\n");
         bus.init(100ms);  // to adapt to your use case
 
         printf("Init done \n");
         print_current_state();
+
+        bus.enableDC(1ms, 10ms, 500us);
 
         bus.createMapping(io_buffer);
 
@@ -121,7 +124,14 @@ int main(int argc, char* argv[])
         printESC(slave);
     }
 
-    auto& easycat = bus.slaves().at(0);
+    auto& easycat = bus.slaves().at(1);
+
+    // Set valid output to exit safe op.
+    auto& foot_slave = bus.slaves().at(0);
+    for (int32_t i = 0; i < foot_slave.output.bsize; ++i)
+    {
+        foot_slave.output.data[i] = 0xBB;
+    }
 
     try
     {

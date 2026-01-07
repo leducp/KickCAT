@@ -1,7 +1,9 @@
 #include <inttypes.h>
+#include <unordered_map>
 
 #include "debug.h"
 #include "Bus.h"
+#include "Diagnostics.h"
 
 namespace kickcat
 {
@@ -146,155 +148,342 @@ namespace kickcat
         }
     }
 
-/*
-    Slave* Bus::next_slave(Slave* current)
+
+    namespace
     {
-        int next_id = current->address - 1001 + 1; //TODO create a constant for the slave address offset
-        if (id >= slaves_.size())
+        // Helper function to get port timestamp
+        nanoseconds portTime(Slave const& slave, uint8_t port)
         {
+            if (port < 4)
+            {
+                return slave.dc_received_time[port];
+            }
+            return 0ns;
+        }
+
+        // Get active ports bitmap from DLStatus
+        uint8_t getActivePorts(Slave const& slave)
+        {
+            uint8_t active = 0;
+            if (slave.dl_status.PL_port0) active |= (1 << 0);
+            if (slave.dl_status.PL_port1) active |= (1 << 1);
+            if (slave.dl_status.PL_port2) active |= (1 << 2);
+            if (slave.dl_status.PL_port3) active |= (1 << 3);
+            return active;
+        }
+
+        // Calculate previous active port (order: 0 - 3 - 1 - 2)
+        uint8_t prevPort(Slave const& slave, uint8_t port)
+        {
+            uint8_t pport = port;
+            uint8_t active = getActivePorts(slave);
+
+            switch (port)
+            {
+                case 0:
+                    if (active & (1 << 2)) pport = 2;
+                    else if (active & (1 << 1)) pport = 1;
+                    else if (active & (1 << 3)) pport = 3;
+                    break;
+                case 1:
+                    if (active & (1 << 3)) pport = 3;
+                    else if (active & (1 << 0)) pport = 0;
+                    else if (active & (1 << 2)) pport = 2;
+                    break;
+                case 2:
+                    if (active & (1 << 1)) pport = 1;
+                    else if (active & (1 << 3)) pport = 3;
+                    else if (active & (1 << 0)) pport = 0;
+                    break;
+                case 3:
+                    if (active & (1 << 0)) pport = 0;
+                    else if (active & (1 << 2)) pport = 2;
+                    else if (active & (1 << 1)) pport = 1;
+                    break;
+            }
+            return pport;
+        }
+
+        // Find and consume an unconsumed port on parent (search order: 3 - 1 - 2 - 0)
+        uint8_t parentPort(uint8_t& consumed_ports)
+        {
+            uint8_t parentport = 0;
+            uint8_t b = consumed_ports;
+
+            if (b & (1 << 3))
+            {
+                parentport = 3;
+                b &= ~(1 << 3);
+            }
+            else if (b & (1 << 1))
+            {
+                parentport = 1;
+                b &= ~(1 << 1);
+            }
+            else if (b & (1 << 2))
+            {
+                parentport = 2;
+                b &= ~(1 << 2);
+            }
+            else if (b & (1 << 0))
+            {
+                parentport = 0;
+                b &= ~(1 << 0);
+            }
+
+            consumed_ports = b;
+            return parentport;
+        }
+
+        // Find slave by address
+        Slave* findSlaveByAddress(std::vector<Slave>& slaves, uint16_t address)
+        {
+            for (auto& slave : slaves)
+            {
+                if (slave.address == address)
+                {
+                    return &slave;
+                }
+            }
             return nullptr;
         }
-
-        return &slaves_.at(id);
     }
-
-    Slave* Bus::next_dc_slave_in_branch(Slave* current)
-    {
-        if (current->countOpenPorts() == 1)
-        {
-            // no more slaves past this point in this branch
-            return current;
-        }
-
-        int id = current->address - 1001; //TODO create a constant for the slave address offset
-        for (auto it = slaves_.begin() + id + 1; it != slaves_.end(); ++it)
-        {
-            if (it->isDCSupport())
-            {
-                return &(*it);
-            }
-
-            if (it->countOpenPorts() == 1)
-            {
-                // last slave of the branch, and it was not DC compatible
-                return current;
-            }
-        }
-
-        // No DC slave past the current one
-        return current;
-    };
-
-
-    // Return nullptr if the branch is a dead end, a new root otherwise
-    Slave* Bus::computeBranchPropagationDelay(Slave* branch_root)
-    {
-        Slave* current_slave = branch_root;
-        while (true)
-        {
-            Slave* next = next_slave(current_slave);
-            if (next == nullptr)
-            {
-                // end of slaves
-                return nullptr;
-            }
-
-            // Set the current delay to next as an offset
-            // If the slave is not DC, it enable propagation of the last delay
-            next->delay = current_slave->delay;
-
-            if (next->countOpenPorts() == 1)
-            {
-                // dead end
-                return nullptr;
-            }
-            else
-            {
-
-            }
-        }
-    }
-*/
 
     void Bus::computePropagationDelay(nanoseconds master_time)
     {
-        // !!! Assume a linear topology for now !!!
+        // Get topology to find parent relationships
+        std::unordered_map<uint16_t, uint16_t> topology = getTopology(slaves_);
 
+        // Map to track consumed ports per slave (bitmap: ....3210)
+        std::unordered_map<uint16_t, uint8_t> consumed_ports;
+        // Map to track entry port per slave
+        std::unordered_map<uint16_t, uint8_t> entry_ports;
+
+        // Initialize consumed ports with active ports for all slaves
+        for (auto& slave : slaves_)
+        {
+            consumed_ports[slave.address] = getActivePorts(slave);
+        }
+
+        // Set DC reference slave time offset
         dc_slave_->dc_time_offset = master_time - dc_slave_->dc_ecat_received_time;
+        dc_slave_->delay = 0ns;
 
-        // Start from the DC slave (the first one on the network that have DC capability)
-        auto current_dc_slave = dc_slave_;
-        current_dc_slave->delay = 0ns;
-
-        auto next_dc_slave = [&](Slave* current)
+        // Process all slaves in order
+        uint16_t parenthold = 0;
+        for (auto& slave : slaves_)
         {
-            int id = current->address - 1001; //TODO create a constant for the slave address offset
-
-            for (auto it = slaves_.begin() + id + 1; it != slaves_.end(); ++it)
+            if (slave.isDCSupport())
             {
-                if (it->isDCSupport())
+                // Compute time offset from ref clock
+                slave.dc_time_offset = master_time - slave.dc_ecat_received_time;
+
+                // Find entry port (port with lowest timestamp)
+                uint8_t active = getActivePorts(slave);
+                int8_t active_port_count = 0;
+                int8_t active_port_numbers[4];
+                nanoseconds port_timestamps[4];
+
+                // Build list of active ports and their timestamps (order: 0, 3, 1, 2)
+                if (active & (1 << 0))
                 {
-                    return &(*it);
+                    active_port_numbers[active_port_count] = 0;
+                    port_timestamps[active_port_count] = portTime(slave, 0);
+                    active_port_count++;
                 }
-            }
+                if (active & (1 << 3))
+                {
+                    active_port_numbers[active_port_count] = 3;
+                    port_timestamps[active_port_count] = portTime(slave, 3);
+                    active_port_count++;
+                }
+                if (active & (1 << 1))
+                {
+                    active_port_numbers[active_port_count] = 1;
+                    port_timestamps[active_port_count] = portTime(slave, 1);
+                    active_port_count++;
+                }
+                if (active & (1 << 2))
+                {
+                    active_port_numbers[active_port_count] = 2;
+                    port_timestamps[active_port_count] = portTime(slave, 2);
+                    active_port_count++;
+                }
 
-            // No DC slave past the current one
-            return current;
-        };
+                // Entry port is port with the lowest timestamp
+                uint8_t entryport = 0;
+                if ((active_port_count > 1) and (port_timestamps[1] < port_timestamps[entryport]))
+                {
+                    entryport = 1;
+                }
+                if ((active_port_count > 2) and (port_timestamps[2] < port_timestamps[entryport]))
+                {
+                    entryport = 2;
+                }
+                if ((active_port_count > 3) and (port_timestamps[3] < port_timestamps[entryport]))
+                {
+                    entryport = 3;
+                }
+                entryport = active_port_numbers[entryport];
+                entry_ports[slave.address] = entryport;
 
-        while (true)
-        {
-            auto next = next_dc_slave(current_dc_slave);
-            if (next->address == current_dc_slave->address)
-            {
-                // End of scan
-                break;
-            }
+                // Consume entry port from consumed ports
+                consumed_ports[slave.address] &= ~(1 << entryport);
 
-            // Compute time offset from ref clock
-            next->dc_time_offset = master_time - next->dc_ecat_received_time;
+                // Find DC parent (walk up parent chain until we find a DC slave or master)
+                Slave* parent_slave = nullptr;
+                uint16_t parent_address = topology[slave.address];
 
-            // Set the current delay to next as an offset
-            next->delay = current_dc_slave->delay;
+                // Walk up parent chain until we find a DC slave or reach master
+                // Note: a slave that is its own parent (topology[address] == address) is connected to master
+                while (parent_address != 0)
+                {
+                    // Check if current parent is DC-capable
+                    Slave* candidate = findSlaveByAddress(slaves_, parent_address);
+                    if (candidate and candidate->isDCSupport())
+                    {
+                        parent_slave = candidate;
+                        break;
+                    }
 
-            // !!! TODO: handle overflow of 32bits registers !!!
-            nanoseconds delta_current = current_dc_slave->dc_received_time[1] - current_dc_slave->dc_received_time[0];
-            nanoseconds delta_next    = next->dc_received_time[1]             - next->dc_received_time[0];
+                    // Stop if we've reached master (slave that is its own parent)
+                    if (parent_address == topology[parent_address])
+                    {
+                        break;
+                    }
 
-            if (next->dl_status.PL_port1 == 0)
-            {
-                // End of line
-                next->delay += delta_current / 2;
+                    // Move to next parent in chain
+                    parent_address = topology[parent_address];
+                }
+
+                // Only calculate propagation delay if slave has a DC parent (not master)
+                if (parent_slave != nullptr)
+                {
+                    // Find port on parent this slave is connected to
+                    uint8_t parentport = parentPort(consumed_ports[parent_slave->address]);
+
+                    // If parent has only one link (topology == 1), use parent's entry port
+                    if (parent_slave->countOpenPorts() == 1)
+                    {
+                        parentport = entry_ports[parent_slave->address];
+                    }
+
+                    // Calculate delta times for propagation delay computation
+                    nanoseconds entry_to_prev_delta = 0ns;  // Time from entry port to previous port on current slave (subtracted for children)
+                    nanoseconds parent_prev_to_entry_delta = 0ns;  // Time from parent's previous port to parent's entry port (added for previous siblings)
+
+                    // Time from parent port to previous port on parent (base propagation time)
+                    nanoseconds parent_port_to_prev_delta = portTime(*parent_slave, parentport) -
+                                                            portTime(*parent_slave, prevPort(*parent_slave, parentport));
+
+                    // If current slave has children (topology > 1), subtract their delays
+                    if (slave.countOpenPorts() > 1)
+                    {
+                        entry_to_prev_delta = portTime(slave, prevPort(slave, entryport)) -
+                                              portTime(slave, entryport);
+                    }
+
+                    // We are only interested in positive difference
+                    if (entry_to_prev_delta > parent_port_to_prev_delta)
+                    {
+                        entry_to_prev_delta = -entry_to_prev_delta;
+                    }
+
+                    // If current slave is not the first child of parent, add previous child's delays
+                    // Check if there are other DC slaves that are direct children of the same parent
+                    // and appear before current slave in the sequential order
+                    bool is_first_child = true;
+                    for (auto const& check_slave : slaves_)
+                    {
+                        // Stop when we reach current slave
+                        if (&check_slave == &slave)
+                        {
+                            break;
+                        }
+
+                        // Check if this slave is a DC slave and a direct child of the same parent
+                        if (check_slave.isDCSupport() and
+                            topology[check_slave.address] == parent_slave->address)
+                        {
+                            is_first_child = false;
+                            break;
+                        }
+                    }
+
+                    if (not is_first_child)
+                    {
+                        parent_prev_to_entry_delta = portTime(*parent_slave, prevPort(*parent_slave, parentport)) -
+                                                     portTime(*parent_slave, entry_ports[parent_slave->address]);
+                    }
+                    if (parent_prev_to_entry_delta < 0ns)
+                    {
+                        parent_prev_to_entry_delta = -parent_prev_to_entry_delta;
+                    }
+
+                    // Calculate current slave delay from delta times
+                    // Assumption: forward delay equals return delay
+                    slave.delay = ((parent_port_to_prev_delta - entry_to_prev_delta) / 2) +
+                                  parent_prev_to_entry_delta +
+                                  parent_slave->delay;
+                }
+                else
+                {
+                    // No DC parent found (connected directly to master or through non-DC slaves)
+                    // Delay is 0 (or could be calculated differently if needed)
+                    slave.delay = 0ns;
+                }
+
+                // Clear parenthold since this branch has DC slave
+                parenthold = 0;
             }
             else
             {
+                // Non-DC slave
+                uint16_t parent_address = topology[slave.address];
 
-                next->delay += delta_current - delta_next;
+                // If non-DC slave found on first position on branch, hold root parent
+                if (parent_address != 0 and parent_address != topology[parent_address])
+                {
+                    Slave* parent = findSlaveByAddress(slaves_, parent_address);
+                    if (parent and parent->countOpenPorts() > 2)
+                    {
+                        parenthold = parent_address;
+                    }
+                }
+
+                // If branch has no DC slaves, consume port on root parent
+                if (parenthold != 0 and slave.countOpenPorts() == 1)
+                {
+                    parentPort(consumed_ports[parenthold]);
+                    parenthold = 0;
+                }
             }
-            current_dc_slave = next;
         }
 
         // Apply propagation delay to slaves
         for (auto& slave : slaves_)
         {
-            dc_info("DC slave %d delay is %ld from DC ref\n", slave.address, slave.delay.count());
-            auto error = [](DatagramState const& state)
+            if (slave.isDCSupport())
             {
-                THROW_ERROR_DATAGRAM("Error while applying slave DC delay", state);
-            };
-
-            auto process = [&slave](DatagramHeader const*, uint8_t const*, uint16_t wkc)
-            {
-                if (wkc != 1)
+                dc_info("DC slave %d delay is %ld from DC ref\n", slave.address, slave.delay.count());
+                auto error = [](DatagramState const& state)
                 {
-                    return DatagramState::INVALID_WKC;
-                }
+                    THROW_ERROR_DATAGRAM("Error while applying slave DC delay", state);
+                };
 
-                return DatagramState::OK;
-            };
+                auto process = [&slave](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+                {
+                    if (wkc != 1)
+                    {
+                        return DatagramState::INVALID_WKC;
+                    }
 
-            uint32_t raw_delay = static_cast<uint32_t>(slave.delay.count());
-            link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::DC_SYSTEM_TIME_DELAY), &raw_delay, sizeof(raw_delay), process, error);
+                    return DatagramState::OK;
+                };
+
+                uint32_t raw_delay = static_cast<uint32_t>(slave.delay.count());
+                link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::DC_SYSTEM_TIME_DELAY), &raw_delay, sizeof(raw_delay), process, error);
+            }
         }
         link_->processDatagrams();
     }

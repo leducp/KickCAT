@@ -56,7 +56,7 @@ namespace kickcat
         return sum;
     }
 
-    int Slave::countOpenPorts()
+    int Slave::countOpenPorts() const
     {
         return  dl_status.PL_port0 +
                 dl_status.PL_port1 +
@@ -64,7 +64,7 @@ namespace kickcat
                 dl_status.PL_port3;
     }
 
-    bool Slave::isDCSupport()
+    bool Slave::isDCSupport() const
     {
         return esc.features & ESC::feature::DC_AVAILABLE;
     }
