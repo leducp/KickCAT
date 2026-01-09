@@ -8,6 +8,8 @@
 #include "kickcat/helpers.h"
 #include "kickcat/OS/Timer.h"
 
+#include "kickcat/Diagnostics.h"
+
 #include "CanOpenErrors.h"
 #include "CanOpenStateMachine.h"
 #include "MarvinProtocol.h"
@@ -86,17 +88,6 @@ int main(int argc, char *argv[])
 
         bus.requestState(State::PRE_OP);
         bus.waitForState(State::PRE_OP, 3000ms);
-
-        //TODO
-        // remove enableDC from init()
-        // go back in INIT, enableDC, go again in PREOP, continue
-
-        //for (auto& slave: bus.slaves())
-        //{
-        //    printInfo(slave);
-        //    printESC(slave);
-        //}
-
 
 
         auto map_pdos = [&](uint8_t id)
@@ -178,15 +169,23 @@ int main(int argc, char *argv[])
         //printf("- previous error was a false alarm - ");
     };
 
-    pdo::Output* output_pdo[7];
-    pdo::Input*  input_pdo[7];
-    CANOpenStateMachine state_machine[7];
+    constexpr int MOTORS = 14;
+    pdo::Output* output_pdo[MOTORS];
+    pdo::Input*  input_pdo[MOTORS];
+    CANOpenStateMachine state_machine[MOTORS];
     for (int i = 0; i < 7; ++i)
     {
         Slave& motor = bus.slaves().at(i + 1);
         output_pdo[i] = reinterpret_cast<pdo::Output *>(motor.output.data);
         input_pdo[i] = reinterpret_cast<pdo::Input *>(motor.input.data);
         state_machine[i].setCommand(CANOpenCommand::DISABLE);
+    }
+    for (int i = 0; i < 7; ++i)
+    {
+        Slave& motor = bus.slaves().at(i + 9);
+        output_pdo[i+7] = reinterpret_cast<pdo::Output *>(motor.output.data);
+        input_pdo[i+7] = reinterpret_cast<pdo::Input *>(motor.input.data);
+        state_machine[i+7].setCommand(CANOpenCommand::DISABLE);
     }
 
     Timer timer{1ms};
@@ -267,7 +266,7 @@ int main(int argc, char *argv[])
     //output_pdo->mode_of_operation = 8;
     //output_pdo->target_position = input_pdo->actual_position;
 
-    int32_t initial_position[7] = {0};
+    int32_t initial_position[MOTORS] = {0};
     nanoseconds start_time = kickcat::since_epoch();
 
     std::shared_ptr<mailbox::request::AbstractMessage> msg = nullptr;
@@ -283,13 +282,13 @@ int main(int argc, char *argv[])
         {
             if (i == 500)
             {
-                for (int j = 0; j < 7; ++j)
+                for (int j = 0; j < MOTORS; ++j)
                 {
                     output_pdo[j]->target_position = input_pdo[j]->actual_position;
                     state_machine[j].setCommand(CANOpenCommand::ENABLE);
                 }
             }
-
+/*
             if (i == 4000)
             {
                 for (int j = 0; j < 7; ++j)
@@ -319,7 +318,7 @@ int main(int argc, char *argv[])
                     output_pdo[j]->target_position =  initial_position[j] - static_cast<int32_t>(REDUCTION_RATIO[j] * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN[j]);
                 }
             }
-
+*/
 
             bus.sendLogicalRead(false_alarm);  // Update inputPDO
             bus.sendLogicalWrite(false_alarm); // Update outputPDO
@@ -376,7 +375,7 @@ int main(int argc, char *argv[])
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
 
-        for (int j = 0; j<7; ++j)
+        for (int j = 0; j<MOTORS; ++j)
         {
             state_machine[j].update(input_pdo[j]->status_word);
             output_pdo[j]->control_word = state_machine[j].getControlWord();
@@ -396,7 +395,7 @@ int main(int argc, char *argv[])
         }
             */
 
-        if ((i % 1000) == 0)
+        if ((i % 10) == 0)
         {
 
         //bus.read_address<uint8_t>(reg::DC_SYNC_ACTIVATION);
@@ -412,11 +411,18 @@ int main(int argc, char *argv[])
         //bus.read_address<uint8_t>(reg::SYNC_MANAGER_2 + 5);
         //bus.read_address<uint8_t>(reg::SYNC_MANAGER_3 + 5, value_u8);
 
+        printf("\r");
+        for (int j = 0; j<MOTORS; ++j)
+        {
+            printf("%d ", input_pdo[j]->actual_position);
+        }
+        /*
             printf("[%d] {%x} %x (%x) position %d to %d - RECD %d\n",
                 i, input_pdo[0]->error_code,
                 state_machine[0].getControlWord(), input_pdo[0]->status_word,
                 input_pdo[0]->actual_position, output_pdo[0]->target_position,
                 input_pdo[0]->RECD);
+                */
             //printf("velocity %d\n", input_pdo->actual_velocity);
             //printf("torque   %d\n", input_pdo->actual_torque);
             //printf("LTor     %d\n", input_pdo->LTor_feedback);

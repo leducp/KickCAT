@@ -19,6 +19,7 @@ namespace kickcat
                 //TODO: read DC port received times - compute drift depending on topology
             }
         }
+        
         dc_slave_ = &slaves_.at(1);
         if (dc_slave_ == nullptr)
         {
@@ -258,6 +259,8 @@ namespace kickcat
         std::unordered_map<uint16_t, uint8_t> consumed_ports;
         // Map to track entry port per slave
         std::unordered_map<uint16_t, uint8_t> entry_ports;
+        // Map to track which port was used for each branch (child address -> parent port)
+        std::unordered_map<uint16_t, uint8_t> branch_ports;
 
         // Initialize consumed ports with active ports for all slaves
         for (auto& slave : slaves_)
@@ -357,10 +360,30 @@ namespace kickcat
                 }
 
                 // Only calculate propagation delay if slave has a DC parent (not master)
-                if (parent_slave != nullptr)
+                // DC reference slave always has delay = 0, skip calculation
+                // Slaves that come before the DC reference in sequential order should have delay = 0
+                // Slaves that come after the DC reference should calculate delay normally
+                bool is_before_reference = false;
+                // Check if current slave comes before DC reference in sequential order
+                for (auto const& s : slaves_)
+                {
+                    if (&s == &slave)
+                    {
+                        is_before_reference = true;
+                        break;
+                    }
+                    if (&s == dc_slave_)
+                    {
+                        break;
+                    }
+                }
+                
+                if (parent_slave != nullptr and &slave != dc_slave_ and not is_before_reference)
                 {
                     // Find port on parent this slave is connected to
                     uint8_t parentport = parentPort(consumed_ports[parent_slave->address]);
+                    // Track which port this branch uses
+                    branch_ports[slave.address] = parentport;
 
                     // If parent has only one link (topology == 1), use parent's entry port
                     if (parent_slave->countOpenPorts() == 1)
@@ -390,29 +413,61 @@ namespace kickcat
                     }
 
                     // If current slave is not the first child of parent, add previous child's delays
-                    // Check if there are other DC slaves that are direct children of the same parent
-                    // and appear before current slave in the sequential order
+                    // Check if there are other DC slaves between parent and current slave in sequential order
+                    // This accounts for round-trip time through previous branches
                     bool is_first_child = true;
-                    for (auto const& check_slave : slaves_)
+                    
+                    // Find indices of current slave and parent in the slaves_ vector
+                    size_t current_index = 0;
+                    size_t parent_index = 0;
+                    for (size_t i = 0; i < slaves_.size(); ++i)
                     {
-                        // Stop when we reach current slave
-                        if (&check_slave == &slave)
+                        if (&slaves_[i] == &slave)
                         {
-                            break;
+                            current_index = i;
                         }
-
-                        // Check if this slave is a DC slave and a direct child of the same parent
-                        if (check_slave.isDCSupport() and
-                            topology[check_slave.address] == parent_slave->address)
+                        if (&slaves_[i] == parent_slave)
                         {
-                            is_first_child = false;
-                            break;
+                            parent_index = i;
+                        }
+                    }
+                    
+                    // Check if there are DC slaves between parent and current slave (SOEM: (child - parent) > 1)
+                    if (current_index > parent_index + 1)
+                    {
+                        // Check if any DC slave exists between parent and current
+                        for (size_t i = parent_index + 1; i < current_index; ++i)
+                        {
+                            if (slaves_[i].isDCSupport())
+                            {
+                                is_first_child = false;
+                                break;
+                            }
                         }
                     }
 
                     if (not is_first_child)
                     {
-                        parent_prev_to_entry_delta = portTime(*parent_slave, prevPort(*parent_slave, parentport)) -
+                        // Find which port the previous branch used
+                        // Look for the first DC slave that is a direct child of the same parent
+                        uint8_t previous_branch_port = 0;
+                        for (size_t i = parent_index + 1; i < current_index; ++i)
+                        {
+                            if (slaves_[i].isDCSupport() and
+                                topology[slaves_[i].address] == parent_slave->address)
+                            {
+                                // Found the first DC child - use the port it used
+                                previous_branch_port = branch_ports[slaves_[i].address];
+                                break;
+                            }
+                        }
+                        
+                        // If we found a previous branch port, use it; otherwise fall back to prevPort
+                        uint8_t parent_prev_port = (previous_branch_port != 0) ? previous_branch_port 
+                                                                                : prevPort(*parent_slave, parentport);
+                        
+                        // Calculate time from parent's previous port (where previous branch returned) to entry port
+                        parent_prev_to_entry_delta = portTime(*parent_slave, parent_prev_port) -
                                                      portTime(*parent_slave, entry_ports[parent_slave->address]);
                     }
                     if (parent_prev_to_entry_delta < 0ns)
