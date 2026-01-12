@@ -15,12 +15,8 @@ namespace kickcat
             {
                 dc_slave_ = &slave;
                 break;
-                //TODO: read 0x910 DC_SYSTEM_TIME to check if the slave can provide a clock
-                //TODO: read DC port received times - compute drift depending on topology
             }
         }
-        
-        dc_slave_ = &slaves_.at(1);
         if (dc_slave_ == nullptr)
         {
             THROW_ERROR("No dc slave found");
@@ -152,6 +148,11 @@ namespace kickcat
 
     namespace
     {
+        constexpr uint8_t PORT0 = (1 << 0);
+        constexpr uint8_t PORT1 = (1 << 1);
+        constexpr uint8_t PORT2 = (1 << 2);
+        constexpr uint8_t PORT3 = (1 << 3);
+
         // Helper function to get port timestamp
         nanoseconds portTime(Slave const& slave, uint8_t port)
         {
@@ -166,10 +167,10 @@ namespace kickcat
         uint8_t getActivePorts(Slave const& slave)
         {
             uint8_t active = 0;
-            if (slave.dl_status.PL_port0) active |= (1 << 0);
-            if (slave.dl_status.PL_port1) active |= (1 << 1);
-            if (slave.dl_status.PL_port2) active |= (1 << 2);
-            if (slave.dl_status.PL_port3) active |= (1 << 3);
+            if (slave.dl_status.PL_port0) { active |= PORT0; }
+            if (slave.dl_status.PL_port1) { active |= PORT1; }
+            if (slave.dl_status.PL_port2) { active |= PORT2; }
+            if (slave.dl_status.PL_port3) { active |= PORT3; }
             return active;
         }
 
@@ -182,25 +183,33 @@ namespace kickcat
             switch (port)
             {
                 case 0:
-                    if (active & (1 << 2)) pport = 2;
-                    else if (active & (1 << 1)) pport = 1;
-                    else if (active & (1 << 3)) pport = 3;
+                {
+                    if (active & PORT2) pport = 2;
+                    else if (active & PORT1) pport = 1;
+                    else if (active & PORT3) pport = 3;
                     break;
+                }
                 case 1:
-                    if (active & (1 << 3)) pport = 3;
-                    else if (active & (1 << 0)) pport = 0;
-                    else if (active & (1 << 2)) pport = 2;
+                {
+                    if (active & PORT3) pport = 3;
+                    else if (active & PORT0) pport = 0;
+                    else if (active & PORT2) pport = 2;
                     break;
+                }
                 case 2:
-                    if (active & (1 << 1)) pport = 1;
-                    else if (active & (1 << 3)) pport = 3;
-                    else if (active & (1 << 0)) pport = 0;
+                {
+                    if (active & PORT1) pport = 1;
+                    else if (active & PORT3) pport = 3;
+                    else if (active & PORT0) pport = 0;
                     break;
+                }
                 case 3:
-                    if (active & (1 << 0)) pport = 0;
-                    else if (active & (1 << 2)) pport = 2;
-                    else if (active & (1 << 1)) pport = 1;
+                {
+                    if (active & PORT0) pport = 0;
+                    else if (active & PORT2) pport = 2;
+                    else if (active & PORT1) pport = 1;
                     break;
+                }
             }
             return pport;
         }
@@ -211,25 +220,25 @@ namespace kickcat
             uint8_t parentport = 0;
             uint8_t b = consumed_ports;
 
-            if (b & (1 << 3))
+            if (b & PORT3)
             {
                 parentport = 3;
-                b &= ~(1 << 3);
+                b &= ~PORT3;
             }
-            else if (b & (1 << 1))
+            else if (b & PORT1)
             {
                 parentport = 1;
-                b &= ~(1 << 1);
+                b &= ~PORT1;
             }
-            else if (b & (1 << 2))
+            else if (b & PORT2)
             {
                 parentport = 2;
-                b &= ~(1 << 2);
+                b &= ~PORT2;
             }
-            else if (b & (1 << 0))
+            else if (b & PORT0)
             {
                 parentport = 0;
-                b &= ~(1 << 0);
+                b &= ~PORT0;
             }
 
             consumed_ports = b;
@@ -288,25 +297,25 @@ namespace kickcat
                 nanoseconds port_timestamps[4];
 
                 // Build list of active ports and their timestamps (order: 0, 3, 1, 2)
-                if (active & (1 << 0))
+                if (active & PORT0)
                 {
                     active_port_numbers[active_port_count] = 0;
                     port_timestamps[active_port_count] = portTime(slave, 0);
                     active_port_count++;
                 }
-                if (active & (1 << 3))
+                if (active & PORT3)
                 {
                     active_port_numbers[active_port_count] = 3;
                     port_timestamps[active_port_count] = portTime(slave, 3);
                     active_port_count++;
                 }
-                if (active & (1 << 1))
+                if (active & PORT1)
                 {
                     active_port_numbers[active_port_count] = 1;
                     port_timestamps[active_port_count] = portTime(slave, 1);
                     active_port_count++;
                 }
-                if (active & (1 << 2))
+                if (active & PORT2)
                 {
                     active_port_numbers[active_port_count] = 2;
                     port_timestamps[active_port_count] = portTime(slave, 2);
@@ -359,11 +368,20 @@ namespace kickcat
                     parent_address = topology[parent_address];
                 }
 
+                // Track branch port for DC reference (needed for subsequent branches)
+                // This must be done even if we skip delay calculation
+                if (&slave == dc_slave_ and parent_slave != nullptr)
+                {
+                    uint8_t ref_parentport = parentPort(consumed_ports[parent_slave->address]);
+                    branch_ports[slave.address] = ref_parentport;
+                }
+
                 // Only calculate propagation delay if slave has a DC parent (not master)
                 // DC reference slave always has delay = 0, skip calculation
                 // Slaves that come before the DC reference in sequential order should have delay = 0
                 // Slaves that come after the DC reference should calculate delay normally
                 bool is_before_reference = false;
+
                 // Check if current slave comes before DC reference in sequential order
                 for (auto const& s : slaves_)
                 {
@@ -377,7 +395,7 @@ namespace kickcat
                         break;
                     }
                 }
-                
+
                 if (parent_slave != nullptr and &slave != dc_slave_ and not is_before_reference)
                 {
                     // Find port on parent this slave is connected to
@@ -416,7 +434,7 @@ namespace kickcat
                     // Check if there are other DC slaves between parent and current slave in sequential order
                     // This accounts for round-trip time through previous branches
                     bool is_first_child = true;
-                    
+
                     // Find indices of current slave and parent in the slaves_ vector
                     size_t current_index = 0;
                     size_t parent_index = 0;
@@ -431,14 +449,16 @@ namespace kickcat
                             parent_index = i;
                         }
                     }
-                    
+
                     // Check if there are DC slaves between parent and current slave (SOEM: (child - parent) > 1)
+                    // Only count direct children of the same parent
                     if (current_index > parent_index + 1)
                     {
-                        // Check if any DC slave exists between parent and current
+                        // Check if any DC slave that is a direct child of the same parent exists between parent and current
                         for (size_t i = parent_index + 1; i < current_index; ++i)
                         {
-                            if (slaves_[i].isDCSupport())
+                            if (slaves_[i].isDCSupport() and
+                                topology[slaves_[i].address] == parent_slave->address)
                             {
                                 is_first_child = false;
                                 break;
@@ -451,21 +471,27 @@ namespace kickcat
                         // Find which port the previous branch used
                         // Look for the first DC slave that is a direct child of the same parent
                         uint8_t previous_branch_port = 0;
+                        bool found_previous_branch = false;
                         for (size_t i = parent_index + 1; i < current_index; ++i)
                         {
                             if (slaves_[i].isDCSupport() and
                                 topology[slaves_[i].address] == parent_slave->address)
                             {
                                 // Found the first DC child - use the port it used
-                                previous_branch_port = branch_ports[slaves_[i].address];
+                                // Check if branch port was set (exists in map)
+                                if (branch_ports.find(slaves_[i].address) != branch_ports.end())
+                                {
+                                    previous_branch_port = branch_ports[slaves_[i].address];
+                                    found_previous_branch = true;
+                                }
                                 break;
                             }
                         }
-                        
+
                         // If we found a previous branch port, use it; otherwise fall back to prevPort
-                        uint8_t parent_prev_port = (previous_branch_port != 0) ? previous_branch_port 
-                                                                                : prevPort(*parent_slave, parentport);
-                        
+                        uint8_t parent_prev_port = found_previous_branch ? previous_branch_port
+                                                                          : prevPort(*parent_slave, parentport);
+
                         // Calculate time from parent's previous port (where previous branch returned) to entry port
                         parent_prev_to_entry_delta = portTime(*parent_slave, parent_prev_port) -
                                                      portTime(*parent_slave, entry_ports[parent_slave->address]);
@@ -478,8 +504,8 @@ namespace kickcat
                     // Calculate current slave delay from delta times
                     // Assumption: forward delay equals return delay
                     slave.delay = ((parent_port_to_prev_delta - entry_to_prev_delta) / 2) +
-                                  parent_prev_to_entry_delta +
-                                  parent_slave->delay;
+                                   parent_prev_to_entry_delta +
+                                   parent_slave->delay;
                 }
                 else
                 {
