@@ -1,4 +1,8 @@
-# KickCAT
+<p align="center">
+    <picture>
+    <img alt="KickCAT" src="doc/kickCAT_logo.png" width="300">
+    </picture><br>
+</p>
 
 <p align="center">
   <strong>A lightweight, efficient EtherCAT master/slave stack for embedded systems</strong>
