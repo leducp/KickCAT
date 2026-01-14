@@ -1,6 +1,8 @@
 <p align="center">
     <picture>
-    <img alt="KickCAT" src="doc/kickCAT_logo.png" width="300">
+    <source media="(prefers-color-scheme: dark)" srcset="doc/kickCAT_logo_dark_mode.png">
+    <source media="(prefers-color-scheme: light)" srcset="doc/kickCAT_logo_light_mode.png">
+    <img alt="KickCAT" width="300">
     </picture><br>
 </p>
 
