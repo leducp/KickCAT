@@ -70,15 +70,6 @@ namespace kickcat
             return;
         }
 
-        std::memset(input_, 0, sm_input_.length);
-
-        for (auto const& e : input_map_)
-        {
-            uint8_t* dst = static_cast<uint8_t*>(input_) + (e.bit_offset / 8);
-
-            std::memcpy(dst, e.od_data, e.bit_len / 8);
-        }
-
         int32_t written = esc_->write(sm_input_.start_address, input_, sm_input_.length);
 
         if (written != sm_input_.length)
@@ -100,13 +91,6 @@ namespace kickcat
         {
             slave_error("PDO::updateOutput read error\n");
             return;
-        }
-
-        for (auto const& e : output_map_)
-        {
-            uint8_t* src = static_cast<uint8_t*>(output_) + (e.bit_offset / 8);
-
-            std::memcpy(e.od_data, src, e.bit_len / 8);
         }
     }
 
@@ -132,7 +116,7 @@ namespace kickcat
         return pdo_indices;
     }
 
-    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, std::vector<PdoEntry>& map, uint16_t& bit_offset)
+    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset)
     {
         auto [obj0, entry0] = CoE::findObject(dict, pdo_idx, 0);
         if (not entry0)
@@ -162,11 +146,24 @@ namespace kickcat
                 return false;
             }
 
-            map.push_back({
-                .od_data = od_entry->data,
-                .bit_len = bits,
-                .bit_offset = bit_offset
-            });
+            // Aliasing logic
+            void* old_data = od_entry->data;
+            bool old_owns  = od_entry->owns_data;
+
+            uint8_t* new_ptr = static_cast<uint8_t*>(buffer) + (bit_offset / 8);
+
+            od_entry->data = new_ptr;
+            od_entry->owns_data = false;
+
+            if (old_data)
+            {
+                std::memcpy(new_ptr, old_data, bits / 8);
+
+                if (old_owns)
+                {
+                    std::free(old_data);
+                }
+            }
 
             bit_offset += bits;
         }
@@ -176,9 +173,6 @@ namespace kickcat
 
     StatusCode PDO::configureMapping(CoE::Dictionary& dict)
     {
-        input_map_.clear();
-        output_map_.clear();
-
         {
             uint16_t bit_offset = 0;
             std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C13);
@@ -190,7 +184,7 @@ namespace kickcat
 
             for (auto pdo : pdo_indices)
             {
-                if (not parsePdoMap(dict, pdo, input_map_, bit_offset))
+                if (not parsePdoMap(dict, pdo, input_, bit_offset))
                 {
                     return StatusCode::INVALID_INPUT_CONFIGURATION;
                 }
@@ -208,7 +202,7 @@ namespace kickcat
 
             for (auto pdo : pdo_indices)
             {
-                if (not parsePdoMap(dict, pdo, output_map_, bit_offset))
+                if (not parsePdoMap(dict, pdo, output_, bit_offset))
                 {
                     return StatusCode::INVALID_OUTPUT_CONFIGURATION;
                 }
