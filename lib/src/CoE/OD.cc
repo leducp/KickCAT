@@ -246,7 +246,7 @@ namespace kickcat::CoE
 
     Entry::~Entry()
     {
-        if (data != nullptr)
+        if (data != nullptr && owns_data)
         {
             std::free(data);
         }
@@ -268,6 +268,8 @@ namespace kickcat::CoE
         description = std::move(other.description);
         data        = std::move(other.data);
         other.data = nullptr;
+        owns_data = other.owns_data;
+        other.owns_data = true;
 
         return *this;
     }

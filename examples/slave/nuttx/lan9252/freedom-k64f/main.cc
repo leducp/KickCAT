@@ -138,6 +138,9 @@ int main(int argc, char *argv[])
             {
                 auto &dict = mbx.getDictionary();
 
+                pdo.configureMapping(dict);
+                pdo_configured = true;
+
                 auto bind = [&](uint16_t idx, auto *&ptr)
                 {
                     auto [obj, entry] = CoE::findObject(dict, idx, 0);
@@ -153,9 +156,6 @@ int main(int argc, char *argv[])
                 bind(0x7000, led_r);
                 bind(0x7001, led_g);
                 bind(0x7002, led_b);
-
-                pdo.configureMapping(dict);
-                pdo_configured = true;
             }
 
             if (buffer_out[0] != 0xFF)
