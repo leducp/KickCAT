@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
         switch (state)
         {
         case State::INIT:
+        case State::PRE_OP:
         {
             if (pdo_configured)
             {
@@ -118,16 +119,17 @@ int main(int argc, char *argv[])
                 auto original_dict = CoE::createOD();
                 mbx.enableCoE(std::move(original_dict));
                 pdo_configured = false;
-            }
-            break;
-        }
 
-        case State::PRE_OP:
-        {
-            if (pdo_configured)
-            {
-                // PDOs must be remapped when re-entering PRE-OP
-                pdo_configured = false;
+                // Clear pointers
+                ax = nullptr;
+                ay = nullptr;
+                az = nullptr;
+                mx = nullptr;
+                my = nullptr;
+                mz = nullptr;
+                led_r = nullptr;
+                led_g = nullptr;
+                led_b = nullptr;
             }
             break;
         }
@@ -165,41 +167,45 @@ int main(int argc, char *argv[])
             break;
         }
 
-        default:
+        case State::OPERATIONAL:
+        {
+            // Cyclic PDO I/O once configured
+            if (pdo_configured)
+            {
+                if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
+                {
+                    *ax = sensor_data.accel.x;
+                    *ay = sensor_data.accel.y;
+                    *az = sensor_data.accel.z;
+                    *mx = sensor_data.magn.x;
+                    *my = sensor_data.magn.y;
+                    *mz = sensor_data.magn.z;
+                }
+
+                userled_set_t led_set = 0;
+                if (*led_r)
+                {
+                    led_set |= LED_R_BIT;
+                }
+                if (*led_g)
+                {
+                    led_set |= LED_G_BIT;
+                }
+                if (*led_b)
+                {
+                    led_set |= LED_B_BIT;
+                }
+
+                if (ioctl(led_fd, ULEDIOC_SETALL, led_set) < 0)
+                {
+                    printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errno);
+                }
+            }
             break;
         }
 
-        // Cyclic PDO I/O once configured
-        if (pdo_configured)
-        {
-            if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
-            {
-                *ax = sensor_data.accel.x;
-                *ay = sensor_data.accel.y;
-                *az = sensor_data.accel.z;
-                *mx = sensor_data.magn.x;
-                *my = sensor_data.magn.y;
-                *mz = sensor_data.magn.z;
-            }
-
-            userled_set_t led_set = 0;
-            if (*led_r)
-            {
-                led_set |= LED_R_BIT;
-            }
-            if (*led_g)
-            {
-                led_set |= LED_G_BIT;
-            }
-            if (*led_b)
-            {
-                led_set |= LED_B_BIT;
-            }
-
-            if (ioctl(led_fd, ULEDIOC_SETALL, led_set) < 0)
-            {
-                printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errno);
-            }
+        default:
+            break;
         }
     }
 
