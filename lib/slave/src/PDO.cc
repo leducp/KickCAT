@@ -65,25 +65,150 @@ namespace kickcat
 
     void PDO::updateInput()
     {
-        if (input_ != nullptr)
+        if (input_ == nullptr)
         {
-            int32_t written = esc_->write(sm_input_.start_address, input_, sm_input_.length);
-            if (written != sm_input_.length)
-            {
-                slave_error("\n update_process_data_input ERROR\n");
-            }
+            return;
+        }
+
+        int32_t written = esc_->write(sm_input_.start_address, input_, sm_input_.length);
+
+        if (written != sm_input_.length)
+        {
+            slave_error("PDO::updateInput write error\n");
         }
     }
 
     void PDO::updateOutput()
     {
-        if (output_ != nullptr)
+        if (output_ == nullptr)
         {
-            int32_t r = esc_->read(sm_output_.start_address, output_, sm_output_.length);
-            if (r != sm_output_.length)
+            return;
+        }
+
+        int32_t read = esc_->read(sm_output_.start_address, output_, sm_output_.length);
+
+        if (read != sm_output_.length)
+        {
+            slave_error("PDO::updateOutput read error\n");
+            return;
+        }
+    }
+
+    std::vector<uint16_t> PDO::parseAssignment(CoE::Dictionary& dict, uint16_t assign_idx)
+    {
+        std::vector<uint16_t> pdo_indices;
+
+        auto [obj0, entry0] = CoE::findObject(dict, assign_idx, 0);
+        if (entry0)
+        {
+            uint8_t count = *static_cast<uint8_t*>(entry0->data);
+
+            for (uint8_t i = 1; i <= count; ++i)
             {
-                slave_error("\n update_process_data_output ERROR\n");
+                auto [obj, entry] = CoE::findObject(dict, assign_idx, i);
+                if (entry)
+                {
+                    pdo_indices.push_back(*static_cast<uint16_t*>(entry->data));
+                }
             }
         }
+
+        return pdo_indices;
+    }
+
+    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset)
+    {
+        auto [obj0, entry0] = CoE::findObject(dict, pdo_idx, 0);
+        if (not entry0)
+        {
+            return false;
+        }
+
+        uint8_t count = *static_cast<uint8_t*>(entry0->data);
+
+        for (uint8_t i = 1; i <= count; ++i)
+        {
+            auto [obj, entry] = CoE::findObject(dict, pdo_idx, i);
+            if (not entry)
+            {
+                return false;
+            }
+
+            uint32_t mapping = *static_cast<uint32_t*>(entry->data);
+
+            uint16_t index = (mapping >> 16) & 0xFFFF;
+            uint8_t  sub   = (mapping >> 8)  & 0xFF;
+            uint8_t  bits  =  mapping        & 0xFF;
+
+            auto [od_obj, od_entry] = CoE::findObject(dict, index, sub);
+            if (not od_entry)
+            {
+                return false;
+            }
+
+            // Aliasing logic
+            void* old_data = od_entry->data;
+            bool old_owns  = od_entry->owns_data;
+
+            uint8_t* new_ptr = static_cast<uint8_t*>(buffer) + (bit_offset / 8);
+
+            od_entry->data = new_ptr;
+            od_entry->owns_data = false;
+
+            if (old_data)
+            {
+                std::memcpy(new_ptr, old_data, bits / 8);
+
+                if (old_owns)
+                {
+                    std::free(old_data);
+                }
+            }
+
+            bit_offset += bits;
+        }
+
+        return true;
+    }
+
+    StatusCode PDO::configureMapping(CoE::Dictionary& dict)
+    {
+        {
+            uint16_t bit_offset = 0;
+            std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C13);
+
+            if (pdo_indices.empty())
+            {
+                return StatusCode::INVALID_INPUT_CONFIGURATION;
+            }
+
+            for (auto pdo : pdo_indices)
+            {
+                if (not parsePdoMap(dict, pdo, input_, bit_offset))
+                {
+                    return StatusCode::INVALID_INPUT_CONFIGURATION;
+                }
+            }
+        }
+
+        {
+            uint16_t bit_offset = 0;
+            std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C12);
+
+            if (pdo_indices.empty())
+            {
+                return StatusCode::INVALID_OUTPUT_CONFIGURATION;
+            }
+
+            for (auto pdo : pdo_indices)
+            {
+                if (not parsePdoMap(dict, pdo, output_, bit_offset))
+                {
+                    return StatusCode::INVALID_OUTPUT_CONFIGURATION;
+                }
+            }
+        }
+
+        return StatusCode::NO_ERROR;
     }
 }

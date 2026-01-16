@@ -196,6 +196,7 @@ namespace kickcat::CoE
         std::string  description;
 
         void* data{nullptr};
+        bool owns_data{true};
 
         /// Called before access
         std::vector<std::function<void(uint16_t access, Entry*)>> before_access;

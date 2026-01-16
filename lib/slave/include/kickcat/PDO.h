@@ -3,6 +3,7 @@
 
 #include "AbstractESC.h"
 #include "kickcat/protocol.h"
+#include "kickcat/CoE/OD.h"
 
 namespace kickcat
 {
@@ -23,7 +24,14 @@ namespace kickcat
         void updateInput();
         void updateOutput();
 
+        StatusCode configureMapping(CoE::Dictionary& dict);
+
     private:
+
+        std::vector<uint16_t> parseAssignment(CoE::Dictionary& dict, uint16_t assign_idx);
+
+        bool parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset);
+
         AbstractESC* esc_;
         void* input_                = {nullptr};
         SyncManagerConfig sm_input_ = {};
