@@ -8,3 +8,6 @@ add_subdirectory(wdc_foot)
 if(UNIX)
     add_subdirectory(gateway)
 endif()
+
+add_subdirectory(topology)
+add_subdirectory(scout)
