@@ -74,8 +74,6 @@ namespace kickcat
             uint16_t const QUICK_STOP                     = 0x0002U;
             uint16_t const SET_ABS_POINT_NOBLEND          = 0x001FU;
             uint16_t const SET_POINT_RESET                = 0x000FU;
-            uint16_t const DISABLE_BRAKE                  = 0x8000U;
-            //uint16_t const DISABLE_BRAKE                  = 0x0000U;
         }
 
         // controlmode stores the available CAN control mode (also called "Mode of Operation")

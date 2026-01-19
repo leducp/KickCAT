@@ -6,7 +6,10 @@ add_subdirectory(ingenia)
 add_subdirectory(load_esi)
 add_subdirectory(wdc_foot)
 add_subdirectory(marvin)
-add_subdirectory(topology)
+
 if(UNIX)
     add_subdirectory(gateway)
 endif()
+
+add_subdirectory(topology)
+add_subdirectory(scout)
