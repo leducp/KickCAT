@@ -59,12 +59,16 @@ def read_pdo_assignment(bus, slave, assignment_index, pdo_type_name, timeout=0.1
                 obj_subindex = (mapping_entry >> 8) & 0xFF
                 bit_length = mapping_entry & 0xFF
 
-                name, _ = bus.read_entry_description(slave, obj_index, obj_subindex)
-                if not name:
-                    # Fallback to object name if the entry name is not populated
-                    name, _ = bus.read_object_description(slave, obj_index)
-                if not name:
-                    # Fallback to default value to emphasize that no name was found at all
+                try:
+                    name, _ = bus.read_entry_description(slave, obj_index, obj_subindex)
+                    if not name:
+                        # Fallback to object name if the entry name is not populated
+                        name, _ = bus.read_object_description(slave, obj_index)
+                    if not name:
+                        # Fallback to default value to emphasize that no name was found at all
+                        name = "empty name"
+                except Exception as e:
+                    print(e)
                     name = "empty name"
 
                 print(

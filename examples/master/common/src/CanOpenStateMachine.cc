@@ -4,6 +4,7 @@
 
 namespace kickcat
 {
+    static bool yolo = false;
     void CANOpenStateMachine::update(uint16_t status_word)
     {
         status_word_ = status_word;
@@ -16,18 +17,25 @@ namespace kickcat
                 {
                     case CANOpenState::OFF:
                     {
-                        start_motor_timestamp_ = since_epoch();
+                        if (yolo == false)
+                        {
+                            start_motor_timestamp_ = since_epoch();
+                            yolo = true;
+                        }
                         control_word_ = control::word::FAULT_RESET;
                         if ((status_word_ & status::value::FAULT_STATE) != status::value::FAULT_STATE)
                         {
-                            motor_state_ = CANOpenState::SAFE_RESET;
+                            if (elapsed_time(start_motor_timestamp_) > 1s)
+                            {
+                                motor_state_ = CANOpenState::SAFE_RESET;
+                            }
                         }
                         break;
                     }
                     case CANOpenState::SAFE_RESET:
                     {
                         control_word_ = control::word::SHUTDOWN;
-                        if (elapsed_time(start_motor_timestamp_) > MOTOR_RESET_DELAY)
+                        if (elapsed_time(start_motor_timestamp_) > (MOTOR_RESET_DELAY + 1s))
                         {
                             motor_state_ = CANOpenState::PREPARE_TO_SWITCH_ON ;
                         }
