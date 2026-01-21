@@ -17,10 +17,24 @@
 #include <rtm/probe.h>
 #include <rtm/io/posix/local_socket.h>
 
+#include "Teleplot.h"
+
 
 using namespace kickcat;
 
+constexpr double ENCODER_TICKS_PER_TURN = 1<<17;
+constexpr double REDUCTION_RATIO = 100.0;
+constexpr double SCALING_FACTOR = 50; //TODO?
 
+constexpr double tick_to_rad_art(double tick)
+{
+    return tick * (2 * M_PI) / (ENCODER_TICKS_PER_TURN * REDUCTION_RATIO);
+}
+
+constexpr double rad_to_tick(double rad)
+{
+    return  rad * (ENCODER_TICKS_PER_TURN * REDUCTION_RATIO) / (2 * M_PI);
+}
 
 int main(int argc, char *argv[])
 {
@@ -30,7 +44,7 @@ int main(int argc, char *argv[])
         printf("usage no redundancy mode : ./test NIC_nominal\n");
         return 1;
     }
-
+/*
     rtm::Probe probe;
     {
         auto io = std::make_unique<rtm::LocalSocket>();
@@ -45,6 +59,9 @@ int main(int argc, char *argv[])
                 since_epoch(), 1ms, 42,
                 std::move(io));
     }
+                */
+
+    Teleplot teleplot("127.0.0.1");
 
     std::string red_interface_name = "";
     std::string nom_interface_name = argv[1];
@@ -124,9 +141,9 @@ int main(int argc, char *argv[])
         };
 
         // Map TXPDO
-        mapPDO(0, 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
+        mapPDO(1, 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
         // Map RXPDO
-        mapPDO(0, 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
+        mapPDO(1, 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
 
         printf("mapping\n");
         bus.createMapping(io_buffer);
@@ -134,13 +151,21 @@ int main(int argc, char *argv[])
         printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 100ms);
+/*
+        float value = 320.0;
+        uint32_t value_size = sizeof(value);
+        bus.writeSDO(bus.slaves().at(1), 0x3500, 0, Bus::Access::PARTIAL, &value, value_size);
 
-        uint16_t speed_max = 30000;
-        uint32_t mode_size = 2;
-        for (int j = 0; j < 1; ++j)
-        {
-            bus.writeSDO(bus.slaves().at(j), 0x3401, 0, Bus::Access::PARTIAL, &speed_max, mode_size);
-        }
+        value = 30.0;
+        value_size = sizeof(value);
+        bus.writeSDO(bus.slaves().at(1), 0x3501, 0, Bus::Access::PARTIAL, &value, value_size);
+*/
+        //value = 30.0;
+        //value_size = sizeof(value);
+        //bus.writeSDO(bus.slaves().at(1), 0x3501, 0, Bus::Access::PARTIAL, &value, value_size);
+
+        //value =
+        //bus.writeSDO(bus.slaves().at(1), 0x3503, 0, Bus::Access::PARTIAL, &value, value_size);
     }
     catch (ErrorAL const &e)
     {
@@ -168,14 +193,13 @@ int main(int argc, char *argv[])
     };
 
     CANOpenStateMachine state_machine;
-    Slave& motor = bus.slaves().at(0);
+    Slave& motor = bus.slaves().at(1);
     pdo::Output* output_pdo = reinterpret_cast<pdo::Output *>(motor.output.data);
     pdo::Input*  input_pdo  = reinterpret_cast<pdo::Input *>(motor.input.data);
     printf("mapping: input(%d) output(%d)\n", motor.input.bsize, motor.output.bsize);
 
-    output_pdo->mode_of_operation = 0xA;
-    output_pdo->min_torque = 6000;
-    output_pdo->max_torque = 6000;
+    output_pdo->mode_of_operation = 0x8;
+    output_pdo->target_velocity = 0;
 
 
     state_machine.setCommand(CANOpenCommand::DISABLE);
@@ -224,12 +248,15 @@ int main(int argc, char *argv[])
 
     std::shared_ptr<mailbox::request::AbstractMessage> msg = nullptr;
 
+    uint16_t test;
+    uint32_t test_size = sizeof(test);
+
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     //constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        probe.log();
+        //probe.log();
         try
         {
             if (i == 500)
@@ -242,24 +269,30 @@ int main(int argc, char *argv[])
             {
                 initial_position = input_pdo->actual_position;
                 start_time = kickcat::since_epoch();
+                printf("GO!\n");
             }
 
             if (i > 4000)
             {
                 double time = std::chrono::duration_cast<seconds_f>(kickcat::elapsed_time(start_time)).count();
 
-                constexpr double MOTION_FQ = 0.2; // Hz
-                constexpr double MOTION_AMPLITUDE = 80.0 / 180.0 * M_PI;
-                constexpr double REDUCTION_RATIO = 100.0;
-                constexpr double ENCODER_TICKS_PER_TURN = 1<<23;
+                constexpr double MOTION_FQ = 0.16; // Hz
+                constexpr double MOTION_AMPLITUDE = 90.0 / 180.0 * M_PI;
 
-                double targetSI = MOTION_AMPLITUDE * std::sin(2 * M_PI * MOTION_FQ * time);
+                double targetSI = MOTION_AMPLITUDE * (std::cos(2 * M_PI * MOTION_FQ * time) - 1);
+                double targetVelSI = -MOTION_AMPLITUDE * std::sin(2 * M_PI * MOTION_FQ * time) * 2 * M_PI * MOTION_FQ;
+                double targetVel = rad_to_tick(targetVelSI) / SCALING_FACTOR;
+                //double targetSI = 100 * std::sin(2 * M_PI * MOTION_FQ * time);
 
                 // Set target
-                double measureSI = (input_pdo->actual_position - initial_position) / ENCODER_TICKS_PER_TURN / REDUCTION_RATIO * 2.0 * M_PI;
-                output_pdo->target_position =  initial_position - static_cast<int32_t>(REDUCTION_RATIO * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN);
-                output_pdo->target_torque = 3000;
+                //double measureSI = (input_pdo->actual_position - initial_position) / ENCODER_TICKS_PER_TURN / REDUCTION_RATIO * 2.0 * M_PI;
+                //output_pdo->target_position =  (initial_position - static_cast<int32_t>(REDUCTION_RATIO * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN)) / 256;
+                //output_pdo->target_velocity = static_cast<int32_t>(std::sin(2 * M_PI * MOTION_FQ * time) * 5000);
 
+                teleplot.update("target SI", targetVelSI);
+
+                //output_pdo->target_position = static_cast<int32_t>(rad_to_tick(targetSI)) + initial_position;
+                output_pdo->velocity_offset = static_cast<int32_t>(targetVel);
             }
 
             bus.sendLogicalRead(callback_error);  // Update inputPDO
@@ -328,20 +361,19 @@ int main(int argc, char *argv[])
         }
 
 
-        if ((i % 100) == 0)
+        if ((i % 10) == 0)
         {
             /*
-            uint16_t status;
-            uint32_t size = 2;
             if (msg == nullptr)
             {
-                msg = bus.slaves().at(0).mailbox.createSDO(0x6040, 0, false, CoE::SDO::request::UPLOAD, &status, &size, 1s);
+                test_size = sizeof(test);
+                msg = motor.mailbox.createSDO(0x3516, 0, false, CoE::SDO::request::UPLOAD, &test, &test_size, 1s);
             }
             else
             {
                 if (msg->status() == mailbox::request::MessageStatus::SUCCESS)
                 {
-                    printf("--> %x\n", status);
+                    printf("O--> %d %x\n", test, test);
                     msg = nullptr;
                 }
                 else if (msg->status() != mailbox::request::MessageStatus::RUNNING)
@@ -352,14 +384,21 @@ int main(int argc, char *argv[])
             }
                 */
 
-
-            printf("[%d] %x (%x) position %d to %d\n",
-                i, state_machine.getControlWord(), input_pdo->status_word,
-                input_pdo->actual_torque, output_pdo->target_position);
-
+            //printf("[%d] %x (%x) target %d -> position %d tracking -> %d demand -> %d torque -> %d\n",
+            //    i, state_machine.getControlWord(), input_pdo->status_word,
+            //    output_pdo->target_position, input_pdo->actual_position, input_pdo->tracking_error, input_pdo->position_demand, input_pdo->actual_torque);
         }
 
-        probe.log();
+        teleplot.update("target position", tick_to_rad_art(output_pdo->target_position));
+        teleplot.update("velocity offset", output_pdo->velocity_offset);
+        teleplot.update("actual position", tick_to_rad_art(input_pdo->actual_position));
+        teleplot.update("tracking error",  input_pdo->tracking_error);
+        teleplot.update("position demand", tick_to_rad_art(input_pdo->position_demand));
+        teleplot.update("actual torque",   input_pdo->actual_torque);
+        teleplot.update("actual speed",    tick_to_rad_art(input_pdo->actual_velocity));
+        teleplot.update("merdasse",        input_pdo->merdasse);
+
+        //probe.log();
         timer.wait_next_tick();
     }
 
