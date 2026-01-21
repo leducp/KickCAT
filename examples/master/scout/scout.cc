@@ -24,7 +24,7 @@ using namespace kickcat;
 
 constexpr double ENCODER_TICKS_PER_TURN = 1<<17;
 constexpr double REDUCTION_RATIO = 100.0;
-constexpr double SCALING_FACTOR = 50; //TODO?
+constexpr double SCALING_FACTOR = 256; //TODO?
 
 constexpr double tick_to_rad_art(double tick)
 {
@@ -111,9 +111,6 @@ int main(int argc, char *argv[])
         }
         */
 
-        //sync_point = bus.enableDC(dc_cycle, dc_cycle / 2, 100ms);
-
-
         const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, uint32_t const* mapping, uint8_t mapping_count, const uint32_t SM_map) -> void
         {
             auto& slave = bus.slaves().at(slaveId);
@@ -151,15 +148,7 @@ int main(int argc, char *argv[])
         printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 100ms);
-/*
-        float value = 320.0;
-        uint32_t value_size = sizeof(value);
-        bus.writeSDO(bus.slaves().at(1), 0x3500, 0, Bus::Access::PARTIAL, &value, value_size);
 
-        value = 30.0;
-        value_size = sizeof(value);
-        bus.writeSDO(bus.slaves().at(1), 0x3501, 0, Bus::Access::PARTIAL, &value, value_size);
-*/
         //value = 30.0;
         //value_size = sizeof(value);
         //bus.writeSDO(bus.slaves().at(1), 0x3501, 0, Bus::Access::PARTIAL, &value, value_size);
@@ -198,7 +187,7 @@ int main(int argc, char *argv[])
     pdo::Input*  input_pdo  = reinterpret_cast<pdo::Input *>(motor.input.data);
     printf("mapping: input(%d) output(%d)\n", motor.input.bsize, motor.output.bsize);
 
-    output_pdo->mode_of_operation = 0x8;
+    output_pdo->mode_of_operation = 0x9; // CSV
     output_pdo->target_velocity = 0;
 
 
@@ -277,22 +266,18 @@ int main(int argc, char *argv[])
                 double time = std::chrono::duration_cast<seconds_f>(kickcat::elapsed_time(start_time)).count();
 
                 constexpr double MOTION_FQ = 0.16; // Hz
-                constexpr double MOTION_AMPLITUDE = 90.0 / 180.0 * M_PI;
+                constexpr double MOTION_AMPLITUDE = 45.0 / 180.0 * M_PI;
 
                 double targetSI = MOTION_AMPLITUDE * (std::cos(2 * M_PI * MOTION_FQ * time) - 1);
                 double targetVelSI = -MOTION_AMPLITUDE * std::sin(2 * M_PI * MOTION_FQ * time) * 2 * M_PI * MOTION_FQ;
                 double targetVel = rad_to_tick(targetVelSI) / SCALING_FACTOR;
-                //double targetSI = 100 * std::sin(2 * M_PI * MOTION_FQ * time);
-
-                // Set target
-                //double measureSI = (input_pdo->actual_position - initial_position) / ENCODER_TICKS_PER_TURN / REDUCTION_RATIO * 2.0 * M_PI;
-                //output_pdo->target_position =  (initial_position - static_cast<int32_t>(REDUCTION_RATIO * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN)) / 256;
-                //output_pdo->target_velocity = static_cast<int32_t>(std::sin(2 * M_PI * MOTION_FQ * time) * 5000);
 
                 teleplot.update("target SI", targetVelSI);
 
+                // Set target
                 //output_pdo->target_position = static_cast<int32_t>(rad_to_tick(targetSI)) + initial_position;
-                output_pdo->velocity_offset = static_cast<int32_t>(targetVel);
+                //output_pdo->velocity_offset = static_cast<int32_t>(targetVel);
+                output_pdo->target_velocity = static_cast<int32_t>(targetVel);
             }
 
             bus.sendLogicalRead(callback_error);  // Update inputPDO
@@ -396,7 +381,6 @@ int main(int argc, char *argv[])
         teleplot.update("position demand", tick_to_rad_art(input_pdo->position_demand));
         teleplot.update("actual torque",   input_pdo->actual_torque);
         teleplot.update("actual speed",    tick_to_rad_art(input_pdo->actual_velocity));
-        teleplot.update("merdasse",        input_pdo->merdasse);
 
         //probe.log();
         timer.wait_next_tick();

@@ -17,9 +17,8 @@ namespace kickcat
             int16_t actual_torque;      // 0x6077
             int32_t tracking_error;     // 0x60f4
             int32_t position_demand;    // 0x60fc
-            uint16_t merdasse;//0x3516
         } __attribute__((packed));
-        constexpr uint32_t tx_mapping[] = {0x60410010, 0x60640020, 0x606C0020, 0x60770010, 0x60f40020, 0x60fc0020, 0x35160010}; // uint32_t is 0x[Address(4byte), SubIndex(2byte), typeSizeInBits(2byte)]
+        constexpr uint32_t tx_mapping[] = {0x60410010, 0x60640020, 0x606C0020, 0x60770010, 0x60f40020, 0x60fc0020}; // uint32_t is 0x[Address(4byte), SubIndex(2byte), typeSizeInBits(2byte)]
         constexpr uint32_t tx_mapping_count = sizeof(tx_mapping) / sizeof(uint32_t);
 
         struct Output
