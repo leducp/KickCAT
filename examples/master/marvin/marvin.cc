@@ -14,8 +14,8 @@
 #include "CanOpenStateMachine.h"
 #include "MarvinProtocol.h"
 
-#include <rtm/probe.h>
-#include <rtm/io/posix/local_socket.h>
+//#include <rtm/probe.h>
+//#include <rtm/io/posix/local_socket.h>
 
 using namespace kickcat;
 
@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    /*
     rtm::Probe probe;
     {
         auto io = std::make_unique<rtm::LocalSocket>();
@@ -42,6 +43,7 @@ int main(int argc, char *argv[])
                 since_epoch(), 1ms, 42,
                 std::move(io));
     }
+                */
 
     std::string red_interface_name = "";
     std::string nom_interface_name = argv[1];
@@ -276,7 +278,7 @@ int main(int argc, char *argv[])
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        probe.log();
+        //probe.log();
 
         try
         {
@@ -430,7 +432,7 @@ int main(int argc, char *argv[])
             //printf("RECD     %d\n", input_pdo->RECD);
         }
 
-        probe.log();
+        //probe.log();
         //probe.flush();
 
         timer.wait_next_tick();

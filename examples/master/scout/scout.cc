@@ -14,17 +14,14 @@
 #include "CanOpenStateMachine.h"
 #include "ScoutProtocol.h"
 
-#include <rtm/probe.h>
-#include <rtm/io/posix/local_socket.h>
-
 #include "Teleplot.h"
-
 
 using namespace kickcat;
 
+//////////////////////////////////////////////////////////////////////////////
+// Conversion tools: from raw units to SI unit, joint side
 constexpr double ENCODER_TICKS_PER_TURN = 1<<17;
-constexpr double REDUCTION_RATIO = 100.0;
-constexpr double SCALING_FACTOR = 256; //TODO?
+constexpr double REDUCTION_RATIO = 101.0;
 
 constexpr double tick_to_rad_art(double tick)
 {
@@ -35,6 +32,7 @@ constexpr double rad_to_tick(double rad)
 {
     return  rad * (ENCODER_TICKS_PER_TURN * REDUCTION_RATIO) / (2 * M_PI);
 }
+//////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char *argv[])
 {
@@ -44,24 +42,9 @@ int main(int argc, char *argv[])
         printf("usage no redundancy mode : ./test NIC_nominal\n");
         return 1;
     }
-/*
-    rtm::Probe probe;
-    {
-        auto io = std::make_unique<rtm::LocalSocket>();
-        auto rc = io->open(rtm::access::Mode::READ_WRITE);
-        if (rc)
-        {
-            printf("io open() error: %s\n", rc.message().c_str());
-            return 1;
-        }
-
-        probe.init("scout", "op",
-                since_epoch(), 1ms, 42,
-                std::move(io));
-    }
-                */
-
     Teleplot teleplot("127.0.0.1");
+
+    // Find the right network interface and open bus
 
     std::string red_interface_name = "";
     std::string nom_interface_name = argv[1];
@@ -97,19 +80,11 @@ int main(int argc, char *argv[])
     nanoseconds sync_point = 0ns;
     nanoseconds dc_cycle = 1ms;
 
-
     uint8_t io_buffer[2048];
     try
     {
         bus.init(100ms);
-
-        /*
-        for (auto& slave: bus.slaves())
-        {
-            printInfo(slave);
-            printESC(slave);
-        }
-        */
+        // Perform PDO mapping
 
         const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, uint32_t const* mapping, uint8_t mapping_count, const uint32_t SM_map) -> void
         {
@@ -148,13 +123,6 @@ int main(int argc, char *argv[])
         printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 100ms);
-
-        //value = 30.0;
-        //value_size = sizeof(value);
-        //bus.writeSDO(bus.slaves().at(1), 0x3501, 0, Bus::Access::PARTIAL, &value, value_size);
-
-        //value =
-        //bus.writeSDO(bus.slaves().at(1), 0x3503, 0, Bus::Access::PARTIAL, &value, value_size);
     }
     catch (ErrorAL const &e)
     {
@@ -190,12 +158,10 @@ int main(int argc, char *argv[])
     output_pdo->mode_of_operation = 0x9; // CSV
     output_pdo->target_velocity = 0;
 
-
     state_machine.setCommand(CANOpenCommand::DISABLE);
 
     Timer timer{dc_cycle};
     timer.start(sync_point);
-
     for (int i = 0; i < 10; ++i)
     {
         bus.processDataRead(false_alarm);
@@ -231,37 +197,34 @@ int main(int argc, char *argv[])
 
     link->setTimeout(1500us);
 
-    int sdo_seq = 0;
     int32_t initial_position = 0;
     nanoseconds start_time = kickcat::since_epoch();
 
     std::shared_ptr<mailbox::request::AbstractMessage> msg = nullptr;
 
-    uint16_t test;
-    uint32_t test_size = sizeof(test);
-
+    // Start main communication loop
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
-    //constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        //probe.log();
         try
         {
-            if (i == 500)
+            if (i == 100)
             {
                 output_pdo->target_position = input_pdo->actual_position;
+                output_pdo->velocity_offset = 0;
+                output_pdo->target_velocity = 0;
                 state_machine.setCommand(CANOpenCommand::ENABLE);
             }
 
-            if (i == 4000)
+            if (i == 2000)
             {
                 initial_position = input_pdo->actual_position;
                 start_time = kickcat::since_epoch();
                 printf("GO!\n");
             }
 
-            if (i > 4000)
+            if (i > 2000)
             {
                 double time = std::chrono::duration_cast<seconds_f>(kickcat::elapsed_time(start_time)).count();
 
@@ -270,13 +233,13 @@ int main(int argc, char *argv[])
 
                 double targetSI = MOTION_AMPLITUDE * (std::cos(2 * M_PI * MOTION_FQ * time) - 1);
                 double targetVelSI = -MOTION_AMPLITUDE * std::sin(2 * M_PI * MOTION_FQ * time) * 2 * M_PI * MOTION_FQ;
-                double targetVel = rad_to_tick(targetVelSI) / SCALING_FACTOR;
+                double targetVel = rad_to_tick(targetVelSI);
 
-                teleplot.update("target SI", targetVelSI);
+                teleplot.update("Target velocity rad/s", targetVelSI);
 
                 // Set target
                 //output_pdo->target_position = static_cast<int32_t>(rad_to_tick(targetSI)) + initial_position;
-                //output_pdo->velocity_offset = static_cast<int32_t>(targetVel);
+                output_pdo->velocity_offset = static_cast<int32_t>(0);
                 output_pdo->target_velocity = static_cast<int32_t>(targetVel);
             }
 
@@ -285,36 +248,6 @@ int main(int argc, char *argv[])
             bus.processAwaitingFrames();
             bus.finalizeDatagrams();
 
-            switch (sdo_seq)
-            {
-                case 0:
-                {
-                    bus.sendMailboxesReadChecks(callback_error);
-                    sdo_seq = 1;
-                    break;
-                }
-                case 1:
-                {
-                    bus.sendMailboxesWriteChecks(callback_error);
-                    sdo_seq = 2;
-                    break;
-                }
-                case 2:
-                {
-                    bus.sendReadMessages(callback_error); // Get emergencies
-                    sdo_seq = 3;
-                    break;
-                }
-                case 3:
-                {
-                    bus.sendWriteMessages(callback_error);
-                    sdo_seq = 0;
-                    break;
-                }
-            }
-
-            bus.processAwaitingFrames();
-            bus.finalizeDatagrams();
         }
         catch (kickcat::ErrorDatagram const& e)
         {
@@ -332,57 +265,11 @@ int main(int argc, char *argv[])
         state_machine.update(input_pdo->status_word);
         output_pdo->control_word = state_machine.getControlWord();
 
+        // Telemetry
+        teleplot.update("Raw velocity 0x606C",    input_pdo->actual_velocity);
+        teleplot.update("Raw velocity target 0x60FF",    output_pdo->target_velocity);
+        teleplot.update("Measured velocity rad/s",    tick_to_rad_art(input_pdo->actual_velocity));
 
-        // Receive emergencies in case of failure
-        if (motor.mailbox.emergencies.size() > 0)
-        {
-            for (auto const& em : motor.mailbox.emergencies)
-            {
-                std::cerr << "*~~~ Emergency received @ " << i << " ~~~*" << std::endl;
-                std::cerr << registerToError(em.error_register);
-                std::cerr << codeToError(em.error_code);
-            }
-            motor.mailbox.emergencies.resize(0);
-        }
-
-
-        if ((i % 10) == 0)
-        {
-            /*
-            if (msg == nullptr)
-            {
-                test_size = sizeof(test);
-                msg = motor.mailbox.createSDO(0x3516, 0, false, CoE::SDO::request::UPLOAD, &test, &test_size, 1s);
-            }
-            else
-            {
-                if (msg->status() == mailbox::request::MessageStatus::SUCCESS)
-                {
-                    printf("O--> %d %x\n", test, test);
-                    msg = nullptr;
-                }
-                else if (msg->status() != mailbox::request::MessageStatus::RUNNING)
-                {
-                    printf("error reading SDO %x\n", msg->status());
-                    msg = nullptr;
-                }
-            }
-                */
-
-            //printf("[%d] %x (%x) target %d -> position %d tracking -> %d demand -> %d torque -> %d\n",
-            //    i, state_machine.getControlWord(), input_pdo->status_word,
-            //    output_pdo->target_position, input_pdo->actual_position, input_pdo->tracking_error, input_pdo->position_demand, input_pdo->actual_torque);
-        }
-
-        teleplot.update("target position", tick_to_rad_art(output_pdo->target_position));
-        teleplot.update("velocity offset", output_pdo->velocity_offset);
-        teleplot.update("actual position", tick_to_rad_art(input_pdo->actual_position));
-        teleplot.update("tracking error",  input_pdo->tracking_error);
-        teleplot.update("position demand", tick_to_rad_art(input_pdo->position_demand));
-        teleplot.update("actual torque",   input_pdo->actual_torque);
-        teleplot.update("actual speed",    tick_to_rad_art(input_pdo->actual_velocity));
-
-        //probe.log();
         timer.wait_next_tick();
     }
 

@@ -99,6 +99,7 @@ namespace kickcat
         void update(uint16_t status_word);
         void setCommand(CANOpenCommand command) { command_ = command; };
         uint16_t getControlWord() { return control_word_; }
+        bool isOn() { return motor_state_ == CANOpenState::ON;}
 
     private:
         CANOpenCommand command_  = CANOpenCommand::NONE;
