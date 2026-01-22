@@ -244,7 +244,8 @@ namespace kickcat
 
         constexpr uint16_t PDI_CONTROL        = 0x140;
         constexpr uint16_t ESC_CONFIG         = 0x141;
-        constexpr uint16_t PDI_CONFIGURATION  = 0x14E;
+        constexpr uint16_t PDI_INFORMATION    = 0x14E;
+        constexpr uint16_t PDI_CONFIGURATION  = 0x150;
 
         constexpr uint16_t ECAT_EVENT_MASK = 0x200;
         constexpr uint16_t AL_EVENT_MASK   = 0x204;      // AL event interrupt mask
@@ -287,17 +288,36 @@ namespace kickcat
     constexpr uint16_t AL_CONTROL_ERR_ACK = 0x10;
     constexpr uint16_t AL_STATUS_ERR_IND = 0x10;
 
-    struct ESCDescription
+    namespace ESC
     {
-        uint8_t type;
-        uint8_t revision;
-        uint16_t build;
-        uint8_t fmmus;
-        uint8_t syncManagers;
-        uint8_t ram_size;
-        uint8_t ports;
-        uint16_t features;
-    }__attribute__((__packed__));
+        struct Description
+        {
+            uint8_t type;
+            uint8_t revision;
+            uint16_t build;
+            uint8_t fmmus;
+            uint8_t syncManagers;
+            uint8_t ram_size;
+            uint8_t ports;
+            uint16_t features;
+        }__attribute__((__packed__));
+
+        namespace feature
+        {
+            constexpr uint16_t FMMU_BYTE_ORIENTED            = (1 << 0);
+            constexpr uint16_t UNUSED_REG_ACCESS             = (1 << 1);
+            constexpr uint16_t DC_AVAILABLE                  = (1 << 2);
+            constexpr uint16_t DC_64_BITS                    = (1 << 3);
+            constexpr uint16_t EBUS_LOW_JITTER               = (1 << 4);
+            constexpr uint16_t EBUS_ENHANCED_LINK_DETECTION  = (1 << 5);
+            constexpr uint16_t MII_ENHANCED_LINK_DETECTION   = (1 << 6);
+            constexpr uint16_t FCS_ERROR_SEPARATE_HANDLING   = (1 << 7);
+            constexpr uint16_t DC_ENHANCED_SYNC_ACTIVATION   = (1 << 8);
+            constexpr uint16_t ECAT_LRW                      = (1 << 9);
+            constexpr uint16_t ECAT_B_A_F_RW                 = (1 << 10);
+            constexpr uint16_t FIXED_FMMU_SYNC_CONF          = (1 << 11);
+        }
+    }
 
     struct DLStatus
     {
@@ -641,6 +661,11 @@ namespace kickcat
     // MAC addresses are not used by EtherCAT but set them helps the debug easier when following a network trace.
     constexpr MAC PRIMARY_IF_MAC   = { 0xCA, 0xDE, 0xCA, 0xDE, 0xDE, 0xFF };
     constexpr MAC SECONDARY_IF_MAC = { 0x03, 0x02, 0x02, 0x02, 0xFF, 0xFF };
+
+    // Return the time since EtherCAT epoch (01-01-2020)
+    // Useful for Distributed Clock
+    nanoseconds since_ecat_epoch();
+    nanoseconds to_unix_epoch(nanoseconds ecat_epoch);
 
     // helpers
     constexpr uint16_t datagram_size(uint16_t data_size)

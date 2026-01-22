@@ -22,7 +22,7 @@ class KickCATRecipe(ConanFile):
     default_options = {"shared": False, "fPIC": True, "with_esi_parser": False}
 
     # Sources are located in the same place as this recipe, copy them to the recipe
-    exports_sources = "CMakeLists.txt", "lib/*", "examples/*", "cmake/*"
+    exports_sources = "CMakeLists.txt", "lib/*", "examples/*", "cmake/*", "py_bindings/*"
 
     # def source(self):
     #     get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -48,7 +48,7 @@ class KickCATRecipe(ConanFile):
 
         if self.settings.compiler == 'gcc' and Version(self.settings.compiler.version) < "7":
             raise ConanInvalidConfiguration("Building requires GCC >= 7")
-        
+
     def requirements(self):
         if self.options.with_esi_parser:
             self.requires("tinyxml2/10.0.0")

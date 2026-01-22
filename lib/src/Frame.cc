@@ -106,6 +106,8 @@ namespace kickcat
                 case Command::APRD:
                 case Command::FPRD:
                 case Command::LRD:
+                case Command::FRMW:
+                case Command::ARMW:
                 {
                     // no-op or read only command: clear the area
                     std::memset(pos, 0, data_size);

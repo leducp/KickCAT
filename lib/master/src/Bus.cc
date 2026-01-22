@@ -273,11 +273,11 @@ namespace kickcat
                 {
                     return DatagramState::INVALID_WKC;
                 }
-                std::memcpy(&slave.esc, data, sizeof(ESCDescription));
+                std::memcpy(&slave.esc, data, sizeof(ESC::Description));
                 return DatagramState::OK;
             };
 
-            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::TYPE), nullptr, sizeof(ESCDescription), process, error);
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::TYPE), nullptr, sizeof(ESC::Description), process, error);
         }
         link_->processDatagrams();
     }

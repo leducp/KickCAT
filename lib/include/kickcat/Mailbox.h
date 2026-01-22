@@ -43,7 +43,7 @@ namespace kickcat::mailbox::request
         constexpr uint32_t COE_WRONG_SERVICE            = 0x101;
         constexpr uint32_t COE_UNKNOWN_SERVICE          = 0x102;
         constexpr uint32_t COE_CLIENT_BUFFER_TOO_SMALL  = 0x103;
-        constexpr uint32_t COE_SEGMENT_BAD_TOGGLE_BIT   = 0x103;
+        constexpr uint32_t COE_SEGMENT_BAD_TOGGLE_BIT   = 0x104;
     }
 
     class AbstractMessage
