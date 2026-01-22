@@ -457,6 +457,7 @@ KickCAT includes several utility tools in the `tools/` directory:
 
 - **EEPROM tools**: Read/write/dump EEPROM from ESC
 - **OD Generator**: Generate Object Dictionary code from ESI files
+- **EtherCAT GUI**: PySide6-based graphical interface for bus monitoring
 
 Build tools with the main project:
 ```bash
@@ -464,6 +465,23 @@ cd build
 make
 ls tools/  # Your built tools will be here
 ```
+
+<details>
+<summary><b>EtherCAT GUI Tool Usage</b></summary>
+
+The KickCAT EtherCAT GUI is a PySide6-based application for monitoring and controlling the EtherCAT bus.
+
+#### Requirements
+- Python 3
+- PySide6
+- `kickcat` package (installed via `pip install -e .` in project root)
+
+#### Usage
+Run the application as a module from the project root:
+```bash
+python -m tools.ethercat_gui -i enp8s0
+```
+</details>
 
 ### EEPROM Tool Usage
 

@@ -8,3 +8,4 @@ build*/
 compile_commands.json
 .clangd
 flashBin.jlink
+__pycache__/
