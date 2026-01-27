@@ -37,8 +37,8 @@ int main(int argc, char *argv[])
         buffer_out[i] = 0xFF;
     }
 
-    pdo.setInput(buffer_in);
-    pdo.setOutput(buffer_out);
+    pdo.setInput(buffer_in, pdo_size);
+    pdo.setOutput(buffer_out, pdo_size);
 
 
     uint8_t esc_config;

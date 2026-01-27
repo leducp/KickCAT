@@ -53,14 +53,16 @@ namespace kickcat
         }
     }
 
-    void PDO::setInput(void* buffer)
+    void PDO::setInput(void* buffer, uint32_t size)
     {
         input_ = buffer;
+        input_size_ = size;
     }
 
-    void PDO::setOutput(void* buffer)
+    void PDO::setOutput(void* buffer, uint32_t size)
     {
         output_ = buffer;
+        output_size_ = size;
     }
 
     void PDO::updateInput()
@@ -116,7 +118,7 @@ namespace kickcat
         return pdo_indices;
     }
 
-    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset)
+    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset, uint32_t max_size)
     {
         auto [obj0, entry0] = CoE::findObject(dict, pdo_idx, 0);
         if (not entry0)
@@ -139,6 +141,12 @@ namespace kickcat
             uint16_t index = (mapping >> 16) & 0xFFFF;
             uint8_t  sub   = (mapping >> 8)  & 0xFF;
             uint8_t  bits  =  mapping        & 0xFF;
+
+            if (max_size > 0 && ((bit_offset + bits + 7) / 8) > max_size)
+            {
+                slave_error("PDO::parsePdoMap mapping size exceeds buffer size\n");
+                return false;
+            }
 
             auto [od_obj, od_entry] = CoE::findObject(dict, index, sub);
             if (not od_entry)
@@ -184,7 +192,7 @@ namespace kickcat
 
             for (auto pdo : pdo_indices)
             {
-                if (not parsePdoMap(dict, pdo, input_, bit_offset))
+                if (not parsePdoMap(dict, pdo, input_, bit_offset, input_size_))
                 {
                     return StatusCode::INVALID_INPUT_CONFIGURATION;
                 }
@@ -202,7 +210,7 @@ namespace kickcat
 
             for (auto pdo : pdo_indices)
             {
-                if (not parsePdoMap(dict, pdo, output_, bit_offset))
+                if (not parsePdoMap(dict, pdo, output_, bit_offset, output_size_))
                 {
                     return StatusCode::INVALID_OUTPUT_CONFIGURATION;
                 }

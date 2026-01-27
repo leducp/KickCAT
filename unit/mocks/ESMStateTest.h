@@ -53,8 +53,8 @@ public:
         pdo_in  = {0x02, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
         pdo_out = {0x03, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
 
-        pdo_.setInput(buffer_in_);
-        pdo_.setOutput(buffer_out_);
+        pdo_.setInput(buffer_in_, sizeof(buffer_in_));
+        pdo_.setOutput(buffer_out_, sizeof(buffer_out_));
 
         SetUpSpecific();
     }
