@@ -109,7 +109,7 @@ namespace kickcat
                 // wait until eeprom is loaded.
                 while (*ecatAddress<uint32_t>(reg::AL_EVENT) & EEPROM_LOADING_STATUS);
 
-                printf("eeprom RELOAD command\n");
+                slave_info("eeprom RELOAD command\n");
                 break;
             }
             case eeprom::Control::NOP:
@@ -118,7 +118,7 @@ namespace kickcat
             }
             default:
             {
-                printf("Invalid eeprom command %x \n", control_status_reg);
+                slave_warning("Invalid eeprom command %x \n", control_status_reg);
             }
         }
     }
@@ -129,11 +129,11 @@ namespace kickcat
 
         uint32_t adler_sum = adler32Sum(eeprom_.data(), eeprom_.size() * 2);
 
-        printf("Adler sum read %" PRIx32 ", computed %" PRIx32 "\n", adler_checksum_, adler_sum);
+        slave_info("Adler sum read %" PRIx32 ", computed %" PRIx32 "\n", adler_checksum_, adler_sum);
 
         if (adler_sum != adler_checksum_)
         {
-            printf("Checksum Mismatch !! Load default eeprom \n");
+            slave_warning("Checksum Mismatch !! Load default eeprom \n");
             load_default_eeprom_ = true;
         }
     }
