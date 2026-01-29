@@ -96,6 +96,9 @@ namespace kickcat
 
         void writeInternalRegister(uint16_t address, void const* payload, uint16_t size);
 
+        template<typename Predicate>
+        bool pollRegister(uint16_t reg, uint32_t& value, Predicate condition, uint16_t timeout_ms);
+
         int32_t waitCSR();
 
         int32_t readData(uint16_t address, void* data, uint16_t to_read);
