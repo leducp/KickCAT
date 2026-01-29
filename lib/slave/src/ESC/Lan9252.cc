@@ -1,11 +1,11 @@
 #include "kickcat/ESC/Lan9252.h"
+#include "kickcat/debug.h"
 
 #include <cstring>
 #include <inttypes.h>
 
 namespace kickcat
 {
-// LCOV_EXCL_START
     Lan9252::Lan9252(std::shared_ptr<AbstractSPI> spi_interface)
     : spi_interface_(spi_interface)
     {
@@ -14,56 +14,49 @@ namespace kickcat
     int32_t Lan9252::init()
     {
         spi_interface_->disableChipSelect();
-
         writeInternalRegister(RESET_CTL, DIGITAL_RST);
-
-        uint16_t counter = 0;
-        uint16_t timeout = 10000;
-
-        // wait for reset to complete
-        uint32_t reset_ctl_value = 1;
-
-        while (counter < timeout and (reset_ctl_value & 0x1))
+        
+        uint16_t const number_of_retries = 10000;
+        
+        // Wait for reset to complete
+        uint32_t reset_ctl_value;
+        if (not pollRegister(RESET_CTL, reset_ctl_value, [](uint32_t val) { return not (val & 0x1); }, number_of_retries))
         {
-            counter++;
-            readInternalRegister(RESET_CTL, reset_ctl_value);
+            return -ETIMEDOUT;
         }
-
-        if (counter == timeout)
+        
+        // Check SPI interface is ready
+        uint32_t byte_test_result;
+        if (not pollRegister(BYTE_TEST, byte_test_result, [](uint32_t val) { return val == BYTE_TEST_DEFAULT; }, number_of_retries))
         {
-          return -ETIMEDOUT;
+            return -ETIMEDOUT;
         }
-
-        // Check SPI interface is ready thanks to BYTE_TEST to test byte order
-        uint32_t byte_test_result = 0;
-        counter = 0;
-        while (counter < timeout and  byte_test_result != BYTE_TEST_DEFAULT)
+        
+        slave_info("Byte test read: %" PRIu32 " \n", byte_test_result);
+        
+        // Wait for device ready
+        uint32_t hw_cfg_ready;
+        if (not pollRegister(HW_CFG, hw_cfg_ready, [](uint32_t val) { return val & DEVICE_READY; }, number_of_retries))
         {
-            counter++;
-            readInternalRegister(BYTE_TEST, byte_test_result);
+            slave_error("Timeout hw cfg ready \n");
+            return -ETIMEDOUT;
         }
-
-        if (counter == timeout)
-        {
-          return -ETIMEDOUT;
-        }
-        printf("Byte test read: %" PRIu32 " \n", byte_test_result);
-
-
-        uint32_t hw_cfg_ready = 0;
-        counter = 0;
-        while (counter < timeout and not (hw_cfg_ready & DEVICE_READY))
-        {
-            counter++;
-            readInternalRegister(HW_CFG, hw_cfg_ready);
-        }
-
-        if (counter == timeout)
-        {
-          printf("Timeout hw cfg ready \n");
-          return -ETIMEDOUT;
-        }
+        
         return 0;
+    }
+
+    template<typename Predicate>
+    bool Lan9252::pollRegister(uint16_t reg, uint32_t& value, Predicate condition, uint16_t retry_cycles)
+    {
+        for (uint16_t i = 0; i < retry_cycles; i++)
+        {
+            readInternalRegister(reg, value);
+            if (condition(value))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -287,5 +280,4 @@ namespace kickcat
 
         return size;
     }
-// LCOV_EXCL_STOP
 }

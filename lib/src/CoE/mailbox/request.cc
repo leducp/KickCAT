@@ -418,8 +418,8 @@ namespace kickcat::mailbox::request
             if (coe->service == CoE::Service::SDO_REQUEST)
             {
                 auto repr = CoE::toString(coe);
-                printf("WARNING: slave try to to do an SDO request -> dropping\n");
-                printf("%s\n", repr.c_str());
+                coe_warning("WARNING: slave is trying to do an SDO request -> dropping\n");
+                coe_warning("%s\n", repr.c_str());
                 status_ = MessageStatus::SUCCESS;
                 return ProcessingResult::FINALIZE_AND_KEEP;
             }
@@ -427,7 +427,7 @@ namespace kickcat::mailbox::request
         }
 
         Type type = static_cast<Type>(header->type);
-        printf("received a message of type %x %s\n", type, mailbox::toString(type));
+        coe_info("received a message of type %x %s\n", type, mailbox::toString(type));
         status_ = MessageStatus::SUCCESS;
         return ProcessingResult::FINALIZE_AND_KEEP;
     }
