@@ -108,102 +108,62 @@ int main(int argc, char *argv[])
 
         const State state = slave.state();
 
-        switch (state)
+        if (state == State::SAFE_OP)
         {
-        case State::INIT:
-        case State::PRE_OP:
-        {
-            if (pdo_configured)
+            auto &dict = mbx.getDictionary();
+
+            auto bind = [&](uint16_t idx, auto *&ptr)
             {
-                // Reinitialize CoE dictionary and PDO mapping
-                auto original_dict = CoE::createOD();
-                mbx.enableCoE(std::move(original_dict));
-                pdo_configured = false;
+                auto [obj, entry] = CoE::findObject(dict, idx, 0);
+                ptr = static_cast<std::remove_reference_t<decltype(*ptr)> *>(entry->data);
+            };
 
-                // Clear pointers
-                ax = nullptr;
-                ay = nullptr;
-                az = nullptr;
-                mx = nullptr;
-                my = nullptr;
-                mz = nullptr;
-                led_r = nullptr;
-                led_g = nullptr;
-                led_b = nullptr;
-            }
-            break;
-        }
+            bind(0x6000, ax);
+            bind(0x6001, ay);
+            bind(0x6002, az);
+            bind(0x6003, mx);
+            bind(0x6004, my);
+            bind(0x6005, mz);
+            bind(0x7000, led_r);
+            bind(0x7001, led_g);
+            bind(0x7002, led_b);
 
-        case State::SAFE_OP:
-        {
-            if (not pdo_configured)
-            {
-                pdo_configured = true;
-                auto &dict = mbx.getDictionary();
-
-                auto bind = [&](uint16_t idx, auto *&ptr)
-                {
-                    auto [obj, entry] = CoE::findObject(dict, idx, 0);
-                    ptr = static_cast<std::remove_reference_t<decltype(*ptr)> *>(entry->data);
-                };
-
-                bind(0x6000, ax);
-                bind(0x6001, ay);
-                bind(0x6002, az);
-                bind(0x6003, mx);
-                bind(0x6004, my);
-                bind(0x6005, mz);
-                bind(0x7000, led_r);
-                bind(0x7001, led_g);
-                bind(0x7002, led_b);
-            }
-
-            if (buffer_out[0] != 0xFF)
+            if (buffer_out[1] != 0xFF)
             {
                 slave.validateOutputData();
             }
-            break;
         }
-
-        case State::OPERATIONAL:
+        else if (state == State::OPERATIONAL)
         {
-            // Cyclic PDO I/O once configured
-            if (pdo_configured)
+
+            if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
             {
-                if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
-                {
-                    *ax = sensor_data.accel.x;
-                    *ay = sensor_data.accel.y;
-                    *az = sensor_data.accel.z;
-                    *mx = sensor_data.magn.x;
-                    *my = sensor_data.magn.y;
-                    *mz = sensor_data.magn.z;
-                }
-
-                userled_set_t led_set = 0;
-                if (*led_r)
-                {
-                    led_set |= LED_R_BIT;
-                }
-                if (*led_g)
-                {
-                    led_set |= LED_G_BIT;
-                }
-                if (*led_b)
-                {
-                    led_set |= LED_B_BIT;
-                }
-
-                if (ioctl(led_fd, ULEDIOC_SETALL, led_set) < 0)
-                {
-                    printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errno);
-                }
+                *ax = sensor_data.accel.x;
+                *ay = sensor_data.accel.y;
+                *az = sensor_data.accel.z;
+                *mx = sensor_data.magn.x;
+                *my = sensor_data.magn.y;
+                *mz = sensor_data.magn.z;
             }
-            break;
-        }
 
-        default:
-            break;
+            userled_set_t led_set = 0;
+            if (*led_r)
+            {
+                led_set |= LED_R_BIT;
+            }
+            if (*led_g)
+            {
+                led_set |= LED_G_BIT;
+            }
+            if (*led_b)
+            {
+                led_set |= LED_B_BIT;
+            }
+
+            if (ioctl(led_fd, ULEDIOC_SETALL, led_set) < 0)
+            {
+                printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errno);
+            }
         }
     }
 
