@@ -11,7 +11,8 @@ using namespace kickcat;
 namespace pdo
 {
     // TxPDO mapping (slave -> master): Accelerometer only
-    constexpr uint32_t tx_mapping[] = {
+    constexpr uint32_t tx_mapping[] = 
+    {
         0x60000010, // accel_x, 16 bits
         0x60010010, // accel_y, 16 bits
         0x60020010  // accel_z, 16 bits
@@ -19,7 +20,8 @@ namespace pdo
     constexpr uint32_t tx_mapping_count = sizeof(tx_mapping) / sizeof(tx_mapping[0]);
 
     // RxPDO mapping (master -> slave): RGB LEDs
-    constexpr uint32_t rx_mapping[] = {
+    constexpr uint32_t rx_mapping[] = 
+    {
         0x70000008, // LED_R, 8 bits
         0x70010008, // LED_G, 8 bits
         0x70020008  // LED_B, 8 bits

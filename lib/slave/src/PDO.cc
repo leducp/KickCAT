@@ -156,18 +156,18 @@ namespace kickcat
 
             // Aliasing logic
             void* old_data = od_entry->data;
-            bool old_owns  = od_entry->owns_data;
+            bool old_is_mapped = od_entry->is_mapped;
 
             uint8_t* new_ptr = static_cast<uint8_t*>(buffer) + (bit_offset / 8);
 
             od_entry->data = new_ptr;
-            od_entry->owns_data = false;
+            od_entry->is_mapped = true; // data has been remapped/aliased
 
             if (old_data)
             {
                 std::memcpy(new_ptr, old_data, bits / 8);
 
-                if (old_owns)
+                if (not old_is_mapped) // if the old data was not mapped, we allocated it, so free it
                 {
                     std::free(old_data);
                 }
@@ -185,11 +185,6 @@ namespace kickcat
             uint16_t bit_offset = 0;
             std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C13);
 
-            if (pdo_indices.empty())
-            {
-                return StatusCode::INVALID_INPUT_CONFIGURATION;
-            }
-
             for (auto pdo : pdo_indices)
             {
                 if (not parsePdoMap(dict, pdo, input_, bit_offset, input_size_))
@@ -202,11 +197,6 @@ namespace kickcat
         {
             uint16_t bit_offset = 0;
             std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C12);
-
-            if (pdo_indices.empty())
-            {
-                return StatusCode::INVALID_OUTPUT_CONFIGURATION;
-            }
 
             for (auto pdo : pdo_indices)
             {

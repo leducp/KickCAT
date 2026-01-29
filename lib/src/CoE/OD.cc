@@ -246,7 +246,7 @@ namespace kickcat::CoE
 
     Entry::~Entry()
     {
-        if (data != nullptr && owns_data)
+        if (data != nullptr && not is_mapped)
         {
             std::free(data);
         }
@@ -268,8 +268,8 @@ namespace kickcat::CoE
         description = std::move(other.description);
         data        = std::move(other.data);
         other.data = nullptr;
-        owns_data = other.owns_data;
-        other.owns_data = true;
+        is_mapped = other.is_mapped;
+        other.is_mapped = false;
 
         return *this;
     }

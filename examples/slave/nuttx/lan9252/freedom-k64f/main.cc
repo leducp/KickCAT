@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
         case State::SAFE_OP:
         {
-            if (!pdo_configured)
+            if (not pdo_configured)
             {
                 auto &dict = mbx.getDictionary();
 
