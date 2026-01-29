@@ -138,17 +138,8 @@ int main(int argc, char *argv[])
         {
             if (not pdo_configured)
             {
-                auto &dict = mbx.getDictionary();
-
-                StatusCode rc = pdo.configureMapping(dict);
-
-                if (rc != StatusCode::NO_ERROR)
-                {
-                    printf("PDO mapping failed with code 0x%04x\n", rc);
-                    break;
-                }
-                
                 pdo_configured = true;
+                auto &dict = mbx.getDictionary();
 
                 auto bind = [&](uint16_t idx, auto *&ptr)
                 {
