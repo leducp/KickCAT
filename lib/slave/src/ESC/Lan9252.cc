@@ -16,18 +16,18 @@ namespace kickcat
         spi_interface_->disableChipSelect();
         writeInternalRegister(RESET_CTL, DIGITAL_RST);
         
-        const uint16_t timeout = 10000;
+        uint16_t const number_of_retries = 10000;
         
         // Wait for reset to complete
         uint32_t reset_ctl_value;
-        if (!pollRegister(RESET_CTL, reset_ctl_value, [](uint32_t val) { return !(val & 0x1); }, timeout))
+        if (not pollRegister(RESET_CTL, reset_ctl_value, [](uint32_t val) { return not (val & 0x1); }, number_of_retries))
         {
             return -ETIMEDOUT;
         }
         
         // Check SPI interface is ready
         uint32_t byte_test_result;
-        if (!pollRegister(BYTE_TEST, byte_test_result, [](uint32_t val) { return val == BYTE_TEST_DEFAULT; }, timeout))
+        if (not pollRegister(BYTE_TEST, byte_test_result, [](uint32_t val) { return val == BYTE_TEST_DEFAULT; }, number_of_retries))
         {
             return -ETIMEDOUT;
         }
@@ -36,7 +36,7 @@ namespace kickcat
         
         // Wait for device ready
         uint32_t hw_cfg_ready;
-        if (!pollRegister(HW_CFG, hw_cfg_ready, [](uint32_t val) { return val & DEVICE_READY; }, timeout))
+        if (not pollRegister(HW_CFG, hw_cfg_ready, [](uint32_t val) { return val & DEVICE_READY; }, number_of_retries))
         {
             slave_error("Timeout hw cfg ready \n");
             return -ETIMEDOUT;
@@ -46,9 +46,9 @@ namespace kickcat
     }
 
     template<typename Predicate>
-    bool Lan9252::pollRegister(uint16_t reg, uint32_t& value, Predicate condition, uint16_t timeout_ms)
+    bool Lan9252::pollRegister(uint16_t reg, uint32_t& value, Predicate condition, uint16_t retry_cycles)
     {
-        for (uint16_t i = 0; i < timeout_ms; i++)
+        for (uint16_t i = 0; i < retry_cycles; i++)
         {
             readInternalRegister(reg, value);
             if (condition(value))
