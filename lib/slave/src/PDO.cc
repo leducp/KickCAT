@@ -1,5 +1,6 @@
 #include "kickcat/PDO.h"
 #include "kickcat/debug.h"
+#include "kickcat/CoE/protocol.h"
 #include "protocol.h"
 
 
@@ -138,11 +139,11 @@ namespace kickcat
 
             uint32_t mapping = *static_cast<uint32_t*>(entry->data);
 
-            uint16_t index = (mapping >> 16) & 0xFFFF;
-            uint8_t  sub   = (mapping >> 8)  & 0xFF;
-            uint8_t  bits  =  mapping        & 0xFF;
+            uint16_t index = static_cast<uint16_t>((mapping & CoE::PDO::MAPPING_INDEX_MASK) >> CoE::PDO::MAPPING_INDEX_SHIFT);
+            uint8_t  sub   = static_cast<uint8_t>((mapping & CoE::PDO::MAPPING_SUB_MASK) >> CoE::PDO::MAPPING_SUB_SHIFT);
+            uint8_t  bits  = static_cast<uint8_t>(mapping & CoE::PDO::MAPPING_LENGTH_MASK);
 
-            if (max_size > 0 && ((bit_offset + bits + 7) / 8) > max_size)
+            if (max_size > 0 and static_cast<uint32_t>((bit_offset + bits + 7) / 8) > max_size)
             {
                 slave_error("PDO::parsePdoMap mapping size exceeds buffer size\n");
                 return false;

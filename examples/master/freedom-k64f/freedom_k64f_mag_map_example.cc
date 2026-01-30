@@ -32,7 +32,6 @@ namespace pdo
 
 namespace freedom
 {
-    // POC 2: Only magnetometer data
     struct fxos8700cq_mag_only
     {
         int16_t magnetometerX; // mapped 0x6000

@@ -55,6 +55,17 @@ namespace kickcat::CoE
         SDO_INFORMATION      = 0x08
     };
 
+    namespace PDO
+    {
+        // PDO Mapping Entry: Index (16 bits), Subindex (8 bits), Length in bits (8 bits)
+        constexpr uint32_t MAPPING_INDEX_MASK  = 0xFFFF0000;
+        constexpr uint32_t MAPPING_SUB_MASK    = 0x0000FF00;
+        constexpr uint32_t MAPPING_LENGTH_MASK = 0x000000FF;
+
+        constexpr uint8_t MAPPING_INDEX_SHIFT = 16;
+        constexpr uint8_t MAPPING_SUB_SHIFT   = 8;
+    }
+
     namespace SDO
     {
         // Command specifiers depending on SDO request type

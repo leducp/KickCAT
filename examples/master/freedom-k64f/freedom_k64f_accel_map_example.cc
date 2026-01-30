@@ -31,7 +31,6 @@ namespace pdo
 
 namespace freedom
 {
-    // POC 1: Only accelerometer data
     struct fxos8700cq_accel_only
     {
         int16_t accelerometerX; // mapped 0x6000

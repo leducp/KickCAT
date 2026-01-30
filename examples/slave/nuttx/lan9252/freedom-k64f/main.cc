@@ -112,21 +112,15 @@ int main(int argc, char *argv[])
         {
             auto &dict = mbx.getDictionary();
 
-            auto bind = [&](uint16_t idx, auto *&ptr)
-            {
-                auto [obj, entry] = CoE::findObject(dict, idx, 0);
-                ptr = static_cast<std::remove_reference_t<decltype(*ptr)> *>(entry->data);
-            };
-
-            bind(0x6000, ax);
-            bind(0x6001, ay);
-            bind(0x6002, az);
-            bind(0x6003, mx);
-            bind(0x6004, my);
-            bind(0x6005, mz);
-            bind(0x7000, led_r);
-            bind(0x7001, led_g);
-            bind(0x7002, led_b);
+            slave.bind(0x6000, ax);
+            slave.bind(0x6001, ay);
+            slave.bind(0x6002, az);
+            slave.bind(0x6003, mx);
+            slave.bind(0x6004, my);
+            slave.bind(0x6005, mz);
+            slave.bind(0x7000, led_r);
+            slave.bind(0x7001, led_g);
+            slave.bind(0x7002, led_b);
 
             if (buffer_out[1] != 0xFF)
             {
@@ -162,7 +156,7 @@ int main(int argc, char *argv[])
 
             if (ioctl(led_fd, ULEDIOC_SETALL, led_set) < 0)
             {
-                printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %d\n", errno);
+                printf("ERROR: ioctl(ULEDIOC_SETALL) failed: %s\n", strerror(errno));
             }
         }
     }

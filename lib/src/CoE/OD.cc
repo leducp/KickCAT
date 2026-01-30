@@ -246,7 +246,7 @@ namespace kickcat::CoE
 
     Entry::~Entry()
     {
-        if (data != nullptr && not is_mapped)
+        if (data != nullptr and not is_mapped)
         {
             std::free(data);
         }
