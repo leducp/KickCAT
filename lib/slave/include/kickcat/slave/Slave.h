@@ -7,6 +7,9 @@
 #include "kickcat/Mailbox.h"
 #include "kickcat/ESMStates.h"
 
+#include <tuple>
+#include <type_traits>
+
 namespace kickcat::slave
 {
     class Slave final
@@ -19,6 +22,20 @@ namespace kickcat::slave
         void routine();
         State state();
         void validateOutputData();
+
+        template<typename T>
+        void bind(uint16_t idx, T*& ptr, uint8_t subindex = 0)
+        {
+            if (mbx_)
+            {
+                auto& dict = mbx_->getDictionary();
+                auto [obj, entry] = kickcat::CoE::findObject(dict, idx, subindex);
+                if (entry)
+                {
+                    ptr = static_cast<std::remove_reference_t<decltype(*ptr)> *>(entry->data);
+                }
+            }
+        }
 
     private:
         AbstractESC* esc_;

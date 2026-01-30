@@ -69,8 +69,8 @@ int main(int, char *[])
     mbx.enableCoE(std::move(dictionary));
 
     slave.setMailbox(&mbx);
-    pdo.setInput(&input_PDO);
-    pdo.setOutput(&output_PDO);
+    pdo.setInput(&input_PDO, sizeof(input_PDO));
+    pdo.setOutput(&output_PDO, sizeof(output_PDO));
 
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
