@@ -1,5 +1,5 @@
-#ifndef KICKAT_H
-#define KICKAT_H
+#ifndef KICKCAT_H
+#define KICKCAT_H
 
 namespace kickcat
 {

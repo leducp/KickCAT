@@ -646,7 +646,7 @@ For real-time performance on Linux:
 ```bash
 # Enable unit tests in CMake
 cd build
-cmake .. -DBUILD_UNIT_TEST=ON
+cmake .. -DBUILD_UNIT_TESTS=ON
 make
 
 # Run tests
@@ -662,7 +662,7 @@ uv pip install gcovr
 
 # Build with coverage
 cd build
-cmake .. -DBUILD_UNIT_TEST=ON -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DBUILD_UNIT_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
 make
 make coverage
 ```
@@ -699,7 +699,7 @@ cd KickCAT
 
 # Build with tests
 cd build
-cmake .. -DBUILD_UNIT_TEST=ON -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DBUILD_UNIT_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
 make
 ```
 

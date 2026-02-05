@@ -1,5 +1,5 @@
-#ifndef KICKAT_FRAME_H
-#define KICKAT_FRAME_H
+#ifndef KICKCAT_FRAME_H
+#define KICKCAT_FRAME_H
 
 #include <memory>
 

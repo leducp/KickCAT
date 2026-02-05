@@ -31,7 +31,7 @@ namespace kickcat
         {
             THROW_ERROR("Too many datagrams in flight. Max is 255");
         }
-        link_info("Addind a datagram (already %d pending)\n", index_queue_);
+        link_info("Adding a datagram (already %d pending)\n", index_queue_);
 
         uint16_t const needed_space = datagram_size(data_size);
         if (frame_nominal_.freeSpace() < needed_space)
