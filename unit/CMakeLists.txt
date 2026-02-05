@@ -29,7 +29,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/Time.cc
 )
 
-# Use foor ESI as a dataset for EsiParser
+# Use for ESI as a dataset for EsiParser
 file(COPY ${CMAKE_SOURCE_DIR}/examples/slave/nuttx/xmc4800/boards/wdc_foot/foot.xml DESTINATION ${CMAKE_BINARY_DIR})
 
 target_link_libraries(kickcat_unit kickcat GTest::gmock_main)

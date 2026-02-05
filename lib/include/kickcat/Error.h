@@ -83,10 +83,9 @@ namespace kickcat
     struct ErrorDatagram : public Error
     {
         ErrorDatagram(char const* message, DatagramState state)
-        : Error(message)
-        {
-            state_ = state;
-        }
+            : Error(message)
+            , state_(state)
+        { }
 
         DatagramState state() const noexcept
         {
