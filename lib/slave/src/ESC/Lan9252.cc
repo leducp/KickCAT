@@ -204,7 +204,7 @@ namespace kickcat
         // CSR_DATA is 4 bytes
         uint32_t padding = 0;
         std::memcpy(&padding, data, size);
-        writeInternalRegister(ECAT_CSR_DATA, data, sizeof(padding));
+        writeInternalRegister(ECAT_CSR_DATA, &padding, sizeof(padding));
         writeInternalRegister(ECAT_CSR_CMD, CSR_CMD{address, static_cast<uint8_t>(size), CSR_CMD::ESC_WRITE});
 
         // wait for command execution
