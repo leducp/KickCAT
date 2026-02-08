@@ -95,9 +95,7 @@ int main(int, char*[])
             else
             {
                 current_value += 0x11;
-            }
-            
-            printf("Updated input buffer to: 0x%02X\n", buffer_in[0]);
+            }            
         }
     }
     

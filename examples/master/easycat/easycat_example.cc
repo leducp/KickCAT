@@ -1,11 +1,11 @@
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
-
 
 using namespace kickcat;
 
@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
         printf("Redundancy has been activated due to loss of a cable \n");
     };
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
+    std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
@@ -62,13 +62,19 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
+        printf("Initializing Bus...\n");
         bus.init(100ms);  // to adapt to your use case
 
-        printf("Init done \n");
-        print_current_state();
+        printf("Init done\n");
+        printf("Detected slaves: %zu\n", bus.slaves().size());
+        for (auto& slave : bus.slaves())
+        {
+            printf(" - Slave %d\n", slave.address);
+        }
 
         bus.createMapping(io_buffer);
 
+        // Optional: Enable IRQ if needed
         bus.enableIRQ(EcatEvent::DL_STATUS,
         [&]()
         {
@@ -76,7 +82,7 @@ int main(int argc, char* argv[])
             bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state){ printf("IRQ reset error: %s\n", toString(state));});
             bus.processAwaitingFrames();
 
-            printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
+            printf("Slave DL status: %s\n", toString(bus.slaves().at(0).dl_status).c_str());
         });
     }
     catch (ErrorAL const& e)
@@ -90,40 +96,40 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    for (auto& slave: bus.slaves())
+    auto cyclic_process_data = [&]()
     {
-        printInfo(slave);
-        printESC(slave);
-    }
-
-    // Get ref on the first slave to work with it
-    auto& easycat = bus.slaves().at(0);
+        auto noop = [](DatagramState const&){};
+        bus.processDataRead(noop);
+        bus.processDataWrite(noop);
+    };
 
     try
     {
-        auto cyclic_process_data = [&]()
-        {
-            auto noop =[](DatagramState const&){};
-            bus.processDataRead (noop);
-            bus.processDataWrite(noop);
-        };
-
-        printf("Going to SAFE OP\n");
+        printf("Switching to SAFE_OP...\n");
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
         print_current_state();
 
-        // Set valid output to exit safe op.
-        for (int32_t i = 0; i < easycat.output.bsize; ++i)
+        // Set valid output for all slaves to exit safe op
+        for (auto& slave : bus.slaves())
         {
-            easycat.output.data[i] = 0xBB;
+            for (int32_t i = 0; i < slave.output.bsize; ++i)
+            {
+                slave.output.data[i] = 0xBB;
+            }
         }
         cyclic_process_data();
 
-        printf("Going to OPERATIONAL\n");
-        bus.requestState(kickcat::State::OPERATIONAL);
-        bus.waitForState(kickcat::State::OPERATIONAL, 1s, cyclic_process_data);
-        print_current_state();
+        printf("Switching to OPERATIONAL...\n");
+        bus.requestState(State::OPERATIONAL);
+        bus.waitForState(State::OPERATIONAL, 1s, cyclic_process_data);
+        
+        printf("After OPERATIONAL - Slave info:\n");
+        for (auto& slave : bus.slaves())
+        {
+            printf(" - Slave %d input: %d output: %d\n", 
+                   slave.address, slave.input.bsize, slave.output.bsize);
+        }
     }
     catch (ErrorAL const& e)
     {
@@ -137,25 +143,16 @@ int main(int argc, char* argv[])
     }
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    link->setTimeout(10ms);  // Adapt to your use case (RT loop)
+    link->setTimeout(10ms);
 
-    constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
-    FILE* stat_file = fopen("stats.csv", "w");
-    fwrite("latency\n", 1, 8, stat_file);
+    printf("Running loop...\n");
 
-    for (int32_t i = 0; i < easycat.output.bsize; ++i)
+    while (true)
     {
-        easycat.output.data[i] = 0xAA;
-    }
-
-    int64_t last_error = 0;
-    for (int64_t i = 0; i < LOOP_NUMBER; ++i)
-    {
-        sleep(4ms);
+        sleep(1ms);
 
         try
         {
-            nanoseconds t1 = since_epoch();
             bus.sendLogicalRead(callback_error);
             bus.sendLogicalWrite(callback_error);
             bus.sendRefreshErrorCounters(callback_error);
@@ -164,51 +161,30 @@ int main(int argc, char* argv[])
             bus.sendReadMessages(callback_error);
             bus.sendWriteMessages(callback_error);
             bus.finalizeDatagrams();
-            nanoseconds t2 = since_epoch();
 
-
-            nanoseconds t3 = since_epoch();
             bus.processAwaitingFrames();
-            nanoseconds t4 = since_epoch();
 
-            for (int32_t j = 0;  j < easycat.input.bsize; ++j)
+            // Clear line and print all slave inputs
+            printf("\033[K");  // Clear line
+            for (size_t idx = 0; idx < bus.slaves().size(); ++idx)
             {
-                printf("%02x ", easycat.input.data[j]);
+                auto& slave = bus.slaves().at(idx);
+                printf("input_slave_%zu: ", idx);
+                for (int32_t j = 0; j < slave.input.bsize; ++j)
+                {
+                    printf("%02x", slave.input.data[j]);
+                }
+                printf("\n");
             }
-            printf("\r");
-
-            // blink a led - EasyCAT example for Arduino
-            if ((i % 50) < 25)
-            {
-                easycat.output.data[0] = 1;
-                easycat.output.data[1] = 2;
-                easycat.output.data[2] = 3;
-            }
-            else
-            {
-                easycat.output.data[0] = 0;
-                easycat.output.data[1] = 0;
-                easycat.output.data[2] = 0;
-            }
-
-            if ((i % 1000) == 0)
-            {
-                printf("\n -*-*-*-*- slave %u -*-*-*-*-\n %s", easycat.address, toString(easycat.error_counters).c_str());
-            }
-
-            microseconds sample = duration_cast<microseconds>(t4 - t3 + t2 - t1);
-            std::string sample_str = std::to_string(sample.count());
-            fwrite(sample_str.data(), 1, sample_str.size(), stat_file);
-            fwrite("\n", 1, 1, stat_file);
+            // Move cursor up
+            printf("\033[%zuA", bus.slaves().size());
+            fflush(stdout);
         }
         catch (std::exception const& e)
         {
-            int64_t delta = i - last_error;
-            last_error = i;
-            std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
+            printf("\nError in loop iteration: %s\n\n", e.what());
         }
     }
 
-    fclose(stat_file);
     return 0;
 }
