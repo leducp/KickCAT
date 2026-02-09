@@ -1,6 +1,5 @@
 #include <iostream>
 #include <fstream>
-#include <iomanip>
 
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
@@ -143,7 +142,7 @@ int main(int argc, char* argv[])
     }
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    link->setTimeout(10ms);
+    link->setTimeout(10ms); // Adapt to your use case (RT loop)
 
     printf("Running loop...\n");
 
