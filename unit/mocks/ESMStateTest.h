@@ -1,5 +1,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "mocks/ESC.h"
 #include "kickcat/ESM.h"
 #include "kickcat/ESMStates.h"
 #include "kickcat/Mailbox.h"
@@ -8,14 +9,6 @@
 using namespace kickcat;
 using namespace kickcat::ESM;
 using namespace testing;
-
-class MockESC : public kickcat::AbstractESC
-{
-public:
-    MOCK_METHOD(int32_t, read, (uint16_t address, void* data, uint16_t size), (override));
-    MOCK_METHOD(int32_t, write, (uint16_t address, void const* data, uint16_t size), (override));
-    MOCK_METHOD(int32_t, init, (), (override));
-};
 
 class ESMStateTest : public testing::Test
 {
@@ -27,10 +20,10 @@ public:
     uint8_t buffer_in_[1024];
     uint8_t buffer_out_[1024];
 
-    SyncManager mbx_in;
-    SyncManager mbx_out;
-    SyncManager pdo_in;
-    SyncManager pdo_out;
+    SyncManager mbx_in{0x00, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+    SyncManager mbx_out{0x01, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+    SyncManager pdo_in{0x02, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+    SyncManager pdo_out{0x03, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
 
     Init init{esc_, pdo_};
     PreOP preop{esc_, pdo_};
@@ -43,20 +36,29 @@ public:
 
     void SetUp() override
     {
-        init.setMailbox(&mbx_);
-        preop.setMailbox(&mbx_);
-        safeop.setMailbox(&mbx_);
-        op.setMailbox(&mbx_);
-
-        mbx_in  = {0x00, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
-        mbx_out = {0x01, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
-        pdo_in  = {0x02, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
-        pdo_out = {0x03, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+        for (auto state : std::initializer_list<AbstractState*>{&init, &preop, &safeop, &op})
+        {
+            state->setMailbox(&mbx_);
+        }
 
         pdo_.setInput(buffer_in_);
         pdo_.setOutput(buffer_out_);
 
         SetUpSpecific();
+    }
+
+    void expectMailboxConfig()
+    {
+        expectSyncManagerRead(0, mbx_in);
+        expectSyncManagerRead(1, mbx_out);
+        mbx_.configure();
+    }
+
+    void expectPdoConfig()
+    {
+        expectSyncManagerRead(2, pdo_in);
+        expectSyncManagerRead(3, pdo_out);
+        pdo_.configure();
     }
 
     void expectAlStatus(Context context, State state, StatusCode statusCode = StatusCode::NO_ERROR)

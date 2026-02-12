@@ -1,6 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <cstring>
+#include "mocks/ESC.h"
 #include "kickcat/AbstractESC.h"
 #include "kickcat/ESM.h"
 #include "kickcat/Error.h"
@@ -10,21 +11,13 @@ using namespace kickcat;
 using namespace kickcat::ESM;
 using namespace testing;
 
-class MockESC : public kickcat::AbstractESC
-{
-public:
-    MOCK_METHOD(int32_t, read, (uint16_t address, void* data, uint16_t size), (override));
-    MOCK_METHOD(int32_t, write, (uint16_t address, void const* data, uint16_t size), (override));
-    MOCK_METHOD(int32_t, init, (), (override));
-};
-
 class MockState : public AbstractState
 {
 public:
-    PDO pdo_{&esc_};
+    PDO pdo_instance;
 
     MockState(uint8_t id, AbstractESC& esc)
-        : AbstractState(id, esc, pdo_) {};
+        : AbstractState(id, esc, pdo_instance), pdo_instance(&esc) {};
 
     MOCK_METHOD(Context, routine, (Context status, ALControl control), (override));
     MOCK_METHOD(Context, routineInternal, (Context status, ALControl control), (override));

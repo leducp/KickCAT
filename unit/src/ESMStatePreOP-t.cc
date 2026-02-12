@@ -5,11 +5,7 @@ class ESMStatePreOPTest : public ESMStateTest
 {
     void SetUpSpecific() override
     {
-        expectSyncManagerRead(0, mbx_in);
-        expectSyncManagerRead(1, mbx_out);
-
-        // In Preop mbx sync managers need to be configured
-        mbx_.configure();
+        expectMailboxConfig();
     }
 };
 

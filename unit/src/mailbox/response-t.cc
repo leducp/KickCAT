@@ -109,7 +109,7 @@ public:
         mbx.enableCoE(std::move(createTestDictionary()));
     }
 
-    kickcat::MockESC esc;
+    MockESC esc;
     Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
 };
 
