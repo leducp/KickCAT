@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstring>
 #include <numeric>
+#include <argparse/argparse.hpp>
 
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
@@ -24,13 +25,39 @@ using namespace kickcat::slave;
 
 int main(int argc, char* argv[])
 {
-    if (argc < 3)
+    argparse::ArgumentParser program("network_simulator");
+
+    std::string interface;
+    program.add_argument("-i", "--interface")
+        .help("network interface name")
+        .required()
+        .store_into(interface);
+
+    std::vector<std::string> eeproms;
+    program.add_argument("-e", "--eeproms")
+        .help("EEPROM binary files for slaves")
+        .remaining()
+        .store_into(eeproms);
+
+    try
     {
-        printf("Usage: ./network_simulator interface_name eeprom_s1.bin ... eeprom_sn.bin");
-        return -1;
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        return 1;
     }
 
-    size_t slaveCount = argc - 2;
+    if (eeproms.empty())
+    {
+        std::cerr << "No EEPROM files provided" << std::endl;
+        std::cerr << program;
+        return 1;
+    }
+
+    size_t slaveCount = eeproms.size();
     std::vector<EmulatedESC> escs;
     std::vector<PDO> pdos;
     std::vector<Slave> slaves;
@@ -42,9 +69,9 @@ int main(int argc, char* argv[])
     slaves.reserve(slaveCount);
     inputPdo.reserve(slaveCount);
     outputPdo.reserve(slaveCount);
-    for (int i = 2; i < argc; ++i)
+    for (const auto& eeprom : eeproms)
     {
-        escs.emplace_back(argv[i]);
+        escs.emplace_back(eeprom.c_str());
         pdos.emplace_back(&escs.back());
         slaves.emplace_back(&escs.back(), &pdos.back());
 
@@ -57,10 +84,10 @@ int main(int argc, char* argv[])
     CoE::EsiParser parser;
     auto coe_dict = parser.loadFile("foot.xml");
 
-    printf("Start EtherCAT network simulator on %s with %ld slaves\n", argv[1], escs.size());
+    printf("Start EtherCAT network simulator on %s with %ld slaves\n", interface.c_str(), escs.size());
     auto socket = std::make_shared<TapSocket>(true);
     //auto socket = std::make_shared<Socket>();
-    socket->open(argv[1]);
+    socket->open(interface);
     socket->setTimeout(-1ns);
 
     std::vector<nanoseconds> stats;

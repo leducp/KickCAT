@@ -18,6 +18,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <argparse/argparse.hpp>
 
 using namespace kickcat;
 
@@ -49,26 +50,53 @@ bool askContinue()
 
 int main(int argc, char* argv[])
 {
-    if ((argc != 5) and (argc != 6))
+    argparse::ArgumentParser program("eeprom");
+
+    int slave_index;
+    program.add_argument("-s", "--slave")
+        .help("slave number (starts at 0)")
+        .required()
+        .scan<'i', int>()
+        .store_into(slave_index);
+
+    std::string order_raw;
+    program.add_argument("-c", "--command")
+        .help("command: read or write")
+        .required()
+        .store_into(order_raw);
+
+    std::string file;
+    program.add_argument("-f", "--file")
+        .help("file to read from or write to")
+        .required()
+        .store_into(file);
+
+    std::string nom_interface_name;
+    program.add_argument("-i", "--interface")
+        .help("network interface name")
+        .required()
+        .store_into(nom_interface_name);
+
+    std::string red_interface_name;
+    program.add_argument("-r", "--redundancy")
+        .help("redundancy network interface name")
+        .default_value(std::string{"null"})
+        .store_into(red_interface_name);
+
+    try
     {
-        printf("argc: %d\n", argc);
-        printf("usage redundancy mode :    ./eeprom [slave_number] [command] [file] NIC_nominal NIC_redundancy\n");
-        printf("usage no redundancy mode : ./eeprom [slave_number] [command] [file] NIC_nominal\n");
-        printf("Available commands are: \n");
-        printf("\t * read:  read the eeprom of the slave and write it in [file].\n");
-        printf("\t * write: write the given [file] into the eeprom of the slave.\n");
-        printf("Note: First slave number is 0\n");
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
         return 1;
     }
 
     std::shared_ptr<AbstractSocket> socket_redundancy;
-    int slave_index         = std::stoi(argv[1]);
-    std::string order_raw   = argv[2];
-    std::string file        = argv[3];
-    std::string red_interface_name = "null";
-    std::string nom_interface_name = argv[4];
 
-    if (argc == 5)
+    if (red_interface_name == "null")
     {
         printf("No redundancy mode selected \n");
         socket_redundancy = std::make_shared<SocketNull>();
@@ -76,7 +104,6 @@ int main(int argc, char* argv[])
     else
     {
         socket_redundancy = std::make_shared<Socket>();
-        red_interface_name = argv[5];
     }
 
     selectInterface(nom_interface_name, red_interface_name);

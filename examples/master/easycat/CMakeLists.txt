@@ -4,5 +4,5 @@ if (PIKEOS)
 endif()
 
 add_executable(easycat_example ${EXAMPLE_SRCS} ${OS_SRCS})
-target_link_libraries(easycat_example kickcat)
+target_link_libraries(easycat_example kickcat argparse::argparse)
 set_kickcat_properties(easycat_example)

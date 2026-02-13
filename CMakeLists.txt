@@ -8,6 +8,8 @@ list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_BINARY_DIR})
 include(Config)
 include(debug)
 
+find_package(argparse CONFIG REQUIRED)
+
 option(BUILD_EXAMPLES     "Build examples" ON)
 
 if (NOT NUTTX)

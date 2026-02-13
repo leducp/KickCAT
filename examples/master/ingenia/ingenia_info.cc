@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <cmath>
+#include <argparse/argparse.hpp>
 
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
@@ -76,18 +77,29 @@ void printEntryDescription(Bus& bus, Slave& slave, uint16_t index, uint8_t subin
 
 int main(int argc, char *argv[])
 {
-    if (argc != 3 and argc != 2)
-    {
-        printf("usage redundancy mode : ./test NIC_nominal NIC_redundancy\n");
-        printf("usage no redundancy mode : ./test NIC_nominal\n");
-        return 1;
-    }
+    argparse::ArgumentParser program("ingenia_info");
 
-    std::string red_interface_name = "";
-    std::string nom_interface_name = argv[1];
-    if (argc == 3)
+    std::string nom_interface_name;
+    program.add_argument("-i", "--interface")
+        .help("network interface name")
+        .required()
+        .store_into(nom_interface_name);
+
+    std::string red_interface_name;
+    program.add_argument("-r", "--redundancy")
+        .help("redundancy network interface name")
+        .default_value(std::string{""})
+        .store_into(red_interface_name);
+
+    try
     {
-        red_interface_name = argv[2];
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        return 1;
     }
 
     std::shared_ptr<AbstractSocket> socket_nominal;
