@@ -65,7 +65,7 @@ namespace kickcat::CoE
             CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 3",0x60020010);
             CoE::addEntry<uint32_t>(object,4,32,104,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 4",0x60030010);
             CoE::addEntry<uint32_t>(object,5,32,136,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 5",0x60040010);
-            CoE::addEntry<uint32_t>(object,6,32,168,CoE::Access::READ,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 6",0x60050010);
+            CoE::addEntry<uint32_t>(object,6,32,168,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 6",0x60050010);
             dictionary.push_back(std::move(object));
         }
 
