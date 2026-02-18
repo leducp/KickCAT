@@ -25,20 +25,22 @@ int main(int argc, char *argv[])
     PDO pdo(&esc);
     slave::Slave slave(&esc, &pdo);
 
-    constexpr uint32_t pdo_size = 32;
+    // The master can request less inputs/ouputs and these buffers are the space
+    // that the slave app allocated to let the master play with the mapping.
+    constexpr uint32_t PDO_MAX_SIZE = 32;
 
-    uint8_t buffer_in[pdo_size];
-    uint8_t buffer_out[pdo_size];
+    uint8_t buffer_in[PDO_MAX_SIZE];
+    uint8_t buffer_out[PDO_MAX_SIZE];
 
     // init values
-    for (uint32_t i = 0; i < pdo_size; ++i)
+    for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
     {
         buffer_in[i] = i;
         buffer_out[i] = 0xFF;
     }
 
-    pdo.setInput(buffer_in);
-    pdo.setOutput(buffer_out);
+    pdo.setInput(buffer_in, PDO_MAX_SIZE);
+    pdo.setOutput(buffer_out, PDO_MAX_SIZE);
 
 
     uint8_t esc_config;
@@ -57,7 +59,7 @@ int main(int argc, char *argv[])
     {
         slave.routine();
         // Print received data
-    //    for (uint8_t i = 0; i < pdo_size; ++i)
+    //    for (uint8_t i = 0; i < PDO_MAX_SIZE; ++i)
     //    {
     //        printf("%x", buffer_out[i]);
     //    }

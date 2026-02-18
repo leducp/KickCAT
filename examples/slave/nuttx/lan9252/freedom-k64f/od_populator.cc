@@ -44,10 +44,10 @@ namespace kickcat::CoE
                 "RxPDO Map 1",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 000",0x3);
-            CoE::addEntry<uint32_t>(object,1,32,8,CoE::Access::READ,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 1",0x70000008);
-            CoE::addEntry<uint32_t>(object,2,32,40,CoE::Access::READ,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 2",0x70010008);
-            CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 3",0x70020008);
+            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED8,"Subindex 000",0x3);
+            CoE::addEntry<uint32_t>(object,1,32,8,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 1",0x70000008);
+            CoE::addEntry<uint32_t>(object,2,32,40,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 2",0x70010008);
+            CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 3",0x70020008);
             dictionary.push_back(std::move(object));
         }
 
@@ -59,13 +59,13 @@ namespace kickcat::CoE
                 "TxPDO Map 1",
                 {}
             };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 000",0x6);
-            CoE::addEntry<uint32_t>(object,1,32,8,CoE::Access::READ,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 1",0x60000010);
-            CoE::addEntry<uint32_t>(object,2,32,40,CoE::Access::READ,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 2",0x60010010);
-            CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 3",0x60020010);
-            CoE::addEntry<uint32_t>(object,4,32,104,CoE::Access::READ,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 4",0x60030010);
-            CoE::addEntry<uint32_t>(object,5,32,136,CoE::Access::READ,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 5",0x60040010);
-            CoE::addEntry<uint32_t>(object,6,32,168,CoE::Access::READ,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 6",0x60050010);
+            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED8,"Subindex 000",0x6);
+            CoE::addEntry<uint32_t>(object,1,32,8,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 1",0x60000010);
+            CoE::addEntry<uint32_t>(object,2,32,40,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 2",0x60010010);
+            CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 3",0x60020010);
+            CoE::addEntry<uint32_t>(object,4,32,104,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 4",0x60030010);
+            CoE::addEntry<uint32_t>(object,5,32,136,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 5",0x60040010);
+            CoE::addEntry<uint32_t>(object,6,32,168,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 6",0x60050010);
             dictionary.push_back(std::move(object));
         }
 

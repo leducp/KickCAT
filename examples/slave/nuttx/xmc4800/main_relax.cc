@@ -26,12 +26,14 @@ int main(int, char*[])
     esc.read(reg::AL_CONTROL, &al_control, sizeof(al_control));
     printf("al_status %x al_control %x  \n", al_status, al_control);
     
-    constexpr uint32_t pdo_size = 32;
-    uint8_t buffer_in[pdo_size];
-    uint8_t buffer_out[pdo_size];
+    // The master can request less inputs/ouputs and these buffers are the space
+    // that the slave app allocated to let the master play with the mapping.
+    constexpr uint32_t PDO_MAX_SIZE = 32;
+    uint8_t buffer_in[PDO_MAX_SIZE];
+    uint8_t buffer_out[PDO_MAX_SIZE];
     
     // Init values
-    for (uint32_t i = 0; i < pdo_size; ++i)
+    for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
     {
         buffer_in[i] = i;
         buffer_out[i] = 0xFF;
@@ -42,8 +44,8 @@ int main(int, char*[])
     mbx.enableCoE(std::move(dictionary));
 
     slave.setMailbox(&mbx);
-    pdo.setInput(buffer_in);
-    pdo.setOutput(buffer_out);
+    pdo.setInput(buffer_in, PDO_MAX_SIZE);
+    pdo.setOutput(buffer_out, PDO_MAX_SIZE);
     
     uint8_t esc_config;
     esc.read(reg::ESC_CONFIG, &esc_config, sizeof(esc_config));
@@ -82,7 +84,7 @@ int main(int, char*[])
             iteration_counter = 0;
             
             // Fill buffer with current value
-            for (uint32_t i = 0; i < pdo_size; ++i)
+            for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
             {
                 buffer_in[i] = current_value;
             }
