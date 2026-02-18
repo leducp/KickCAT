@@ -38,6 +38,7 @@ add_subdirectory(lib)
 
 if (BUILD_EXAMPLES)
   if (NOT NUTTX)
+    find_package(argparse CONFIG REQUIRED)
     add_subdirectory(examples/master)
   endif()
   add_subdirectory(examples/slave)

@@ -16,14 +16,34 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <argparse/argparse.hpp>
 
 using namespace kickcat;
 
-int main(int, char* argv[])
+int main(int argc, char* argv[])
 {
+    argparse::ArgumentParser program("scanTopology");
+
+    std::string interface;
+    program.add_argument("-i", "--interface")
+        .help("network interface name")
+        .required()
+        .store_into(interface);
+
+    try
+    {
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        return 1;
+    }
+
     std::shared_ptr<AbstractSocket> socketRedundancy;
     std::string red_interface_name = "null";
-    std::string nom_interface_name = argv[1];
+    std::string nom_interface_name = interface;
 
     socketRedundancy = std::make_shared<SocketNull>();
     auto socketNominal = std::make_shared<Socket>();

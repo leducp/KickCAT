@@ -50,6 +50,7 @@ class KickCATRecipe(ConanFile):
             raise ConanInvalidConfiguration("Building requires GCC >= 7")
 
     def requirements(self):
+        self.requires("argparse/3.2")
         if self.options.with_esi_parser:
             self.requires("tinyxml2/10.0.0")
 

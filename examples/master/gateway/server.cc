@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <argparse/argparse.hpp>
 
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
@@ -24,19 +25,34 @@ using namespace std::placeholders;
 
 int main(int argc, char* argv[])
 {
-    if (argc != 3 and argc != 2)
+    argparse::ArgumentParser program("server");
+
+    std::string nom_interface_name;
+    program.add_argument("-i", "--interface")
+        .help("network interface name")
+        .required()
+        .store_into(nom_interface_name);
+
+    std::string red_interface_name;
+    program.add_argument("-r", "--redundancy")
+        .help("redundancy network interface name")
+        .default_value(std::string{"null"})
+        .store_into(red_interface_name);
+
+    try
     {
-        printf("usage redundancy mode : ./test NIC_nominal NIC_redundancy\n");
-        printf("usage no redundancy mode : ./test NIC_nominal\n");
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
         return 1;
     }
 
-
     std::shared_ptr<AbstractSocket> socketRedundancy;
-    std::string red_interface_name = "null";
-    std::string nom_interface_name = argv[1];
 
-    if (argc == 2)
+    if (red_interface_name == "null")
     {
         printf("No redundancy mode selected \n");
         socketRedundancy = std::make_shared<SocketNull>();
@@ -44,7 +60,6 @@ int main(int argc, char* argv[])
     else
     {
         socketRedundancy = std::make_shared<Socket>();
-        red_interface_name = argv[2];
     }
 
     selectInterface(nom_interface_name, red_interface_name);

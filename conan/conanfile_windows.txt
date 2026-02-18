@@ -2,6 +2,7 @@
 gtest/1.15.0
 tinyxml2/10.0.0
 npcap/1.70
+argparse/3.2
 
 [generators]
 CMakeDeps

@@ -1,6 +1,7 @@
 #include <fstream>
 #include <memory>
 #include <algorithm>
+#include <argparse/argparse.hpp>
 
 #include "kickcat/CoE/OD.h"
 #include "kickcat/Prints.h"
@@ -123,14 +124,26 @@ int main(int argc, char *argv[])
 {
     using namespace kickcat;
 
-    if ((argc != 2))
+    argparse::ArgumentParser program("od_generator");
+
+    std::string esi_file;
+    program.add_argument("-f", "--file")
+        .help("ESI XML file")
+        .required()
+        .store_into(esi_file);
+
+    try
     {
-        printf("argc: %d\n", argc);
-        printf("usage :    ./od_generator [esi.xml]\n");
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
         return 1;
     }
 
-    auto dictionary = loadOD(argv[1]);
+    auto dictionary = loadOD(esi_file);
 
     std::ofstream f(std::string(OD_POPULATOR_FILE).c_str());
 

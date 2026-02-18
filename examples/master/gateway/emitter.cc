@@ -3,15 +3,40 @@
 
 #include <arpa/inet.h>
 #include <cstring>
+#include <argparse/argparse.hpp>
 
 
 using namespace kickcat;
 
 int main(int argc, char* argv[])
 {
-    (void) argc;
-    (void) argv;
-    printf("Start\n");
+    argparse::ArgumentParser program("emitter");
+
+    std::string dest_ip;
+    program.add_argument("-a", "--address")
+        .help("destination IP address")
+        .default_value(std::string{"127.0.0.1"})
+        .store_into(dest_ip);
+
+    uint16_t dest_port;
+    program.add_argument("-p", "--port")
+        .help("destination UDP port")
+        .default_value(uint16_t{0x88A4})
+        .scan<'i', uint16_t>()
+        .store_into(dest_port);
+
+    try
+    {
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        return 1;
+    }
+
+    printf("Start emitting to %s:%u\n", dest_ip.c_str(), dest_port);
 
     int fd = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (fd < 0)
@@ -22,12 +47,12 @@ int main(int argc, char* argv[])
 
     // Destination
     struct sockaddr_in addr;
-    socklen_t addr_size;
+    socklen_t addr_size = sizeof(addr);
     std::memset(&addr, 0, sizeof(addr));
 
     addr.sin_family      = AF_INET;         // IPv4
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    addr.sin_port = hton<uint16_t>(0x88A4); // Port is defined in ETG 8200
+    addr.sin_addr.s_addr = inet_addr(dest_ip.c_str());
+    addr.sin_port = hton<uint16_t>(dest_port); // Port is defined in ETG 8200
 
 
     // Serial number storage
