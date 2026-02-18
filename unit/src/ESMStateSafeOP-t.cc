@@ -5,14 +5,8 @@ class ESMStateSafeOPTest : public ESMStateTest
 public:
     void SetUpSpecific() override
     {
-        expectSyncManagerRead(0, mbx_in);
-        expectSyncManagerRead(1, mbx_out);
-        expectSyncManagerRead(2, pdo_in);
-        expectSyncManagerRead(3, pdo_out);
-
-        // In safeop mbx and pdo sync managers need to be configured
-        mbx_.configure();
-        pdo_.configure();
+        expectMailboxConfig();
+        expectPdoConfig();
     }
 };
 
