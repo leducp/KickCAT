@@ -1,6 +1,6 @@
 [settings]
 os=Linux
-arch=x86_64
+arch=CONAN_ARCH
 compiler=gcc
 compiler.version=MAJOR_VERSION
 compiler.libcxx=libstdc++11
