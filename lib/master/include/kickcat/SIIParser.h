@@ -7,6 +7,8 @@
 namespace kickcat::eeprom
 {
     // see ETG2010_S_R_V1.0.1 SII Specification
+    // NOTE: strings, general, syncManagers, TxPDO and RxPDO point into the eeprom buffer.
+    //       If the eeprom vector is modified, call parse() again to re-establish them.
     struct SII
     {
         std::vector<uint32_t> eeprom;

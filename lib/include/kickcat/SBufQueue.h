@@ -2,6 +2,7 @@
 #define KICKCAT_SBUF_QUEUE_H
 
 #include "Ring.h"
+#include "kickcat/types.h"
 #include "kickcat/OS/Mutex.h"
 #include "kickcat/OS/ConditionVariable.h"
 
@@ -32,8 +33,8 @@ namespace kickcat
         {
             struct Descriptors
             {
-                pthread_mutex_t lock;
-                pthread_cond_t cond;
+                os_mutex lock;
+                os_cond cond;
                 typename Ring<Item, N>::Context ring;
             };
 

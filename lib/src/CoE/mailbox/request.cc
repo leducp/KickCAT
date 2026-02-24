@@ -305,8 +305,8 @@ namespace kickcat::mailbox::request
         // => check if message response is coherent
         if (sdo->opcode == CoE::SDO::information::SDO_INFO_ERROR_REQ)
         {
-            uint32_t code = *reinterpret_cast<uint32_t const*>(payload);
-            // TODO: let client display itself the message
+            uint32_t code;
+            std::memcpy(&code, payload, sizeof(uint32_t));
             coe_info("Abort requested for sdo information ! code %08" PRIx32 " - %s\n", code, CoE::SDO::abort_to_str(code));
             status_ = code;
             return ProcessingResult::FINALIZE;

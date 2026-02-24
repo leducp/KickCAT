@@ -17,7 +17,7 @@ namespace kickcat::ESM
             mbx_->activate(false); // reset dictionary here?
         }
         pdo_.activateInput(false);
-        pdo_.activateOuput(false);
+        pdo_.activateOutput(false);
     }
 
 
@@ -95,7 +95,7 @@ namespace kickcat::ESM
         {
             mbx_->activate(true);
         }
-        pdo_.activateOuput(false);
+        pdo_.activateOutput(false);
         pdo_.activateInput(false);
     }
 
@@ -154,11 +154,11 @@ namespace kickcat::ESM
     {
         if (oldStatus.state() == State::OPERATIONAL and newStatus.al_status_code != StatusCode::NO_ERROR)
         {
-            pdo_.activateOuput(false);
+            pdo_.activateOutput(false);
         }
         else
         {
-            pdo_.activateOuput(true);
+            pdo_.activateOutput(true);
             pdo_.activateInput(true);
         }
     }

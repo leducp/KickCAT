@@ -19,11 +19,17 @@ namespace kickcat
         SyncManagerType type;
     };
 
-    #define SYNC_MANAGER_PI_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x20, SyncManagerType::Input}
-    #define SYNC_MANAGER_PI_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x64, SyncManagerType::Output}
+    constexpr SyncManagerConfig SYNC_MANAGER_PI_IN(uint8_t index, uint16_t address, uint16_t length)
+    { return {index, address, length, 0x20, SyncManagerType::Input}; }
 
-    #define SYNC_MANAGER_MBX_IN(index, address, length)  SyncManagerConfig{index, address, length, 0x02, SyncManagerType::MailboxIn}
-    #define SYNC_MANAGER_MBX_OUT(index, address, length) SyncManagerConfig{index, address, length, 0x06, SyncManagerType::MailboxOut}
+    constexpr SyncManagerConfig SYNC_MANAGER_PI_OUT(uint8_t index, uint16_t address, uint16_t length)
+    { return {index, address, length, 0x64, SyncManagerType::Output}; }
+
+    constexpr SyncManagerConfig SYNC_MANAGER_MBX_IN(uint8_t index, uint16_t address, uint16_t length)
+    { return {index, address, length, 0x02, SyncManagerType::MailboxIn}; }
+
+    constexpr SyncManagerConfig SYNC_MANAGER_MBX_OUT(uint8_t index, uint16_t address, uint16_t length)
+    { return {index, address, length, 0x06, SyncManagerType::MailboxOut}; }
 
 
     namespace mailbox::response

@@ -72,7 +72,7 @@ TEST(Protocol, hton)
 {
     uint16_t host_16 = 0xCAFE;
     uint32_t host_32 = 0xCAFEDECA;
-    uint32_t host_64 = 0;
+    uint64_t host_64 = 0;
 
     uint16_t network_16 = hton<uint16_t>(host_16);
     uint32_t network_32 = hton<uint32_t>(host_32);

@@ -162,25 +162,17 @@ namespace kickcat
         os << "Enhanced Link Detection :  " << std::to_string(dl_status.EL_detection) << " \n";
         os << "Reserved :  "                << std::to_string(dl_status.reserved) << " \n";
 
-        os << "Port 0: \n";
-        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port0) << " \n";
-        os << "  Communications : "         << std::to_string(dl_status.COM_port0) << " \n";
-        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port0) << " \n";
+        uint16_t pl[4]   = { dl_status.PL_port0,   dl_status.PL_port1,   dl_status.PL_port2,   dl_status.PL_port3   };
+        uint16_t com[4]  = { dl_status.COM_port0,  dl_status.COM_port1,  dl_status.COM_port2,  dl_status.COM_port3  };
+        uint16_t loop[4] = { dl_status.LOOP_port0, dl_status.LOOP_port1, dl_status.LOOP_port2, dl_status.LOOP_port3 };
 
-        os << "Port 1: \n";
-        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port1) << " \n";
-        os << "  Communications : "         << std::to_string(dl_status.COM_port1) << " \n";
-        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port1) << " \n";
-
-        os << "Port 2: \n";
-        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port2) << " \n";
-        os << "  Communications : "         << std::to_string(dl_status.COM_port2) << " \n";
-        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port2) << " \n";
-
-        os << "Port 3: \n";
-        os << "  Physical Link :  "         << std::to_string(dl_status.PL_port3) << " \n";
-        os << "  Communications : "         << std::to_string(dl_status.COM_port3) << " \n";
-        os << "  Loop Function :  "         << std::to_string(dl_status.LOOP_port3) << " \n";
+        for (int i = 0; i < 4; ++i)
+        {
+            os << "Port " << i << ": \n";
+            os << "  Physical Link :  " << std::to_string(pl[i]) << " \n";
+            os << "  Communications : " << std::to_string(com[i]) << " \n";
+            os << "  Loop Function :  " << std::to_string(loop[i]) << " \n";
+        }
 
         return os.str();
     }
@@ -307,7 +299,7 @@ namespace kickcat
                 case SERVICE_NOT_SUPPORTED: { return "Service is not supported";                }
                 case INVALID_HEADER:        { return "Invalid header (mailbox header is good)"; }
                 case SIZE_TOO_SHORT:        { return "Too few received bytes";                  }
-                case NO_MORE_MEMORY:        { return "Protocol cannot be processed due to limited ressources"; }
+                case NO_MORE_MEMORY:        { return "Protocol cannot be processed due to limited resources"; }
                 case INVALID_SIZE:          { return "Data size is inconsistent";               }
                 case SERVICE_IN_WORK:       { return "Mailbox service already in use.";         }
                 default:                    { return "Unknown mailbox error code";              }

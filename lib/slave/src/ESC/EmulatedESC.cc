@@ -386,7 +386,7 @@ namespace kickcat
         {
             case eeprom::Control::READ:
             {
-                if (memory_.eeprom_address < eeprom_.size())
+                if (memory_.eeprom_address + 2 <= eeprom_.size())
                 {
                     std::memcpy((void*)&memory_.eeprom_data, eeprom_.data() + memory_.eeprom_address, 4);
                 }
@@ -594,14 +594,14 @@ namespace kickcat
             return; // watchdog deactivated
         }
 
-        if ((lastLogicalWrite_ + delay) < since_epoch())
+        if ((lastLogicalWrite_ + delay) >= since_epoch())
         {
-            // Watchog OK
+            // Watchdog OK: last write is recent enough
             memory_.watchdog_status_process_data = 0;
             return;
         }
 
-        // Watchog Triggered - detect front
+        // Watchdog triggered - detect front
         if (memory_.watchdog_status_process_data == 0)
         {
             // Increase PDO wdg counter and reflect the current state

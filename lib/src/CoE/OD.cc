@@ -1,6 +1,5 @@
 #include <sstream>
 #include <algorithm>
-#include <streambuf>
 #include <string_view>
 
 #include "kickcat/CoE/OD.h"
@@ -260,16 +259,25 @@ namespace kickcat::CoE
 
     Entry& Entry::operator=(Entry&& other)
     {
-        subindex    = std::move(other.subindex);
-        bitlen      = std::move(other.bitlen);
-        bitoff      = std::move(other.bitoff);
-        access      = std::move(other.access);
-        type        = std::move(other.type);
-        description = std::move(other.description);
-        data        = std::move(other.data);
-        other.data = nullptr;
-        is_mapped = other.is_mapped;
-        other.is_mapped = false;
+        if (this != &other)
+        {
+            if (data != nullptr and not is_mapped)
+            {
+                std::free(data);
+            }
+
+            subindex    = other.subindex;
+            bitlen      = other.bitlen;
+            bitoff      = other.bitoff;
+            access      = other.access;
+            type        = other.type;
+            description = std::move(other.description);
+            data        = other.data;
+            is_mapped   = other.is_mapped;
+
+            other.data = nullptr;
+            other.is_mapped = false;
+        }
 
         return *this;
     }

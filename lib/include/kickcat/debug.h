@@ -6,10 +6,10 @@
 namespace kickcat
 {
 
-#define _none(...)    do { if (0) { fprintf(stderr, ##__VA_ARGS__); } } while (0);
-#define _error(...)   do { fprintf(stderr, "[E] %s ", LOCATION()); fprintf(stderr, ##__VA_ARGS__); } while(0);
-#define _warning(...) do { fprintf(stderr, "[W] %s ", LOCATION()); fprintf(stderr, ##__VA_ARGS__); } while(0);
-#define _info(...)    do { fprintf(stdout, "[I] %s ", LOCATION()); fprintf(stdout, ##__VA_ARGS__); } while(0);
+#define _none(...)    do { if (0) { fprintf(stderr, ##__VA_ARGS__); } } while (0)
+#define _error(...)   do { fprintf(stderr, "[E] %s ", LOCATION()); fprintf(stderr, ##__VA_ARGS__); } while(0)
+#define _warning(...) do { fprintf(stderr, "[W] %s ", LOCATION()); fprintf(stderr, ##__VA_ARGS__); } while(0)
+#define _info(...)    do { fprintf(stdout, "[I] %s ", LOCATION()); fprintf(stdout, ##__VA_ARGS__); } while(0)
 
 
 #ifdef DEBUG_BUS_ERROR
