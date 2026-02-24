@@ -66,10 +66,9 @@ int main(int argc, char *argv[])
 
     // Variables for toggling pattern
     uint32_t iteration_counter = 0;
-    uint8_t current_value = 0x11;  // Start with 0x11
+    uint8_t current_value = 0x11; // Start with 0x11
 
     constexpr uint32_t ITER = 1000; // Number of iterations before updating input buffer
-    
 
     while (true)
     {
@@ -88,13 +87,13 @@ int main(int argc, char *argv[])
         if (iteration_counter >= ITER)
         {
             iteration_counter = 0;
-            
+
             // Fill buffer with current value
             for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
             {
                 buffer_in[i] = current_value;
             }
-            
+
             // Move to next value: 0x11 -> 0x22 -> 0x33 -> ... -> 0xFF -> 0x00 -> 0x11
             if (current_value == 0xFF)
             {
@@ -103,10 +102,10 @@ int main(int argc, char *argv[])
             else
             {
                 current_value += 0x11;
-            }            
+            }
         }
 
-        usleep(250); // 250 microsecond sleep to avoid 100% CPU usage
+        sleep(250us); // 250 microsecond sleep to avoid 100% CPU usage
     }
 
     return 0;

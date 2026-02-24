@@ -21,7 +21,7 @@ namespace kickcat
 
     void SPI::open(std::string const &device, uint8_t CPOL, uint8_t CPHA, uint32_t baudrate)
     {
-        if (!bcm2835_init())
+        if (not bcm2835_init())
         {
             THROW_SYSTEM_ERROR("bcm2835_init failed. Are you running as root?");
         }
@@ -52,7 +52,7 @@ namespace kickcat
 
     void SPI::transfer(uint8_t const *data_write, uint8_t *data_read, uint32_t size)
     {
-        if (data_write != nullptr && data_read != nullptr)
+        if (data_write != nullptr and data_read != nullptr)
         {
             bcm2835_spi_transfernb(const_cast<char *>(reinterpret_cast<char const *>(data_write)),
                                    reinterpret_cast<char *>(data_read),
