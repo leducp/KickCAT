@@ -26,7 +26,7 @@ namespace kickcat
             THROW_SYSTEM_ERROR("bcm2835_init failed. Are you running as root?");
         }
 
-        if (!bcm2835_spi_begin())
+        if (not bcm2835_spi_begin())
         {
             bcm2835_close();
             THROW_SYSTEM_ERROR("bcm2835_spi_begin failed. Are you running as root?");
