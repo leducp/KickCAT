@@ -31,6 +31,26 @@ echo $build_dir
 
 source "$SOURCE_DIR/tools/setup/detect_gcc.sh"
 
+# Detect architecture and map to Conan arch value
+detect_conan_arch() {
+    local machine
+    machine=$(uname -m)
+    case "$machine" in
+        x86_64)             echo "x86_64" ;;
+        aarch64|arm64)      echo "armv8" ;;
+        armv7l)             echo "armv7hf" ;;
+        armv6l)             echo "armv6" ;;
+        i686|i386)          echo "x86" ;;
+        *)
+            echo "Unknown architecture: $machine. Aborting..." >&2
+            exit 1
+            ;;
+    esac
+}
+
+CONAN_ARCH=$(detect_conan_arch)
+echo "Detected architecture: $(uname -m) -> Conan arch: $CONAN_ARCH"
+
 # Generate cmake toolchain profile
 TEMPLATE_CMAKE_TOOLCHAIN="$SOURCE_DIR/cmake/toolchain.cmake.template"
 OUTPUT_CMAKE_TOOLCHAIN="$build_dir/toolchain.cmake"
@@ -47,6 +67,7 @@ sed \
   -e "s|MAJOR_VERSION|${GREATEST_VERSION}|g" \
   -e "s|BINARY_PATH_CC|$(command -v $GREATEST_CC)|g" \
   -e "s|BINARY_PATH_CXX|$(command -v $GREATEST_CXX)|g" \
+  -e "s|CONAN_ARCH|${CONAN_ARCH}|g" \
   "$TEMPLATE_CONAN_PROFILE" > "$OUTPUT_CONAN_PROFILE"
 
 

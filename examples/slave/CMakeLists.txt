@@ -5,3 +5,7 @@ if (NUTTX)
         add_subdirectory(nuttx/lan9252)
     endif()
 endif()
+
+if (RPI)
+    add_subdirectory(rpi/lan9252)
+endif()
