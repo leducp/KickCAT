@@ -71,12 +71,91 @@ jobs:
           fi
         shell: bash
 
+      - name: Upload Build Artifacts (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-linux
+          path: build/
+          retention-days: 1
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest'
         with:
           name: coverage
           path: build/coverage_xml.xml
+
+  simulation_test:
+    needs: build_x86
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test_case:
+          - name: easycat
+            example_bin: build/examples/master/easycat/easycat_example
+            eeprom: examples/slave/nuttx/lan9252/freedom-k64f/eeprom.bin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-linux
+          path: build/
+
+      - name: Fix permissions
+        run: |
+          chmod +x build/simulation/network_simulator
+          chmod +x ${{ matrix.test_case.example_bin }}
+
+      - name: Run Simulation Test (${{ matrix.test_case.name }})
+        shell: bash
+        run: |
+          # 1. Start simulator in background
+          ./build/simulation/network_simulator -i tap_nominal -e ${{ matrix.test_case.eeprom }} > simulator.log 2>&1 &
+          SIM_PID=$!
+
+          # 2. Wait a bit for simulator to start
+          sleep 2
+
+          # 3. Run example with timeout
+          timeout 15s ./${{ matrix.test_case.example_bin }} -i tap:client > test_output.log 2>&1 || true
+
+          # 4. Stop simulator
+          kill $SIM_PID || true
+
+          # 5. Check results
+          echo "--- Summary of Test Output (last 10 lines) ---"
+          tail -n 10 test_output.log
+          echo "----------------------------------------------"
+
+          if grep -q "After OPERATIONAL - Slave info:" test_output.log; then
+              echo "SUCCESS: ${{ matrix.test_case.name }} reached OPERATIONAL state."
+          else
+              echo "FAILURE: ${{ matrix.test_case.name }} did NOT reach OPERATIONAL state."
+              exit 1
+          fi
+
+          if grep -q "input_slave_0:" test_output.log; then
+               echo "SUCCESS: ${{ matrix.test_case.name }} received input data."
+          else
+              echo "FAILURE: ${{ matrix.test_case.name }} did NOT receive input data."
+              exit 1
+          fi
+
+          echo "Test passed!"
+
+      # - name: Upload Simulation Logs
+      #   uses: actions/upload-artifact@v4
+      #   if: failure()
+      #   with:
+      #     name: simulation-logs-${{ matrix.test_case.name }}
+      #     path: |
+      #       test_output.log
+      #       simulator.log
 
   build_NuttX_stable:
     runs-on: ubuntu-latest
