@@ -201,7 +201,7 @@ namespace kickcat
         nanoseconds pdiWatchdog();  // Get configured PDI watchdog
         nanoseconds pdoWatchdog();  // Get configured PDO watchdog
         void checkWatchdog();
-        nanoseconds lastLogicalWrite_;
+        nanoseconds lastLogicalWrite_{since_epoch()};
 
         nanoseconds last_write_eeprom_{since_epoch()};
     };
