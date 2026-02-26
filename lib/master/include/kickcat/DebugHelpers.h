@@ -1,8 +1,9 @@
 #ifndef KICKCAT_DEBUGHELPERS_H
 #define KICKCAT_DEBUGHELPERS_H
 
+#include <cstring>
+
 #include "kickcat/Link.h"
-#include "kickcat/Error.h"
 
 namespace kickcat
 {
@@ -17,7 +18,7 @@ namespace kickcat
                 return DatagramState::INVALID_WKC;
             }
 
-            value_read = *reinterpret_cast<T const*>(data);
+            std::memcpy(&value_read, data, sizeof(T));
             return DatagramState::OK;
         };
 

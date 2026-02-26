@@ -47,12 +47,15 @@ namespace kickcat
 
     Frame& Frame::operator=(Frame&& other)
     {
+        auto next_offset = other.next_datagram_ - other.first_datagram_;
+        auto last_offset = other.last_datagram_ - other.first_datagram_;
+
         frame_ = std::move(other.frame_);
         ethernet_ = pointData<EthernetHeader>(frame_.data());
         header_   = pointData<EthercatHeader>(ethernet_);
         first_datagram_ = pointData<uint8_t>(header_);
-        next_datagram_  = other.next_datagram_;
-        last_datagram_  = other.last_datagram_;
+        next_datagram_  = first_datagram_ + next_offset;
+        last_datagram_  = first_datagram_ + last_offset;
         datagram_counter_ = other.datagram_counter_;
         is_datagram_available_ = other.is_datagram_available_;
         return *this;

@@ -14,7 +14,7 @@ namespace kickcat
         {
         public:
             Init(AbstractESC& esc, PDO& pdo);
-            virtual ~Init() = default;
+            ~Init() = default;
 
             void onEntry(Context oldStatus, Context newStatus) override;
             Context routineInternal(Context oldStatus, ALControl control) override;
@@ -24,7 +24,7 @@ namespace kickcat
         {
         public:
             PreOP(AbstractESC& esc, PDO& pdo);
-            virtual ~PreOP() = default;
+            ~PreOP() = default;
 
             void onEntry(Context oldStatus, Context newStatus) override;
             Context routineInternal(Context oldStatus, ALControl control) override;
@@ -34,7 +34,7 @@ namespace kickcat
         {
         public:
             SafeOP(AbstractESC& esc, PDO& pdo);
-            virtual ~SafeOP() = default;
+            ~SafeOP() = default;
 
             void onEntry(Context oldStatus, Context newStatus) override;
             Context routineInternal(Context oldStatus, ALControl control) override;
@@ -44,7 +44,7 @@ namespace kickcat
         {
         public:
             OP(AbstractESC& esc, PDO& pdo);
-            virtual ~OP() = default;
+            ~OP() = default;
 
             Context routineInternal(Context oldStatus, ALControl control) override;
 

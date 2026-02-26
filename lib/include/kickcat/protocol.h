@@ -398,8 +398,6 @@ namespace kickcat
     constexpr uint8_t SM_STATUS_IRQ_WRITE       = (1 << 0);
     constexpr uint8_t SM_STATUS_IRQ_READ        = (1 << 1);
     constexpr uint8_t SM_STATUS_MAILBOX         = (1 << 3);
-    constexpr uint8_t SM_STATUS_READ_IN_USE     = (1 << 3);
-    constexpr uint8_t SM_STATUS_WRITE_IN_USE    = (1 << 3);
 
     enum SyncManagerType
     {
@@ -580,7 +578,7 @@ namespace kickcat
 
         struct SyncManagerEntry
         {
-            uint16_t start_adress;
+            uint16_t start_address;
             uint16_t length;
             uint8_t  control_register;
             uint8_t  status_register;

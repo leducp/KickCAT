@@ -17,7 +17,7 @@ namespace kickcat
 
         int32_t configure();
         StatusCode isConfigOk();
-        void activateOuput(bool is_activated);
+        void activateOutput(bool is_activated);
         void activateInput(bool is_activated);
         void setInput(void* buffer, uint32_t size);
         void setOutput(void* buffer, uint32_t size);

@@ -38,7 +38,7 @@ namespace kickcat
         return StatusCode::NO_ERROR;
     }
 
-    void PDO::activateOuput(bool is_activated)
+    void PDO::activateOutput(bool is_activated)
     {
         if (sm_output_.type != SyncManagerType::Unused)
         {

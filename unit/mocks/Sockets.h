@@ -103,7 +103,11 @@ namespace kickcat
                     wkc = reinterpret_cast<uint16_t*>(contexts_.front().payload + contexts_.front().header->len);   // next wkc
                 } while (current_header->multiple == 1);
 
-                int32_t answer_size = contexts_.front().inflight.finalize();
+                int32_t answer_size = contexts_.front().inflight.header()->len + sizeof(EthernetHeader) + sizeof(EthercatHeader);
+                if (answer_size < ETH_MIN_SIZE)
+                {
+                    answer_size = ETH_MIN_SIZE;
+                }
                 std::memcpy(data, contexts_.front().inflight.data(), answer_size);
                 contexts_.pop();
                 return answer_size;

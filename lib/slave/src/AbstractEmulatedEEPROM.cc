@@ -65,6 +65,11 @@ namespace kickcat
             case eeprom::Control::READ:
             {
                 constexpr uint32_t EEPROM_READ_BYTES = 8;
+                constexpr uint32_t EEPROM_READ_WORDS = EEPROM_READ_BYTES / sizeof(uint16_t);
+                if (address + EEPROM_READ_WORDS > eeprom_.size())
+                {
+                    break;
+                }
                 std::memcpy(ecatAddress<uint16_t>(reg::EEPROM_DATA), eeprom_.data() + address, EEPROM_READ_BYTES);
 
                 // ACK command, error bit cleared by writing command, clear CRC errors, all other bits read only

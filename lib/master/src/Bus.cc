@@ -529,7 +529,7 @@ namespace kickcat
         {
             auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-
+				// copy before: a wrong wkc doesn't mean that all data shall be discarded
                 for (auto& input : pi_frame.inputs)
                 {
                     std::memcpy(input.iomap, data + input.offset, input.size);
@@ -668,7 +668,7 @@ namespace kickcat
                 targeted_fmmu += 0x10;          // FMMU1 - inputs (slave to master)
             }
 
-            sm.start_address = sii_sm->start_adress;
+            sm.start_address = sii_sm->start_address;
             sm.length        = static_cast<uint16_t>(mapping.bsize);
             sm.status        = 0x00; // RO register
             sm.activate      = 0x01; // Sync Manager enable
@@ -682,7 +682,7 @@ namespace kickcat
             fmmu.length             = static_cast<uint16_t>(mapping.bsize);
             fmmu.logical_start_bit  = 0;   // we map every bits
             fmmu.logical_stop_bit   = 0x7; // we map every bits
-            fmmu.physical_address   = sii_sm->start_adress;
+            fmmu.physical_address   = sii_sm->start_address;
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             link_->addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu, process, error);
@@ -1071,20 +1071,21 @@ namespace kickcat
 
     std::shared_ptr<mailbox::request::GatewayMessage> Bus::addGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index)
     {
-        mailbox::Header const* const mbx_header = reinterpret_cast<mailbox::Header const*>(raw_message);
+        mailbox::Header mbx_header;
+        std::memcpy(&mbx_header, raw_message, sizeof(mailbox::Header));
 
         // Try to associate the request with a destination
-        if (mbx_header->address == 0)
+        if (mbx_header.address == 0)
         {
             // Master is the destination, unsupported for now (ETG 1510)
             bus_error("Master mailbox not implemented");
             return nullptr;
         }
 
-        auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header->address; });
+        auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header.address; });
         if (it == slaves_.end())
         {
-            bus_error("No slave with address %d on the bus", mbx_header->address);
+            bus_error("No slave with address %d on the bus", mbx_header.address);
             return nullptr;
         }
 
@@ -1131,7 +1132,7 @@ namespace kickcat
                 return DatagramState::INVALID_WKC;
             }
 
-            slave.dl_status= *reinterpret_cast<DLStatus const*>(data);
+            std::memcpy(&slave.dl_status, data, sizeof(DLStatus));
             return DatagramState::OK;
         };
 

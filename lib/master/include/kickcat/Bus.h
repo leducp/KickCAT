@@ -1,7 +1,6 @@
 #ifndef KICKCAT_BUS_H
 #define KICKCAT_BUS_H
 
-#include <list>
 #include <vector>
 
 #include "kickcat/Error.h"
