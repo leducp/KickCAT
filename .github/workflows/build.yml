@@ -148,14 +148,14 @@ jobs:
 
           echo "Test passed!"
 
-      # - name: Upload Simulation Logs
-      #   uses: actions/upload-artifact@v4
-      #   if: failure()
-      #   with:
-      #     name: simulation-logs-${{ matrix.test_case.name }}
-      #     path: |
-      #       test_output.log
-      #       simulator.log
+      - name: Upload Simulation Logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: simulation-logs-${{ matrix.test_case.name }}
+          path: |
+            test_output.log
+            simulator.log
 
   build_NuttX_stable:
     runs-on: ubuntu-latest
