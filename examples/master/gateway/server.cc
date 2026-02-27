@@ -8,6 +8,7 @@
 #include "kickcat/SocketNull.h"
 #include "kickcat/Gateway.h"
 #include "kickcat/helpers.h"
+#include "kickcat/MailboxSequencer.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -119,6 +120,8 @@ int main(int argc, char* argv[])
     Gateway gateway(socket, std::bind(&Bus::addGatewayMessage, &bus, _1, _2, _3));
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+    MailboxSequencer mailbox_sequencer(bus);
+
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
@@ -126,16 +129,7 @@ int main(int argc, char* argv[])
 
         try
         {
-            if (i % 2)
-            {
-                bus.sendMailboxesReadChecks(callback_error);
-                bus.sendMailboxesWriteChecks(callback_error);
-            }
-            else
-            {
-                bus.sendReadMessages(callback_error);
-                bus.sendWriteMessages(callback_error);
-            }
+            mailbox_sequencer.step(callback_error);
             bus.finalizeDatagrams();
 
             bus.processAwaitingFrames();

@@ -5,6 +5,7 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
+#include "kickcat/MailboxSequencer.h"
 
 using namespace kickcat;
 
@@ -227,6 +228,7 @@ int main(int argc, char* argv[])
     auto callback_error = [](DatagramState const &)
     { THROW_ERROR("something bad happened"); };
     link->setTimeout(10ms);
+    MailboxSequencer mailbox_sequencer(bus);
 
     // Map PDO memory to structs
     freedom::Input *input = reinterpret_cast<freedom::Input *>(easycat.input.data);
@@ -252,10 +254,7 @@ int main(int argc, char* argv[])
             bus.sendLogicalRead(callback_error);
             bus.sendLogicalWrite(callback_error);
             bus.sendRefreshErrorCounters(callback_error);
-            bus.sendMailboxesReadChecks(callback_error);
-            bus.sendMailboxesWriteChecks(callback_error);
-            bus.sendReadMessages(callback_error);
-            bus.sendWriteMessages(callback_error);
+            mailbox_sequencer.step(callback_error);
             bus.finalizeDatagrams();
             bus.processAwaitingFrames();
 

@@ -6,6 +6,7 @@ target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helpers.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Link.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Prints.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/MailboxSequencer.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
 )
 

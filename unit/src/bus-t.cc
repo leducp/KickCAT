@@ -5,6 +5,7 @@
 #include "kickcat/Link.h"
 #include "kickcat/SocketNull.h"
 #include "kickcat/Bus.h"
+#include "kickcat/MailboxSequencer.h"
 
 using ::testing::Return;
 using ::testing::_;
@@ -737,4 +738,135 @@ TEST_F(BusTest, clearErrorCounters_wkc_error)
     checkSendFrame(Command::BWR, uint16_t(0));
     handleReplyWriteThenRead(0);
     ASSERT_THROW(bus.clearErrorCounters();, kickcat::Error);
+}
+
+
+TEST_F(BusTest, mailbox_sequencer_cycling)
+{
+    InSequence s;
+    MailboxSequencer sequencer(bus);
+    auto noop = [](DatagramState const&){};
+    auto& slave = bus.slaves().at(0);
+
+    // Phase 0: sendMailboxesReadChecks → FPRD (SM1 status)
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x00}); // SM1 empty → can_read=false
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+    ASSERT_FALSE(slave.mailbox.can_read);
+
+    // Phase 1: sendReadMessages → nothing queued (can_read=false)
+    sequencer.step(noop);
+
+    // Phase 2: sendMailboxesWriteChecks → FPRD (SM0 status)
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x00}); // SM0 empty → can_write=true
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+    ASSERT_TRUE(slave.mailbox.can_write);
+
+    // Phase 3: sendWriteMessages → nothing (no pending messages)
+    sequencer.step(noop);
+
+    // Phase 0 again: verify wrap-around
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x08}); // SM1 full → can_read=true
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+    ASSERT_TRUE(slave.mailbox.can_read);
+}
+
+
+TEST_F(BusTest, mailbox_sequencer_period)
+{
+    InSequence s;
+    MailboxSequencer sequencer(bus, 3);
+    auto noop = [](DatagramState const&){};
+
+    // Calls 1 and 2: nothing happens (counter < period)
+    sequencer.step(noop);
+    sequencer.step(noop);
+
+    // Call 3: phase 0 executes (sendMailboxesReadChecks)
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x00});
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+
+    // Calls 4 and 5: nothing
+    sequencer.step(noop);
+    sequencer.step(noop);
+
+    // Call 6: phase 1 executes (sendReadMessages) - nothing queued since can_read=false
+    sequencer.step(noop);
+
+    // Calls 7 and 8: nothing
+    sequencer.step(noop);
+    sequencer.step(noop);
+
+    // Call 9: phase 2 executes (sendMailboxesWriteChecks)
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x00});
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+}
+
+
+TEST_F(BusTest, mailbox_sequencer_with_active_read)
+{
+    InSequence s;
+    MailboxSequencer sequencer(bus);
+    auto noop = [](DatagramState const&){};
+    auto& slave = bus.slaves().at(0);
+
+    // Phase 0: readCheck → SM1 full → can_read=true
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x08});
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+    ASSERT_TRUE(slave.mailbox.can_read);
+
+    // Phase 1: readMessages → FPRD expected (because can_read=true)
+    checkSendFrameSimple(Command::FPRD);
+    handleReplySimple();
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+}
+
+
+TEST_F(BusTest, mailbox_sequencer_with_active_write)
+{
+    InSequence s;
+    MailboxSequencer sequencer(bus);
+    auto noop = [](DatagramState const&){};
+    auto& slave = bus.slaves().at(0);
+
+    // Phase 0: readCheck
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x00});
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+
+    // Phase 1: readMessages → nothing (can_read=false)
+    sequencer.step(noop);
+
+    // Phase 2: writeCheck → SM0 empty → can_write=true
+    checkSendFrameSimple(Command::FPRD);
+    io_nominal->handleReply<uint8_t>({0x00});
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+    ASSERT_TRUE(slave.mailbox.can_write);
+
+    // Add a message to send
+    int32_t data = 0xCAFEDECA;
+    uint32_t data_size = sizeof(data);
+    slave.mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1s);
+    ASSERT_FALSE(slave.mailbox.to_send.empty());
+
+    // Phase 3: writeMessages → FPWR expected (can_write=true and message pending)
+    checkSendFrameSimple(Command::FPWR);
+    handleReplySimple();
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+    ASSERT_TRUE(slave.mailbox.to_send.empty());
 }
