@@ -5,17 +5,15 @@
 
 #include "kickcat/Error.h"
 #include "kickcat/Frame.h"
-#include "Link.h"
+#include "AbstractLink.h"
 #include "Slave.h"
 
 namespace kickcat
 {
-    class AbstractSocket;
-
     class Bus
     {
     public:
-        Bus(std::shared_ptr<Link> link);
+        Bus(std::shared_ptr<AbstractLink> link);
         ~Bus() = default;
 
         // Enable user to adapt defaults values if they dont fit the current application (i.e. unit tests)
@@ -141,7 +139,7 @@ namespace kickcat
         void readMappedPDO(Slave& slave, uint16_t index);
         void configureFMMUs();
 
-        std::shared_ptr<Link> link_;
+        std::shared_ptr<AbstractLink> link_;
         std::vector<Slave> slaves_;
 
         uint8_t* iomap_read_section_{};   // pointer on read section (to write back inputs)

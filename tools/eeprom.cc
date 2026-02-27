@@ -2,6 +2,7 @@
 // Current state: POC, can only dump eeprom file.
 
 #include "kickcat/Bus.h"
+#include "kickcat/Link.h"
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
 #include "kickcat/helpers.h"

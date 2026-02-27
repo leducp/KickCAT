@@ -5,7 +5,7 @@
 
 namespace kickcat
 {
-    class Socket : public AbstractSocket
+    class Socket final : public AbstractSocket
     {
     public:
         Socket(nanoseconds coalescing = -1us, nanoseconds polling_period = 20us);

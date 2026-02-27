@@ -13,7 +13,7 @@ namespace kickcat
     constexpr uint32_t EEPROM_MAX_SIZE_BYTE = (PAGE_NUMBER * PAGE_SIZE_BYTE - EEPROM_CHECKSUM_SIZE);
     constexpr uint32_t EEPROM_MAX_SIZE_WORD = (EEPROM_MAX_SIZE_BYTE / 2);
 
-    class XMC4800EEPROM : public AbstractEmulatedEEPROM
+    class XMC4800EEPROM final : public AbstractEmulatedEEPROM
     {
     public:
         XMC4800EEPROM();

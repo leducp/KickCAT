@@ -7,7 +7,7 @@
 namespace kickcat
 {
     /// \brief Void socket represents an absent interface, allowing to use the link without redundancy.
-    class SocketNull : public AbstractSocket
+    class SocketNull final : public AbstractSocket
     {
     public:
         SocketNull() = default;

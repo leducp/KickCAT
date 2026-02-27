@@ -12,7 +12,7 @@ extern "C"
 
 namespace kickcat
 {
-    class Socket : public AbstractSocket
+    class Socket final : public AbstractSocket
     {
     public:
         Socket(nanoseconds polling_period = 20us);

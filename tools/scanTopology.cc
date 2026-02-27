@@ -1,5 +1,6 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Diagnostics.h"
+#include "kickcat/Link.h"
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
 

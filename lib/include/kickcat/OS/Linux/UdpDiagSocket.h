@@ -8,7 +8,7 @@
 
 namespace kickcat
 {
-    class UdpDiagSocket : public AbstractDiagSocket
+    class UdpDiagSocket final : public AbstractDiagSocket
     {
     public:
         UdpDiagSocket();

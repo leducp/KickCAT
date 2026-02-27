@@ -4,13 +4,13 @@
 #include <array>
 #include <functional>
 
-#include "kickcat/Frame.h"
+#include "kickcat/AbstractLink.h"
 
 namespace kickcat
 {
     class AbstractSocket;
 
-    class Link
+    class Link final : public AbstractLink
     {
         friend class LinkTest;
     public:
@@ -23,33 +23,23 @@ namespace kickcat
                        std::function<void(void)> const& redundancyActivatedCallback,
                        MAC const src_nominal = PRIMARY_IF_MAC,
                        MAC const src_redundancy = SECONDARY_IF_MAC);
-        ~Link() = default;
+        ~Link() override = default;
 
-        /// \brief   Helper for trivial access (i.e. most of the init bus frames)
-        ///
-        /// \details Since this method is only used for non real time operation, the redundancy mechanism used is slower
-        ///          but guaranty slave order access, ie for setAddresses().
-        void writeThenRead(Frame& frame) ;
+        void writeThenRead(Frame& frame) override;
 
+        using AbstractLink::addDatagram;
         void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                          std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void(DatagramState const& state)> const& error);
-        template<typename T>
-        void addDatagram(enum Command command, uint32_t address, T const& data,
-                         std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
-                         std::function<void(DatagramState const& state)> const& error)
-        {
-            addDatagram(command, address, &data, sizeof(data), process, error);
-        }
+                         std::function<void(DatagramState const& state)> const& error) override;
 
-        void finalizeDatagrams();
-        void processDatagrams();
+        void finalizeDatagrams() override;
+        void processDatagrams() override;
 
-        void setTimeout(nanoseconds const& timeout) {timeout_ = timeout;};
+        void setTimeout(nanoseconds const& timeout) override {timeout_ = timeout;};
 
-        void checkRedundancyNeeded();
+        void checkRedundancyNeeded() override;
 
-        void attachEcatEventCallback(enum EcatEvent event, std::function<void()> callback);
+        void attachEcatEventCallback(enum EcatEvent event, std::function<void()> callback) override;
 
     private:
         uint8_t index_queue_{0};
