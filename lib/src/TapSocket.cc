@@ -100,7 +100,7 @@ namespace kickcat
         }
 
         int32_t toCopy = std::min(static_cast<int32_t>(QUEUE::item_size()), frame_size);
-        std::memcpy(item.address, frame, frame_size);
+        std::memcpy(item.address, frame, toCopy);
         item.len = static_cast<uint32_t>(toCopy); //TODO: compute FCS!
 
         out_->ready(item);

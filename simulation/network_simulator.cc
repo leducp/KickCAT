@@ -6,6 +6,8 @@
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
 #include "kickcat/slave/Slave.h"
+#include "kickcat/PDO.h"
+#include "kickcat/OS/Time.h"
 
 #include "kickcat/CoE/EsiParser.h"
 #include "kickcat/CoE/mailbox/response.h"
@@ -69,34 +71,46 @@ int main(int argc, char* argv[])
     slaves.reserve(slaveCount);
     inputPdo.reserve(slaveCount);
     outputPdo.reserve(slaveCount);
-    for (const auto& eeprom : eeproms)
+
+    constexpr uint32_t PDO_MAX_SIZE = 16;
+
+    for (const auto &eeprom : eeproms)
     {
         escs.emplace_back(eeprom.c_str());
         pdos.emplace_back(&escs.back());
         slaves.emplace_back(&escs.back(), &pdos.back());
 
-        inputPdo.push_back(new uint8_t[1024]);
-        outputPdo.push_back(new uint8_t[1024]);
-        pdos.back().setInput(inputPdo.back(), sizeof(inputPdo.back()));
-        pdos.back().setOutput(outputPdo.back(), sizeof(outputPdo.back()));
-    }
+        uint8_t buffer_in[PDO_MAX_SIZE];
+        uint8_t buffer_out[PDO_MAX_SIZE];
 
-    CoE::EsiParser parser;
-    auto coe_dict = parser.loadFile("foot.xml");
+        // init values
+        for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
+        {
+            buffer_in[i] = i;
+            buffer_out[i] = 0xFF;
+        }
+
+        inputPdo.push_back(buffer_in);
+        outputPdo.push_back(buffer_out);
+        pdos.back().setInput(inputPdo.back(), PDO_MAX_SIZE);
+        pdos.back().setOutput(outputPdo.back(), PDO_MAX_SIZE);
+    }
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", interface.c_str(), escs.size());
     auto socket = std::make_shared<TapSocket>(true);
-    //auto socket = std::make_shared<Socket>();
     socket->open(interface);
     socket->setTimeout(-1ns);
 
     std::vector<nanoseconds> stats;
     stats.reserve(1000);
 
-    auto& esc0   = escs.at(0);
+    auto& esc0 = escs.at(0);
     auto& slave0 = slaves.at(0);
     mailbox::response::Mailbox mbx(&esc0, 1024);
-    mbx.enableCoE(std::move(coe_dict));
+
+    auto dictionary = CoE::createOD();
+    mbx.enableCoE(std::move(dictionary));
+
     slave0.setMailbox(&mbx);
 
 
@@ -105,6 +119,11 @@ int main(int argc, char* argv[])
         slave.start();
     }
 
+     // Variables for toggling pattern
+    uint32_t iteration_counter = 0;
+    uint8_t current_value = 0x11;  // Start with 0x11
+
+    constexpr uint32_t ITER = 1000; // Number of iterations before updating input buffer
 
     while (true)
     {
@@ -127,17 +146,41 @@ int main(int argc, char* argv[])
 
             for (auto& esc : escs)
             {
-                //auto raw = t1.count();
-                //esc.write(0x1800, &raw, sizeof(decltype(raw)));
                 esc.processDatagram(header, data, wkc);
             }
 
-            for (auto& slave : slaves)
+            for (size_t i = 0; i < slaves.size(); ++i)
             {
-                slave.routine();
-                if (slave.state() == State::SAFE_OP)
+                slaves[i].routine();
+                if (slaves[i].state() == State::SAFE_OP)
                 {
-                    slave.validateOutputData();
+                    if (outputPdo[i][1] != 0xFF)
+                    {
+                        slaves[i].validateOutputData();
+                    }
+                }
+
+                // Update input buffer every ITER iterations
+                iteration_counter++;
+                if (iteration_counter >= ITER)
+                {
+                    iteration_counter = 0;
+                    
+                    // Fill buffer with current value
+                    for (uint32_t j = 0; j < PDO_MAX_SIZE; ++j)
+                    {
+                        inputPdo[i][j] = current_value;
+                    }
+                    
+                    // Move to next value: 0x11 -> 0x22 -> 0x33 -> ... -> 0xFF -> 0x00 -> 0x11
+                    if (current_value == 0xFF)
+                    {
+                        current_value = 0x00;
+                    }
+                    else
+                    {
+                        current_value += 0x11;
+                    }            
                 }
             }
         }
@@ -156,12 +199,11 @@ int main(int argc, char* argv[])
             std::sort(stats.begin(), stats.end());
 
             printf("[%f] frame processing time: \n\t min: %f\n\t max: %f\n\t avg: %f\n", seconds_f(since_start()).count(),
-                stats.front().count() / 1000.0,
-                stats.back().count()  / 1000.0,
-                (std::reduce(stats.begin(), stats.end()) / stats.size()).count() / 1000.0);
+                   stats.front().count() / 1000.0,
+                   stats.back().count() / 1000.0,
+                   (std::reduce(stats.begin(), stats.end()) / stats.size()).count() / 1000.0);
             stats.clear();
         }
-
     }
 
     return 0;
