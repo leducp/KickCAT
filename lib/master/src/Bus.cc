@@ -4,14 +4,13 @@
 
 #include "debug.h"
 #include "Bus.h"
-#include "AbstractSocket.h"
 #include "Prints.h"
 
 #include "CoE/mailbox/request.h"
 
 namespace kickcat
 {
-    Bus::Bus(std::shared_ptr<Link> link)
+    Bus::Bus(std::shared_ptr<AbstractLink> link)
         : link_(link)
     {
     }

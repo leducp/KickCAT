@@ -6,7 +6,7 @@
 
 namespace kickcat::mailbox::request
 {
-    class SDOMessage : public AbstractMessage
+    class SDOMessage final : public AbstractMessage
     {
     public:
         SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout);
@@ -27,7 +27,7 @@ namespace kickcat::mailbox::request
         uint32_t* client_data_size_;
     };
 
-    class SDOInformationMessage : public AbstractMessage
+    class SDOInformationMessage final : public AbstractMessage
     {
     public:
         SDOInformationMessage(uint16_t mailbox_size, uint8_t request, void* data, uint32_t* data_size, uint32_t request_payload_size, nanoseconds timeout);
@@ -47,7 +47,7 @@ namespace kickcat::mailbox::request
         uint32_t already_received_size_{0};
     };
 
-    class EmergencyMessage : public AbstractMessage
+    class EmergencyMessage final : public AbstractMessage
     {
     public:
         EmergencyMessage(Mailbox& mailbox);
@@ -59,7 +59,7 @@ namespace kickcat::mailbox::request
         request::Mailbox& mailbox_;
     };
 
-    class CheckMessage : public AbstractMessage
+    class CheckMessage final : public AbstractMessage
     {
     public:
         CheckMessage(Mailbox& mailbox);

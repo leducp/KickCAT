@@ -57,7 +57,7 @@ namespace kickcat
     };
 
     template<int32_t CAT>
-    struct ErrorCode : public Error
+    struct ErrorCode final : public Error
     {
         ErrorCode(char const* message, int32_t code)
             : Error(message)
@@ -80,7 +80,7 @@ namespace kickcat
     using ErrorAL  = ErrorCode<error::category::AL>;
     using ErrorCoE = ErrorCode<error::category::CoE>;
 
-    struct ErrorDatagram : public Error
+    struct ErrorDatagram final : public Error
     {
         ErrorDatagram(char const* message, DatagramState state)
             : Error(message)

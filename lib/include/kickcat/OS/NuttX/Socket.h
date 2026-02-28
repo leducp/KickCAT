@@ -6,7 +6,7 @@
 namespace kickcat
 {
     // Stub socket for NuttX - waiting for a proper implementation
-    class Socket : public AbstractSocket
+    class Socket final : public AbstractSocket
     {
     public:
         Socket() = default;

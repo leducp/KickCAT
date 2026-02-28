@@ -5,7 +5,7 @@
 
 namespace kickcat
 {
-    class pikeos_error_category : public std::error_category
+    class pikeos_error_category final : public std::error_category
     {
         char const* name() const noexcept override
         {

@@ -86,7 +86,7 @@ namespace kickcat::mailbox::request
 
     /// \brief Handle message that are processed through a Mailbox gateway (cf. ETG.8200)
     /// \details Gateway message are standard mailbox messages that are not processed locally
-    class GatewayMessage : public AbstractMessage
+    class GatewayMessage final : public AbstractMessage
     {
     public:
         GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout);
