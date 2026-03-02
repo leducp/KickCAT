@@ -7,7 +7,6 @@
 
 namespace kickcat
 {
-
     template<typename T>
     void sendGetRegister(Link& link, uint16_t slave_address, uint16_t reg_address, T& value_read)
     {
