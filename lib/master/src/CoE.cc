@@ -93,4 +93,32 @@ namespace kickcat
 
         THROW_SYSTEM_ERROR_CODE("Emulated complete access not supported for write", ENOTSUP);
     }
+
+    void mapPDO(Bus& bus, Slave& slave, uint16_t pdo_map, uint32_t const* mapping, uint8_t mapping_count, uint16_t sm_map)
+    {
+        uint8_t zeroU8 = 0;
+
+        // Unmap previous registers, setting 0 in PDO_MAP subindex 0
+        bus.writeSDO(slave, pdo_map, 0, Bus::Access::PARTIAL, &zeroU8, sizeof(zeroU8));
+
+        // Modify mapping, setting register address in PDO's subindexes
+        for (uint8_t i = 0; i < mapping_count; ++i)
+        {
+            bus.writeSDO(slave, pdo_map, i + 1, Bus::Access::PARTIAL, mapping + i, sizeof(uint32_t));
+        }
+
+        // Enable mapping by setting number of registers in PDO_MAP subindex 0
+        bus.writeSDO(slave, pdo_map, 0, Bus::Access::PARTIAL, &mapping_count, sizeof(mapping_count));
+
+        // Set PDO mapping to SM
+        // Unmap previous mappings, setting 0 in SM_MAP subindex 0
+        bus.writeSDO(slave, sm_map, 0, Bus::Access::PARTIAL, &zeroU8, sizeof(zeroU8));
+
+        // Write first mapping (PDO_map) address in SM_MAP subindex 1
+        bus.writeSDO(slave, sm_map, 1, Bus::Access::PARTIAL, &pdo_map, sizeof(pdo_map));
+
+        // Save mapping count in SM (here only one PDO_MAP)
+        uint8_t pdoMapSize = 1;
+        bus.writeSDO(slave, sm_map, 0, Bus::Access::PARTIAL, &pdoMapSize, sizeof(pdoMapSize));
+    }
 }

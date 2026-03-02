@@ -83,9 +83,9 @@ int main(int argc, char *argv[])
         }
 
         // Map TXPDO
-        bus.mapPDO(bus.slaves().at(0), 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
+        mapPDO(bus, bus.slaves().at(0), 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
         // Map RXPDO
-        bus.mapPDO(bus.slaves().at(0), 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
+        mapPDO(bus, bus.slaves().at(0), 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
 
         bus.createMapping(io_buffer);
 

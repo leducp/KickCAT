@@ -125,10 +125,10 @@ int main(int argc, char* argv[])
         printf("\n=== Configuring PDO Mappings (Magnetometer Only) ===\n");
 
         // Map TxPDO (slave -> master): Magnetometer data
-        bus.mapPDO(bus.slaves().at(0), 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
+        mapPDO(bus, bus.slaves().at(0), 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
 
         // Map RxPDO (master -> slave): LED control
-        bus.mapPDO(bus.slaves().at(0), 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
+        mapPDO(bus, bus.slaves().at(0), 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
 
         printf("=== PDO Configuration Complete ===\n\n");
 

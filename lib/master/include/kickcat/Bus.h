@@ -46,9 +46,6 @@ namespace kickcat
         // background_task may be used to keep updated PDO while waiting for a particular state.
         void waitForState(State request, nanoseconds timeout, std::function<void()> background_task = [](){});
 
-        // configure a slave PDO mapping
-        void mapPDO(Slave& slave, uint16_t pdo_map, uint32_t const* mapping, uint8_t mapping_count, uint16_t sm_map);
-
         // create the mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state
         void createMapping(uint8_t* iomap);
@@ -170,6 +167,17 @@ namespace kickcat
 
         uint16_t irq_mask_{0};
     };
+
+    /**
+     * @brief Configure a slave PDO mapping
+     * @param bus           EtherCAT bus to use for SDO transfers
+     * @param slave         Slave to configure
+     * @param pdo_map       PDO mapping index (e.g. 0x1A00 for TxPDO, 0x1600 for RxPDO)
+     * @param mapping       List of object address/bit length to map (e.g. 0x60000010)
+     * @param mapping_count Number of objects in the mapping
+     * @param sm_map        Sync Manager mapping index (e.g. 0x1C12 for Outputs, 0x1C13 for Inputs)
+     */
+    void mapPDO(Bus& bus, Slave& slave, uint16_t pdo_map, uint32_t const* mapping, uint8_t mapping_count, uint16_t sm_map);
 }
 
 #endif
