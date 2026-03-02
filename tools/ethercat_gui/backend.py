@@ -1,6 +1,8 @@
 import struct
-from PySide6.QtCore import QObject, Signal, QTimer
+
 import kickcat
+from PySide6.QtCore import QObject, QTimer, Signal
+
 
 def read_pdo_assignment(bus, slave, assignment_index, timeout=0.1):
     """Read and return PDO assignment and mapping for a slave."""
@@ -8,9 +10,7 @@ def read_pdo_assignment(bus, slave, assignment_index, timeout=0.1):
 
     try:
         # Read number of assigned PDOs
-        data = bus.read_sdo(
-            slave, assignment_index, 0, kickcat.Access.PARTIAL, 1, timeout
-        )
+        data = bus.read_sdo(slave, assignment_index, 0, kickcat.Access.PARTIAL, 1, timeout)
         num_pdos = struct.unpack("B", data)[0]
 
         byte_offset = 0
@@ -18,9 +18,7 @@ def read_pdo_assignment(bus, slave, assignment_index, timeout=0.1):
         # Iterate through each assigned PDO
         for i in range(1, num_pdos + 1):
             # Read PDO index
-            data = bus.read_sdo(
-                slave, assignment_index, i, kickcat.Access.PARTIAL, 2, timeout
-            )
+            data = bus.read_sdo(slave, assignment_index, i, kickcat.Access.PARTIAL, 2, timeout)
             pdo_index = struct.unpack("<H", data)[0]
 
             # Read number of mapped objects in this PDO
@@ -30,9 +28,7 @@ def read_pdo_assignment(bus, slave, assignment_index, timeout=0.1):
             # Read each mapped object
             for j in range(1, num_objects + 1):
                 # Read 32-bit mapping entry
-                data = bus.read_sdo(
-                    slave, pdo_index, j, kickcat.Access.PARTIAL, 4, timeout
-                )
+                data = bus.read_sdo(slave, pdo_index, j, kickcat.Access.PARTIAL, 4, timeout)
                 mapping_entry = struct.unpack("<I", data)[0]
 
                 # Decode mapping entry
@@ -62,6 +58,7 @@ class EtherCATBackend(QObject):
     """
     Manages EtherCAT bus interactions, state changes, and cyclic data processing.
     """
+
     data_received = Signal(str)  # Emits hex string of input data
     state_changed = Signal(str)  # Emits new state name
     error_occurred = Signal(str)
@@ -72,7 +69,7 @@ class EtherCATBackend(QObject):
         "SAFE-OP": kickcat.State.SAFE_OP,
         "OP": kickcat.State.OPERATIONAL,
     }
-    
+
     STATE_MAP_ENUM_TO_STR = {v: k for k, v in STATE_MAP_STR_TO_ENUM.items()}
 
     def __init__(self, bus, slaves, parent=None):
@@ -80,7 +77,7 @@ class EtherCATBackend(QObject):
         self.bus = bus
         self.slaves = slaves
         self.current_slave = slaves[0] if slaves else None
-        
+
         self.cyclic_timer = QTimer(self)
         self.cyclic_timer.timeout.connect(self._process_cyclic_data)
         self.is_operational = False
@@ -119,7 +116,7 @@ class EtherCATBackend(QObject):
                 self.start_cyclic_processing()
             else:
                 self.bus.wait_for_state(target_state, 1.0)
-            
+
             self.state_changed.emit(state_str)
 
         except Exception as e:

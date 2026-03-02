@@ -1,8 +1,9 @@
+import argparse
+import time
+
 import kickcat
 from kickcat import State
 from kickcat.mailbox.request import MessageStatus
-import time
-import argparse
 
 
 def main():

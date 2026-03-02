@@ -6,10 +6,9 @@ Compares perf stat and perf report outputs from two different runs
 
 import re
 import sys
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 
 class ColorCode(Enum):
@@ -48,21 +47,19 @@ class PerfStats:
     time_elapsed: float = 0.0
 
 
-def parse_perf_stat(filepath: Path) -> Optional[PerfStats]:
+def parse_perf_stat(filepath: Path) -> PerfStats | None:
     """Parse perf stat output file"""
     stats = PerfStats()
 
     if not filepath.exists():
-        print(
-            f"{ColorCode.RED.value}Error: File not found: {filepath}{ColorCode.RESET.value}"
-        )
+        print(f"{ColorCode.RED.value}Error: File not found: {filepath}{ColorCode.RESET.value}")
         return None
 
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         content = f.read()
 
     # Helper function to extract numeric values
-    def extract_number(pattern: str, text: str) -> Optional[float]:
+    def extract_number(pattern: str, text: str) -> float | None:
         match = re.search(pattern, text, re.MULTILINE)
         if not match:
             return None
@@ -81,69 +78,41 @@ def parse_perf_stat(filepath: Path) -> Optional[PerfStats]:
             return None
 
     # Parse each metric
-    stats.task_clock_ms = (
-        extract_number(r"([\d., \s]+)\s+msec\s+task-clock", content) or 0.0
-    )
+    stats.task_clock_ms = extract_number(r"([\d., \s]+)\s+msec\s+task-clock", content) or 0.0
 
-    stats.cpu_utilization = (
-        extract_number(r"#\s*([\d.,]+)\s+CPUs utilized", content) or 0.0
-    )
+    stats.cpu_utilization = extract_number(r"#\s*([\d.,]+)\s+CPUs utilized", content) or 0.0
 
-    stats.context_switches = int(
-        extract_number(r"([\d., \s]+)\s+context-switches", content) or 0
-    )
+    stats.context_switches = int(extract_number(r"([\d., \s]+)\s+context-switches", content) or 0)
 
-    stats.cpu_migrations = int(
-        extract_number(r"([\d., \s]+)\s+cpu-migrations", content) or 0
-    )
+    stats.cpu_migrations = int(extract_number(r"([\d., \s]+)\s+cpu-migrations", content) or 0)
 
     stats.page_faults = int(extract_number(r"([\d., \s]+)\s+page-faults", content) or 0)
 
     stats.cycles = int(extract_number(r"([\d., \s]+)\s+cycles", content) or 0)
 
-    stats.instructions = int(
-        extract_number(r"([\d., \s]+)\s+instructions", content) or 0
-    )
+    stats.instructions = int(extract_number(r"([\d., \s]+)\s+instructions", content) or 0)
 
-    stats.ipc = (
-        extract_number(r"instructions.*?#\s*([\d.,]+)\s+insn per cycle", content) or 0.0
-    )
+    stats.ipc = extract_number(r"instructions.*?#\s*([\d.,]+)\s+insn per cycle", content) or 0.0
 
     stats.branches = int(extract_number(r"([\d., \s]+)\s+branches", content) or 0)
 
-    stats.branch_misses = int(
-        extract_number(r"([\d., \s]+)\s+branch-misses", content) or 0
-    )
+    stats.branch_misses = int(extract_number(r"([\d., \s]+)\s+branch-misses", content) or 0)
 
-    stats.branch_miss_rate = (
-        extract_number(r"branch-misses.*?#\s*([\d.,]+)%", content) or 0.0
-    )
+    stats.branch_miss_rate = extract_number(r"branch-misses.*?#\s*([\d.,]+)%", content) or 0.0
 
-    stats.l1_dcache_loads = int(
-        extract_number(r"([\d., \s]+)\s+L1-dcache-loads", content) or 0
-    )
+    stats.l1_dcache_loads = int(extract_number(r"([\d., \s]+)\s+L1-dcache-loads", content) or 0)
 
-    stats.l1_dcache_misses = int(
-        extract_number(r"([\d., \s]+)\s+L1-dcache-load-misses", content) or 0
-    )
+    stats.l1_dcache_misses = int(extract_number(r"([\d., \s]+)\s+L1-dcache-load-misses", content) or 0)
 
-    stats.l1_dcache_miss_rate = (
-        extract_number(r"L1-dcache-load-misses.*?#\s*([\d.,]+)%", content) or 0.0
-    )
+    stats.l1_dcache_miss_rate = extract_number(r"L1-dcache-load-misses.*?#\s*([\d.,]+)%", content) or 0.0
 
     stats.llc_loads = int(extract_number(r"([\d., \s]+)\s+LLC-loads", content) or 0)
 
-    stats.llc_misses = int(
-        extract_number(r"([\d., \s]+)\s+LLC-load-misses", content) or 0
-    )
+    stats.llc_misses = int(extract_number(r"([\d., \s]+)\s+LLC-load-misses", content) or 0)
 
-    stats.llc_miss_rate = (
-        extract_number(r"LLC-load-misses.*?#\s*([\d.,]+)%", content) or 0.0
-    )
+    stats.llc_miss_rate = extract_number(r"LLC-load-misses.*?#\s*([\d.,]+)%", content) or 0.0
 
-    stats.time_elapsed = (
-        extract_number(r"([\d.,]+)\s+seconds time elapsed", content) or 0.0
-    )
+    stats.time_elapsed = extract_number(r"([\d.,]+)\s+seconds time elapsed", content) or 0.0
 
     return stats
 
@@ -196,20 +165,12 @@ def compare_metric(
 
 def print_header(text: str):
     """Print a formatted header"""
-    print(
-        f"\n{ColorCode.BOLD.value}{ColorCode.BLUE.value}{'='*80}{ColorCode.RESET.value}"
-    )
-    print(
-        f"{ColorCode.BOLD.value}{ColorCode.BLUE.value}{text:^80}{ColorCode.RESET.value}"
-    )
-    print(
-        f"{ColorCode.BOLD.value}{ColorCode.BLUE.value}{'='*80}{ColorCode.RESET.value}\n"
-    )
+    print(f"\n{ColorCode.BOLD.value}{ColorCode.BLUE.value}{'=' * 80}{ColorCode.RESET.value}")
+    print(f"{ColorCode.BOLD.value}{ColorCode.BLUE.value}{text:^80}{ColorCode.RESET.value}")
+    print(f"{ColorCode.BOLD.value}{ColorCode.BLUE.value}{'=' * 80}{ColorCode.RESET.value}\n")
 
 
-def print_stats_comparison(
-    stack1_name: str, stats1: PerfStats, stack2_name: str, stats2: PerfStats
-):
+def print_stats_comparison(stack1_name: str, stats1: PerfStats, stack2_name: str, stats2: PerfStats):
     """Print formatted comparison of perf stats"""
 
     print_header("PERF STAT COMPARISON")
@@ -325,14 +286,10 @@ def print_stats_comparison(
     )
 
     print()
-    print(
-        f"{'Test Duration (seconds)':<35} {stats1.time_elapsed:>15.2f} {stats2.time_elapsed:>15.2f}"
-    )
+    print(f"{'Test Duration (seconds)':<35} {stats1.time_elapsed:>15.2f} {stats2.time_elapsed:>15.2f}")
 
 
-def print_executive_summary(
-    stack1_name: str, stats1: PerfStats, stack2_name: str, stats2: PerfStats
-):
+def print_executive_summary(stack1_name: str, stats1: PerfStats, stack2_name: str, stats2: PerfStats):
     """
     Executive performance summary comparing stack2 vs stack1
     """
@@ -349,20 +306,14 @@ def print_executive_summary(
     # CPU cost summary
     cpu_time_change = pct_change(stats1.task_clock_ms, stats2.task_clock_ms)
     if cpu_time_change is not None:
-        factor = (
-            stats1.task_clock_ms / stats2.task_clock_ms
-            if stats2.task_clock_ms
-            else None
-        )
+        factor = stats1.task_clock_ms / stats2.task_clock_ms if stats2.task_clock_ms else None
         if cpu_time_change < 0:
             summary_lines.append(
-                f"✓ {stack2_name} uses {abs(cpu_time_change):.1f}% less CPU time "
-                f"(~{factor:.2f}× more efficient)"
+                f"✓ {stack2_name} uses {abs(cpu_time_change):.1f}% less CPU time (~{factor:.2f}× more efficient)"
             )
         else:
             summary_lines.append(
-                f"✗ {stack2_name} uses {cpu_time_change:.1f}% more CPU time "
-                f"(~{1/factor:.2f}× less efficient)"
+                f"✗ {stack2_name} uses {cpu_time_change:.1f}% more CPU time (~{1 / factor:.2f}× less efficient)"
             )
 
     # Scheduling / RT behavior
@@ -372,40 +323,30 @@ def print_executive_summary(
     if ctx_change is not None:
         if ctx_change < 0:
             summary_lines.append(
-                f"✓ {stack2_name} triggers {abs(ctx_change):.1f}% fewer context switches "
-                "(better real-time behavior)"
+                f"✓ {stack2_name} triggers {abs(ctx_change):.1f}% fewer context switches (better real-time behavior)"
             )
         else:
             summary_lines.append(
-                f"✗ {stack2_name} triggers {ctx_change:.1f}% more context switches "
-                "(more scheduler overhead)"
+                f"✗ {stack2_name} triggers {ctx_change:.1f}% more context switches (more scheduler overhead)"
             )
 
     if mig_change is not None:
         if mig_change < 0:
             summary_lines.append(
-                f"✓ {stack2_name} performs {abs(mig_change):.1f}% fewer CPU migrations "
-                "(better CPU locality)"
+                f"✓ {stack2_name} performs {abs(mig_change):.1f}% fewer CPU migrations (better CPU locality)"
             )
         else:
             summary_lines.append(
-                f"✗ {stack2_name} performs {mig_change:.1f}% more CPU migrations "
-                "(worse cache locality)"
+                f"✗ {stack2_name} performs {mig_change:.1f}% more CPU migrations (worse cache locality)"
             )
 
     # Efficiency
     ipc_change = pct_change(stats1.ipc, stats2.ipc)
     if ipc_change is not None:
         if ipc_change > 0:
-            summary_lines.append(
-                f"✓ {stack2_name} has {ipc_change:.1f}% higher IPC "
-                "(better CPU efficiency)"
-            )
+            summary_lines.append(f"✓ {stack2_name} has {ipc_change:.1f}% higher IPC (better CPU efficiency)")
         else:
-            summary_lines.append(
-                f"✗ {stack2_name} has {abs(ipc_change):.1f}% lower IPC "
-                "(worse CPU efficiency)"
-            )
+            summary_lines.append(f"✗ {stack2_name} has {abs(ipc_change):.1f}% lower IPC (worse CPU efficiency)")
 
     # Cache behavior
     l1_miss_change = pct_change(stats1.l1_dcache_miss_rate, stats2.l1_dcache_miss_rate)
@@ -414,31 +355,21 @@ def print_executive_summary(
     if l1_miss_change is not None:
         if l1_miss_change < 0:
             summary_lines.append(
-                f"✓ {stack2_name} has better L1 cache locality "
-                f"({abs(l1_miss_change):.1f}% fewer misses)"
+                f"✓ {stack2_name} has better L1 cache locality ({abs(l1_miss_change):.1f}% fewer misses)"
             )
         else:
-            summary_lines.append(
-                f"✗ {stack2_name} has worse L1 cache locality "
-                f"({l1_miss_change:.1f}% more misses)"
-            )
+            summary_lines.append(f"✗ {stack2_name} has worse L1 cache locality ({l1_miss_change:.1f}% more misses)")
 
     if llc_miss_change is not None:
         if llc_miss_change < 0:
             summary_lines.append(
-                f"✓ {stack2_name} has better LLC cache locality "
-                f"({abs(llc_miss_change):.1f}% fewer misses)"
+                f"✓ {stack2_name} has better LLC cache locality ({abs(llc_miss_change):.1f}% fewer misses)"
             )
         else:
-            summary_lines.append(
-                f"✗ {stack2_name} has worse LLC cache locality "
-                f"({llc_miss_change:.1f}% more misses)"
-            )
+            summary_lines.append(f"✗ {stack2_name} has worse LLC cache locality ({llc_miss_change:.1f}% more misses)")
 
     # Print summary
-    print(
-        f"{ColorCode.BOLD.value}{stack2_name} vs {stack1_name} — Key Findings:{ColorCode.RESET.value}\n"
-    )
+    print(f"{ColorCode.BOLD.value}{stack2_name} vs {stack1_name} — Key Findings:{ColorCode.RESET.value}\n")
 
     for line in summary_lines:
         color = ColorCode.GREEN.value if line.startswith("✓") else ColorCode.RED.value
@@ -450,10 +381,8 @@ def print_executive_summary(
 def main():
     """Main entry point"""
     if len(sys.argv) < 5:
-        print(
-            f"Usage: {sys.argv[0]} <stack1_name> <stack1_stat> <stack2_name> <stack2_stat>"
-        )
-        print(f"\nExample:")
+        print(f"Usage: {sys.argv[0]} <stack1_name> <stack1_stat> <stack2_name> <stack2_stat>")
+        print("\nExample:")
         print(f"  {sys.argv[0]} KickCAT kickcat_perf_stat.txt SOEM soem_perf_stat.txt")
         sys.exit(1)
 
@@ -463,7 +392,8 @@ def main():
     stack2_stat_path = Path(sys.argv[4])
 
     print(
-        f"\n{ColorCode.BOLD.value}{ColorCode.CYAN.value}EtherCAT Stack Performance Comparison Tool{ColorCode.RESET.value}"
+        f"\n{ColorCode.BOLD.value}{ColorCode.CYAN.value}EtherCAT Stack Performance Comparison Tool\
+            {ColorCode.RESET.value}"
     )
     print(
         f"Comparing: {ColorCode.BOLD.value}{stack1_name}{ColorCode.RESET.value} vs "
@@ -476,9 +406,7 @@ def main():
     stats2 = parse_perf_stat(stack2_stat_path)
 
     if not stats1 or not stats2:
-        print(
-            f"{ColorCode.RED.value}Error: Failed to parse perf stat files{ColorCode.RESET.value}"
-        )
+        print(f"{ColorCode.RED.value}Error: Failed to parse perf stat files{ColorCode.RESET.value}")
         sys.exit(1)
 
     # Print comparisons
@@ -487,9 +415,7 @@ def main():
     # Executive summary
     print_executive_summary(stack1_name, stats1, stack2_name, stats2)
 
-    print(
-        f"\n{ColorCode.BOLD.value}{ColorCode.GREEN.value}Analysis complete!{ColorCode.RESET.value}\n"
-    )
+    print(f"\n{ColorCode.BOLD.value}{ColorCode.GREEN.value}Analysis complete!{ColorCode.RESET.value}\n")
 
 
 if __name__ == "__main__":

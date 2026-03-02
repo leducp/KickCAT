@@ -1,10 +1,11 @@
 from PySide6.QtWidgets import (
-    QPushButton,
-    QLabel,
     QFrame,
-    QVBoxLayout,
     QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
 )
+
 
 class StateButton(QPushButton):
     """Custom styled button for EtherCAT states."""
@@ -44,19 +45,19 @@ class StateButton(QPushButton):
             )
         else:
             self.setStyleSheet(
-                f"""
-                QPushButton {{
+                """
+                QPushButton {
                     background-color: #374151;
                     color: #9CA3AF;
                     border: 2px solid #4B5563;
                     border-radius: 50px;
                     font-size: 12px;
                     font-weight: bold;
-                }}
-                QPushButton:hover {{
+                }
+                QPushButton:hover {
                     background-color: #4B5563;
                     color: white;
-                }}
+                }
             """
             )
 
@@ -84,9 +85,7 @@ class PDOItemWidget(QFrame):
         # Top row: Index and PDO
         top_layout = QHBoxLayout()
         index_label = QLabel(f"0x{mapping['index']:04X}:{mapping['subindex']}")
-        index_label.setStyleSheet(
-            "color: #22D3EE; font-family: monospace; font-weight: bold;"
-        )
+        index_label.setStyleSheet("color: #22D3EE; font-family: monospace; font-weight: bold;")
         pdo_label = QLabel(f"PDO: 0x{mapping['pdo_index']:04X}")
         pdo_label.setStyleSheet("color: #94A3B8; font-size: 11px;")
         top_layout.addWidget(index_label)

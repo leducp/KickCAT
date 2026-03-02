@@ -54,10 +54,30 @@ repair-wheel-command = [
 [tool.cibuildwheel.linux]
 before-all = [
   'pipx install conan',
-  './setup_build.sh /tmp/kickcat_build_config',
+  './scripts/setup_build.sh /tmp/kickcat_build_config',
   'source tools/setup/version.sh && sed -i "s/0\.0\.0/${VERSION}/g" pyproject.toml'
 ]
 repair-wheel-command = [
   "auditwheel repair --zip-compression-level=9 -w {dest_dir} {wheel}",
   "pipx run abi3audit --strict --report {wheel}",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [
+    ".venv",
+    "build",
+    "build_*",
+    "nuttxspace",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "UP"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

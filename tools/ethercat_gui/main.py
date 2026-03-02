@@ -1,16 +1,15 @@
-import sys
 import argparse
-from PySide6.QtWidgets import QApplication
+import sys
+
 import kickcat
+from PySide6.QtWidgets import QApplication
+
 from .mainwindow import EtherCATControlGUI
+
 
 def main():
     parser = argparse.ArgumentParser(description="KickCAT EtherCAT GUI")
-    parser.add_argument(
-        "-i", "--interface", 
-        default="enp8s0", 
-        help="Network interface name (default: enp8s0)"
-    )
+    parser.add_argument("-i", "--interface", default="enp8s0", help="Network interface name (default: enp8s0)")
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
@@ -31,6 +30,7 @@ def main():
     except Exception as e:
         print(f"Error initializing EtherCAT: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

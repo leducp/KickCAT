@@ -1,26 +1,27 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QLabel,
     QComboBox,
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
     QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt
 
-from .widgets import StateButton, PDOItemWidget
 from .backend import EtherCATBackend
+from .widgets import PDOItemWidget, StateButton
+
 
 class EtherCATControlGUI(QMainWindow):
     def __init__(self, bus, slaves):
         super().__init__()
-        
+
         # Initialize Backend
         self.backend = EtherCATBackend(bus, slaves)
-        
+
         # Connect signals
         self.backend.data_received.connect(self.update_data_display)
         self.backend.state_changed.connect(self.on_state_changed)
@@ -42,9 +43,7 @@ class EtherCATControlGUI(QMainWindow):
         # Title
         title = QLabel("EtherCAT State Control")
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet(
-            "color: #60A5FA; font-size: 32px; font-weight: bold; margin-bottom: 10px;"
-        )
+        title.setStyleSheet("color: #60A5FA; font-size: 32px; font-weight: bold; margin-bottom: 10px;")
         main_layout.addWidget(title)
 
         subtitle = QLabel("Manage your EtherCAT bus states and PDO mappings")
@@ -72,9 +71,9 @@ class EtherCATControlGUI(QMainWindow):
         layout = QVBoxLayout()
 
         self.slave_combo = QComboBox()
-        for i, slave in enumerate(self.backend.slaves):
-            self.slave_combo.addItem(f"Slave {i + 1}", i) # Store index as data
-        
+        for i, _ in enumerate(self.backend.slaves):
+            self.slave_combo.addItem(f"Slave {i + 1}", i)  # Store index as data
+
         self.slave_combo.currentIndexChanged.connect(self.on_slave_changed)
 
         layout.addWidget(self.slave_combo)
@@ -88,9 +87,7 @@ class EtherCATControlGUI(QMainWindow):
 
         # Current state label
         self.state_label = QLabel("Current State: UNKNOWN")
-        self.state_label.setStyleSheet(
-            "color: white; font-size: 18px; font-weight: bold;"
-        )
+        self.state_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
         self.state_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.state_label)
 
@@ -214,9 +211,9 @@ class EtherCATControlGUI(QMainWindow):
     def update_data_display(self, data_hex):
         """Update the data display label with new hex data."""
         self.data_label.setText(f"Input Data: {data_hex}")
-    
+
     def on_error(self, message):
-        print(f"Error: {message}") # Could be a QMessageBox
+        print(f"Error: {message}")  # Could be a QMessageBox
 
     def on_state_changed(self, new_state_str):
         self.update_ui_state(new_state_str)
@@ -230,11 +227,7 @@ class EtherCATControlGUI(QMainWindow):
             btn.update_style(state_name == current_state)
 
         # Update navigation buttons
-        current_index = (
-            self.states.index(current_state)
-            if current_state in self.states
-            else -1
-        )
+        current_index = self.states.index(current_state) if current_state in self.states else -1
         self.prev_btn.setEnabled(current_index > 0)
         self.next_btn.setEnabled(current_index < len(self.states) - 1)
 
@@ -280,9 +273,7 @@ class EtherCATControlGUI(QMainWindow):
                 self.tx_content_layout.addWidget(widget)
             self.tx_content_layout.addStretch()
 
-            print(
-                f"Read {len(rx_mappings)} RxPDO and {len(tx_mappings)} TxPDO mappings"
-            )
+            print(f"Read {len(rx_mappings)} RxPDO and {len(tx_mappings)} TxPDO mappings")
 
         except Exception as e:
             print(f"Error reading PDO mappings: {e}")
