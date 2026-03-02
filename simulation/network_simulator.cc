@@ -1,3 +1,11 @@
+#include "kickcat/CoE/EsiParser.h"
+#include "kickcat/CoE/mailbox/response.h"
+#include "kickcat/ESC/EmulatedESC.h"
+#include "kickcat/Frame.h"
+#include "kickcat/OS/Time.h"
+#include "kickcat/PDO.h"
+#include "kickcat/slave/Slave.h"
+
 #include <algorithm>
 #include <argparse/argparse.hpp>
 #include <cstring>
@@ -5,15 +13,6 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <numeric>
-
-#include "kickcat/ESC/EmulatedESC.h"
-#include "kickcat/Frame.h"
-#include "kickcat/OS/Time.h"
-#include "kickcat/PDO.h"
-#include "kickcat/slave/Slave.h"
-
-#include "kickcat/CoE/EsiParser.h"
-#include "kickcat/CoE/mailbox/response.h"
 
 #ifdef __linux__
 #include "kickcat/OS/Linux/Socket.h"
@@ -34,16 +33,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("network_simulator");
 
     std::string interface;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(interface);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(interface);
 
     std::vector<std::string> slave_configs;
-    program.add_argument("-s", "--slaves")
-        .help("JSON configuration files for slaves")
-        .remaining()
-        .store_into(slave_configs);
+    program.add_argument("-s", "--slaves").help("JSON configuration files for slaves").remaining().store_into(slave_configs);
 
     try
     {
@@ -68,8 +61,8 @@ int main(int argc, char* argv[])
     std::vector<std::unique_ptr<PDO>> pdos;
     std::vector<std::unique_ptr<Slave>> slaves;
     std::vector<std::unique_ptr<mailbox::response::Mailbox>> mailboxes;
-    std::vector<uint8_t* > inputPdo;
-    std::vector<uint8_t* > outputPdo;
+    std::vector<uint8_t*> inputPdo;
+    std::vector<uint8_t*> outputPdo;
 
     escs.reserve(slaveCount);
     pdos.reserve(slaveCount);
@@ -239,7 +232,8 @@ int main(int argc, char* argv[])
         {
             std::sort(stats.begin(), stats.end());
 
-            printf("[%f] frame processing time: \n\t min: %f\n\t max: %f\n\t avg: %f\n", seconds_f(since_start()).count(),
+            printf("[%f] frame processing time: \n\t min: %f\n\t max: %f\n\t avg: %f\n",
+                   seconds_f(since_start()).count(),
                    stats.front().count() / 1000.0,
                    stats.back().count() / 1000.0,
                    (std::reduce(stats.begin(), stats.end()) / stats.size()).count() / 1000.0);

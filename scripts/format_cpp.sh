@@ -9,7 +9,7 @@ CLANG_FORMAT_FILE="$PROJECT_ROOT/.clang-format"
 
 # Directories to check by default
 # TODO: Add Complete check later DEFAULT_DIRS=("lib" "examples" "tools" "unit" "simulation" "py_bindings")
-DEFAULT_DIRS=("examples")
+DEFAULT_DIRS=("examples" "simulation")
 # Extensions to check
 EXTENSIONS=("cc" "h" "cpp" "hpp")
 
