@@ -46,6 +46,9 @@ namespace kickcat
         // background_task may be used to keep updated PDO while waiting for a particular state.
         void waitForState(State request, nanoseconds timeout, std::function<void()> background_task = [](){});
 
+        // configure a slave PDO mapping
+        void mapPDO(Slave& slave, uint16_t pdo_map, uint32_t const* mapping, uint8_t mapping_count, uint16_t sm_map);
+
         // create the mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state
         void createMapping(uint8_t* iomap);
