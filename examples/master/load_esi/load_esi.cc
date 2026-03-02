@@ -1,5 +1,6 @@
 #include "kickcat/CoE/EsiParser.h"
 #include "kickcat/OS/Time.h"
+
 #include <argparse/argparse.hpp>
 
 using namespace kickcat;
@@ -9,10 +10,7 @@ int main(int argc, char const* argv[])
     argparse::ArgumentParser program("load_esi");
 
     std::string esi_file;
-    program.add_argument("-f", "--file")
-        .help("ESI XML file")
-        .required()
-        .store_into(esi_file);
+    program.add_argument("-f", "--file").help("ESI XML file").required().store_into(esi_file);
 
     try
     {
@@ -33,7 +31,7 @@ int main(int argc, char const* argv[])
 
     // dangerous lack of error checking.
     printf("Name of vendor: %s\n", parser.vendor());
-    printf("Profile: %s\n",        parser.profile());
+    printf("Profile: %s\n", parser.profile());
 
 
     printf("Load %ld object\n", coe_dict.size());
@@ -41,7 +39,7 @@ int main(int argc, char const* argv[])
     {
         printf("%s\n", CoE::toString(entry).c_str());
     }
-    printf("Scan file in %fs\n", seconds_f(t2-t1).count());
+    printf("Scan file in %fs\n", seconds_f(t2 - t1).count());
 
     return 0;
 }

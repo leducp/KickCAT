@@ -1,0 +1,67 @@
+---
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+AccessModifierOffset: -4
+BreakBeforeBraces: Allman
+NamespaceIndentation: All
+IndentCaseLabels: true
+ColumnLimit: 200
+PointerAlignment: Left
+Standard: c++17
+AllowShortFunctionsOnASingleLine: Inline
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 2
+SpaceBeforeParens: ControlStatements
+IncludeBlocks: Regroup
+SortIncludes: true
+FixNamespaceComments: false
+
+# Templates
+AlwaysBreakTemplateDeclarations: Yes
+SpaceAfterTemplateKeyword: false
+
+# Constructor Initializers
+ConstructorInitializerIndentWidth: 4
+PackConstructorInitializers: Never
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: Align
+AlignTrailingComments: true
+
+# Parameter Packing
+BinPackParameters: false
+BinPackArguments: false
+
+# Spaces
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeRangeBasedForLoopColon: true
+SpacesInAngles: false
+SpacesInContainerLiterals: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Braces
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Space before colon
+SpaceBeforeCaseColon: true
+
+# Include Sorting
+IncludeCategories:
+  - Regex: '^"kickcat/'
+    Priority: 10
+  - Regex: '^"'
+    Priority: 20
+  - Regex: "^<"
+    Priority: 30
+...

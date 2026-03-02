@@ -1,18 +1,18 @@
+#include "kickcat/CoE/OD.h"
 #include "kickcat/ESC/Lan9252.h"
 #include "kickcat/OS/Time.h"
 #include "kickcat/PDO.h"
-#include "kickcat/rpi/SPI.h"
 #include "kickcat/protocol.h"
+#include "kickcat/rpi/SPI.h"
 #include "kickcat/slave/Slave.h"
-#include "kickcat/CoE/OD.h"
 
 #include <cstdio>
-#include <unistd.h>
 #include <memory>
+#include <unistd.h>
 
 using namespace kickcat;
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     (void)argc;
     (void)argv;

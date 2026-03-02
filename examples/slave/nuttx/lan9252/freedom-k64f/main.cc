@@ -7,17 +7,16 @@
 #include "kickcat/slave/Slave.h"
 
 #include <arch/board/board.h>
-#include <nuttx/board.h>
-#include <nuttx/sensors/fxos8700cq.h>
-#include <nuttx/leds/userled.h>
-
-#include <sys/ioctl.h>
-#include <fcntl.h>
 #include <cstdio>
+#include <fcntl.h>
+#include <nuttx/board.h>
+#include <nuttx/leds/userled.h>
+#include <nuttx/sensors/fxos8700cq.h>
+#include <sys/ioctl.h>
 
 using namespace kickcat;
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     (void)argc;
     (void)argv;
@@ -93,16 +92,16 @@ int main(int argc, char *argv[])
 
     bool pdo_configured = false;
 
-    int16_t *ax = nullptr;
-    int16_t *ay = nullptr;
-    int16_t *az = nullptr;
-    int16_t *mx = nullptr;
-    int16_t *my = nullptr;
-    int16_t *mz = nullptr;
+    int16_t* ax = nullptr;
+    int16_t* ay = nullptr;
+    int16_t* az = nullptr;
+    int16_t* mx = nullptr;
+    int16_t* my = nullptr;
+    int16_t* mz = nullptr;
 
-    uint8_t *led_r = nullptr;
-    uint8_t *led_g = nullptr;
-    uint8_t *led_b = nullptr;
+    uint8_t* led_r = nullptr;
+    uint8_t* led_g = nullptr;
+    uint8_t* led_b = nullptr;
 
     while (true)
     {
@@ -112,7 +111,7 @@ int main(int argc, char *argv[])
 
         if (state == State::SAFE_OP)
         {
-            auto &dict = mbx.getDictionary();
+            auto& dict = mbx.getDictionary();
 
             slave.bind(0x6000, ax);
             slave.bind(0x6001, ay);
@@ -131,7 +130,6 @@ int main(int argc, char *argv[])
         }
         else if (state == State::OPERATIONAL)
         {
-
             if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
             {
                 *ax = sensor_data.accel.x;

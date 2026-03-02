@@ -19,7 +19,8 @@ namespace kickcat
             int32_t auxiliar_position;          // 0x2033
             uint16_t mode_of_operation_display; // 0x2015
         } __attribute__((packed));
-        constexpr uint32_t tx_mapping[] = {0x20110010, 0x20300020, 0x20310020, 0x20530020, 0x20290020, 0x20600020, 0x20780020, 0x20330020, 0x20150010}; // uint32_t is 0x[Address(4byte), SubIndex(2byte), typeSizeInBits(2byte)]
+        constexpr uint32_t tx_mapping[] = {
+            0x20110010, 0x20300020, 0x20310020, 0x20530020, 0x20290020, 0x20600020, 0x20780020, 0x20330020, 0x20150010}; // uint32_t is 0x[Address(4byte), SubIndex(2byte), typeSizeInBits(2byte)]
         constexpr uint32_t tx_mapping_count = sizeof(tx_mapping) / sizeof(uint32_t);
 
         struct Output

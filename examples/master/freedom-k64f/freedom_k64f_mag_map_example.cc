@@ -1,11 +1,11 @@
-#include <iostream>
-#include <argparse/argparse.hpp>
-
-#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
+#include "kickcat/Link.h"
+#include "kickcat/MailboxSequencer.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
-#include "kickcat/MailboxSequencer.h"
+
+#include <argparse/argparse.hpp>
+#include <iostream>
 
 using namespace kickcat;
 
@@ -13,8 +13,7 @@ using namespace kickcat;
 namespace pdo
 {
     // TxPDO mapping (slave -> master): Magnetometer only
-    constexpr uint32_t tx_mapping[] = 
-    {
+    constexpr uint32_t tx_mapping[] = {
         0x60030010, // mag_x, 16 bits
         0x60040010, // mag_y, 16 bits
         0x60050010  // mag_z, 16 bits
@@ -22,8 +21,7 @@ namespace pdo
     constexpr uint32_t tx_mapping_count = sizeof(tx_mapping) / sizeof(tx_mapping[0]);
 
     // RxPDO mapping (master -> slave): RGB LEDs
-    constexpr uint32_t rx_mapping[] = 
-    {
+    constexpr uint32_t rx_mapping[] = {
         0x70000008, // LED_R, 8 bits
         0x70010008, // LED_G, 8 bits
         0x70020008  // LED_B, 8 bits
@@ -58,16 +56,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("freedom_k64f_example");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{""})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{""}).store_into(red_interface_name);
 
     try
     {
@@ -88,16 +80,13 @@ int main(int argc, char* argv[])
         socket_nominal = nominal;
         socket_redundancy = redundancy;
     }
-    catch (std::exception const &e)
+    catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
     }
 
-    auto report_redundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto report_redundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
     std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
@@ -107,7 +96,7 @@ int main(int argc, char* argv[])
 
     auto print_current_state = [&]()
     {
-        for (auto &slave : bus.slaves())
+        for (auto& slave : bus.slaves())
         {
             State state = bus.getCurrentState(slave);
             printf("Slave %d state is %s\n", slave.address, toString(state));
@@ -116,9 +105,9 @@ int main(int argc, char* argv[])
 
     uint8_t io_buffer[2048];
 
-    const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, uint32_t const *mapping, uint8_t mapping_count, const uint32_t SM_map) -> void
+    const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, uint32_t const* mapping, uint8_t mapping_count, const uint32_t SM_map) -> void
     {
-        auto &slave = bus.slaves().at(slaveId);
+        auto& slave = bus.slaves().at(slaveId);
         uint8_t zeroU8 = 0;
 
         // Unmap previous registers, setting 0 in PDO_MAP subindex 0
@@ -163,36 +152,35 @@ int main(int argc, char* argv[])
                       [&]()
                       {
                           printf("DL_STATUS IRQ triggered!\n");
-                          bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const &state)
-                                              { printf("IRQ reset error: %s\n", toString(state)); });
+                          bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state) { printf("IRQ reset error: %s\n", toString(state)); });
                           bus.processAwaitingFrames();
                           printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
                       });
     }
-    catch (ErrorAL const &e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
     }
-    catch (std::exception const &e)
+    catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
     }
 
-    for (auto &slave : bus.slaves())
+    for (auto& slave : bus.slaves())
     {
         printInfo(slave);
         printESC(slave);
     }
 
-    auto &easycat = bus.slaves().at(0);
+    auto& easycat = bus.slaves().at(0);
 
     try
     {
         auto cyclic_process_data = [&]()
         {
-            auto noop = [](DatagramState const &) {};
+            auto noop = [](DatagramState const&) {};
             bus.processDataRead(noop);
             bus.processDataWrite(noop);
         };
@@ -214,25 +202,24 @@ int main(int argc, char* argv[])
         bus.waitForState(kickcat::State::OPERATIONAL, 1s, cyclic_process_data);
         print_current_state();
     }
-    catch (ErrorAL const &e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
     }
-    catch (std::exception const &e)
+    catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
     }
 
-    auto callback_error = [](DatagramState const &)
-    { THROW_ERROR("something bad happened"); };
+    auto callback_error = [](DatagramState const&) { THROW_ERROR("something bad happened"); };
     link->setTimeout(10ms);
     MailboxSequencer mailbox_sequencer(bus);
 
     // Map PDO memory to structs
-    freedom::Input *input = reinterpret_cast<freedom::Input *>(easycat.input.data);
-    freedom::Output *output = reinterpret_cast<freedom::Output *>(easycat.output.data);
+    freedom::Input* input = reinterpret_cast<freedom::Input*>(easycat.input.data);
+    freedom::Output* output = reinterpret_cast<freedom::Output*>(easycat.output.data);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
 
@@ -269,10 +256,9 @@ int main(int argc, char* argv[])
             output->LED_G = active;
             output->LED_B = active;
 
-            printf("Mag [X:%6d Y:%6d Z:%6d] | ACTIVE: %s\n",
-                   mx, my, mz, active ? "YES" : "NO");
+            printf("Mag [X:%6d Y:%6d Z:%6d] | ACTIVE: %s\n", mx, my, mz, active ? "YES" : "NO");
         }
-        catch (std::exception const &e)
+        catch (std::exception const& e)
         {
             std::cerr << "Error: " << e.what() << std::endl;
         }

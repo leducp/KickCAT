@@ -3,10 +3,6 @@ NOTE: This ingenia example works with just one slave in the bus,
 feel free to adapt it if you need to control more than one slave.
 */
 
-#include <iostream>
-#include <cstring>
-#include <argparse/argparse.hpp>
-
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
 #include "kickcat/Prints.h"
@@ -16,24 +12,22 @@ feel free to adapt it if you need to control more than one slave.
 #include "CanOpenStateMachine.h"
 #include "IngeniaProtocol.h"
 
+#include <argparse/argparse.hpp>
+#include <cstring>
+#include <iostream>
+
 
 using namespace kickcat;
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     argparse::ArgumentParser program("ingenia_control");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{""})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{""}).store_into(red_interface_name);
 
     try
     {
@@ -60,10 +54,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    auto report_redundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto report_redundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
     std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
@@ -76,7 +67,7 @@ int main(int argc, char *argv[])
     {
         bus.init();
 
-        for (auto& slave: bus.slaves())
+        for (auto& slave : bus.slaves())
         {
             printInfo(slave);
             printESC(slave);
@@ -120,23 +111,19 @@ int main(int argc, char *argv[])
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
     }
-    catch (ErrorAL const &e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
     }
-    catch (std::exception const &e)
+    catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
     }
 
-    auto callback_error = [](DatagramState const & ds)
-    {
-        THROW_ERROR_DATAGRAM("something bad happened", ds);
-    };
-    auto false_alarm = [](DatagramState const &)
-    { printf("previous error was a false alarm"); };
+    auto callback_error = [](DatagramState const& ds) { THROW_ERROR_DATAGRAM("something bad happened", ds); };
+    auto false_alarm = [](DatagramState const&) { printf("previous error was a false alarm"); };
 
     try
     {
@@ -152,12 +139,12 @@ int main(int argc, char *argv[])
         bus.requestState(State::OPERATIONAL);
         bus.waitForState(State::OPERATIONAL, 100ms);
     }
-    catch (ErrorAL const &e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
     }
-    catch (std::exception const &e)
+    catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
@@ -165,9 +152,9 @@ int main(int argc, char *argv[])
 
     link->setTimeout(1500us);
 
-    Slave &ingenia = bus.slaves().at(0);
-    pdo::Output *output_pdo = reinterpret_cast<pdo::Output *>(ingenia.output.data);
-    pdo::Input *input_pdo = reinterpret_cast<pdo::Input *>(ingenia.input.data);
+    Slave& ingenia = bus.slaves().at(0);
+    pdo::Output* output_pdo = reinterpret_cast<pdo::Output*>(ingenia.output.data);
+    pdo::Input* input_pdo = reinterpret_cast<pdo::Input*>(ingenia.input.data);
     CANOpenStateMachine ingenia_state_machine;
 
     printf("mapping: input(%d) output(%d)\n", ingenia.input.bsize, ingenia.output.bsize);
@@ -214,7 +201,7 @@ int main(int argc, char *argv[])
         output_pdo->control_word = ingenia_state_machine.getControlWord();
         if (ingenia.mailbox.emergencies.size() > 0)
         {
-            for (auto &em : ingenia.mailbox.emergencies)
+            for (auto& em : ingenia.mailbox.emergencies)
             {
                 std::cerr << "*~~~ Emergency received @ " << i << " ~~~*" << std::endl;
                 std::cerr << registerToError(em.error_register);

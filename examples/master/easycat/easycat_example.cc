@@ -1,12 +1,12 @@
-#include <iostream>
-#include <fstream>
-#include <argparse/argparse.hpp>
-
-#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
+#include "kickcat/Link.h"
+#include "kickcat/MailboxSequencer.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
-#include "kickcat/MailboxSequencer.h"
+
+#include <argparse/argparse.hpp>
+#include <fstream>
+#include <iostream>
 
 using namespace kickcat;
 
@@ -15,16 +15,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("easycat_example");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{""})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{""}).store_into(red_interface_name);
 
     try
     {
@@ -51,10 +45,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto report_redundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto report_redundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
     std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
@@ -75,7 +66,7 @@ int main(int argc, char* argv[])
     try
     {
         printf("Initializing Bus...\n");
-        bus.init(100ms);  // to adapt to your use case
+        bus.init(100ms); // to adapt to your use case
 
         printf("Init done\n");
         printf("Detected slaves: %zu\n", bus.slaves().size());
@@ -88,14 +79,14 @@ int main(int argc, char* argv[])
 
         // Optional: Enable IRQ if needed
         bus.enableIRQ(EcatEvent::DL_STATUS,
-        [&]()
-        {
-            printf("DL_STATUS IRQ triggered!\n");
-            bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state){ printf("IRQ reset error: %s\n", toString(state));});
-            bus.processAwaitingFrames();
+                      [&]()
+                      {
+                          printf("DL_STATUS IRQ triggered!\n");
+                          bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state) { printf("IRQ reset error: %s\n", toString(state)); });
+                          bus.processAwaitingFrames();
 
-            printf("Slave DL status: %s\n", toString(bus.slaves().at(0).dl_status).c_str());
-        });
+                          printf("Slave DL status: %s\n", toString(bus.slaves().at(0).dl_status).c_str());
+                      });
     }
     catch (ErrorAL const& e)
     {
@@ -110,7 +101,7 @@ int main(int argc, char* argv[])
 
     auto cyclic_process_data = [&]()
     {
-        auto noop = [](DatagramState const&){};
+        auto noop = [](DatagramState const&) {};
         bus.processDataRead(noop);
         bus.processDataWrite(noop);
     };
@@ -135,12 +126,11 @@ int main(int argc, char* argv[])
         printf("Switching to OPERATIONAL...\n");
         bus.requestState(State::OPERATIONAL);
         bus.waitForState(State::OPERATIONAL, 1s, cyclic_process_data);
-        
+
         printf("After OPERATIONAL - Slave info:\n");
         for (auto& slave : bus.slaves())
         {
-            printf(" - Slave %d input: %d output: %d\n", 
-                   slave.address, slave.input.bsize, slave.output.bsize);
+            printf(" - Slave %d input: %d output: %d\n", slave.address, slave.input.bsize, slave.output.bsize);
         }
     }
     catch (ErrorAL const& e)
@@ -154,7 +144,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+    auto callback_error = [](DatagramState const&) { THROW_ERROR("something bad happened"); };
     link->setTimeout(10ms); // Adapt to your use case (RT loop)
     MailboxSequencer mailbox_sequencer(bus);
 
@@ -175,7 +165,7 @@ int main(int argc, char* argv[])
             bus.processAwaitingFrames();
 
             // Clear line and print all slave inputs
-            printf("\033[K");  // Clear line
+            printf("\033[K"); // Clear line
             for (size_t idx = 0; idx < bus.slaves().size(); ++idx)
             {
                 auto& slave = bus.slaves().at(idx);
