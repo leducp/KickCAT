@@ -284,3 +284,42 @@ TEST(EmulatedESC, ecat_PDOs)
     ASSERT_EQ(read_test, payload);
 }
 
+TEST(EmulatedESC, watchdog)
+{
+    EmulatedESC esc;
+    uint16_t wkc = 0;
+    DatagramHeader header{Command::NOP, 0, 0, 0, 0, 0, 0, 0};
+
+    // Configure Watchdog
+    // Divider: 100us (2498 + 2) * 40ns = 2500 * 40ns = 100,000ns = 100us
+    uint16_t divider = 2498;
+    esc.write(reg::WDG_DIVIDER, &divider, 2);
+
+    // Watchdog Time PDO: 100 units of 100us = 10ms
+    uint16_t wdg_time = 100;
+    esc.write(reg::WDG_TIME_PDO, &wdg_time, 2);
+
+    // Trigger processInternalLogic
+    esc.processDatagram(&header, nullptr, &wkc);
+
+    uint16_t status = 0;
+    esc.read(reg::WDOG_STATUS, &status, 2);
+
+    // SPEC: Bit 0 of 0x0440 is 1 if OK, 0 if expired.
+    EXPECT_EQ(status & 0x01, 1);
+
+    // Advance time beyond 10ms
+    // since_epoch() increments by 1ms per call in unit tests.
+    for(int i = 0; i < 20; ++i)
+    {
+        esc.processDatagram(&header, nullptr, &wkc);
+    }
+
+    esc.read(reg::WDOG_STATUS, &status, 2);
+    EXPECT_EQ(status & 0x01, 0);
+
+    uint8_t counter = 0;
+    esc.read(reg::WDOG_COUNTER_PDO, &counter, 1);
+    EXPECT_GT(counter, 0);
+}
+

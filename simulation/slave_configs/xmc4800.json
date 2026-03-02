@@ -1,0 +1,4 @@
+{
+  "eeprom": "../../examples/slave/nuttx/xmc4800/boards/relax/eeprom_xmc4800.bin",
+  "coe_xml": "../../examples/slave/nuttx/xmc4800/xmc4800.xml"
+}

@@ -1,0 +1,4 @@
+{
+  "eeprom": "../../examples/slave/nuttx/lan9252/freedom-k64f/eeprom.bin",
+  "coe_xml": "../../examples/slave/nuttx/lan9252/freedom-k64f/freedom-k64f.xml"
+}

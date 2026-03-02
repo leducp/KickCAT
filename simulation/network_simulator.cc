@@ -1,13 +1,16 @@
 #include <algorithm>
-#include <cstring>
-#include <numeric>
 #include <argparse/argparse.hpp>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <nlohmann/json.hpp>
+#include <numeric>
 
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
-#include "kickcat/slave/Slave.h"
-#include "kickcat/PDO.h"
 #include "kickcat/OS/Time.h"
+#include "kickcat/PDO.h"
+#include "kickcat/slave/Slave.h"
 
 #include "kickcat/CoE/EsiParser.h"
 #include "kickcat/CoE/mailbox/response.h"
@@ -23,7 +26,8 @@
 
 using namespace kickcat;
 using namespace kickcat::slave;
-
+using json = nlohmann::json;
+namespace fs = std::filesystem;
 
 int main(int argc, char* argv[])
 {
@@ -35,11 +39,11 @@ int main(int argc, char* argv[])
         .required()
         .store_into(interface);
 
-    std::vector<std::string> eeproms;
-    program.add_argument("-e", "--eeproms")
-        .help("EEPROM binary files for slaves")
+    std::vector<std::string> slave_configs;
+    program.add_argument("-s", "--slaves")
+        .help("JSON configuration files for slaves")
         .remaining()
-        .store_into(eeproms);
+        .store_into(slave_configs);
 
     try
     {
@@ -52,36 +56,79 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    if (eeproms.empty())
+    if (slave_configs.empty())
     {
-        std::cerr << "No EEPROM files provided" << std::endl;
+        std::cerr << "No slave configuration files provided" << std::endl;
         std::cerr << program;
         return 1;
     }
 
-    size_t slaveCount = eeproms.size();
-    std::vector<EmulatedESC> escs;
-    std::vector<PDO> pdos;
-    std::vector<Slave> slaves;
-    std::vector<uint8_t*> inputPdo;
-    std::vector<uint8_t*> outputPdo;
+    size_t slaveCount = slave_configs.size();
+    std::vector<std::unique_ptr<EmulatedESC>> escs;
+    std::vector<std::unique_ptr<PDO>> pdos;
+    std::vector<std::unique_ptr<Slave>> slaves;
+    std::vector<std::unique_ptr<mailbox::response::Mailbox>> mailboxes;
+    std::vector<uint8_t* > inputPdo;
+    std::vector<uint8_t* > outputPdo;
 
     escs.reserve(slaveCount);
     pdos.reserve(slaveCount);
     slaves.reserve(slaveCount);
+    mailboxes.reserve(slaveCount);
     inputPdo.reserve(slaveCount);
     outputPdo.reserve(slaveCount);
 
-    constexpr uint32_t PDO_MAX_SIZE = 16;
+    constexpr uint32_t PDO_MAX_SIZE = 32;
+    CoE::EsiParser parser;
 
-    for (const auto &eeprom : eeproms)
+    for (const auto& config_path : slave_configs)
     {
-        escs.emplace_back(eeprom.c_str());
-        pdos.emplace_back(&escs.back());
-        slaves.emplace_back(&escs.back(), &pdos.back());
+        fs::path p(config_path);
+        fs::path config_dir = p.parent_path();
 
-        uint8_t buffer_in[PDO_MAX_SIZE];
-        uint8_t buffer_out[PDO_MAX_SIZE];
+        std::ifstream f(config_path);
+        if (not f.is_open())
+        {
+            std::cerr << "Failed to open config file: " << config_path << std::endl;
+            return 1;
+        }
+
+        json config;
+        try
+        {
+            f >> config;
+        }
+        catch (const json::parse_error& e)
+        {
+            std::cerr << "Failed to parse JSON in " << config_path << ": " << e.what() << std::endl;
+            return 1;
+        }
+
+        if (not config.contains("eeprom"))
+        {
+            std::cerr << "Config file " << config_path << " missing 'eeprom' field" << std::endl;
+            return 1;
+        }
+
+        std::string eeprom_path = config["eeprom"];
+        fs::path eeprom_full_path = config_dir / eeprom_path;
+        auto esc = std::make_unique<EmulatedESC>(eeprom_full_path.string().c_str());
+        auto pdo = std::make_unique<PDO>(esc.get());
+        auto slave = std::make_unique<Slave>(esc.get(), pdo.get());
+
+        if (config.contains("coe_xml"))
+        {
+            std::string coe_xml_path = config["coe_xml"];
+            fs::path coe_xml_full_path = config_dir / coe_xml_path;
+            auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
+            auto dictionary = parser.loadFile(coe_xml_full_path.string());
+            mbx->enableCoE(std::move(dictionary));
+            slave->setMailbox(mbx.get());
+            mailboxes.push_back(std::move(mbx));
+        }
+
+        uint8_t* buffer_in = new uint8_t[PDO_MAX_SIZE];
+        uint8_t* buffer_out = new uint8_t[PDO_MAX_SIZE];
 
         // init values
         for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
@@ -92,8 +139,12 @@ int main(int argc, char* argv[])
 
         inputPdo.push_back(buffer_in);
         outputPdo.push_back(buffer_out);
-        pdos.back().setInput(inputPdo.back(), PDO_MAX_SIZE);
-        pdos.back().setOutput(outputPdo.back(), PDO_MAX_SIZE);
+        pdo->setInput(inputPdo.back(), PDO_MAX_SIZE);
+        pdo->setOutput(outputPdo.back(), PDO_MAX_SIZE);
+
+        escs.push_back(std::move(esc));
+        pdos.push_back(std::move(pdo));
+        slaves.push_back(std::move(slave));
     }
 
     printf("Start EtherCAT network simulator on %s with %ld slaves\n", interface.c_str(), escs.size());
@@ -104,24 +155,14 @@ int main(int argc, char* argv[])
     std::vector<nanoseconds> stats;
     stats.reserve(1000);
 
-    auto& esc0 = escs.at(0);
-    auto& slave0 = slaves.at(0);
-    mailbox::response::Mailbox mbx(&esc0, 1024);
-
-    auto dictionary = CoE::createOD();
-    mbx.enableCoE(std::move(dictionary));
-
-    slave0.setMailbox(&mbx);
-
-
     for (auto& slave : slaves)
     {
-        slave.start();
+        slave->start();
     }
 
-     // Variables for toggling pattern
+    // Variables for toggling pattern
     uint32_t iteration_counter = 0;
-    uint8_t current_value = 0x11;  // Start with 0x11
+    uint8_t current_value = 0x11; // Start with 0x11
 
     constexpr uint32_t ITER = 1000; // Number of iterations before updating input buffer
 
@@ -146,41 +187,41 @@ int main(int argc, char* argv[])
 
             for (auto& esc : escs)
             {
-                esc.processDatagram(header, data, wkc);
+                esc->processDatagram(header, data, wkc);
             }
 
             for (size_t i = 0; i < slaves.size(); ++i)
             {
-                slaves[i].routine();
-                if (slaves[i].state() == State::SAFE_OP)
+                slaves[i]->routine();
+                if (slaves[i]->state() == State::SAFE_OP)
                 {
                     if (outputPdo[i][1] != 0xFF)
                     {
-                        slaves[i].validateOutputData();
+                        slaves[i]->validateOutputData();
                     }
                 }
 
-                // Update input buffer every ITER iterations
-                iteration_counter++;
-                if (iteration_counter >= ITER)
+                // Fill buffer with current value
+                for (uint32_t j = 0; j < PDO_MAX_SIZE; ++j)
                 {
-                    iteration_counter = 0;
-                    
-                    // Fill buffer with current value
-                    for (uint32_t j = 0; j < PDO_MAX_SIZE; ++j)
-                    {
-                        inputPdo[i][j] = current_value;
-                    }
-                    
-                    // Move to next value: 0x11 -> 0x22 -> 0x33 -> ... -> 0xFF -> 0x00 -> 0x11
-                    if (current_value == 0xFF)
-                    {
-                        current_value = 0x00;
-                    }
-                    else
-                    {
-                        current_value += 0x11;
-                    }            
+                    inputPdo[i][j] = current_value;
+                }
+            }
+
+            // Update input buffer every ITER iterations
+            iteration_counter++;
+            if (iteration_counter >= ITER)
+            {
+                iteration_counter = 0;
+
+                // Move to next value: 0x11 -> 0x22 -> 0x33 -> ... -> 0xFF -> 0x00 -> 0x11
+                if (current_value == 0xFF)
+                {
+                    current_value = 0x00;
+                }
+                else
+                {
+                    current_value += 0x11;
                 }
             }
         }

@@ -45,6 +45,7 @@ if (BUILD_EXAMPLES)
 endif()
 
 if (BUILD_SIMULATION)
+  find_package(nlohmann_json REQUIRED)
   add_subdirectory(simulation)
 endif()
 

@@ -596,17 +596,15 @@ namespace kickcat
 
         if ((lastLogicalWrite_ + delay) >= since_epoch())
         {
-            // Watchdog OK: last write is recent enough
-            memory_.watchdog_status_process_data = 0;
+            // Watchdog OK
+            memory_.watchdog_status_process_data = 1;
             return;
         }
 
-        // Watchdog triggered - detect front
-        if (memory_.watchdog_status_process_data == 0)
+        if (memory_.watchdog_status_process_data == 1)
         {
-            // Increase PDO wdg counter and reflect the current state
-            memory_.watchdog_status_process_data = 1;
-
+            // Front detection (1 to 0)
+            memory_.watchdog_status_process_data = 0;
             if (memory_.watchdog_counter_process_data < 0xFF)
             {
                 memory_.watchdog_counter_process_data++;
