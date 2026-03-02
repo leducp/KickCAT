@@ -14,6 +14,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/SBufQueue-t.cc
                             src/slave-t.cc
                             src/socket-t.cc
+                            src/EEPROM_factory-t.cc
                             src/EmulatedESC-t.cc
                             src/ESM-t.cc
                             src/ESMStateOP-t.cc
@@ -26,6 +27,8 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/CoE/OD-t.cc
                             src/mailbox/request-t.cc
                             src/mailbox/response-t.cc
+                            src/mailbox/CoE/request-t.cc
+                            src/mailbox/CoE/response-t.cc
                             src/Time.cc
 )
 

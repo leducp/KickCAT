@@ -169,7 +169,6 @@ namespace kickcat::mailbox::response
     protected:
         void reply(std::vector<uint8_t>&& reply); /// Enqueue a raw message to be sent in the mailbox
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code); // wrapper on mailbox replyError
-        uint16_t replyExpectedSize();
 
         std::vector<uint8_t> data_;
         Mailbox* mailbox_;

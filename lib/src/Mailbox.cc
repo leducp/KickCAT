@@ -482,11 +482,6 @@ namespace kickcat::mailbox::response
 
     }
 
-    uint16_t AbstractMessage::replyExpectedSize()
-    {
-        return mailbox_->mbx_out_.length;
-    }
-
     void AbstractMessage::reply(std::vector<uint8_t>&& reply)
     {
         mailbox_->to_send_.push(std::move(reply));

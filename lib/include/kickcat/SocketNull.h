@@ -17,7 +17,7 @@ namespace kickcat
         void setTimeout(nanoseconds ) override {}
         void close() noexcept override {}
         int32_t read(void* , int32_t ) override { return 0;}
-        int32_t write(void const* , int32_t frame_size) override { return frame_size;};
+        int32_t write(void const* , int32_t frame_size) override { return frame_size; }
     };
 }
 
