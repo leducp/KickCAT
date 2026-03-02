@@ -5,7 +5,7 @@
 using namespace kickcat;
 using namespace kickcat::mailbox::request;
 
-class RequestMailbox : public ::testing::Test
+class Mailbox_Request : public ::testing::Test
 {
 public:
     void SetUp() override
@@ -19,7 +19,7 @@ protected:
     uint8_t raw_message[256]{};
 };
 
-TEST_F(RequestMailbox, SyncManager_configuration)
+TEST_F(Mailbox_Request, SyncManager_configuration)
 {
     mailbox.send_size = 17;
     mailbox.send_offset = 8;
@@ -40,7 +40,7 @@ TEST_F(RequestMailbox, SyncManager_configuration)
     ASSERT_EQ(0x22,     SM[1].control);
 }
 
-TEST_F(RequestMailbox, counter)
+TEST_F(Mailbox_Request, counter)
 {
     for (int i = mailbox.nextCounter(); i < 100; ++i)
     {
@@ -48,7 +48,7 @@ TEST_F(RequestMailbox, counter)
     }
 }
 
-TEST_F(RequestMailbox, received_unknown_message)
+TEST_F(Mailbox_Request, received_unknown_message)
 {
     ASSERT_FALSE(mailbox.receive(raw_message));
 }

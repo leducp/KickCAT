@@ -30,7 +30,7 @@ static CoE::Dictionary createResponseTestDictionary()
     return dict;
 }
 
-class ResponseMailbox : public ::testing::Test
+class Mailbox_Response : public ::testing::Test
 {
 public:
     void SetUp() override
@@ -86,7 +86,7 @@ public:
 };
 
 
-TEST(ResponseMailboxConfigure, not_configured)
+TEST(Mailbox_Reponse_configure, not_configured)
 {
     MockESC esc;
     Mailbox mbx{&esc, RESP_MBX_SIZE};
@@ -99,7 +99,7 @@ TEST(ResponseMailboxConfigure, not_configured)
 }
 
 
-TEST(ResponseMailboxConfigure, badly_configured)
+TEST(Mailbox_Reponse_configure, badly_configured)
 {
     MockESC esc;
     Mailbox mbx{&esc, RESP_MBX_SIZE};
@@ -120,7 +120,7 @@ TEST(ResponseMailboxConfigure, badly_configured)
 }
 
 
-TEST_F(ResponseMailbox, receive_nothing_when_sm_empty)
+TEST_F(Mailbox_Response, receive_nothing_when_sm_empty)
 {
     SyncManager sync{};
     sync.status = 0;
@@ -130,7 +130,7 @@ TEST_F(ResponseMailbox, receive_nothing_when_sm_empty)
 }
 
 
-TEST_F(ResponseMailbox, receive_new_CoE_message)
+TEST_F(Mailbox_Response, receive_new_CoE_message)
 {
     auto raw = buildRawSDORead(0x1018, 1);
 
@@ -143,7 +143,7 @@ TEST_F(ResponseMailbox, receive_new_CoE_message)
 }
 
 
-TEST_F(ResponseMailbox, receive_read_failure)
+TEST_F(Mailbox_Response, receive_read_failure)
 {
     SyncManager sync{};
     sync.status = SM_STATUS_MAILBOX;
@@ -156,7 +156,7 @@ TEST_F(ResponseMailbox, receive_read_failure)
 }
 
 
-TEST_F(ResponseMailbox, receive_unsupported_protocol)
+TEST_F(Mailbox_Response, receive_unsupported_protocol)
 {
     std::vector<uint8_t> raw(RESP_MBX_SIZE, 0);
     auto header = pointData<mailbox::Header>(raw.data());
@@ -177,7 +177,7 @@ TEST_F(ResponseMailbox, receive_unsupported_protocol)
 }
 
 
-TEST_F(ResponseMailbox, receive_queue_full)
+TEST_F(Mailbox_Response, receive_queue_full)
 {
     SyncManager sync{};
     sync.status = SM_STATUS_MAILBOX;
@@ -206,7 +206,7 @@ TEST_F(ResponseMailbox, receive_queue_full)
 }
 
 
-TEST_F(ResponseMailbox, process_finalize_message)
+TEST_F(Mailbox_Response, process_finalize_message)
 {
     auto raw = buildRawSDORead(0x1018, 1);
 
@@ -229,13 +229,13 @@ TEST_F(ResponseMailbox, process_finalize_message)
 }
 
 
-TEST_F(ResponseMailbox, process_empty_queue)
+TEST_F(Mailbox_Response, process_empty_queue)
 {
     mbx.process();
 }
 
 
-TEST_F(ResponseMailbox, send_nothing_when_queue_empty)
+TEST_F(Mailbox_Response, send_nothing_when_queue_empty)
 {
     SyncManager sync{};
     sync.status = 0;
@@ -247,7 +247,7 @@ TEST_F(ResponseMailbox, send_nothing_when_queue_empty)
 }
 
 
-TEST_F(ResponseMailbox, send_message)
+TEST_F(Mailbox_Response, send_message)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
@@ -272,7 +272,7 @@ TEST_F(ResponseMailbox, send_message)
 }
 
 
-TEST_F(ResponseMailbox, send_blocked_when_mailbox_full)
+TEST_F(Mailbox_Response, send_blocked_when_mailbox_full)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
@@ -296,7 +296,7 @@ TEST_F(ResponseMailbox, send_blocked_when_mailbox_full)
 }
 
 
-TEST_F(ResponseMailbox, send_repeat_procedure)
+TEST_F(Mailbox_Response, send_repeat_procedure)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
@@ -346,7 +346,7 @@ TEST_F(ResponseMailbox, send_repeat_procedure)
 }
 
 
-TEST_F(ResponseMailbox, full_receive_process_send_cycle)
+TEST_F(Mailbox_Response, full_receive_process_send_cycle)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
