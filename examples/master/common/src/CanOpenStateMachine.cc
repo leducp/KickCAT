@@ -1,4 +1,5 @@
 #include "CanOpenStateMachine.h"
+
 #include "kickcat/OS/Time.h"
 #include "kickcat/debug.h"
 
@@ -10,27 +11,27 @@ namespace kickcat
 
         switch (command_)
         {
-            case CANOpenCommand::ENABLE:
+            case CANOpenCommand::ENABLE :
             {
                 switch (motor_state_)
                 {
-                    case CANOpenState::OFF:
+                    case CANOpenState::OFF :
                     {
                         start_motor_timestamp_ = since_epoch();
                         control_word_ = control::word::FAULT_RESET;
                         motor_state_ = CANOpenState::SAFE_RESET;
                         break;
                     }
-                    case CANOpenState::SAFE_RESET:
+                    case CANOpenState::SAFE_RESET :
                     {
                         control_word_ = control::word::SHUTDOWN;
                         if (elapsed_time(start_motor_timestamp_) > MOTOR_RESET_DELAY)
                         {
-                            motor_state_ = CANOpenState::PREPARE_TO_SWITCH_ON ;
+                            motor_state_ = CANOpenState::PREPARE_TO_SWITCH_ON;
                         }
                         break;
                     }
-                    case CANOpenState::PREPARE_TO_SWITCH_ON:
+                    case CANOpenState::PREPARE_TO_SWITCH_ON :
                     {
                         control_word_ = control::word::SHUTDOWN;
                         if ((status_word_ & status::value::READY_TO_SWITCH_ON_STATE) == status::value::READY_TO_SWITCH_ON_STATE)
@@ -39,38 +40,35 @@ namespace kickcat
                         }
                         break;
                     }
-                    case CANOpenState::SWITCH_ON:
+                    case CANOpenState::SWITCH_ON :
                     {
                         control_word_ = control::word::ENABLE_OPERATION;
-                        if ((status_word_ & status::value::ON_STATE)== status::value::ON_STATE)
+                        if ((status_word_ & status::value::ON_STATE) == status::value::ON_STATE)
                         {
-                            motor_state_ = CANOpenState::ON ;
+                            motor_state_ = CANOpenState::ON;
 
                             // Reset command now that the desired state has been reached.
                             command_ = CANOpenCommand::NONE;
                         }
                         break;
                     }
-                    default:
-                    case CANOpenState::ON: coe_info("ON status achieved\n"); break;
-                    case CANOpenState::FAULT:
+                    default :
+                    case CANOpenState::ON : coe_info("ON status achieved\n"); break;
+                    case CANOpenState::FAULT :
                         // Do nothing
                         break;
                 }
 
                 // Time out, motor start failed
-                if ( (motor_state_ != CANOpenState::ON)
-                    and (motor_state_ != CANOpenState::FAULT)
-                    and (motor_state_ != CANOpenState::OFF)
-                    and (elapsed_time(start_motor_timestamp_) > MOTOR_INIT_TIMEOUT)
-                    )
+                if ((motor_state_ != CANOpenState::ON) and (motor_state_ != CANOpenState::FAULT) and (motor_state_ != CANOpenState::OFF) and
+                    (elapsed_time(start_motor_timestamp_) > MOTOR_INIT_TIMEOUT))
                 {
                     coe_error("Can't enable motor: timeout, start again from OFF state.\n");
                     motor_state_ = CANOpenState::OFF;
                 }
                 break;
             }
-            case CANOpenCommand::DISABLE:
+            case CANOpenCommand::DISABLE :
             {
                 control_word_ = control::word::DISABLE_VOLTAGE;
                 if ((status::value::OFF_STATE & status_word_) == status::value::OFF_STATE)
@@ -82,8 +80,8 @@ namespace kickcat
                 }
                 break;
             }
-            case CANOpenCommand::NONE:
-            default:
+            case CANOpenCommand::NONE :
+            default :
             {
                 break;
             }

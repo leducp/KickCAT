@@ -5,6 +5,7 @@ namespace kickcat
 {
     char const* codeToError(uint16_t const& code)
     {
+        // clang-format off
         switch (code)
         {
             // General messages
@@ -41,14 +42,19 @@ namespace kickcat
             case 0x8680 : {return "Position limit exceeded\n";}
             case 0xFF10 : {return "Cannot start motor\n";}
 
-            default : {return "Unknown error\n";}
+            default :
+            {
+                return "Unknown error\n";
+            }
         }
+        // clang-format on
     }
 
     std::string registerToError(uint16_t const& reg)
     {
-        std::string result = "GENERIC_ERROR";                           // Generic error is mandatory
+        std::string result = "GENERIC_ERROR"; // Generic error is mandatory
 
+        // clang-format off
         // Context can be precised, depending on the state of bits (see CiA DS301 page 53)
         if ((reg & (1U << 1)) == (1U << 1)) {result += " + CURRENT";}
         if ((reg & (1U << 2)) == (1U << 2)) {result += " + VOLTAGE";}
@@ -56,6 +62,7 @@ namespace kickcat
         if ((reg & (1U << 4)) == (1U << 4)) {result += " + COMMUNICATION_ERROR";}
         if ((reg & (1U << 5)) == (1U << 5)) {result += " + DEVICE_SPECIFIC";}
         if ((reg & (1U << 7)) == (1U << 7)) {result += " + MANUFACTURER_SPECIFIC";}
+        // clang-format on
 
         result += "\n";
         return result;

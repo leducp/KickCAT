@@ -9,216 +9,120 @@ namespace kickcat::CoE
         CoE::Dictionary dictionary;
 
         {
-            CoE::Object object
-            {
-                0x1000,
-                CoE::ObjectCode::VAR,
-                "Device Type",
-                {}
-            };
-            CoE::addEntry<uint32_t>(object,0,32,0,CoE::Access::READ,CoE::DataType::UNSIGNED32,"",0x0);
+            CoE::Object object{0x1000, CoE::ObjectCode::VAR, "Device Type", {}};
+            CoE::addEntry<uint32_t>(object, 0, 32, 0, CoE::Access::READ, CoE::DataType::UNSIGNED32, "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1018,
-                CoE::ObjectCode::RECORD,
-                "Identity Object",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 000",0x4);
-            CoE::addEntry<uint32_t>(object,1,32,8,CoE::Access::READ,CoE::DataType::UNSIGNED32,"Vendor ID",0x6a5);
-            CoE::addEntry<uint32_t>(object,2,32,40,CoE::Access::READ,CoE::DataType::UNSIGNED32,"Product code",0xb0cad0);
-            CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ,CoE::DataType::UNSIGNED32,"Revision number",0x0);
-            CoE::addEntry<uint32_t>(object,4,32,104,CoE::Access::READ,CoE::DataType::UNSIGNED32,"Serial number",0xcafedeca);
+            CoE::Object object{0x1018, CoE::ObjectCode::RECORD, "Identity Object", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Subindex 000", 0x4);
+            CoE::addEntry<uint32_t>(object, 1, 32, 8, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Vendor ID", 0x6a5);
+            CoE::addEntry<uint32_t>(object, 2, 32, 40, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Product code", 0xb0cad0);
+            CoE::addEntry<uint32_t>(object, 3, 32, 72, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Revision number", 0x0);
+            CoE::addEntry<uint32_t>(object, 4, 32, 104, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Serial number", 0xcafedeca);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1600,
-                CoE::ObjectCode::RECORD,
-                "RxPDO Map 1",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED8,"Subindex 000",0x3);
-            CoE::addEntry<uint32_t>(object,1,32,8,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 1",0x70000008);
-            CoE::addEntry<uint32_t>(object,2,32,40,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 2",0x70010008);
-            CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"RxPDO Map 1 Element 3",0x70020008);
+            CoE::Object object{0x1600, CoE::ObjectCode::RECORD, "RxPDO Map 1", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED8, "Subindex 000", 0x3);
+            CoE::addEntry<uint32_t>(object, 1, 32, 8, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "RxPDO Map 1 Element 1", 0x70000008);
+            CoE::addEntry<uint32_t>(object, 2, 32, 40, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "RxPDO Map 1 Element 2", 0x70010008);
+            CoE::addEntry<uint32_t>(object, 3, 32, 72, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "RxPDO Map 1 Element 3", 0x70020008);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1a00,
-                CoE::ObjectCode::RECORD,
-                "TxPDO Map 1",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED8,"Subindex 000",0x6);
-            CoE::addEntry<uint32_t>(object,1,32,8,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 1",0x60000010);
-            CoE::addEntry<uint32_t>(object,2,32,40,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 2",0x60010010);
-            CoE::addEntry<uint32_t>(object,3,32,72,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 3",0x60020010);
-            CoE::addEntry<uint32_t>(object,4,32,104,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 4",0x60030010);
-            CoE::addEntry<uint32_t>(object,5,32,136,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 5",0x60040010);
-            CoE::addEntry<uint32_t>(object,6,32,168,CoE::Access::READ | CoE::Access::WRITE,CoE::DataType::UNSIGNED32,"TxPDO Map 1 Element 6",0x60050010);
+            CoE::Object object{0x1a00, CoE::ObjectCode::RECORD, "TxPDO Map 1", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED8, "Subindex 000", 0x6);
+            CoE::addEntry<uint32_t>(object, 1, 32, 8, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "TxPDO Map 1 Element 1", 0x60000010);
+            CoE::addEntry<uint32_t>(object, 2, 32, 40, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "TxPDO Map 1 Element 2", 0x60010010);
+            CoE::addEntry<uint32_t>(object, 3, 32, 72, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "TxPDO Map 1 Element 3", 0x60020010);
+            CoE::addEntry<uint32_t>(object, 4, 32, 104, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "TxPDO Map 1 Element 4", 0x60030010);
+            CoE::addEntry<uint32_t>(object, 5, 32, 136, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "TxPDO Map 1 Element 5", 0x60040010);
+            CoE::addEntry<uint32_t>(object, 6, 32, 168, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "TxPDO Map 1 Element 6", 0x60050010);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1c00,
-                CoE::ObjectCode::ARRAY,
-                "Sync manager type",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 0",0x4);
-            CoE::addEntry<uint8_t>(object,1,8,8,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 1",0x1);
-            CoE::addEntry<uint8_t>(object,2,8,16,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 2",0x2);
-            CoE::addEntry<uint8_t>(object,3,8,24,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 3",0x3);
-            CoE::addEntry<uint8_t>(object,4,8,32,CoE::Access::READ,CoE::DataType::UNSIGNED8,"Subindex 4",0x4);
+            CoE::Object object{0x1c00, CoE::ObjectCode::ARRAY, "Sync manager type", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Subindex 0", 0x4);
+            CoE::addEntry<uint8_t>(object, 1, 8, 8, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Subindex 1", 0x1);
+            CoE::addEntry<uint8_t>(object, 2, 8, 16, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Subindex 2", 0x2);
+            CoE::addEntry<uint8_t>(object, 3, 8, 24, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Subindex 3", 0x3);
+            CoE::addEntry<uint8_t>(object, 4, 8, 32, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Subindex 4", 0x4);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1c12,
-                CoE::ObjectCode::ARRAY,
-                "RxPDO assign",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ | CoE::Access::WRITE_PREOP,CoE::DataType::UNSIGNED8,"Subindex 000",0x1);
-            CoE::addEntry<uint16_t>(object,1,16,8,CoE::Access::READ | CoE::Access::WRITE_PREOP,CoE::DataType::UNSIGNED16,"RxPDO assign Element 1",0x1600);
+            CoE::Object object{0x1c12, CoE::ObjectCode::ARRAY, "RxPDO assign", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::READ | CoE::Access::WRITE_PREOP, CoE::DataType::UNSIGNED8, "Subindex 000", 0x1);
+            CoE::addEntry<uint16_t>(object, 1, 16, 8, CoE::Access::READ | CoE::Access::WRITE_PREOP, CoE::DataType::UNSIGNED16, "RxPDO assign Element 1", 0x1600);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1c13,
-                CoE::ObjectCode::ARRAY,
-                "TxPDO assign",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::READ | CoE::Access::WRITE_PREOP,CoE::DataType::UNSIGNED8,"Subindex 000",0x1);
-            CoE::addEntry<uint16_t>(object,1,16,8,CoE::Access::READ | CoE::Access::WRITE_PREOP,CoE::DataType::UNSIGNED16,"TxPDO assign Element 1",0x1a00);
+            CoE::Object object{0x1c13, CoE::ObjectCode::ARRAY, "TxPDO assign", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::READ | CoE::Access::WRITE_PREOP, CoE::DataType::UNSIGNED8, "Subindex 000", 0x1);
+            CoE::addEntry<uint16_t>(object, 1, 16, 8, CoE::Access::READ | CoE::Access::WRITE_PREOP, CoE::DataType::UNSIGNED16, "TxPDO assign Element 1", 0x1a00);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6000,
-                CoE::ObjectCode::VAR,
-                "accel_x",
-                {}
-            };
-            CoE::addEntry<int16_t>(object,0,16,0,CoE::Access::READ | CoE::Access::TxPDO,CoE::DataType::INTEGER16,"accel_x",0);
+            CoE::Object object{0x6000, CoE::ObjectCode::VAR, "accel_x", {}};
+            CoE::addEntry<int16_t>(object, 0, 16, 0, CoE::Access::READ | CoE::Access::TxPDO, CoE::DataType::INTEGER16, "accel_x", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6001,
-                CoE::ObjectCode::VAR,
-                "accel_y",
-                {}
-            };
-            CoE::addEntry<int16_t>(object,0,16,0,CoE::Access::READ | CoE::Access::TxPDO,CoE::DataType::INTEGER16,"accel_y",0);
+            CoE::Object object{0x6001, CoE::ObjectCode::VAR, "accel_y", {}};
+            CoE::addEntry<int16_t>(object, 0, 16, 0, CoE::Access::READ | CoE::Access::TxPDO, CoE::DataType::INTEGER16, "accel_y", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6002,
-                CoE::ObjectCode::VAR,
-                "accel_z",
-                {}
-            };
-            CoE::addEntry<int16_t>(object,0,16,0,CoE::Access::READ | CoE::Access::TxPDO,CoE::DataType::INTEGER16,"accel_z",0);
+            CoE::Object object{0x6002, CoE::ObjectCode::VAR, "accel_z", {}};
+            CoE::addEntry<int16_t>(object, 0, 16, 0, CoE::Access::READ | CoE::Access::TxPDO, CoE::DataType::INTEGER16, "accel_z", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6003,
-                CoE::ObjectCode::VAR,
-                "mag_x",
-                {}
-            };
-            CoE::addEntry<int16_t>(object,0,16,0,CoE::Access::READ | CoE::Access::TxPDO,CoE::DataType::INTEGER16,"mag_x",0);
+            CoE::Object object{0x6003, CoE::ObjectCode::VAR, "mag_x", {}};
+            CoE::addEntry<int16_t>(object, 0, 16, 0, CoE::Access::READ | CoE::Access::TxPDO, CoE::DataType::INTEGER16, "mag_x", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6004,
-                CoE::ObjectCode::VAR,
-                "mag_y",
-                {}
-            };
-            CoE::addEntry<int16_t>(object,0,16,0,CoE::Access::READ | CoE::Access::TxPDO,CoE::DataType::INTEGER16,"mag_y",0);
+            CoE::Object object{0x6004, CoE::ObjectCode::VAR, "mag_y", {}};
+            CoE::addEntry<int16_t>(object, 0, 16, 0, CoE::Access::READ | CoE::Access::TxPDO, CoE::DataType::INTEGER16, "mag_y", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6005,
-                CoE::ObjectCode::VAR,
-                "mag_z",
-                {}
-            };
-            CoE::addEntry<int16_t>(object,0,16,0,CoE::Access::READ | CoE::Access::TxPDO,CoE::DataType::INTEGER16,"mag_z",0);
+            CoE::Object object{0x6005, CoE::ObjectCode::VAR, "mag_z", {}};
+            CoE::addEntry<int16_t>(object, 0, 16, 0, CoE::Access::READ | CoE::Access::TxPDO, CoE::DataType::INTEGER16, "mag_z", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x7000,
-                CoE::ObjectCode::VAR,
-                "LED_R",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::WRITE | CoE::Access::RxPDO,CoE::DataType::UNSIGNED8,"LED_R",0);
+            CoE::Object object{0x7000, CoE::ObjectCode::VAR, "LED_R", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::WRITE | CoE::Access::RxPDO, CoE::DataType::UNSIGNED8, "LED_R", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x7001,
-                CoE::ObjectCode::VAR,
-                "LED_G",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::WRITE | CoE::Access::RxPDO,CoE::DataType::UNSIGNED8,"LED_G",0);
+            CoE::Object object{0x7001, CoE::ObjectCode::VAR, "LED_G", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::WRITE | CoE::Access::RxPDO, CoE::DataType::UNSIGNED8, "LED_G", 0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x7002,
-                CoE::ObjectCode::VAR,
-                "LED_B",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,CoE::Access::WRITE | CoE::Access::RxPDO,CoE::DataType::UNSIGNED8,"LED_B",0);
+            CoE::Object object{0x7002, CoE::ObjectCode::VAR, "LED_B", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, CoE::Access::WRITE | CoE::Access::RxPDO, CoE::DataType::UNSIGNED8, "LED_B", 0);
             dictionary.push_back(std::move(object));
         }
 
-         return dictionary;
+        return dictionary;
     }
 }

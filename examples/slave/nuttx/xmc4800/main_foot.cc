@@ -20,7 +20,7 @@ namespace foot
         int16_t gyroscopeZ;
 
         int16_t temperature; // Celsius degrees
-    }__attribute__((packed));
+    } __attribute__((packed));
 
     struct Input
     {
@@ -43,7 +43,7 @@ namespace foot
     } __attribute__((packed));
 }
 
-int main(int, char *[])
+int main(int, char*[])
 {
     using namespace kickcat;
 

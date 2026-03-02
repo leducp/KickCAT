@@ -1,13 +1,13 @@
-#include <iostream>
-#include <cstring>
-#include <cmath>
-#include <argparse/argparse.hpp>
-
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
 #include "kickcat/Mailbox.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
+
+#include <argparse/argparse.hpp>
+#include <cmath>
+#include <cstring>
+#include <iostream>
 
 
 using namespace kickcat;
@@ -75,21 +75,15 @@ void printEntryDescription(Bus& bus, Slave& slave, uint16_t index, uint8_t subin
 }
 
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     argparse::ArgumentParser program("ingenia_info");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{""})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{""}).store_into(red_interface_name);
 
     try
     {
@@ -116,10 +110,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    auto report_redundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto report_redundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
     std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
@@ -130,37 +121,34 @@ int main(int argc, char *argv[])
     {
         bus.init();
 
-        for (auto& slave: bus.slaves())
+        for (auto& slave : bus.slaves())
         {
             printInfo(slave);
             printESC(slave);
         }
     }
-    catch (ErrorAL const &e)
+    catch (ErrorAL const& e)
     {
         std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
         return 1;
     }
-    catch (std::exception const &e)
+    catch (std::exception const& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
     }
 
     auto& ingenia = bus.slaves().at(0);
-    //printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::NUMBER);
+    // printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::NUMBER);
     printObjectDictionnaryList(bus, ingenia, CoE::SDO::information::ListType::ALL);
 
 
     printObjectDescription(bus, ingenia, 0x1018);
-    printEntryDescription(bus, ingenia, 0x1018, 0,
-        CoE::SDO::information::ValueInfo::MAXIMUM);
+    printEntryDescription(bus, ingenia, 0x1018, 0, CoE::SDO::information::ValueInfo::MAXIMUM);
 
-    printEntryDescription(bus, ingenia, 0x1600, 0,
-        CoE::SDO::information::ValueInfo::DEFAULT);
+    printEntryDescription(bus, ingenia, 0x1600, 0, CoE::SDO::information::ValueInfo::DEFAULT);
 
-    printEntryDescription(bus, ingenia, 0x1600, 0,
-        CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
+    printEntryDescription(bus, ingenia, 0x1600, 0, CoE::SDO::information::ValueInfo::DEFAULT | CoE::SDO::information::ValueInfo::MINIMUM | CoE::SDO::information::ValueInfo::MAXIMUM);
 
 
     return 0;

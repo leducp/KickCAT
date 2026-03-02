@@ -1,14 +1,14 @@
-#include <iostream>
-#include <argparse/argparse.hpp>
-
-#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
+#include "kickcat/Link.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 
-#include "ElmoProtocol.h"
 #include "CanOpenErrors.h"
 #include "CanOpenStateMachine.h"
+#include "ElmoProtocol.h"
+
+#include <argparse/argparse.hpp>
+#include <iostream>
 
 
 using namespace kickcat;
@@ -18,16 +18,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("elmo_control");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{""})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{""}).store_into(red_interface_name);
 
     try
     {
@@ -54,12 +48,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto report_redundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto report_redundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
+    std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
@@ -92,8 +83,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    auto false_alarm = [](DatagramState const&){ printf("previous error was a false alarm"); };
+    auto callback_error = [](DatagramState const&) { THROW_ERROR("something bad happened"); };
+    auto false_alarm = [](DatagramState const&) { printf("previous error was a false alarm"); };
 
     try
     {
@@ -145,10 +136,10 @@ int main(int argc, char* argv[])
 
         try
         {
-            bus.sendLogicalRead(callback_error);            // Update inputPDO
-            bus.sendLogicalWrite(callback_error);           // Update outputPDO
+            bus.sendLogicalRead(callback_error);  // Update inputPDO
+            bus.sendLogicalWrite(callback_error); // Update outputPDO
             bus.sendMailboxesReadChecks(callback_error);
-            bus.sendReadMessages(callback_error);           // Get emergencies
+            bus.sendReadMessages(callback_error); // Get emergencies
 
             bus.finalizeDatagrams();
             bus.processAwaitingFrames();

@@ -1,9 +1,9 @@
-#include "kickcat/protocol.h"
 #include "kickcat/CoE/mailbox/request.h"
+#include "kickcat/protocol.h"
 
+#include <argparse/argparse.hpp>
 #include <arpa/inet.h>
 #include <cstring>
-#include <argparse/argparse.hpp>
 
 
 using namespace kickcat;
@@ -13,17 +13,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("emitter");
 
     std::string dest_ip;
-    program.add_argument("-a", "--address")
-        .help("destination IP address")
-        .default_value(std::string{"127.0.0.1"})
-        .store_into(dest_ip);
+    program.add_argument("-a", "--address").help("destination IP address").default_value(std::string{"127.0.0.1"}).store_into(dest_ip);
 
     uint16_t dest_port;
-    program.add_argument("-p", "--port")
-        .help("destination UDP port")
-        .default_value(uint16_t{0x88A4})
-        .scan<'i', uint16_t>()
-        .store_into(dest_port);
+    program.add_argument("-p", "--port").help("destination UDP port").default_value(uint16_t{0x88A4}).scan<'i', uint16_t>().store_into(dest_port);
 
     try
     {
@@ -50,7 +43,7 @@ int main(int argc, char* argv[])
     socklen_t addr_size = sizeof(addr);
     std::memset(&addr, 0, sizeof(addr));
 
-    addr.sin_family      = AF_INET;         // IPv4
+    addr.sin_family = AF_INET; // IPv4
     addr.sin_addr.s_addr = inet_addr(dest_ip.c_str());
     addr.sin_port = hton<uint16_t>(dest_port); // Port is defined in ETG 8200
 

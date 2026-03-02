@@ -9,296 +9,164 @@ namespace kickcat::CoE
         CoE::Dictionary dictionary;
 
         {
-            CoE::Object object
-            {
-                0x1000,
-                CoE::ObjectCode::VAR,
-                "Device Type",
-                {}
-            };
-            CoE::addEntry<uint32_t>(object,0,32,0,7,static_cast<CoE::DataType>(7),"",0x0);
+            CoE::Object object{0x1000, CoE::ObjectCode::VAR, "Device Type", {}};
+            CoE::addEntry<uint32_t>(object, 0, 32, 0, 7, static_cast<CoE::DataType>(7), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1018,
-                CoE::ObjectCode::RECORD,
-                "Identity Object",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x4);
-            CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"Vendor ID",0x6a5);
-            CoE::addEntry<uint32_t>(object,2,32,48,7,static_cast<CoE::DataType>(7),"Product code",0xb0cad0);
-            CoE::addEntry<uint32_t>(object,3,32,80,7,static_cast<CoE::DataType>(7),"Revision number",0x0);
-            CoE::addEntry<uint32_t>(object,4,32,112,7,static_cast<CoE::DataType>(7),"Serial number",0xcafedeca);
+            CoE::Object object{0x1018, CoE::ObjectCode::RECORD, "Identity Object", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, 7, static_cast<CoE::DataType>(5), "Subindex 000", 0x4);
+            CoE::addEntry<uint32_t>(object, 1, 32, 16, 7, static_cast<CoE::DataType>(7), "Vendor ID", 0x6a5);
+            CoE::addEntry<uint32_t>(object, 2, 32, 48, 7, static_cast<CoE::DataType>(7), "Product code", 0xb0cad0);
+            CoE::addEntry<uint32_t>(object, 3, 32, 80, 7, static_cast<CoE::DataType>(7), "Revision number", 0x0);
+            CoE::addEntry<uint32_t>(object, 4, 32, 112, 7, static_cast<CoE::DataType>(7), "Serial number", 0xcafedeca);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1600,
-                CoE::ObjectCode::RECORD,
-                "RxPDO Map 1",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"RxPDO Map 1 Element 1",0x60000010);
+            CoE::Object object{0x1600, CoE::ObjectCode::RECORD, "RxPDO Map 1", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, 7, static_cast<CoE::DataType>(5), "Subindex 000", 0x1);
+            CoE::addEntry<uint32_t>(object, 1, 32, 16, 7, static_cast<CoE::DataType>(7), "RxPDO Map 1 Element 1", 0x60000010);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1a00,
-                CoE::ObjectCode::RECORD,
-                "TxPDO Map 1",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0xd);
-            CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 1",0x60000010);
-            CoE::addEntry<uint32_t>(object,2,32,48,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 2",0x60010010);
-            CoE::addEntry<uint32_t>(object,3,32,80,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 3",0x60020010);
-            CoE::addEntry<uint32_t>(object,4,32,112,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 4",0x60030010);
-            CoE::addEntry<uint32_t>(object,5,32,144,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 5",0x60040010);
-            CoE::addEntry<uint32_t>(object,6,32,176,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 6",0x60050010);
-            CoE::addEntry<uint32_t>(object,7,32,208,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 7",0x60060010);
-            CoE::addEntry<uint32_t>(object,8,32,240,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 8",0x60070010);
-            CoE::addEntry<uint32_t>(object,9,32,272,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 9",0x60080010);
-            CoE::addEntry<uint32_t>(object,10,32,304,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 10",0x60090010);
-            CoE::addEntry<uint32_t>(object,11,32,336,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 11",0x600a0010);
-            CoE::addEntry<uint32_t>(object,12,32,368,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 12",0x600b0010);
-            CoE::addEntry<uint32_t>(object,13,32,400,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 13",0x600c0010);
-            CoE::addEntry<uint32_t>(object,14,32,432,7,static_cast<CoE::DataType>(7),"TxPDO Map 1 Element 14",0x600d0010);
+            CoE::Object object{0x1a00, CoE::ObjectCode::RECORD, "TxPDO Map 1", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, 7, static_cast<CoE::DataType>(5), "Subindex 000", 0xd);
+            CoE::addEntry<uint32_t>(object, 1, 32, 16, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 1", 0x60000010);
+            CoE::addEntry<uint32_t>(object, 2, 32, 48, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 2", 0x60010010);
+            CoE::addEntry<uint32_t>(object, 3, 32, 80, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 3", 0x60020010);
+            CoE::addEntry<uint32_t>(object, 4, 32, 112, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 4", 0x60030010);
+            CoE::addEntry<uint32_t>(object, 5, 32, 144, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 5", 0x60040010);
+            CoE::addEntry<uint32_t>(object, 6, 32, 176, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 6", 0x60050010);
+            CoE::addEntry<uint32_t>(object, 7, 32, 208, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 7", 0x60060010);
+            CoE::addEntry<uint32_t>(object, 8, 32, 240, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 8", 0x60070010);
+            CoE::addEntry<uint32_t>(object, 9, 32, 272, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 9", 0x60080010);
+            CoE::addEntry<uint32_t>(object, 10, 32, 304, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 10", 0x60090010);
+            CoE::addEntry<uint32_t>(object, 11, 32, 336, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 11", 0x600a0010);
+            CoE::addEntry<uint32_t>(object, 12, 32, 368, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 12", 0x600b0010);
+            CoE::addEntry<uint32_t>(object, 13, 32, 400, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 13", 0x600c0010);
+            CoE::addEntry<uint32_t>(object, 14, 32, 432, 7, static_cast<CoE::DataType>(7), "TxPDO Map 1 Element 14", 0x600d0010);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1c00,
-                CoE::ObjectCode::ARRAY,
-                "Sync manager type",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 0",0x4);
-            CoE::addEntry<uint8_t>(object,1,8,16,7,static_cast<CoE::DataType>(5),"Subindex 1",0x1);
-            CoE::addEntry<uint8_t>(object,2,8,24,7,static_cast<CoE::DataType>(5),"Subindex 2",0x2);
-            CoE::addEntry<uint8_t>(object,3,8,32,7,static_cast<CoE::DataType>(5),"Subindex 3",0x3);
-            CoE::addEntry<uint8_t>(object,4,8,40,7,static_cast<CoE::DataType>(5),"Subindex 4",0x4);
+            CoE::Object object{0x1c00, CoE::ObjectCode::ARRAY, "Sync manager type", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, 7, static_cast<CoE::DataType>(5), "Subindex 0", 0x4);
+            CoE::addEntry<uint8_t>(object, 1, 8, 16, 7, static_cast<CoE::DataType>(5), "Subindex 1", 0x1);
+            CoE::addEntry<uint8_t>(object, 2, 8, 24, 7, static_cast<CoE::DataType>(5), "Subindex 2", 0x2);
+            CoE::addEntry<uint8_t>(object, 3, 8, 32, 7, static_cast<CoE::DataType>(5), "Subindex 3", 0x3);
+            CoE::addEntry<uint8_t>(object, 4, 8, 40, 7, static_cast<CoE::DataType>(5), "Subindex 4", 0x4);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1c12,
-                CoE::ObjectCode::ARRAY,
-                "RxPDO assign",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry<uint16_t>(object,1,16,16,15,static_cast<CoE::DataType>(6),"RxPDO assign Element 1",0x1600);
+            CoE::Object object{0x1c12, CoE::ObjectCode::ARRAY, "RxPDO assign", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, 15, static_cast<CoE::DataType>(5), "Subindex 000", 0x1);
+            CoE::addEntry<uint16_t>(object, 1, 16, 16, 15, static_cast<CoE::DataType>(6), "RxPDO assign Element 1", 0x1600);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x1c13,
-                CoE::ObjectCode::ARRAY,
-                "TxPDO assign",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,15,static_cast<CoE::DataType>(5),"Subindex 000",0x1);
-            CoE::addEntry<uint16_t>(object,1,16,16,15,static_cast<CoE::DataType>(6),"TxPDO assign Element 1",0x1a00);
+            CoE::Object object{0x1c13, CoE::ObjectCode::ARRAY, "TxPDO assign", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, 15, static_cast<CoE::DataType>(5), "Subindex 000", 0x1);
+            CoE::addEntry<uint16_t>(object, 1, 16, 16, 15, static_cast<CoE::DataType>(6), "TxPDO assign Element 1", 0x1a00);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x2000,
-                CoE::ObjectCode::RECORD,
-                "FreezeValue",
-                {}
-            };
-            CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x2);
-            CoE::addEntry<uint32_t>(object,1,32,16,63,static_cast<CoE::DataType>(7),"ForceSensor0",0x2);
-            CoE::addEntry<uint32_t>(object,2,32,48,63,static_cast<CoE::DataType>(7),"IMU",0x2);
+            CoE::Object object{0x2000, CoE::ObjectCode::RECORD, "FreezeValue", {}};
+            CoE::addEntry<uint8_t>(object, 0, 8, 0, 7, static_cast<CoE::DataType>(5), "Subindex 000", 0x2);
+            CoE::addEntry<uint32_t>(object, 1, 32, 16, 63, static_cast<CoE::DataType>(7), "ForceSensor0", 0x2);
+            CoE::addEntry<uint32_t>(object, 2, 32, 48, 63, static_cast<CoE::DataType>(7), "IMU", 0x2);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6000,
-                CoE::ObjectCode::VAR,
-                "wdg_counter",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,199,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6000, CoE::ObjectCode::VAR, "wdg_counter", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 199, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6001,
-                CoE::ObjectCode::VAR,
-                "acc_x",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6001, CoE::ObjectCode::VAR, "acc_x", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6002,
-                CoE::ObjectCode::VAR,
-                "acc_y",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6002, CoE::ObjectCode::VAR, "acc_y", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6003,
-                CoE::ObjectCode::VAR,
-                "acc_z",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6003, CoE::ObjectCode::VAR, "acc_z", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6004,
-                CoE::ObjectCode::VAR,
-                "gyro_x",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6004, CoE::ObjectCode::VAR, "gyro_x", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6005,
-                CoE::ObjectCode::VAR,
-                "gyro_y",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6005, CoE::ObjectCode::VAR, "gyro_y", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6006,
-                CoE::ObjectCode::VAR,
-                "gyro_z",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6006, CoE::ObjectCode::VAR, "gyro_z", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6007,
-                CoE::ObjectCode::VAR,
-                "imu_temperature",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6007, CoE::ObjectCode::VAR, "imu_temperature", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6008,
-                CoE::ObjectCode::VAR,
-                "force_sensor_0",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6008, CoE::ObjectCode::VAR, "force_sensor_0", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x6009,
-                CoE::ObjectCode::VAR,
-                "force_sensor_1",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x6009, CoE::ObjectCode::VAR, "force_sensor_1", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x600a,
-                CoE::ObjectCode::VAR,
-                "force_sensor_2",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x600a, CoE::ObjectCode::VAR, "force_sensor_2", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x600b,
-                CoE::ObjectCode::VAR,
-                "force_sensor_3",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x600b, CoE::ObjectCode::VAR, "force_sensor_3", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x600c,
-                CoE::ObjectCode::VAR,
-                "adc_vref",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x600c, CoE::ObjectCode::VAR, "adc_vref", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
         {
-            CoE::Object object
-            {
-                0x600d,
-                CoE::ObjectCode::VAR,
-                "board_status",
-                {}
-            };
-            CoE::addEntry<uint16_t>(object,0,16,0,135,static_cast<CoE::DataType>(6),"",0x0);
+            CoE::Object object{0x600d, CoE::ObjectCode::VAR, "board_status", {}};
+            CoE::addEntry<uint16_t>(object, 0, 16, 0, 135, static_cast<CoE::DataType>(6), "", 0x0);
             dictionary.push_back(std::move(object));
         }
 
-         return dictionary;
+        return dictionary;
     }
 }

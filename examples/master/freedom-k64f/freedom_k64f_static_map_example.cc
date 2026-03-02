@@ -1,11 +1,11 @@
-#include <iostream>
-#include <argparse/argparse.hpp>
-
-#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
+#include "kickcat/Link.h"
+#include "kickcat/MailboxSequencer.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
-#include "kickcat/MailboxSequencer.h"
+
+#include <argparse/argparse.hpp>
+#include <iostream>
 
 using namespace kickcat;
 
@@ -17,9 +17,9 @@ namespace freedom
         int16_t accelerometerY; // mapped 0x6001
         int16_t accelerometerZ; // mapped 0x6002
 
-        int16_t magnetometerX;  // mapped 0x6003
-        int16_t magnetometerY;  // mapped 0x6004
-        int16_t magnetometerZ;  // mapped 0x6005
+        int16_t magnetometerX; // mapped 0x6003
+        int16_t magnetometerY; // mapped 0x6004
+        int16_t magnetometerZ; // mapped 0x6005
     } __attribute__((packed));
 
     struct Input
@@ -41,16 +41,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("freedom_k64f_example");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{""})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{""}).store_into(red_interface_name);
 
     try
     {
@@ -77,12 +71,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto report_redundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto report_redundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
+    std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
@@ -100,7 +91,7 @@ int main(int argc, char* argv[])
     uint8_t io_buffer[2048];
     try
     {
-        bus.init(100ms);  // to adapt to your use case
+        bus.init(100ms); // to adapt to your use case
 
         printf("Init done \n");
         print_current_state();
@@ -108,14 +99,14 @@ int main(int argc, char* argv[])
         bus.createMapping(io_buffer);
 
         bus.enableIRQ(EcatEvent::DL_STATUS,
-        [&]()
-        {
-            printf("DL_STATUS IRQ triggered!\n");
-            bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state){ printf("IRQ reset error: %s\n", toString(state));});
-            bus.processAwaitingFrames();
+                      [&]()
+                      {
+                          printf("DL_STATUS IRQ triggered!\n");
+                          bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state) { printf("IRQ reset error: %s\n", toString(state)); });
+                          bus.processAwaitingFrames();
 
-            printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
-        });
+                          printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
+                      });
     }
     catch (ErrorAL const& e)
     {
@@ -128,7 +119,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    for (auto& slave: bus.slaves())
+    for (auto& slave : bus.slaves())
     {
         printInfo(slave);
         printESC(slave);
@@ -140,8 +131,8 @@ int main(int argc, char* argv[])
     {
         auto cyclic_process_data = [&]()
         {
-            auto noop =[](DatagramState const&){};
-            bus.processDataRead (noop);
+            auto noop = [](DatagramState const&) {};
+            bus.processDataRead(noop);
             bus.processDataWrite(noop);
         };
 
@@ -173,12 +164,12 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    link->setTimeout(10ms);  // Adapt to your use case (RT loop)
+    auto callback_error = [](DatagramState const&) { THROW_ERROR("something bad happened"); };
+    link->setTimeout(10ms); // Adapt to your use case (RT loop)
     MailboxSequencer mailbox_sequencer(bus);
 
     // Map PDO memory to structs
-    freedom::Input*  input  = reinterpret_cast<freedom::Input*>(easycat.input.data);
+    freedom::Input* input = reinterpret_cast<freedom::Input*>(easycat.input.data);
     freedom::Output* output = reinterpret_cast<freedom::Output*>(easycat.output.data);
 
 
@@ -190,7 +181,7 @@ int main(int argc, char* argv[])
     }
 
     constexpr int16_t THRESHOLD_ACCEL = 1000;
-    constexpr int16_t THRESHOLD_MAG   = 1000;
+    constexpr int16_t THRESHOLD_MAG = 1000;
 
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
@@ -218,11 +209,7 @@ int main(int argc, char* argv[])
             output->LED_G = (ay > THRESHOLD_ACCEL || ay < -THRESHOLD_ACCEL) ? 1 : 0;
             output->LED_B = (mz > THRESHOLD_MAG || mz < -THRESHOLD_MAG) ? 1 : 0;
 
-            printf("Accel [X:%d Y:%d Z:%d] | Mag [X:%d Y:%d Z:%d] | LED [R:%u G:%u B:%u]\n",
-                ax, ay, az,
-                mx, my, mz,
-                output->LED_R, output->LED_G, output->LED_B
-            );
+            printf("Accel [X:%d Y:%d Z:%d] | Mag [X:%d Y:%d Z:%d] | LED [R:%u G:%u B:%u]\n", ax, ay, az, mx, my, mz, output->LED_R, output->LED_G, output->LED_B);
         }
         catch (std::exception const& e)
         {

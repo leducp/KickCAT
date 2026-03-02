@@ -1,11 +1,11 @@
-#include <iostream>
-#include <argparse/argparse.hpp>
-
-#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
+#include "kickcat/Link.h"
+#include "kickcat/MailboxSequencer.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
-#include "kickcat/MailboxSequencer.h"
+
+#include <argparse/argparse.hpp>
+#include <iostream>
 
 using namespace kickcat;
 
@@ -22,7 +22,7 @@ namespace foot
         int16_t gyroscopeZ;
 
         int16_t temperature; // Celsius degrees
-    }__attribute__((packed));
+    } __attribute__((packed));
 
     struct Input
     {
@@ -51,16 +51,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("wdc_foot_example");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{""})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{""}).store_into(red_interface_name);
 
     try
     {
@@ -87,12 +81,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto report_redundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto report_redundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
+    std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
@@ -123,14 +114,14 @@ int main(int argc, char* argv[])
         printf("Firmware Version %02x\n", identityObject[0]);
 
         bus.enableIRQ(EcatEvent::DL_STATUS,
-        [&]()
-        {
-            printf("DL_STATUS IRQ triggered!\n");
-            bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state){ printf("IRQ reset error: %s\n", toString(state));});
-            bus.processAwaitingFrames();
+                      [&]()
+                      {
+                          printf("DL_STATUS IRQ triggered!\n");
+                          bus.sendGetDLStatus(bus.slaves().at(0), [](DatagramState const& state) { printf("IRQ reset error: %s\n", toString(state)); });
+                          bus.processAwaitingFrames();
 
-            printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
-        });
+                          printf("Slave DL status: %s", toString(bus.slaves().at(0).dl_status).c_str());
+                      });
 
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
@@ -147,13 +138,13 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    for (auto& slave: bus.slaves())
+    for (auto& slave : bus.slaves())
     {
         printInfo(slave);
         printESC(slave);
     }
 
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+    auto callback_error = [](DatagramState const&) { THROW_ERROR("something bad happened"); };
     MailboxSequencer mailbox_sequencer(bus);
 
     // Set valid output to exit safe op.
@@ -220,8 +211,12 @@ int main(int argc, char* argv[])
             bus.processAwaitingFrames();
 
             printf("input Acc %i %i %i, force sensor 0: %i Watchdog counter input %i, wdg cnt output %i\n",
-                input->footIMU.accelerometerX, input->footIMU.accelerometerY, input->footIMU.accelerometerZ,
-                input->force_sensor0, input->watchdog_counter, output->watchdog_counter);
+                   input->footIMU.accelerometerX,
+                   input->footIMU.accelerometerY,
+                   input->footIMU.accelerometerZ,
+                   input->force_sensor0,
+                   input->watchdog_counter,
+                   output->watchdog_counter);
         }
         catch (std::exception const& e)
         {

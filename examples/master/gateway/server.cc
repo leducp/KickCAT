@@ -1,21 +1,21 @@
-#include <iostream>
-#include <cstring>
-#include <argparse/argparse.hpp>
-
-#include "kickcat/Link.h"
 #include "kickcat/Bus.h"
+#include "kickcat/Gateway.h"
+#include "kickcat/Link.h"
+#include "kickcat/MailboxSequencer.h"
 #include "kickcat/Prints.h"
 #include "kickcat/SocketNull.h"
-#include "kickcat/Gateway.h"
 #include "kickcat/helpers.h"
-#include "kickcat/MailboxSequencer.h"
+
+#include <argparse/argparse.hpp>
+#include <cstring>
+#include <iostream>
 
 #ifdef __linux__
-    #include "kickcat/OS/Linux/Socket.h"
+#include "kickcat/OS/Linux/Socket.h"
 #elif __PikeOS__
-    #include "kickcat/OS/PikeOS/Socket.h"
+#include "kickcat/OS/PikeOS/Socket.h"
 #else
-    #error "Unknown platform"
+#error "Unknown platform"
 #endif
 
 #include "kickcat/OS/Linux/UdpDiagSocket.h"
@@ -29,16 +29,10 @@ int main(int argc, char* argv[])
     argparse::ArgumentParser program("server");
 
     std::string nom_interface_name;
-    program.add_argument("-i", "--interface")
-        .help("network interface name")
-        .required()
-        .store_into(nom_interface_name);
+    program.add_argument("-i", "--interface").help("network interface name").required().store_into(nom_interface_name);
 
     std::string red_interface_name;
-    program.add_argument("-r", "--redundancy")
-        .help("redundancy network interface name")
-        .default_value(std::string{"null"})
-        .store_into(red_interface_name);
+    program.add_argument("-r", "--redundancy").help("redundancy network interface name").default_value(std::string{"null"}).store_into(red_interface_name);
 
     try
     {
@@ -77,12 +71,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto reportRedundancy = []()
-    {
-        printf("Redundancy has been activated due to loss of a cable \n");
-    };
+    auto reportRedundancy = []() { printf("Redundancy has been activated due to loss of a cable \n"); };
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socketNominal, socketRedundancy, reportRedundancy);
+    std::shared_ptr<Link> link = std::make_shared<Link>(socketNominal, socketRedundancy, reportRedundancy);
     link->setTimeout(2ms);
     link->checkRedundancyNeeded();
 
@@ -119,7 +110,7 @@ int main(int argc, char* argv[])
     socket->open();
     Gateway gateway(socket, std::bind(&Bus::addGatewayMessage, &bus, _1, _2, _3));
 
-    auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
+    auto callback_error = [](DatagramState const&) { THROW_ERROR("something bad happened"); };
     MailboxSequencer mailbox_sequencer(bus);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
