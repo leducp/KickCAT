@@ -34,7 +34,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             export conan_profile=${{github.workspace}}/build/profile.txt
-            ./scripts/setup_build.sh ${{github.workspace}}/build
+            ./setup_build.sh ${{github.workspace}}/build
           elif [ "$RUNNER_OS" == "Windows" ]; then
             conan install conan/conanfile_windows.txt -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
             mkdir -p ${{github.workspace}}/build
