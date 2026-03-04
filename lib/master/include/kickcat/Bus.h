@@ -87,7 +87,13 @@ namespace kickcat
         void checkMailboxes( std::function<void(DatagramState const&)> const& error);
         void processMessages(std::function<void(DatagramState const&)> const& error);
 
-        // DC
+        /// \brief  Send drift compensation datagrams to maintain DC synchronization
+        /// \details Writes the current master time to the DC reference clock slave's system time register (0x0910)
+        ///          using FPWR, then reads it back with FRMW so that each slave on the segment updates its
+        ///          local clock offset accordingly.
+        ///          Called cyclically during process data exchange, and repeatedly (15 000 times) during
+        ///          static drift compensation at DC initialization.
+        /// \param  error  Callback invoked when a datagram error occurs
         void sendDriftCompensation(std::function<void(DatagramState const&)> const& error);
 
         /// \brief  Check if distributed clocks are synchronized

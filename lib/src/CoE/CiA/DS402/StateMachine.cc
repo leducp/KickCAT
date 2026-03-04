@@ -17,7 +17,7 @@ namespace kickcat::CoE::CiA::DS402
                     case State::OFF:
                     {
                         start_motor_timestamp_ = since_epoch();
-                        control_word_ = control::word::FAULT_RESET | control::word::DISABLE_BRAKE;
+                        control_word_ = control::word::FAULT_RESET;
                         if ((status_word_ & status::value::FAULT_STATE) != status::value::FAULT_STATE)
                         {
                             motor_state_ = State::SAFE_RESET;
@@ -26,7 +26,7 @@ namespace kickcat::CoE::CiA::DS402
                     }
                     case State::SAFE_RESET:
                     {
-                        control_word_ = control::word::SHUTDOWN | control::word::DISABLE_BRAKE;
+                        control_word_ = control::word::SHUTDOWN;
                         if (elapsed_time(start_motor_timestamp_) > MOTOR_RESET_DELAY)
                         {
                             motor_state_ = State::PREPARE_TO_SWITCH_ON ;
@@ -35,7 +35,7 @@ namespace kickcat::CoE::CiA::DS402
                     }
                     case State::PREPARE_TO_SWITCH_ON:
                     {
-                        control_word_ = control::word::SHUTDOWN | control::word::DISABLE_BRAKE;
+                        control_word_ = control::word::SHUTDOWN;
                         if ((status_word_ & status::value::READY_TO_SWITCH_ON_STATE) == status::value::READY_TO_SWITCH_ON_STATE)
                         {
                             motor_state_ = State::SWITCH_ON;
@@ -44,7 +44,7 @@ namespace kickcat::CoE::CiA::DS402
                     }
                     case State::SWITCH_ON:
                     {
-                        control_word_ = control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE;
+                        control_word_ = control::word::ENABLE_OPERATION;
                         if ((status_word_ & status::value::ON_STATE)== status::value::ON_STATE)
                         {
                             motor_state_ = State::ON ;
@@ -81,7 +81,7 @@ namespace kickcat::CoE::CiA::DS402
             }
             case Command::DISABLE:
             {
-                control_word_ = control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE;
+                control_word_ = control::word::DISABLE_VOLTAGE;
                 if ((status::value::OFF_STATE & status_word_) == status::value::OFF_STATE)
                 {
                     motor_state_ = State::OFF;

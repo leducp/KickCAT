@@ -55,7 +55,6 @@ namespace kickcat::CoE::CiA::DS402
             constexpr uint16_t QUICK_STOP                     = 0x0002U;
             constexpr uint16_t SET_ABS_POINT_NOBLEND          = 0x001FU;
             constexpr uint16_t SET_POINT_RESET                = 0x000FU;
-            constexpr uint16_t DISABLE_BRAKE                  = 0x8000U; //TODO check if this is usesful!
         }
 
         // controlmode stores the available CAN control mode (also called "Mode of Operation")

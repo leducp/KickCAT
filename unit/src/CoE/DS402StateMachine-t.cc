@@ -76,17 +76,17 @@ TEST_F(DS402StateMachineTest, enable_from_off_sends_fault_reset)
     sm.enable();
     sm.update(0);
 
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 }
 
 TEST_F(DS402StateMachineTest, enable_off_with_fault_stays_in_off)
 {
     sm.enable();
     sm.update(status::value::FAULT_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 
     sm.update(status::value::FAULT_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 }
 
 TEST_F(DS402StateMachineTest, enable_off_transitions_after_fault_cleared)
@@ -97,7 +97,7 @@ TEST_F(DS402StateMachineTest, enable_off_transitions_after_fault_cleared)
 
     // Now in SAFE_RESET
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 }
 
 // --- ENABLE: SAFE_RESET state ---
@@ -107,7 +107,7 @@ TEST_F(DS402StateMachineTest, safe_reset_sends_shutdown)
     reachSafeReset();
 
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 }
 
 TEST_F(DS402StateMachineTest, safe_reset_does_not_transition_before_delay)
@@ -120,7 +120,7 @@ TEST_F(DS402StateMachineTest, safe_reset_does_not_transition_before_delay)
     sm.update(status::value::READY_TO_SWITCH_ON_STATE);
     sm.update(status::value::ON_STATE);
 
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 }
 
 TEST_F(DS402StateMachineTest, safe_reset_transitions_after_delay)
@@ -132,7 +132,7 @@ TEST_F(DS402StateMachineTest, safe_reset_transitions_after_delay)
     // Now in PREPARE_TO_SWITCH_ON: READY_TO_SWITCH_ON triggers SWITCH_ON transition
     sm.update(status::value::READY_TO_SWITCH_ON_STATE);
     sm.update(status::value::ON_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 }
 
 // --- ENABLE: PREPARE_TO_SWITCH_ON state ---
@@ -142,7 +142,7 @@ TEST_F(DS402StateMachineTest, prepare_to_switch_on_sends_shutdown)
     reachPrepareToSwitchOn();
 
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 }
 
 TEST_F(DS402StateMachineTest, prepare_to_switch_on_waits_for_ready_status)
@@ -151,7 +151,7 @@ TEST_F(DS402StateMachineTest, prepare_to_switch_on_waits_for_ready_status)
 
     sm.update(0);
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 }
 
 TEST_F(DS402StateMachineTest, prepare_to_switch_on_transitions_on_ready_status)
@@ -160,7 +160,7 @@ TEST_F(DS402StateMachineTest, prepare_to_switch_on_transitions_on_ready_status)
 
     sm.update(status::value::READY_TO_SWITCH_ON_STATE);
     sm.update(status::value::ON_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 }
 
 // --- ENABLE: SWITCH_ON state ---
@@ -170,7 +170,7 @@ TEST_F(DS402StateMachineTest, switch_on_sends_enable_operation)
     reachSwitchOn();
 
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 }
 
 TEST_F(DS402StateMachineTest, switch_on_waits_for_on_status)
@@ -179,7 +179,7 @@ TEST_F(DS402StateMachineTest, switch_on_waits_for_on_status)
 
     sm.update(0);
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 }
 
 TEST_F(DS402StateMachineTest, switch_on_transitions_to_on)
@@ -187,11 +187,11 @@ TEST_F(DS402StateMachineTest, switch_on_transitions_to_on)
     reachSwitchOn();
 
     sm.update(status::value::ON_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 
     // Command should be reset: further updates via NONE don't change anything
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 }
 
 // --- Full enable sequence ---
@@ -202,24 +202,24 @@ TEST_F(DS402StateMachineTest, full_enable_sequence)
 
     // OFF -> SAFE_RESET
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 
     // In SAFE_RESET
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 
     // Wait for reset delay, then SAFE_RESET -> PREPARE_TO_SWITCH_ON
     advanceClock(110ms);
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 
     // PREPARE_TO_SWITCH_ON -> SWITCH_ON
     sm.update(status::value::READY_TO_SWITCH_ON_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 
     // SWITCH_ON -> ON
     sm.update(status::value::ON_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 }
 
 TEST_F(DS402StateMachineTest, enable_command_resets_after_reaching_on)
@@ -245,7 +245,7 @@ TEST_F(DS402StateMachineTest, timeout_in_prepare_to_switch_on_resets_to_off)
 
     // Should have timed out -> motor_state_ back to OFF, command still ENABLE
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 }
 
 TEST_F(DS402StateMachineTest, timeout_in_safe_reset_resets_to_off)
@@ -257,7 +257,7 @@ TEST_F(DS402StateMachineTest, timeout_in_safe_reset_resets_to_off)
 
     // Timed out -> back to OFF, command still ENABLE
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 }
 
 TEST_F(DS402StateMachineTest, timeout_in_switch_on_resets_to_off)
@@ -268,7 +268,7 @@ TEST_F(DS402StateMachineTest, timeout_in_switch_on_resets_to_off)
     sm.update(0);
 
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 }
 
 // --- DISABLE ---
@@ -278,18 +278,18 @@ TEST_F(DS402StateMachineTest, disable_sends_disable_voltage)
     sm.disable();
     sm.update(0);
 
-    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE);
 }
 
 TEST_F(DS402StateMachineTest, disable_transitions_to_off_on_off_status)
 {
     sm.disable();
     sm.update(status::value::OFF_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE);
 
     // Command should be reset to NONE
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE);
 }
 
 TEST_F(DS402StateMachineTest, disable_from_on_state)
@@ -298,10 +298,10 @@ TEST_F(DS402StateMachineTest, disable_from_on_state)
 
     sm.disable();
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE);
 
     sm.update(status::value::OFF_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE);
 }
 
 TEST_F(DS402StateMachineTest, disable_during_enable_sequence)
@@ -310,10 +310,10 @@ TEST_F(DS402StateMachineTest, disable_during_enable_sequence)
 
     sm.disable();
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE);
 
     sm.update(status::value::OFF_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::DISABLE_VOLTAGE);
 }
 
 // --- Re-enable ---
@@ -327,7 +327,7 @@ TEST_F(DS402StateMachineTest, enable_after_disable)
 
     sm.enable();
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 }
 
 TEST_F(DS402StateMachineTest, enable_after_timeout)
@@ -338,15 +338,15 @@ TEST_F(DS402StateMachineTest, enable_after_timeout)
 
     // Back in OFF with ENABLE command, start the sequence again
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::FAULT_RESET);
 
     // Can complete the full sequence after a timeout
     sm.update(0);
-    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::SHUTDOWN);
 
     advanceClock(110ms);
     sm.update(0);
     sm.update(status::value::READY_TO_SWITCH_ON_STATE);
     sm.update(status::value::ON_STATE);
-    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION | control::word::DISABLE_BRAKE);
+    EXPECT_EQ(sm.controlWord(), control::word::ENABLE_OPERATION);
 }

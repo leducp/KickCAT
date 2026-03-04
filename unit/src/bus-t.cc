@@ -73,8 +73,7 @@ public:
         mock_link->handleProcess(Command::FPRD, ESC::Description{0x4, 0, 0, 8, 8, 16, 0xf, 0x1cc}, 1);
 
         // fetch DL status
-        checkSendFrameSimple(Command::FPRD);
-        io_nominal->handleReply<uint16_t>({0x0030}); // PL_port0 and PL_port1 active
+        mock_link->handleProcess(Command::FPRD, uint16_t(0x0030), 1); // PL_port0 and PL_port1 active
 
         // requestState: INIT
         mock_link->handleWriteThenRead(Command::BWR, 1);
