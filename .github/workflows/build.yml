@@ -163,7 +163,7 @@ jobs:
 
       - name: Install KickCAT Wheel
         run: |
-          pip install wheelhouse/*.whl
+          pip install kickcat --no-index --find-links wheelhouse
 
       - name: Fix permissions
         run: |
