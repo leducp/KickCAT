@@ -4,7 +4,7 @@ name: Quality
 # access to secrets
 on:
   workflow_run:
-    workflows: ["PR build"]
+    workflows: ["CI pipeline"]
     types:
       - completed
 
