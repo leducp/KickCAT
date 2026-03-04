@@ -1,6 +1,7 @@
-import kickcat
 import argparse
 import struct
+
+import kickcat
 from kickcat import State
 
 
@@ -24,9 +25,7 @@ def read_pdo_assignment(bus, slave, assignment_index, pdo_type_name, timeout=0.1
 
     try:
         # Read number of assigned PDOs
-        data = bus.read_sdo(
-            slave, assignment_index, 0, kickcat.Access.PARTIAL, 1, timeout
-        )
+        data = bus.read_sdo(slave, assignment_index, 0, kickcat.Access.PARTIAL, 1, timeout)
         num_pdos = struct.unpack("B", data)[0]
         print(f"Number of {pdo_type_name}s: {num_pdos}")
 
@@ -35,9 +34,7 @@ def read_pdo_assignment(bus, slave, assignment_index, pdo_type_name, timeout=0.1
         # Iterate through each assigned PDO
         for i in range(1, num_pdos + 1):
             # Read PDO index
-            data = bus.read_sdo(
-                slave, assignment_index, i, kickcat.Access.PARTIAL, 2, timeout
-            )
+            data = bus.read_sdo(slave, assignment_index, i, kickcat.Access.PARTIAL, 2, timeout)
             pdo_index = struct.unpack("<H", data)[0]
             print(f"  {pdo_type_name} {i}: 0x{pdo_index:04X}")
 
@@ -49,9 +46,7 @@ def read_pdo_assignment(bus, slave, assignment_index, pdo_type_name, timeout=0.1
             # Read each mapped object
             for j in range(1, num_objects + 1):
                 # Read 32-bit mapping entry
-                data = bus.read_sdo(
-                    slave, pdo_index, j, kickcat.Access.PARTIAL, 4, timeout
-                )
+                data = bus.read_sdo(slave, pdo_index, j, kickcat.Access.PARTIAL, 4, timeout)
                 mapping_entry = struct.unpack("<I", data)[0]
 
                 # Decode mapping entry: [Index:16][SubIndex:8][BitLength:8]
@@ -68,8 +63,7 @@ def read_pdo_assignment(bus, slave, assignment_index, pdo_type_name, timeout=0.1
                     name = "empty name"
 
                 print(
-                    f"      [{j}] : 0x{obj_index:04X}:{obj_subindex} {name}, "
-                    f"Bits: {bit_length}, Offset: {byte_offset}"
+                    f"      [{j}] : 0x{obj_index:04X}:{obj_subindex} {name}, Bits: {bit_length}, Offset: {byte_offset}"
                 )
 
                 # Store mapping info
@@ -115,9 +109,7 @@ def read_all_pdo_mappings(bus, slave):
 
 # Usage in your main code:
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="EtherCAT master for Freedom K64F using EasyCAT"
-    )
+    parser = argparse.ArgumentParser(description="EtherCAT master for Freedom K64F using EasyCAT")
 
     parser.add_argument(
         "-i",
@@ -151,9 +143,7 @@ if __name__ == "__main__":
 
     # Print slave info
     for slave in bus.slaves():
-        print(
-            f"Slave {slave.address}: input={slave.input_size} output={slave.output_size}"
-        )
+        print(f"Slave {slave.address}: input={slave.input_size} output={slave.output_size}")
 
     slave = bus.slaves()[0]
 
@@ -172,7 +162,4 @@ if __name__ == "__main__":
 
     # Example: Access specific mapping details
     for mapping in mappings["rx"]:
-        print(
-            f"RxPDO 0x{mapping['index']:04X}:{mapping['subindex']} "
-            f"at byte offset {mapping['byte_offset']}"
-        )
+        print(f"RxPDO 0x{mapping['index']:04X}:{mapping['subindex']} at byte offset {mapping['byte_offset']}")

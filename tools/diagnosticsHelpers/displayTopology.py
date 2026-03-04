@@ -1,25 +1,26 @@
+import argparse
+import csv
+
 import matplotlib.pyplot as plt
 import networkx as nx
-import csv
-import argparse
 
 parser = argparse.ArgumentParser()
-   
-parser.add_argument('--file', type=str, required=False, help='Path to the network topology - .csv file')
+
+parser.add_argument("--file", type=str, required=False, help="Path to the network topology - .csv file")
 
 args = parser.parse_args()
 
-if (args.file is None):
-    path = './build/topology.csv'
+if args.file is None:
+    path = "./build/topology.csv"
 else:
     path = args.file
 
 G = nx.Graph()
-with open(path, 'r') as file:
+with open(path) as file:
     reader = csv.reader(file)
     for row in reader:
-        a = "0x%04x" % int(row[0])
-        b = "0x%04x" % int(row[1])
+        a = f"0x{int(row[0]):04x}"
+        b = f"0x{int(row[1]):04x}"
         if a == b:
             G.add_edge("MASTER", a)
         else:
@@ -38,5 +39,5 @@ for v in G.nodes():
 pos = nx.kamada_kawai_layout(G)
 
 plt.title("Topology")
-nx.draw(G, pos=pos, node_size=sizes, node_color=colors, with_labels=True, font_weight='bold')
+nx.draw(G, pos=pos, node_size=sizes, node_color=colors, with_labels=True, font_weight="bold")
 plt.show()

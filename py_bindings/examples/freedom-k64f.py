@@ -1,8 +1,9 @@
-import kickcat
-import time
-import struct
 import argparse
+import struct
+import time
 from dataclasses import dataclass
+
+import kickcat
 from kickcat import State
 
 
@@ -33,9 +34,7 @@ class LEDOutput:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="EtherCAT master for Freedom K64F using EasyCAT"
-    )
+    parser = argparse.ArgumentParser(description="EtherCAT master for Freedom K64F using EasyCAT")
 
     parser.add_argument(
         "-i",
@@ -69,9 +68,7 @@ def main():
 
     # Print slave info
     for slave in bus.slaves():
-        print(
-            f"Slave {slave.address}: input={slave.input_size} output={slave.output_size}"
-        )
+        print(f"Slave {slave.address}: input={slave.input_size} output={slave.output_size}")
 
     easycat = bus.slaves()[0]
 
@@ -91,8 +88,8 @@ def main():
     bus.wait_for_state(State.OPERATIONAL, 1.0, cyclic_callback)
 
     # Thresholds
-    THRESHOLD_ACCEL = 1000
-    THRESHOLD_MAG = 1000
+    threashold_accel = 1000
+    threadhold_mag = 1000
 
     print("Running loop...")
     while True:
@@ -113,13 +110,9 @@ def main():
 
                 # LED toggle logic
                 output = LEDOutput()
-                output.led_r = (
-                    1 if (ax > THRESHOLD_ACCEL or ax < -THRESHOLD_ACCEL) else 0
-                )
-                output.led_g = (
-                    1 if (ay > THRESHOLD_ACCEL or ay < -THRESHOLD_ACCEL) else 0
-                )
-                output.led_b = 1 if (mz > THRESHOLD_MAG or mz < -THRESHOLD_MAG) else 0
+                output.led_r = 1 if (ax > threashold_accel or ax < -threashold_accel) else 0
+                output.led_g = 1 if (ay > threashold_accel or ay < -threashold_accel) else 0
+                output.led_b = 1 if (mz > threadhold_mag or mz < -threadhold_mag) else 0
 
                 # Set output
                 easycat.set_output_bytes(output.to_bytes())

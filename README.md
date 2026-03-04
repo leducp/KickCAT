@@ -46,7 +46,7 @@ KickCAT is a thin EtherCAT stack designed to be embedded in complex software wit
 
 ```bash
 # 1. Setup build environment
-./setup_build.sh build
+./scripts/setup_build.sh build
 
 # 2. Configure and build
 cd build
@@ -695,7 +695,7 @@ git clone https://github.com/leducp/KickCAT.git
 cd KickCAT
 
 # Setup build environment
-./setup_build.sh build
+./scripts/setup_build.sh build
 
 # Build with tests
 cd build

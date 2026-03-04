@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SOURCE_DIR=$(dirname "$(realpath $0)")
+KICKCAT_DIR=$(dirname "$(realpath $0)")/../
 
 # Minimum required version
 MIN_CONAN_VERSION="2.10.0"
@@ -29,7 +29,7 @@ else
 fi
 echo $build_dir
 
-source "$SOURCE_DIR/tools/setup/detect_gcc.sh"
+source "$KICKCAT_DIR/tools/setup/detect_gcc.sh"
 
 # Detect architecture and map to Conan arch value
 detect_conan_arch() {
@@ -52,7 +52,7 @@ CONAN_ARCH=$(detect_conan_arch)
 echo "Detected architecture: $(uname -m) -> Conan arch: $CONAN_ARCH"
 
 # Generate cmake toolchain profile
-TEMPLATE_CMAKE_TOOLCHAIN="$SOURCE_DIR/cmake/toolchain.cmake.template"
+TEMPLATE_CMAKE_TOOLCHAIN="$KICKCAT_DIR/cmake/toolchain.cmake.template"
 OUTPUT_CMAKE_TOOLCHAIN="$build_dir/toolchain.cmake"
 sed \
   -e "s|MAJOR_VERSION|${GREATEST_VERSION}|g" \
@@ -61,7 +61,7 @@ sed \
   "$TEMPLATE_CMAKE_TOOLCHAIN" > "$OUTPUT_CMAKE_TOOLCHAIN"
 
 # Generate conan profile
-TEMPLATE_CONAN_PROFILE="$SOURCE_DIR/conan/profile.txt.template"
+TEMPLATE_CONAN_PROFILE="$KICKCAT_DIR/conan/profile.txt.template"
 OUTPUT_CONAN_PROFILE="$build_dir/profile.txt"
 sed \
   -e "s|MAJOR_VERSION|${GREATEST_VERSION}|g" \
@@ -73,6 +73,6 @@ sed \
 
 # Prepare debug depencies only for local call, not in CI
 if [[ $CIBUILDWHEEL != "1" ]]; then
-    conan install $SOURCE_DIR/conan/conanfile_linux.txt -of=$build_dir -pr $OUTPUT_CONAN_PROFILE -pr:b $OUTPUT_CONAN_PROFILE  --build=missing -s build_type=Debug
+    conan install $KICKCAT_DIR/conan/conanfile_linux.txt -of=$build_dir -pr $OUTPUT_CONAN_PROFILE -pr:b $OUTPUT_CONAN_PROFILE  --build=missing -s build_type=Debug
 fi
-conan install $SOURCE_DIR/conan/conanfile_linux.txt -of=$build_dir -pr $OUTPUT_CONAN_PROFILE -pr:b $OUTPUT_CONAN_PROFILE  --build=missing -s build_type=Release
+conan install $KICKCAT_DIR/conan/conanfile_linux.txt -of=$build_dir -pr $OUTPUT_CONAN_PROFILE -pr:b $OUTPUT_CONAN_PROFILE  --build=missing -s build_type=Release
