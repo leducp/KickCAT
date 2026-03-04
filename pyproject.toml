@@ -30,6 +30,7 @@ BUILD_UNIT_TESTS  = "OFF"
 CODE_COVERAGE     = "OFF"
 BUILD_SIMULATION  = "OFF"
 BUILD_TOOLS       = "OFF"
+BUILD_EXAMPLES    = "OFF"
 
 [tool.cibuildwheel]
 # https://github.com/pypa/cibuildwheel/blob/main/docs/options.md

@@ -1,8 +1,10 @@
-name: PR build
+name: CI pipeline
 
 on:
   push:
     branches: [master]
+    tags:
+      - "*"
   pull_request:
     branches: [master]
 
@@ -10,6 +12,7 @@ env:
   BUILD_TYPE: Debug
 
 jobs:
+  # Python formatting and linting
   py_lint:
     runs-on: ubuntu-latest
     steps:
@@ -18,9 +21,10 @@ jobs:
         run: pip install ruff
       - name: Check Python formatting and linting
         run: scripts/format_py.sh check
-
+  # Build C++ and Build Wheels
   build_x86:
     needs: py_lint
+    name: Build C++ (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -42,7 +46,6 @@ jobs:
             echo "$RUNNER_OS not supported"
             exit 1
           fi
-
         shell: bash
 
       - name: Install Gcovr and Lcov
@@ -68,7 +71,8 @@ jobs:
       - name: Build
         run: cmake --build build --config ${{env.BUILD_TYPE}}
 
-      - name: Test
+      # Unit Tests and Coverage Report
+      - name: Unit Test
         working-directory: ${{github.workspace}}/build
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
@@ -97,8 +101,26 @@ jobs:
           path: build/coverage_xml.xml
           if-no-files-found: error
 
+  build-wheels:
+    needs: py_lint
+    name: Build Python Wheels
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v3.1.0
+        with:
+          output-dir: wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheelhouse-kickcat-linux
+          path: wheelhouse/*.whl
+
+  # Simulation Tests
   simulation_test:
-    needs: build_x86
+    needs: [build_x86, build-wheels]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -107,8 +129,14 @@ jobs:
           - name: easycat
             example_bin: build/examples/master/easycat/easycat_example
             slave_config: simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
+          - name: easycat_py
+            example_bin: py_bindings/examples/easycat.py
+            slave_config: simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
           - name: freedom-k64f
             example_bin: build/examples/master/freedom-k64f/freedom_k64f_static_map_example
+            slave_config: simulation/slave_configs/freedom-k64f.json
+          - name: freedom-k64f_py
+            example_bin: py_bindings/examples/freedom-k64f.py
             slave_config: simulation/slave_configs/freedom-k64f.json
           - name: wdc-foot
             example_bin: build/examples/master/wdc_foot/wdc_foot_example
@@ -116,12 +144,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-linux
           path: build/
+
+      - name: Download Wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheelhouse-kickcat-linux
+          path: wheelhouse
+
+      - name: Install KickCAT Wheel
+        run: |
+          pip install kickcat --no-index --find-links wheelhouse
 
       - name: Fix permissions
         run: |
@@ -139,7 +181,7 @@ jobs:
           sleep 2
 
           # 3. Run example with timeout
-          timeout 15s ./${{ matrix.test_case.example_bin }} -i tap:client > test_output.log 2>&1 || true
+          timeout 15s ${{ matrix.test_case.example_bin }} -i tap:client > test_output.log 2>&1 || true
 
           # 4. Stop simulator
           kill $SIM_PID || true
@@ -178,10 +220,10 @@ jobs:
             test_output.log
             simulator.log
 
+  # NuttX Builds
   build_NuttX_stable:
     needs: py_lint
     runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
       matrix:
@@ -189,7 +231,6 @@ jobs:
           - xmc4800-relax
           - arduino-due
           - freedom-k64f
-
     env:
       nuttx_version: 6161fececfb2e510cd947131634d8fa352657886
       nuttx_apps_version: c7ac7171673c5e8c12945b0c89d7a2537fd88745
@@ -200,14 +241,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: "KickCAT"
-
       - name: Cache NuttX
         id: cache-nuttx
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/nuttxspace/nuttx
           key: nuttx_${{ env.nuttx_version }}
-
       - if: ${{ steps.cache-nuttx.outputs.cache-hit != 'true' }}
         name: Checkout NuttX
         uses: actions/checkout@v4
@@ -215,14 +254,12 @@ jobs:
           repository: apache/nuttx
           path: "nuttxspace/nuttx"
           ref: "${{ env.nuttx_version }}"
-
       - name: Cache NuttX Apps
         id: cache-nuttx-apps
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/nuttxspace/apps
           key: nuttx-apps_${{ env.nuttx_apps_version }}
-
       - if: ${{ steps.cache-nuttx-apps.outputs.cache-hit != 'true' }}
         name: Checkout NuttX Apps
         uses: actions/checkout@v4
@@ -230,31 +267,26 @@ jobs:
           repository: apache/nuttx-apps
           path: "nuttxspace/apps"
           ref: "${{ env.nuttx_apps_version }}"
-
       - name: Install Kconfig dependencies
         run: sudo apt-get update && sudo apt-get install -y kconfig-frontends
-
       - name: Cache ARM GCC Toolchain
         id: cache-arm-none-eabi
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/gcc-arm-none-eabi
           key: ${{ env.arm_none_eabi_version }}
-
       - if: ${{ steps.cache-arm-none-eabi.outputs.cache-hit != 'true' }}
         name: Download ARM GCC Toolchain
         run: |
           mkdir gcc-arm-none-eabi
           curl -s -L  "https://developer.arm.com/-/media/Files/downloads/gnu/${{env.arm_none_eabi_version}}.tar.xz" \
           | tar -C gcc-arm-none-eabi --strip-components=1 -xJ
-
       - name: Build ${{ matrix.board }}
         run: |
           export PATH="${{ github.workspace }}/gcc-arm-none-eabi/bin:$PATH"
           KickCAT/scripts/build_slave_bin.sh \
             ${{ matrix.board }} \
             ${{ github.workspace }}/nuttxspace/nuttx
-
       - name: Upload firmware binary for ${{ matrix.board }} nuttx stable version
         uses: actions/upload-artifact@v4
         with:
@@ -266,9 +298,7 @@ jobs:
   build_NuttX_master:
     needs: py_lint
     runs-on: ubuntu-latest
-
     continue-on-error: true
-
     strategy:
       fail-fast: false
       matrix:
@@ -283,48 +313,40 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: "KickCAT"
-
       - name: checkout NuttX (master)
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx
           path: "nuttxspace/nuttx"
           ref: "master"
-
       - name: checkout NuttX Apps (master)
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx-apps
           path: "nuttxspace/apps"
           ref: "master"
-
       - name: apt update + Kconfig
         run: |
           sudo apt update
           sudo apt install -y kconfig-frontends
-
       - name: Cache Arm None Eabi
         id: cache-arm-none-eabi
         uses: actions/cache@v4
         with:
           path: ${{GITHUB.WORKSPACE}}/gcc-arm-none-eabi
           key: ${{env.arm_none_eabi_version}}
-
       - if: ${{ steps.cache-arm-none-eabi.outputs.cache-hit != 'true' }}
         name: Download gcc-arm-none-eabi
         run: |
-          # Download the latest ARM GCC toolchain prebuilt by ARM
           mkdir gcc-arm-none-eabi && \
           curl -s -L  "https://developer.arm.com/-/media/Files/downloads/gnu/${{env.arm_none_eabi_version}}.tar.xz" \
           | tar -C gcc-arm-none-eabi --strip-components 1 -xJ
-
       - name: Build ${{ matrix.board }}
         run: |
           export PATH="${{ github.workspace }}/gcc-arm-none-eabi/bin:$PATH"
           KickCAT/scripts/build_slave_bin.sh \
             ${{ matrix.board }} \
             ${{ github.workspace }}/nuttxspace/nuttx
-
       - name: Upload firmware binary for ${{ matrix.board }} nuttx master version
         uses: actions/upload-artifact@v4
         with:
@@ -332,3 +354,41 @@ jobs:
           path: KickCAT/build_${{ matrix.board }}/*.bin
           if-no-files-found: error
           retention-days: 1
+
+  # Release
+  release:
+    needs: [build-wheels, simulation_test]
+    if: startsWith(github.ref, 'refs/tags/') # Only run on tag pushes
+    runs-on: ubuntu-24.04
+    environment:
+      name: maintainer
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheelhouse-kickcat-linux
+          path: wheelhouse
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+        run: |
+          gh release create "$tag" wheelhouse/*.whl \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
+              --generate-notes
+
+      - name: Publish the wheels on PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        with:
+          packages-dir: wheelhouse
+          verify-metadata: true
+          attestations: true
+          print-hash: true
+          skip-existing: true
