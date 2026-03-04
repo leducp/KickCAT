@@ -82,37 +82,10 @@ int main(int argc, char *argv[])
             printESC(slave);
         }
 
-        // Prepare mapping for ingenia
-        const auto mapPDO = [&](const uint8_t slaveId, const uint16_t PDO_map, uint32_t const* mapping, uint8_t mapping_count, const uint32_t SM_map) -> void
-        {
-            auto& slave = bus.slaves().at(slaveId);
-            uint8_t zeroU8 = 0;
-
-            // Unmap previous registers, setting 0 in PDO_MAP subindex 0
-            bus.writeSDO(slave, PDO_map, 0, Bus::Access::PARTIAL, &zeroU8, sizeof(zeroU8));
-            // Modify mapping, setting register address in PDO's subindexes
-            for (uint8_t i = 0; i < mapping_count; ++i)
-            {
-                bus.writeSDO(slave, PDO_map, i + 1, Bus::Access::PARTIAL, mapping + i, sizeof(uint32_t));
-            }
-            // Enable mapping by setting number of registers in PDO_MAP subindex 0
-            bus.writeSDO(slave, PDO_map, 0, Bus::Access::PARTIAL, &mapping_count, sizeof(mapping_count));
-
-
-            // Set PDO mapping to SM
-            // Unmap previous mappings, setting 0 in SM_MAP subindex 0
-            bus.writeSDO(slave, SM_map, 0, Bus::Access::PARTIAL, &zeroU8, sizeof(zeroU8));
-            // Write first mapping (PDO_map) address in SM_MAP subindex 1
-            bus.writeSDO(slave, SM_map, 1, Bus::Access::PARTIAL, &PDO_map, sizeof(PDO_map));
-            // Save mapping count in SM (here only one PDO_MAP)
-            uint8_t pdoMapSize = 1;
-            bus.writeSDO(slave, SM_map, 0, Bus::Access::PARTIAL, &pdoMapSize, sizeof(pdoMapSize));
-        };
-
         // Map TXPDO
-        mapPDO(0, 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
+        mapPDO(bus, bus.slaves().at(0), 0x1A00, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
         // Map RXPDO
-        mapPDO(0, 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
+        mapPDO(bus, bus.slaves().at(0), 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
 
         bus.createMapping(io_buffer);
 
