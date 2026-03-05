@@ -101,7 +101,7 @@ namespace kickcat
         ///          The value converges to zero when the slave is synchronized with the reference clock.
         /// \param  threshold  Maximum acceptable time difference in nanoseconds
         /// \return true if all DC slaves are synchronized within the given threshold
-        bool isDCSynchronized(nanoseconds threshold = 1000ns);
+        bool isDCSynchronized(nanoseconds threshold = 1000ns, bool log_all = false);
 
 
         enum Access

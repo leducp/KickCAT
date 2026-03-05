@@ -35,23 +35,27 @@ namespace kickcat
         applyMasterTime();
 
         //------------------ Static drift compensation ------------------//
-        // 1. reset time control loop filter and set optimal filter depth (0 per spec 9.1.3.3)
+        // 1. reset time control loop and set filter depth
+        //    - System Time Diff filter depth (0x0934) = 0x00 (no filtering on diff)
+        //    - Speed Counter filter depth (0x0935)    = 0x0c (12 -> 2^12 IIR averaging)
+        //    A higher speed counter filter depth damps the PLL, preventing oscillation
+        //    when the initial system time difference is large (e.g. branch 2 in Y-topology).
         uint16_t reset = 0x1000;
         broadcastWrite(reg::DC_SPEED_CNT_START, &reset, sizeof(uint16_t));
-        uint8_t filter_depth = 0;
-        broadcastWrite(reg::DC_SPEED_CNT_FILTER_DEPTH, &filter_depth, sizeof(filter_depth));
+        uint16_t filter_settings = 0x0c00;
+        broadcastWrite(reg::DC_TIME_FILTER, &filter_settings, sizeof(filter_settings));
 
         // 2. Send multiple FRMW drift compensation frames (15000 from the doc)
         auto error = [](DatagramState const& state)
         {
             THROW_ERROR_DATAGRAM("Error while doing static drift compensation", state);
         };
+
         for (int i = 0; i < 15000; ++i)
         {
             sendDriftCompensation(error);
             link_->processDatagrams();
         }
-
 
         //----------------------- Apply cycle time ----------------------//
         uint32_t cycle_time_raw = static_cast<uint32_t>(cycle_time.count());
@@ -59,7 +63,7 @@ namespace kickcat
 
         //------------------------ Set start time -----------------------//
         // 1. Get current network time to compute start time (relative to absolute)
-        uint64_t network_time;
+        uint64_t network_time = 0;
         auto& slave = *dc_slave_;
         auto process = [&slave, &network_time](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
         {
@@ -459,10 +463,6 @@ namespace kickcat
                 continue;
             }
             int64_t raw_dc_time_diff = slave.dc_time_offset.count();
-            if (raw_dc_time_diff == 0)
-            {
-                continue;
-            }
             dc_info("DC slave %d time offset is %ld from DC ref\n", slave.address, slave.dc_time_offset.count());
             link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::DC_SYSTEM_TIME_OFFSET), &raw_dc_time_diff, sizeof(raw_dc_time_diff), process, error);
         }
@@ -472,14 +472,13 @@ namespace kickcat
 
     void Bus::sendDriftCompensation(std::function<void(DatagramState const&)> const& error)
     {
-        auto process = [&](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
         {
             if (wkc == 0)
             {
                 dc_error("Invalid working counter:  %" PRIu16 "\n", wkc);
                 return DatagramState::INVALID_WKC;
             }
-
             return DatagramState::OK;
         };
 
@@ -490,7 +489,7 @@ namespace kickcat
     }
 
 
-    bool Bus::isDCSynchronized(nanoseconds threshold)
+    bool Bus::isDCSynchronized(nanoseconds threshold, bool log_all)
     {
         if (dc_slave_ == nullptr)
         {
@@ -500,7 +499,7 @@ namespace kickcat
         struct DCSlaveSync
         {
             Slave* slave;
-            int32_t time_diff{0};
+            uint32_t time_diff_raw{0};
         };
         std::vector<DCSlaveSync> dc_syncs;
 
@@ -525,27 +524,29 @@ namespace kickcat
                 {
                     return DatagramState::INVALID_WKC;
                 }
-                std::memcpy(&sync.time_diff, data, sizeof(sync.time_diff));
+                std::memcpy(&sync.time_diff_raw, data, sizeof(sync.time_diff_raw));
                 return DatagramState::OK;
             };
 
-            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SYSTEM_TIME_DIFF), nullptr, sizeof(sync.time_diff), process, error);
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SYSTEM_TIME_DIFF), nullptr, sizeof(sync.time_diff_raw), process, error);
         }
         link_->processDatagrams();
 
         bool synchronized = true;
         for (auto const& sync : dc_syncs)
         {
-            nanoseconds drift = nanoseconds(std::abs(sync.time_diff));
+            // DC_SYSTEM_TIME_DIFF uses sign-magnitude encoding (bit 31 = sign, bits 30:0 = magnitude)
+            nanoseconds drift = nanoseconds(sync.time_diff_raw & 0x7FFFFFFF);
             if (drift > threshold)
             {
                 dc_info("DC slave %d NOT synchronized: drift = %ld ns (threshold = %ld ns)\n",
                         sync.slave->address, drift.count(), threshold.count());
                 synchronized = false;
             }
-            else
+            else if (log_all)
             {
-                dc_info("DC slave %d synchronized: drift = %ld ns\n", sync.slave->address, drift.count());
+                dc_info("DC slave %d synchronized: drift = %ld ns\n",
+                        sync.slave->address, drift.count());
             }
         }
 

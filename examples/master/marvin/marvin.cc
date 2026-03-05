@@ -95,41 +95,15 @@ int main(int argc, char *argv[])
         bus.waitForState(State::PRE_OP, 3000ms);
 
 
-        auto map_pdos = [&](uint8_t id)
+        /*
+        // Map RxPDO/TxPDO
+        for (int i = 0; i < 7; ++i)
         {
-            uint8_t zero = 0;
-            uint8_t uno = 1;
-            uint8_t size = 2;
-            auto& slave = bus.slaves().at(id);
-            bus.writeSDO(slave, 0x1c12, 0, Bus::Access::PARTIAL, &zero, 1);
-                bus.writeSDO(slave, 0x1601, 0, Bus::Access::PARTIAL, &zero, 1);
+            mapPDO(bus, bus.slaves().at(i), 0x1A01, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C13);
+            mapPDO(bus, bus.slaves().at(i), 0x1601, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C12);
+        }
+        */
 
-                    uint32_t tx_mapping[] = {0x60410010, 0x60640020};
-                    bus.writeSDO(slave, 0x1601, 1, Bus::Access::PARTIAL, &tx_mapping[0], 4);
-                    bus.writeSDO(slave, 0x1601, 2, Bus::Access::PARTIAL, &tx_mapping[1], 4);
-                    size =2;
-                bus.writeSDO(slave, 0x1601, 0, Bus::Access::PARTIAL, &size, 1);
-            bus.writeSDO(slave, 0x1c12, 0, Bus::Access::PARTIAL, &uno, 1);
-
-
-            bus.writeSDO(slave, 0x1c13, 0, Bus::Access::PARTIAL, &zero, 1);
-                bus.writeSDO(slave, 0x1a01, 0, Bus::Access::PARTIAL, &zero, 1);
-
-                    uint32_t rx_mapping[] = {0x60400010, 0x60600010, 0x607A0020};
-                    bus.writeSDO(slave, 0x1a01, 1, Bus::Access::PARTIAL, &rx_mapping[0], 4);
-                    bus.writeSDO(slave, 0x1a01, 2, Bus::Access::PARTIAL, &rx_mapping[1], 4);
-                    bus.writeSDO(slave, 0x1a01, 3, Bus::Access::PARTIAL, &rx_mapping[2], 4);
-                    size = 3;
-
-                bus.writeSDO(slave, 0x1a01, 0, Bus::Access::PARTIAL, &size, 1);
-            bus.writeSDO(slave, 0x1c13, 0, Bus::Access::PARTIAL, &uno, 1);
-        };
-
-        //for (int i = 0; i < 7; ++i)
-        //{
-        //    map_pdos(i);
-        //    map_pdos(i);
-        //}
 
         uint8_t mode = 8;
         uint32_t mode_size = 1;
@@ -307,13 +281,18 @@ int main(int argc, char *argv[])
             output_pdo[j]->control_word = state_machine[j].controlWord();
         }
 
-        if ((i % 100) == 0)
+        //if ((i % 100) == 0)
+        //{
+        //    printf("[%ld] {%x} %x (%x) position %d to %d - RECD %d\n",
+        //        i, input_pdo[0]->error_code,
+        //        state_machine[0].controlWord(), input_pdo[0]->status_word,
+        //        input_pdo[0]->actual_position, output_pdo[0]->target_position,
+        //        input_pdo[0]->RECD);
+        //}
+
+        if ((i % 1000) == 0)
         {
-            printf("[%d] {%x} %x (%x) position %d to %d - RECD %d\n",
-                i, input_pdo[0]->error_code,
-                state_machine[0].controlWord(), input_pdo[0]->status_word,
-                input_pdo[0]->actual_position, output_pdo[0]->target_position,
-                input_pdo[0]->RECD);
+            bus.isDCSynchronized(1000ns, true);
         }
 
         //probe.log();
