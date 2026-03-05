@@ -21,11 +21,21 @@ class KickCATRecipe(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False], "with_esi_parser": [True, False]}
     default_options = {"shared": False, "fPIC": True, "with_esi_parser": False}
 
-    # Sources are located in the same place as this recipe, copy them to the recipe
-    exports_sources = "CMakeLists.txt", "lib/*", "examples/*", "cmake/*", "py_bindings/*"
+    def export_sources(self):
+        # This method is used for local development to copy sources into the recipe
+        # We go up two levels from conan/all/ to reach the project root
+        root = os.path.abspath(os.path.join(self.recipe_folder, "../.."))
+        copy(self, "CMakeLists.txt", src=root, dst=self.export_sources_folder)
+        copy(self, "lib/*", src=root, dst=self.export_sources_folder)
+        copy(self, "examples/*", src=root, dst=self.export_sources_folder)
+        copy(self, "cmake/*", src=root, dst=self.export_sources_folder)
+        copy(self, "py_bindings/*", src=root, dst=self.export_sources_folder)
+        copy(self, "LICENSE", src=root, dst=self.export_sources_folder)
 
-    # def source(self):
-    #     get(self, **self.conan_data["sources"][self.version], strip_root=True)
+    def source(self):
+        # This method is used by Conan Center Index to fetch sources
+        # get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        pass
 
     def configure(self):
         if self.options.get_safe("shared"):
