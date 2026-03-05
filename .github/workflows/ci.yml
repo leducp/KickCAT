@@ -118,6 +118,23 @@ jobs:
           name: wheelhouse-kickcat-linux
           path: wheelhouse/*.whl
 
+  # Build Conan Package
+  build-conan-package:
+    needs: build_x86
+    name: Build Conan Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-conan-action
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-linux
+          path: build/
+      - name: Conan Create
+        run: |
+          conan create conan/all --build=missing --version ${{ github.sha }} -pr:b build/profile.txt -pr:h build/profile.txt
+
   # Simulation Tests
   simulation_test:
     needs: [build_x86, build-wheels]
@@ -357,7 +374,7 @@ jobs:
 
   # Release
   release:
-    needs: [build-wheels, simulation_test]
+    needs: [build-wheels, simulation_test, build-conan-package]
     if: startsWith(github.ref, 'refs/tags/') # Only run on tag pushes
     runs-on: ubuntu-24.04
     environment:
