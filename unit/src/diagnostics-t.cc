@@ -1,57 +1,54 @@
 #include "kickcat/Diagnostics.h"
 #include "kickcat/Error.h"
 #include <gtest/gtest.h>
+#include <cstring>
 
 using namespace kickcat;
 
+void setOpenPorts(Slave& slave, std::vector<int> ports)
+{
+    std::memset(&slave.dl_status, 0, sizeof(DLStatus));
+    // Loop is open (0) by default. We just need to set COM established.
+    // For ports not in the list, we close the loop.
+    slave.dl_status.LOOP_port0 = 1;
+    slave.dl_status.LOOP_port1 = 1;
+    slave.dl_status.LOOP_port2 = 1;
+    slave.dl_status.LOOP_port3 = 1;
+
+    for (int p : ports)
+    {
+        if (p == 0) { slave.dl_status.LOOP_port0 = 0; slave.dl_status.COM_port0 = 1; }
+        if (p == 1) { slave.dl_status.LOOP_port1 = 0; slave.dl_status.COM_port1 = 1; }
+        if (p == 2) { slave.dl_status.LOOP_port2 = 0; slave.dl_status.COM_port2 = 1; }
+        if (p == 3) { slave.dl_status.LOOP_port3 = 0; slave.dl_status.COM_port3 = 1; }
+    }
+}
 
 TEST(Diagnostics, get_topology)
 {
     std::unordered_map<uint16_t, uint16_t> expected_map;
     std::vector<uint16_t> parents;
-    std::vector<Slave> slaves;
+    std::vector<Slave> slaves(5);
 
     for (uint16_t i = 0; i < 5; ++i)
     {
-        Slave slave;
-        slave.address = i;
-        slaves.push_back(slave);
+        slaves[i].address = i;
     }
 
     // Case 1 : line ( 0 - 1 - 2 - 3 - 4)
     parents = {0, 0, 1, 2, 3};
 
-    slaves[0].dl_status.PL_port0 = 1;
-    slaves[0].dl_status.PL_port1 = 1;
-    slaves[0].dl_status.PL_port2 = 0;
-    slaves[0].dl_status.PL_port3 = 0;
+    setOpenPorts(slaves[0], {0, 1});
+    setOpenPorts(slaves[1], {0, 1});
+    setOpenPorts(slaves[2], {0, 1});
+    setOpenPorts(slaves[3], {0, 1});
+    setOpenPorts(slaves[4], {0});
 
-    slaves[1].dl_status.PL_port0 = 1;
-    slaves[1].dl_status.PL_port1 = 1;
-    slaves[1].dl_status.PL_port2 = 0;
-    slaves[1].dl_status.PL_port3 = 0;
-
-    slaves[2].dl_status.PL_port0 = 1;
-    slaves[2].dl_status.PL_port1 = 1;
-    slaves[2].dl_status.PL_port2 = 0;
-    slaves[2].dl_status.PL_port3 = 0;
-
-    slaves[3].dl_status.PL_port0 = 1;
-    slaves[3].dl_status.PL_port1 = 1;
-    slaves[3].dl_status.PL_port2 = 0;
-    slaves[3].dl_status.PL_port3 = 0;
-
-    slaves[4].dl_status.PL_port0 = 1;
-    slaves[4].dl_status.PL_port1 = 0;
-    slaves[4].dl_status.PL_port2 = 0;
-    slaves[4].dl_status.PL_port3 = 0;
-
+    expected_map.clear();
     for (uint16_t i = 0; i < 5; ++i)
     {
         expected_map[i] = parents.at(i);
     }
-
-    
     ASSERT_EQ(expected_map, getTopology(slaves));
 
     // Case 2 : simple branch ( 0 - 1 - 2 - 3 )
@@ -59,36 +56,17 @@ TEST(Diagnostics, get_topology)
     //                              4
     parents = {0, 0, 1, 2, 1};
 
-    slaves[0].dl_status.PL_port0 = 1;
-    slaves[0].dl_status.PL_port1 = 1;
-    slaves[0].dl_status.PL_port2 = 0;
-    slaves[0].dl_status.PL_port3 = 0;
+    setOpenPorts(slaves[0], {0, 1});
+    setOpenPorts(slaves[1], {0, 1, 2});
+    setOpenPorts(slaves[2], {0, 1});
+    setOpenPorts(slaves[3], {0});
+    setOpenPorts(slaves[4], {0});
 
-    slaves[1].dl_status.PL_port0 = 1;
-    slaves[1].dl_status.PL_port1 = 1;
-    slaves[1].dl_status.PL_port2 = 1;
-    slaves[1].dl_status.PL_port3 = 0;
-
-    slaves[2].dl_status.PL_port0 = 1;
-    slaves[2].dl_status.PL_port1 = 1;
-    slaves[2].dl_status.PL_port2 = 0;
-    slaves[2].dl_status.PL_port3 = 0;
-
-    slaves[3].dl_status.PL_port0 = 1;
-    slaves[3].dl_status.PL_port1 = 0;
-    slaves[3].dl_status.PL_port2 = 0;
-    slaves[3].dl_status.PL_port3 = 0;
-
-    slaves[4].dl_status.PL_port0 = 1;
-    slaves[4].dl_status.PL_port1 = 0;
-    slaves[4].dl_status.PL_port2 = 0;
-    slaves[4].dl_status.PL_port3 = 0;
-
+    expected_map.clear();
     for (uint16_t i = 0; i < 5; ++i)
     {
         expected_map[i] = parents.at(i);
     }
-
     ASSERT_EQ(expected_map, getTopology(slaves));
 
     // Case 3 : multiple branches ( 0 - 1 - 2 )
@@ -96,44 +74,20 @@ TEST(Diagnostics, get_topology)
     //                              4   3
     parents = {0, 0, 1, 1, 0};
 
-    slaves[0].dl_status.PL_port0 = 1;
-    slaves[0].dl_status.PL_port1 = 1;
-    slaves[0].dl_status.PL_port2 = 1;
-    slaves[0].dl_status.PL_port3 = 0;
+    setOpenPorts(slaves[0], {0, 1, 2});
+    setOpenPorts(slaves[1], {0, 1, 2});
+    setOpenPorts(slaves[2], {0});
+    setOpenPorts(slaves[3], {0});
+    setOpenPorts(slaves[4], {0});
 
-    slaves[1].dl_status.PL_port0 = 1;
-    slaves[1].dl_status.PL_port1 = 1;
-    slaves[1].dl_status.PL_port2 = 1;
-    slaves[1].dl_status.PL_port3 = 0;
-
-    slaves[2].dl_status.PL_port0 = 1;
-    slaves[2].dl_status.PL_port1 = 0;
-    slaves[2].dl_status.PL_port2 = 0;
-    slaves[2].dl_status.PL_port3 = 0;
-
-    slaves[3].dl_status.PL_port0 = 1;
-    slaves[3].dl_status.PL_port1 = 0;
-    slaves[3].dl_status.PL_port2 = 0;
-    slaves[3].dl_status.PL_port3 = 0;
-
-    slaves[4].dl_status.PL_port0 = 1;
-    slaves[4].dl_status.PL_port1 = 0;
-    slaves[4].dl_status.PL_port2 = 0;
-    slaves[4].dl_status.PL_port3 = 0;
-
+    expected_map.clear();
     for (uint16_t i = 0; i < 5; ++i)
     {
         expected_map[i] = parents.at(i);
     }
-    
     ASSERT_EQ(expected_map, getTopology(slaves));
 
     // Case 4 : invalid topology [lone slave] ( 0 - 1 - 2 - 3    4 )
-
-    slaves[4].dl_status.PL_port0 = 0;
-    slaves[4].dl_status.PL_port1 = 0;
-    slaves[4].dl_status.PL_port2 = 0;
-    slaves[4].dl_status.PL_port3 = 0;
-
+    setOpenPorts(slaves[4], {});
     ASSERT_THROW(getTopology(slaves), Error);
 }
