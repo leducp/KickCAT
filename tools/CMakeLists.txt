@@ -17,7 +17,7 @@ endif()
 
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    add_executable(check_network_stability checkNetworkStability.cc)
+    add_executable(check_network_stability check_network_stability.cc)
     target_link_libraries(check_network_stability kickcat argparse::argparse)
     set_kickcat_properties(check_network_stability)
 endif()
