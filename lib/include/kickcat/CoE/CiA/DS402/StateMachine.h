@@ -74,6 +74,14 @@ namespace kickcat::CoE::CiA::DS402
     constexpr nanoseconds MOTOR_RESET_DELAY = 100ms;
     constexpr nanoseconds MOTOR_INIT_TIMEOUT = 2s;
 
+    // Fault reset toggle: DS402 requires a rising edge on controlword bit 7 to
+    // acknowledge a fault. We toggle bit 7 with this half-period (~10Hz).
+    constexpr nanoseconds FAULT_RESET_HALF_PERIOD = 50ms;
+
+    // After a fault clears, hold controlword at 0 (neutral) for this duration
+    // before sending SHUTDOWN, to let the drive settle.
+    constexpr nanoseconds STABILIZATION_DELAY = 100ms;
+
     class StateMachine
     {
     public:
@@ -86,6 +94,9 @@ namespace kickcat::CoE::CiA::DS402
         // General control over the state machine
         void enable()  { command_ = Command::ENABLE;  }
         void disable() { command_ = Command::DISABLE; }
+
+        bool isEnabled() const { return motor_state_ == State::ON; }
+        bool isFaulted() const { return (status_word_ & status::value::FAULT_STATE) == status::value::FAULT_STATE; }
 
     private:
         enum class Command
@@ -110,6 +121,13 @@ namespace kickcat::CoE::CiA::DS402
         nanoseconds start_motor_timestamp_ = 0ns;
         uint16_t control_word_ = 0;
         uint16_t status_word_ = 0;
+
+        nanoseconds toggle_timestamp_ = 0ns;
+        bool fault_reset_active_ = false;
+
+        bool was_faulted_ = false;
+        bool stabilizing_ = false;
+        nanoseconds stabilization_timestamp_ = 0ns;
     };
 }
 

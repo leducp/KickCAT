@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <stdexcept>
 #include <unistd.h>
+
+#include "kickcat/debug.h"
 #include "kickcat/Error.h"
 #include "kickcat/OS/Timer.h"
 
@@ -80,17 +82,20 @@ namespace kickcat
 
         // Calculate next deadline.
         next_deadline_ += period_;
+
+        std::error_code ret{};
         if (next_deadline_ < last_wakeup_)
         {
-            printf("!!! LATE !!!\n");
+            dc_error("!!! LATE !!!\n");
+            ret = std::error_code{ETIME, std::system_category()};
         }
-        //while (next_deadline_ < last_wakeup_)
-        //{
-        //    // We are late: compute a new deadline that maintain the cycle.
-        //    next_deadline_ += period_;
-        //    printf("!!! LATE !!!\n");
-        //}
+        while (next_deadline_ < last_wakeup_)
+        {
+            // We are late: compute a new deadline that maintain the cycle.
+            next_deadline_ += period_;
+        }
 
-        return {};
+
+        return ret;
     }
 }

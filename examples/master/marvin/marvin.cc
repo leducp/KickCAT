@@ -15,8 +15,10 @@
 #include "CanOpenErrors.h"
 #include "MarvinProtocol.h"
 
-//#include <rtm/probe.h>
-//#include <rtm/io/posix/local_socket.h>
+constexpr double REDUCTION_RATIO[] = {120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0,
+                                        120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0};
+constexpr double ENCODER_TICKS_PER_TURN[] = {1<<20, 1<<20, 1<<19, 1<<19, 1<<19, 1<<19, 1<<19,
+                                            1<<20, 1<<20, 1<<19, 1<<19, 1<<19, 1<<19, 1<<19};
 
 using namespace kickcat;
 
@@ -28,22 +30,7 @@ int main(int argc, char *argv[])
         printf("usage no redundancy mode : ./test NIC_nominal\n");
         return 1;
     }
-/*
-    rtm::Probe probe;
-    {
-        auto io = std::make_unique<rtm::LocalSocket>();
-        auto rc = io->open(rtm::access::Mode::READ_WRITE);
-        if (rc)
-        {
-            printf("io open() error: %s\n", rc.message().c_str());
-            return 1;
-        }
 
-        probe.init("marvin", "op",
-                since_epoch(), 1ms, 42,
-                std::move(io));
-    }
-*/
     std::string red_interface_name = "";
     std::string nom_interface_name = argv[1];
     if (argc == 3)
@@ -77,7 +64,22 @@ int main(int argc, char *argv[])
     Bus bus(link);
     nanoseconds sync_point = 0ns;
 
-    uint8_t io_buffer[2048];
+    struct Motor
+    {
+        Slave* slave{};
+        pdo::Output* output{};
+        pdo::Input*  input{};
+        CoE::CiA::DS402::StateMachine state_machine{};
+        int32_t initial_position{};
+        double reduction_ratio;
+        double encoder_ticks_per_turn;
+        uint16_t prev_status_word{0xFFFF};
+        uint16_t prev_control_word{0xFFFF};
+    };
+    std::vector<Motor> motors;
+    motors.resize(14);
+
+    uint8_t io_buffer[2048] = {};
     try
     {
         bus.init(100ms);
@@ -94,26 +96,46 @@ int main(int argc, char *argv[])
         bus.requestState(State::PRE_OP);
         bus.waitForState(State::PRE_OP, 3000ms);
 
-
-        /*
-        // Map RxPDO/TxPDO
         for (int i = 0; i < 7; ++i)
         {
-            mapPDO(bus, bus.slaves().at(i), 0x1A01, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C13);
-            mapPDO(bus, bus.slaves().at(i), 0x1601, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C12);
+            motors[i].slave = &bus.slaves().at(i + 1);
+            motors[i].encoder_ticks_per_turn = ENCODER_TICKS_PER_TURN[i];
+            motors[i].reduction_ratio = REDUCTION_RATIO[i];
         }
-        */
-
-
-        uint8_t mode = 8;
-        uint32_t mode_size = 1;
-        for (int j = 1; j < 8; ++j)
+        for (int i = 7; i < 14; ++i)
         {
-            bus.writeSDO(bus.slaves().at(j), 0x6060, 0, Bus::Access::PARTIAL, &mode, mode_size);
+            motors[i].slave = &bus.slaves().at(i + 2); // skip first and last of first arm
+            motors[i].encoder_ticks_per_turn = ENCODER_TICKS_PER_TURN[i];
+            motors[i].reduction_ratio = REDUCTION_RATIO[i];
+        }
+
+        for (auto& motor : motors)
+        {
+            mapPDO(bus, *motor.slave, 0x1A01, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
+            mapPDO(bus, *motor.slave, 0x1601, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
         }
 
         printf("mapping\n");
         bus.createMapping(io_buffer);
+
+        for (auto& motor : motors)
+        {
+            motor.output = reinterpret_cast<pdo::Output *>(motor.slave->output.data);
+            motor.input  = reinterpret_cast<pdo::Input *> (motor.slave->input.data);
+            motor.state_machine.disable();
+
+            uint8_t mode = 8;   //CSP
+            uint32_t mode_size = 1;
+            bus.writeSDO(*motor.slave, 0x6060, 0, Bus::Access::PARTIAL, &mode, mode_size);
+
+            uint8_t interpolation_value = 1;
+            uint32_t interpolation_value_size = 1;
+            bus.writeSDO(*motor.slave, 0x60C2, 1, Bus::Access::PARTIAL, &interpolation_value, interpolation_value_size);
+
+            int8_t interpolation_index = -3; // 10^(-3) = milliseconds
+            uint32_t interpolation_index_size = 1;
+            bus.writeSDO(*motor.slave, 0x60C2, 2, Bus::Access::PARTIAL, &interpolation_index, interpolation_index_size);
+        }
 
         printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);
@@ -143,25 +165,6 @@ int main(int argc, char *argv[])
     {
         //printf("- previous error was a false alarm - ");
     };
-
-    constexpr int MOTORS = 14;
-    pdo::Output* output_pdo[MOTORS];
-    pdo::Input*  input_pdo[MOTORS];
-    CoE::CiA::DS402::StateMachine state_machine[MOTORS];
-    for (int i = 0; i < 7; ++i)
-    {
-        Slave& motor = bus.slaves().at(i + 1);
-        output_pdo[i] = reinterpret_cast<pdo::Output *>(motor.output.data);
-        input_pdo[i] = reinterpret_cast<pdo::Input *>(motor.input.data);
-        state_machine[i].disable();
-    }
-    for (int i = 0; i < 7; ++i)
-    {
-        Slave& motor = bus.slaves().at(i + 9);
-        output_pdo[i+7] = reinterpret_cast<pdo::Output *>(motor.output.data);
-        input_pdo[i+7] = reinterpret_cast<pdo::Input *>(motor.input.data);
-        state_machine[i+7].disable();
-    }
 
     Timer timer{1ms};
     timer.start(sync_point);
@@ -201,36 +204,28 @@ int main(int argc, char *argv[])
 
     link->setTimeout(1500us);
 
-    //printf("mapping: input(%d) output(%d)\n", motor.input.bsize, motor.output.bsize);
-
-    int32_t initial_position[MOTORS] = {0};
     nanoseconds start_time = kickcat::since_epoch();
-
-    std::shared_ptr<mailbox::request::AbstractMessage> msg = nullptr;
-
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     //constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
     int64_t last_error = 0;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        //probe.log();
-
         try
         {
             if (i == 500)
             {
-                for (int j = 0; j < MOTORS; ++j)
+                for (auto& motor : motors)
                 {
-                    output_pdo[j]->target_position = input_pdo[j]->actual_position;
-                    state_machine[j].enable();
+                    motor.output->target_position = motor.input->actual_position;
+                    motor.state_machine.enable();
                 }
             }
 
             if (i == 4000)
             {
-                for (int j = 0; j < MOTORS; ++j)
+                for (auto& motor : motors)
                 {
-                    initial_position[j] = input_pdo[j]->actual_position;
+                    motor.initial_position = motor.input->actual_position;
                 }
                 start_time = kickcat::since_epoch();
             }
@@ -241,18 +236,13 @@ int main(int argc, char *argv[])
 
                 constexpr double MOTION_FQ = 0.2; // Hz
                 constexpr double MOTION_AMPLITUDE = 8.0 / 180.0 * M_PI;
-                constexpr double REDUCTION_RATIO[] = {120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0, 120.0,
-                                                      120.0, 100.0, 100.0, 100.0, 100.0, 100.0};
-                constexpr double ENCODER_TICKS_PER_TURN[] = {1<<20, 1<<20, 1<<19, 1<<19, 1<<19, 1<<19, 1<<19,
-                                                             1<<20, 1<<20, 1<<19, 1<<19, 1<<19, 1<<19, 1<<19};
-
                 double targetSI = MOTION_AMPLITUDE * std::sin(2 * M_PI * MOTION_FQ * time);
 
                 // Set target
-                for (int j = 0; j < MOTORS; ++j)
+                for (auto& motor : motors)
                 {
                     //double measureSI = (input_pdo[j]->actual_position - initial_position[j]) / ENCODER_TICKS_PER_TURN[j] / REDUCTION_RATIO[j] * 2.0 * M_PI;
-                    output_pdo[j]->target_position =  initial_position[j] - static_cast<int32_t>(REDUCTION_RATIO[j] * targetSI / 2.0 / M_PI * ENCODER_TICKS_PER_TURN[j]);
+                    motor.output->target_position = motor.initial_position - static_cast<int32_t>(motor.reduction_ratio * targetSI / 2.0 / M_PI * motor.encoder_ticks_per_turn);
                 }
             }
 
@@ -275,27 +265,41 @@ int main(int argc, char *argv[])
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
 
-        for (int j = 0; j<MOTORS; ++j)
+        bool changed = false;
+        for (auto& motor : motors)
         {
-            state_machine[j].update(input_pdo[j]->status_word);
-            output_pdo[j]->control_word = state_machine[j].controlWord();
+            auto x = motor.input->status_word;
+            motor.state_machine.update(x);
+            motor.output->control_word = motor.state_machine.controlWord();
+            if (x != motor.prev_status_word or motor.state_machine.controlWord() != motor.prev_control_word)
+            {
+                changed = true;
+            }
+            motor.prev_status_word = x;
+            motor.prev_control_word = motor.state_machine.controlWord();
         }
+        if (changed)
+        {
+            for (auto const& motor : motors)
+            {
+                printf("%x (%x) - ", motor.prev_status_word, motor.prev_control_word);
+            }
+            printf("\n");
 
-        //if ((i % 100) == 0)
-        //{
-        //    printf("[%ld] {%x} %x (%x) position %d to %d - RECD %d\n",
-        //        i, input_pdo[0]->error_code,
-        //        state_machine[0].controlWord(), input_pdo[0]->status_word,
-        //        input_pdo[0]->actual_position, output_pdo[0]->target_position,
-        //        input_pdo[0]->RECD);
-        //}
+            for (size_t m = 0; m < motors.size(); ++m)
+            {
+                uint16_t sw = motors[m].prev_status_word;
+                if ((sw & 0x08) == 0x08 && motors[m].input->error_code != 0)
+                {
+                    printf("  Motor %zu fault: error_code=0x%04x\n", m, motors[m].input->error_code);
+                }
+            }
+        }
 
         if ((i % 1000) == 0)
         {
-            bus.isDCSynchronized(1000ns, true);
+            bus.isDCSynchronized(1000ns);
         }
-
-        //probe.log();
 
         timer.wait_next_tick();
     }
