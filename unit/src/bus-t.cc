@@ -43,8 +43,8 @@ public:
         // detectSlaves: broadcastRead
         mock_link->handleWriteThenRead(Command::BRD, 1);
 
-        // resetSlaves: 10 broadcastWrites + 3 broadcastReads
-        for (int i = 0; i < 10; ++i)
+        // reset slaves
+        for (int i = 0; i < 11; ++i)
         {
             mock_link->handleWriteThenRead(Command::BWR, 1);
         }
@@ -71,6 +71,9 @@ public:
 
         // fetchESC
         mock_link->handleProcess(Command::FPRD, ESC::Description{0x4, 0, 0, 8, 8, 16, 0xf, 0x1cc}, 1);
+
+        // fetch DL status
+        mock_link->handleProcess(Command::FPRD, uint16_t(0x0030), 1); // PL_port0 and PL_port1 active
 
         // requestState: INIT
         mock_link->handleWriteThenRead(Command::BWR, 1);

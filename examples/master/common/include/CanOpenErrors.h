@@ -3,7 +3,7 @@
 
 namespace kickcat
 {
-    char const* codeToError(uint16_t const& code)
+    char const* codeToError(uint16_t code)
     {
         switch (code)
         {
@@ -45,7 +45,7 @@ namespace kickcat
         }
     }
 
-    std::string registerToError(uint16_t const& reg)
+    std::string registerToError(uint16_t reg)
     {
         std::string result = "GENERIC_ERROR";                           // Generic error is mandatory
 

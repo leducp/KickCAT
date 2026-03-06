@@ -13,6 +13,7 @@ set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/protocol.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/request.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/mailbox/response.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/CiA/DS402/StateMachine.cc
 
   ${CMAKE_CURRENT_SOURCE_DIR}/src/EoE/protocol.cc
 )
@@ -47,6 +48,7 @@ elseif (WIN32)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/SharedMemory.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Timer.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/ConditionVariable.cc

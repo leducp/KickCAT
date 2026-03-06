@@ -4,16 +4,16 @@
 
 namespace kickcat
 {
-    constexpr nanoseconds THIRTY_YEARS = 30 * 365 * 24h;
+    constexpr nanoseconds ECAT_EPOCH_OFFSET = 10957 * 24h; // 1970-01-01 to 2000-01-01 (30 years + 7 leap days)
 
     nanoseconds since_ecat_epoch()
     {
-        return since_epoch() - THIRTY_YEARS;
+        return since_epoch() - ECAT_EPOCH_OFFSET;
     }
 
     nanoseconds to_unix_epoch(nanoseconds ecat_epoch)
     {
-        return ecat_epoch + THIRTY_YEARS;
+        return ecat_epoch + ECAT_EPOCH_OFFSET;
     }
 
     // ETG1000.6 and ETG1020 chapter 4 Description of AL Status Codes
@@ -222,12 +222,12 @@ namespace kickcat
     {
         switch (type)
         {
-            case SyncManagerType::Unused:     {return "Unused";    }
-            case SyncManagerType::MailboxOut: {return "MailboxOut";}
-            case SyncManagerType::MailboxIn: {return "MailboxIn" ;}
-            case SyncManagerType::Output:     {return "Output (Master to Slave)";    }
-            case SyncManagerType::Input:      {return "Input  (Slave to Master)";     }
-            default:                          {return "unknown";   }
+            case SyncManagerType::Unused:     { return "Unused";                    }
+            case SyncManagerType::MailboxOut: { return "MailboxOut";                }
+            case SyncManagerType::MailboxIn:  { return "MailboxIn" ;                }
+            case SyncManagerType::Output:     { return "Output (Master to Slave)";  }
+            case SyncManagerType::Input:      { return "Input  (Slave to Master)";  }
+            default:                          { return "unknown";                   }
         }
     }
 
@@ -283,7 +283,6 @@ namespace kickcat
                 case mailbox::VoE: { return "VoE";      }
                 default:           { return "Unknown";  }
             }
-
         }
     }
 

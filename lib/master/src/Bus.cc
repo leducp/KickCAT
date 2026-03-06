@@ -89,6 +89,7 @@ namespace kickcat
         resetSlaves(watchdogTimePDIO);
         setAddresses();
         fetchESC();
+        fetchDL();
 
         requestState(State::INIT);
         waitForState(State::INIT, 5000ms);
@@ -229,6 +230,7 @@ namespace kickcat
         broadcastWrite(reg::SYNC_MANAGER,       param, 128);
         broadcastWrite(reg::DC_SYSTEM_TIME,     param, 8);
         broadcastWrite(reg::DC_SYNC_ACTIVATION, param, 1);
+        broadcastWrite(reg::DC_CYCLIC_CONTROL,  param, 2);
         broadcastWrite(reg::ECAT_EVENT_MASK,    param, 2);
         broadcastWrite(reg::WDOG_COUNTER_PDO,   param, 2);
 
@@ -239,7 +241,7 @@ namespace kickcat
         broadcastWrite(reg::DC_TIME_FILTER, &dc_param, sizeof(dc_param));
 
         // reset ECAT Event registers
-        broadcastRead(reg::LATCH_STATUS, 1);
+        broadcastRead(reg::DC_LATCH0_STATUS, 1);
         broadcastRead(reg::ESC_DL_STATUS, 1);
         broadcastRead(reg::AL_STATUS, 1);
 
@@ -279,6 +281,21 @@ namespace kickcat
             link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::TYPE), nullptr, sizeof(ESC::Description), process, error);
         }
         link_->processDatagrams();
+    }
+
+
+    void Bus::fetchDL()
+    {
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error fetching DL status", state);
+        };
+
+        for (auto& slave : slaves_)
+        {
+            sendGetDLStatus(slave, error);
+        }
+        processAwaitingFrames();
     }
 
 
@@ -576,6 +593,11 @@ namespace kickcat
             };
             link_->addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
         }
+
+        if (dc_slave_ != nullptr)
+        {
+            sendDriftCompensation(error);
+        }
     }
 
 
@@ -613,6 +635,11 @@ namespace kickcat
             };
 
             link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
+        }
+
+        if (dc_slave_ != nullptr)
+        {
+            sendDriftCompensation(error);
         }
     }
 

@@ -27,6 +27,29 @@ namespace kickcat
 
         int countOpenPorts() const;
 
+        //---------------------- DC Helpers --------------------------//
+        // Port bitmask
+        static constexpr uint8_t PORT0 = (1 << 0);
+        static constexpr uint8_t PORT1 = (1 << 1);
+        static constexpr uint8_t PORT2 = (1 << 2);
+        static constexpr uint8_t PORT3 = (1 << 3);
+
+        bool isDCSupport() const;
+
+        // Retrieve the timestamp of a port (for DC)
+        nanoseconds portTime(uint8_t port);
+
+        // Compute the delta time between port_a and port_b - handle the wrapping
+        nanoseconds portDelta(uint8_t port_a, uint8_t port_b);
+
+        /// \return active ports bitmap from DLStatus
+        uint8_t activePorts();
+
+        // Calculate previous active port (order: 0 - 3 - 1 - 2)
+        uint8_t prevPort(uint8_t port);
+
+        //-----------------------------------------------------------//
+
         uint16_t address;
         uint8_t al_status{State::INVALID};
         uint16_t al_status_code;
@@ -57,8 +80,16 @@ namespace kickcat
         int previous_errors_sum{0};
 
         ESC::Description esc;
+
+        // DC received time record - required to compute propagation delay
+        nanoseconds dc_received_time[4];
+        nanoseconds dc_ecat_received_time;
+        nanoseconds delay = 0ns;
+        nanoseconds dc_time_offset = 0ns;
     };
 
+    // Helper to find a slave by its address
+    Slave* findSlaveByAddress(std::vector<Slave>& slaves, uint16_t address);
 }
 
 #endif

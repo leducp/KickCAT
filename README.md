@@ -413,7 +413,7 @@ Replace eth0 with the network interface connected to your EtherCAT bus if needed
 The master will enumerate all slaves on the bus and continuously print their input/output data.
 
 Expected output:
-![Multi Slave EasyCAT Example Output](doc/multi-slave-easycat-output.gif) 
+![Multi Slave EasyCAT Example Output](doc/multi-slave-easycat-output.gif)
 ---
 
 ## Simulator
@@ -556,12 +556,12 @@ You can also manually create `od_populator.cc` by implementing the `CoE::createO
 - Hook system for non-compliant slaves
 - Consecutive writes (up to 255 datagrams in flight)
 - EtherCAT mailbox gateway (ETG.8200)
+- Distributed Clock (DC) support - experimental
 
 
 📋 **Planned:**
 - CoE: Segmented transfer (partial)
 - CoE: Diagnosis message (0x10F3)
-- Distributed clock support
 - FoE, EoE, AoE, SoE profiles
 - Auto-discovery of broken wires
 - AF_XDP Linux socket for improved performance
@@ -724,7 +724,6 @@ make
 ### Master Stack
 - **Little-endian only**: Current implementation supports little-endian hosts only
 - **Windows**: Not suitable for real-time applications
-- **Distributed Clock**: Not yet implemented
 - **Mailbox protocols**: Limited to CoE SDO (FoE, EoE planned)
 
 ### Slave Stack
