@@ -47,7 +47,7 @@ To facilitate the hardware test, an automated script should be used to gather ar
    ./release/hw_test_deploy.sh --version v1.2.0-rc1 --pi-addr <pi-ip>
    ```
    *This script should:*
-   - Download artifacts using `gh run download` or direct links.
+   - Download artifacts using direct links.
    - Use `scp` to move the master binary/wheel to the Pi.
    - Use `scripts/deploy_artifacts.sh` (locally connected) or a remote trigger to flash slaves.
    - Start the master process on the Pi.
