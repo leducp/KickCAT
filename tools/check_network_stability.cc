@@ -1,19 +1,15 @@
 /// Tools to evaluate network quality by displaying number of packet lost or corrupted.
 /// Only available on linux for the moment.
 
-#include "kickcat/Link.h"
-#include "kickcat/Bus.h"
-#include "kickcat/SocketNull.h"
-
-#ifdef __linux__
-    #include "kickcat/OS/Linux/Socket.h"
-#else
-    #error "Unknown platform"
-#endif
-
 #include <iostream>
 #include <fstream>
 #include <argparse/argparse.hpp>
+
+#include "kickcat/Link.h"
+#include "kickcat/Bus.h"
+#include "kickcat/helpers.h"
+#include "kickcat/Prints.h"
+#include "kickcat/Error.h"
 
 using namespace kickcat;
 
@@ -30,7 +26,7 @@ int main(int argc, char* argv[])
     std::string red_interface_name;
     program.add_argument("-r", "--redundancy")
         .help("redundancy network interface name")
-        .default_value(std::string{"null"})
+        .default_value(std::string{""})
         .store_into(red_interface_name);
 
     try
@@ -44,23 +40,13 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    std::shared_ptr<AbstractSocket> socket_nominal;
     std::shared_ptr<AbstractSocket> socket_redundancy;
-
-    if (red_interface_name == "null")
-    {
-        printf("No redundancy mode selected \n");
-        socket_redundancy = std::make_shared<SocketNull>();
-    }
-    else
-    {
-        socket_redundancy = std::make_shared<Socket>();
-    }
-
-    auto socket_nominal = std::make_shared<Socket>();
     try
     {
-        socket_nominal->open(nom_interface_name);
-        socket_redundancy->open(red_interface_name);
+        auto [nominal, redundancy] = createSockets(nom_interface_name, red_interface_name);
+        socket_nominal = nominal;
+        socket_redundancy = redundancy;
     }
     catch (std::exception const& e)
     {
@@ -73,16 +59,16 @@ int main(int argc, char* argv[])
         printf("Redundancy has been activated due to loss of a cable \n");
     };
 
-    std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
+    std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
     link->setTimeout(500ms);
+    link->checkRedundancyNeeded();
 
     Bus bus(link);
 
-    constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
+    constexpr int64_t LOOP_NUMBER = 6 * 3600 * 1000; // 6h
 
     int64_t last_error = 0;
     nanoseconds last_time = 0s;
-
 
     auto is_file_open = [](std::ifstream const& file, std::string const& name)
     {
@@ -109,6 +95,9 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    printf("Starting network stability check on %s (redundancy: %s)...\n", 
+           nom_interface_name.c_str(), red_interface_name.empty() ? "none" : red_interface_name.c_str());
+
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
         sleep(1ms);
@@ -127,11 +116,22 @@ int main(int argc, char* argv[])
         if (elapsed_time(last_time) > 5s)
         {
             last_time = since_epoch();
-            uint32_t tx_packets, rx_packets, rx_errors;
+            uint32_t tx_packets = 0, rx_packets = 0, rx_errors = 0;
+            
+            file_tx_packets.clear();
+            file_tx_packets.seekg(0);
             file_tx_packets >> tx_packets;
+            
+            file_rx_packets.clear();
+            file_rx_packets.seekg(0);
             file_rx_packets >> rx_packets;
-            file_rx_errors  >> rx_errors;
-            printf("tx_packets: %u, rx_packets: %u, Diff: %i, rx_errors: %u \n", tx_packets, rx_packets, tx_packets - rx_packets, rx_errors);
+            
+            file_rx_errors.clear();
+            file_rx_errors.seekg(0);
+            file_rx_errors >> rx_errors;
+
+            printf("tx_packets: %u, rx_packets: %u, Diff: %d, rx_errors: %u \n", 
+                   tx_packets, rx_packets, static_cast<int>(tx_packets - rx_packets), rx_errors);
         }
     }
 

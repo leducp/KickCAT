@@ -20,18 +20,17 @@ Before an official release, a Release Candidate must be created to trigger the f
 Stability is critical for EtherCAT applications. A 6-hour continuous run must be performed on actual hardware.
 
 ### Hardware Setup
-- **Master:** Raspberry Pi (any model with Ethernet, 4 or 5 recommended).
+- **Master:** Raspberry Pi with RT Kernel.
 - **Slaves in Bus:**
   - 1x Freedom-K64F (NuttX slave).
   - 1x XMC4800 Relax Kit (NuttX slave).
-  - (Optional) EasyCAT or other LAN9252-based slaves.
 
 ### Test Procedure
 1. **Fetch CI Artifacts:** Download the latest `build-linux` (for RPi) and `firmware-*.bin` artifacts from the RC tag's CI run.
 2. **Deploy Slaves:** Use `scripts/deploy_artifacts.sh` to flash the Freedom and XMC boards.
 3. **Deploy Master:** `scp` the compiled `easycat_example` or the Python wheel to the Raspberry Pi.
 4. **Run Test:** Execute the master for at least **6 hours** in a cyclic loop.
-   - Use `tools/checkNetworkStability.cc` or an example app that monitors `AL Status` and `WC` (Working Counter) errors.
+   - Use `tools/check_network_stability.cc` or an example app that monitors `AL Status` and `WC` (Working Counter) errors.
 5. **Validation:** The test is successful if:
    - Zero lost frames are reported (or within acceptable low threshold for the environment).
    - No slave dropped out of `OP` state.
