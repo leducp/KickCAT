@@ -101,10 +101,45 @@ jobs:
           path: build/coverage_xml.xml
           if-no-files-found: error
 
+  build_arm64:
+    needs: py_lint
+    name: Build C++ (ARM64)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-conan-action
+
+      - name: Conan install
+        run: |
+          export conan_profile=${{github.workspace}}/build/profile.txt
+          ./scripts/setup_build.sh ${{github.workspace}}/build
+        shell: bash
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -G "Unix Makefiles"
+        shell: bash
+
+      - name: Build
+        run: cmake --build build --config ${{env.BUILD_TYPE}}
+
+      - name: Upload Build Artifacts (ARM64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-arm64
+          path: build/
+          retention-days: 1
+
   build-wheels:
     needs: py_lint
-    name: Build Python Wheels
-    runs-on: ubuntu-24.04
+    name: Build Python Wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    env:
+      CIBW_ARCHS: native
     steps:
       - uses: actions/checkout@v4
 
@@ -374,7 +409,7 @@ jobs:
 
   # Release
   release:
-    needs: [build-wheels, simulation_test, build-conan-package]
+    needs: [build-wheels, simulation_test, build-conan-package, build_arm64]
     if: startsWith(github.ref, 'refs/tags/') # Only run on tag pushes
     runs-on: ubuntu-24.04
     environment:
