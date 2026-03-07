@@ -7,7 +7,7 @@ This document outlines the mandatory steps to be followed when releasing a new v
 Before an official release, a Release Candidate must be created to trigger the full CI pipeline and provide artifacts for hardware testing.
 
 1. Ensure the version in `conanfile.py` and `pyproject.toml` is updated to the target version (e.g., `1.2.0-rc1`).
-2. Update the `CHANGELOG.md` (if present) or internal release notes.
+2. [TODO] Update the `CHANGELOG.md` (if present) or internal release notes. 
 3. Push a tag with the `-rc` suffix:
    ```bash
    git tag -a v1.2.0-rc1 -m "Release Candidate 1 for v1.2.0"
@@ -26,31 +26,40 @@ Stability is critical for EtherCAT applications. A 6-hour continuous run must be
   - 1x XMC4800 Relax Kit (NuttX slave).
 
 ### Test Procedure
-1. **Fetch CI Artifacts:** Download the latest `build-linux` (for RPi) and `firmware-*.bin` artifacts from the RC tag's CI run.
-2. **Deploy Slaves:** Use `scripts/deploy_artifacts.sh` to flash the Freedom and XMC boards.
-3. **Deploy Master:** `scp` the compiled `easycat_example` or the Python wheel to the Raspberry Pi.
-4. **Run Test:** Execute the master for at least **6 hours** in a cyclic loop.
-   - Use `tools/check_network_stability.cc` or an example app that monitors `AL Status` and `WC` (Working Counter) errors.
-5. **Validation:** The test is successful if:
-   - Zero lost frames are reported (or within acceptable low threshold for the environment).
-   - No slave dropped out of `OP` state.
-   - No crashes or memory leaks (check `dmesg` and process memory usage).
+1. **Fetch CI Artifacts:** Download the latest artifacts from the RC tag's CI run:
+   - `build-arm64.zip` (containing `hw_test_bench` for RPi).
+   - `firmware-freedom-k64f-nuttx-master.zip` (NuttX firmware).
+   - `firmware-xmc4800-relax-nuttx-master.zip` (NuttX firmware).
+2. **Run Orchestrator:** Use the `release/hw_test_orchestrator.sh` script to automate deployment and monitoring (see Section 3).
+3. **Validation:** The test is successful if:
+   - [TODO] Zero lost frames (exceptions) are reported.
+   - [TODO] Zero Working Counter (WC) errors are reported.
+   - [TODO] No slave dropped out of `OP` state.
+   - [TODO] No memory leaks (RSS remains stable in `hw_test_results.txt`).
 
 ## 3. Automatic Deployment & Test Script
 
-To facilitate the hardware test, an automated script should be used to gather artifacts and deploy them.
+The `release/hw_test_orchestrator.sh` script automates the entire hardware validation process, including SSH setup, firmware flashing, and remote monitoring.
 
-### Automated Workflow
-1. **Gather Links:** Get the artifact download URLs from the GitHub Action run.
-2. **Run Deployment Script:** (Proposed/Internal tool)
-   ```bash
-   ./release/hw_test_deploy.sh --version v1.2.0-rc1 --pi-addr <pi-ip>
-   ```
-   *This script should:*
-   - Download artifacts using direct links.
-   - Use `scp` to move the master binary/wheel to the Pi.
-   - Use `scripts/deploy_artifacts.sh` (locally connected) or a remote trigger to flash slaves.
-   - Start the master process on the Pi.
+### Usage
+```bash
+./release/hw_test_orchestrator.sh \No memory leaks
+    -m ./path/to/build-arm64.zip \
+    -f ./path/to/firmware-freedom-k64f-nuttx-master.zip \
+    -x ./path/to/firmware-xmc4800-relax-nuttx-master.zip \
+    -a <pi-ip-address> \
+    -d 21600
+```
+
+### Features
+- **SSH Key Management:** Automatically generates and deploys SSH keys to the Pi for passwordless access.
+- **Slave Deployment:** Uses `scripts/deploy_artifacts.sh` to flash locally connected NutttX slaves.
+- **Remote Monitoring:** Deploys the master binary to the Pi, starts the test, and logs Resident Set Size (RSS) memory usage every 60 minutes.
+- **Robust Cleanup:** Ensures the remote process is killed and temporary files are removed on script exit or interruption.
+
+### Monitoring Results
+- **Local Progress:** `hw_test_results.txt` (contains elapsed time and memory stats).
+- **Remote Log:** `~/hw_test.log` on the Raspberry Pi (contains detailed `hw_test_bench` output).
 
 ## 4. Official Release
 
@@ -72,7 +81,7 @@ Once the RC is validated via hardware tests:
 ## 5. Post-Release Verification
 
 ### Wheel Deployment
-1. Verify the package is available on PyPI: `pip install kickcat==1.2.0` (wait a few minutes for index update).
+1. Verify the package is available on PyPI: `pip install kickcat==1.2.0`.
 2. Perform a manual test on a clean machine:
    ```bash
    python3 -m venv test_env
