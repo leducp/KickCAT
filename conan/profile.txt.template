@@ -1,9 +1,9 @@
 [settings]
-os=Linux
-arch=CONAN_ARCH
-compiler=gcc
-compiler.version=MAJOR_VERSION
-compiler.libcxx=libstdc++11
+os=@OS_NAME@
+arch=@ARCH_NAME@
+compiler=@COMPILER_NAME@
+compiler.version=@MAJOR_VERSION@
+compiler.libcxx=@LIBCXX_NAME@
 compiler.cppstd=17
 build_type=Release
 
@@ -11,5 +11,5 @@ build_type=Release
 [tool_requires]
 
 [buildenv]
-CC=BINARY_PATH_CC
-CXX=BINARY_PATH_CXX
+CC=@BINARY_PATH_CC@
+CXX=@BINARY_PATH_CXX@
