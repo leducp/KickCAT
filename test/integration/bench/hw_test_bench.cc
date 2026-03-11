@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
     }
     catch (const std::runtime_error &err)
     {
-        printf("%s\n", err.what());
-        printf("%s", program);
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
         return 1;
     }
 
