@@ -23,8 +23,8 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 
 # --- Defaults ---
 INTERFACE="eth0"
-DURATION=21600          # 6 hours
-LOGGING_INTERVAL=300    # Log to file every 5 minutes
+DURATION=259200         # 72 hours
+LOGGING_INTERVAL=300    # Log to file every 10 minutes
 SAMPLE_INTERVAL=5       # Sample CPU/MEM every 5 seconds
 WINDOW_SIZE=12          # Rolling average window (12 samples = 60s)
 PI_ADDR=""
