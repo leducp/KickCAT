@@ -4,6 +4,10 @@
 #include <chrono>
 #include <vector>
 #include <numeric>
+#include <cstdio>
+#include <cinttypes>
+#include <cstdarg>
+#include <ctime>
 
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
@@ -12,6 +16,25 @@
 #include "kickcat/MailboxSequencer.h"
 
 using namespace kickcat;
+
+void log_msg(const char *format, ...)
+{
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    char time_buf[64];
+    struct tm *tm_info = std::localtime(&in_time_t);
+    std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", tm_info);
+
+    printf("[%s.%03d] ", time_buf, static_cast<int>(ms.count()));
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    fflush(stdout);
+}
 
 int main(int argc, char *argv[])
 {
@@ -36,7 +59,7 @@ int main(int argc, char *argv[])
     }
     catch (const std::runtime_error &err)
     {
-        std::cerr << err.what() << std::endl;
+        log_msg("%s\n", err.what());
         std::cerr << program;
         return 1;
     }
@@ -51,13 +74,13 @@ int main(int argc, char *argv[])
     }
     catch (std::exception const &e)
     {
-        std::cerr << e.what() << std::endl;
+        log_msg("%s\n", e.what());
         return 1;
     }
 
     auto report_redundancy = []()
     {
-        printf("Redundancy has been activated due to loss of a cable \n");
+        log_msg("Redundancy has been activated due to loss of a cable \n");
     };
 
     std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
@@ -69,12 +92,12 @@ int main(int argc, char *argv[])
     uint8_t io_buffer[2048];
     try
     {
-        std::cout << "Initializing EtherCAT Master on " << nom_interface_name << "..." << std::endl;
+        log_msg("Initializing EtherCAT Master on %s...\n", nom_interface_name.c_str());
         bus.init(100ms);
 
         if (bus.slaves().size() != static_cast<size_t>(expected_slaves))
         {
-            std::cerr << "Error: Expected " << expected_slaves << " slaves, but found " << bus.slaves().size() << std::endl;
+            log_msg("Error: Expected %d slaves, but found %zu\n", expected_slaves, bus.slaves().size());
             return 1;
         }
 
@@ -104,7 +127,7 @@ int main(int argc, char *argv[])
     }
     catch (std::exception const &e)
     {
-        std::cerr << e.what() << std::endl;
+        log_msg("%s\n", e.what());
         return 1;
     }
 
@@ -133,7 +156,7 @@ int main(int argc, char *argv[])
     auto last_tick = start_time;
     bool calibrated = false;
 
-    std::cout << "Starting 1-minute calibration cycle..." << std::endl;
+    log_msg("Starting 1-minute calibration cycle...\n");
 
     while (true)
     {
@@ -179,24 +202,27 @@ int main(int argc, char *argv[])
                     calibrated = true;
                     baseline_wc = current_wc_sum;
                     baseline_lost = current_lost_sum;
-                    std::cout << "Calibration complete. Baseline WC Errors: " << baseline_wc
-                              << ", Baseline Lost Frames: " << baseline_lost << std::endl;
+                    log_msg("Calibration complete. Baseline WC Errors: %" PRIu64 ", Baseline Lost Frames: %" PRIu64 "\n", baseline_wc, baseline_lost);
                 }
                 else if (elapsed % 10 == 0)
                 {
-                    std::cout << "Calibration in progress... " << elapsed << "s/60s" << std::endl;
+                    log_msg("Calibration in progress... %" PRId64 "s/60s\n", elapsed);
                 }
             }
             else
             {
+                if (elapsed % 60 == 0)
+                {
+                    log_msg("WC Errors in last minute: %" PRIu64 ", Lost Frames in last minute: %" PRIu64 "\n", current_wc_sum, current_lost_sum);
+                }
                 if (current_wc_sum > baseline_wc)
                 {
-                    std::cerr << "Error: WC errors (" << current_wc_sum << ") exceeded baseline threshold (" << baseline_wc << ")" << std::endl;
+                    log_msg("Error: WC errors (%" PRIu64 ") exceeded baseline threshold (%" PRIu64 ")\n", current_wc_sum, baseline_wc);
                     return 1;
                 }
                 if (current_lost_sum > baseline_lost)
                 {
-                    std::cerr << "Error: Lost frames (" << current_lost_sum << ") exceeded baseline threshold (" << baseline_lost << ")" << std::endl;
+                    log_msg("Error: Lost frames (%" PRIu64 ") exceeded baseline threshold (%" PRIu64 ")\n", current_lost_sum, baseline_lost);
                     return 1;
                 }
             }
