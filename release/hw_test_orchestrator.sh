@@ -24,7 +24,7 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 # --- Defaults ---
 INTERFACE="eth0"
 DURATION=259200         # 72 hours
-LOGGING_INTERVAL=300    # Log to file every 10 minutes
+LOGGING_INTERVAL=600    # Log to file every 10 minutes
 SAMPLE_INTERVAL=5       # Sample CPU/MEM every 5 seconds
 WINDOW_SIZE=12          # Rolling average window (12 samples = 60s)
 PI_ADDR=""
@@ -271,7 +271,7 @@ while [ "$(date +%s)" -lt "$END_TIME" ]; do
     AVG_CPU=$(get_avg_bash "${CPU_WINDOW[@]}")
     AVG_MEM=$(get_avg_bash "${MEM_WINDOW[@]}")
 
-    # Threshold check on every sample
+    # Threshold check
     CPU_BREACH=$(awk "BEGIN {print ($AVG_CPU > $THRESHOLD_CPU) ? 1 : 0}")
     MEM_BREACH=$(awk "BEGIN {print ($AVG_MEM > $THRESHOLD_MEM) ? 1 : 0}")
 
