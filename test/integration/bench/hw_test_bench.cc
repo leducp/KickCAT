@@ -1,6 +1,9 @@
 #include <iostream>
 #include <fstream>
 #include <argparse/argparse.hpp>
+#include <chrono>
+#include <vector>
+#include <numeric>
 
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
@@ -105,10 +108,32 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    auto callback_error = [](DatagramState const &)
-    { THROW_SYSTEM_ERROR("[ERROR] COM Failure (not sure if this is correct might be better to check datagram state ok?)"); };
+    uint64_t wc_errors_in_sec = 0;
+    uint64_t lost_frames_in_sec = 0;
+
+    auto callback_error = [&](DatagramState const &state)
+    {
+        if (state != DatagramState::OK)
+        {
+            wc_errors_in_sec++;
+        }
+    };
+
     link->setTimeout(10ms);
     MailboxSequencer mailbox_sequencer(bus);
+
+    std::vector<uint64_t> wc_window(60, 0);
+    std::vector<uint64_t> lost_window(60, 0);
+    size_t window_pos = 0;
+
+    uint64_t baseline_wc = 0;
+    uint64_t baseline_lost = 0;
+
+    auto start_time = std::chrono::steady_clock::now();
+    auto last_tick = start_time;
+    bool calibrated = false;
+
+    std::cout << "Starting 1-minute calibration cycle..." << std::endl;
 
     while (true)
     {
@@ -126,8 +151,55 @@ int main(int argc, char *argv[])
         }
         catch (std::exception const &e)
         {
-            // Lost frame should we add some kinda stat metric for that ?
-            std::cerr << "\n[EXCEPTION] " << e.what() << std::endl;
+            lost_frames_in_sec++;
+        }
+
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_tick >= 1s)
+        {
+            last_tick = now;
+
+            wc_window[window_pos] = wc_errors_in_sec;
+            lost_window[window_pos] = lost_frames_in_sec;
+
+            wc_errors_in_sec = 0;
+            lost_frames_in_sec = 0;
+
+            window_pos = (window_pos + 1) % 60;
+
+            uint64_t current_wc_sum = std::accumulate(wc_window.begin(), wc_window.end(), 0ULL);
+            uint64_t current_lost_sum = std::accumulate(lost_window.begin(), lost_window.end(), 0ULL);
+
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
+
+            if (!calibrated)
+            {
+                if (elapsed >= 60)
+                {
+                    calibrated = true;
+                    baseline_wc = current_wc_sum;
+                    baseline_lost = current_lost_sum;
+                    std::cout << "Calibration complete. Baseline WC Errors: " << baseline_wc
+                              << ", Baseline Lost Frames: " << baseline_lost << std::endl;
+                }
+                else if (elapsed % 10 == 0)
+                {
+                    std::cout << "Calibration in progress... " << elapsed << "s/60s" << std::endl;
+                }
+            }
+            else
+            {
+                if (current_wc_sum > baseline_wc)
+                {
+                    std::cerr << "Error: WC errors (" << current_wc_sum << ") exceeded baseline threshold (" << baseline_wc << ")" << std::endl;
+                    return 1;
+                }
+                if (current_lost_sum > baseline_lost)
+                {
+                    std::cerr << "Error: Lost frames (" << current_lost_sum << ") exceeded baseline threshold (" << baseline_lost << ")" << std::endl;
+                    return 1;
+                }
+            }
         }
     }
 
