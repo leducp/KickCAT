@@ -35,24 +35,26 @@ update_status() {
     shift
     local tmp="${STATUS_FILE}.tmp"
     {
-        echo "STATE=$state"
-        echo "START_TIME=$START_TIME"
-        echo "DURATION=$DURATION"
-        echo "INTERFACE=$INTERFACE"
-        echo "SLAVES=$SLAVES"
-        echo "BENCH_PID=$BENCH_PID"
-        echo "SAMPLE_INTERVAL=$SAMPLE_INTERVAL"
-        echo "LOGGING_INTERVAL=$LOGGING_INTERVAL"
-        echo "WINDOW_SIZE=$WINDOW_SIZE"
-        echo "BASELINE_CPU=$BASELINE_CPU"
-        echo "BASELINE_MEM=$BASELINE_MEM"
-        echo "THRESHOLD_CPU=$THRESHOLD_CPU"
-        echo "THRESHOLD_MEM=$THRESHOLD_MEM"
-        echo "AVG_CPU=${AVG_CPU:-0}"
-        echo "AVG_MEM=${AVG_MEM:-0}"
-        echo "LAST_UPDATE=$(date +%s)"
+        echo "STATE='$state'"
+        echo "START_TIME='$START_TIME'"
+        echo "DURATION='$DURATION'"
+        echo "INTERFACE='$INTERFACE'"
+        echo "SLAVES='$SLAVES'"
+        echo "BENCH_PID='$BENCH_PID'"
+        echo "SAMPLE_INTERVAL='$SAMPLE_INTERVAL'"
+        echo "LOGGING_INTERVAL='$LOGGING_INTERVAL'"
+        echo "WINDOW_SIZE='$WINDOW_SIZE'"
+        echo "BASELINE_CPU='$BASELINE_CPU'"
+        echo "BASELINE_MEM='$BASELINE_MEM'"
+        echo "THRESHOLD_CPU='$THRESHOLD_CPU'"
+        echo "THRESHOLD_MEM='$THRESHOLD_MEM'"
+        echo "AVG_CPU='${AVG_CPU:-0}'"
+        echo "AVG_MEM='${AVG_MEM:-0}'"
+        echo "LAST_UPDATE='$(date +%s)'"
         for arg in "$@"; do
-            echo "$arg"
+            local key="${arg%%=*}"
+            local val="${arg#*=}"
+            echo "${key}='${val}'"
         done
     } > "$tmp"
     mv "$tmp" "$STATUS_FILE"
@@ -104,12 +106,12 @@ if [[ "${1:-}" == "--stop" ]]; then
         {
             while IFS= read -r line; do
                 if [[ "$line" == STATE=* ]]; then
-                    echo "STATE=STOPPED"
+                    echo "STATE='STOPPED'"
                 else
                     echo "$line"
                 fi
             done < "$STATUS_FILE"
-            echo "RESULT=Test stopped by user after ${ELAPSED}s"
+            echo "RESULT='Test stopped by user after ${ELAPSED}s'"
         } > "$local_tmp"
         mv "$local_tmp" "$STATUS_FILE"
     fi
