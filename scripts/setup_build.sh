@@ -1,6 +1,10 @@
 #!/bin/bash
+set -euo pipefail
 
-KICKCAT_DIR=$(dirname "$(realpath $0)")/../
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+KICKCAT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+source "$SCRIPT_DIR/lib/log.sh"
 
 usage() {
     cat <<EOF
@@ -42,8 +46,7 @@ while [[ $# -gt 0 ]]; do
             if [ -z "$build_dir" ]; then
                 build_dir="$1"
             else
-                echo "Unknown argument: $1"
-                echo ""
+                error "Unknown argument: $1"
                 usage
                 exit 1
             fi
@@ -60,23 +63,22 @@ fi
 # Minimum required version
 MIN_CONAN_VERSION="2.10.0"
 
-# Check if conan is installed
+step "Checking prerequisites"
 if ! command -v conan >/dev/null 2>&1; then
-    echo "Conan is not installed. Aborting..."
+    error "Conan is not installed."
     exit 1
 fi
 
-# Get installed version
 INSTALLED_CONAN_VERSION=$(conan --version | awk '{print $3}')
 
-# Compare versions
 if [[ "$(printf '%s\n' "$MIN_CONAN_VERSION" "$INSTALLED_CONAN_VERSION" | sort -V | head -n1)" != "$MIN_CONAN_VERSION" ]]; then
-    echo "Conan version $MIN_CONAN_VERSION or higher is required (found $INSTALLED_CONAN_VERSION)"
+    error "Conan version $MIN_CONAN_VERSION or higher is required (found $INSTALLED_CONAN_VERSION)"
     exit 1
 fi
+success "Conan $INSTALLED_CONAN_VERSION"
 
 mkdir -p "$build_dir"
-echo "$build_dir"
+info "Build directory: $build_dir"
 
 TEMPLATE_CMAKE_TOOLCHAIN="$KICKCAT_DIR/cmake/toolchain.cmake.template"
 OUTPUT_CMAKE_TOOLCHAIN="$build_dir/toolchain.cmake"
@@ -84,8 +86,7 @@ TEMPLATE_CONAN_PROFILE="$KICKCAT_DIR/conan/profile.txt.template"
 OUTPUT_CONAN_PROFILE="$build_dir/profile.txt"
 
 if [ -n "$CROSS_TARGET" ]; then
-    # ── Cross-compilation ───────────────────────────────────────────────
-    echo "Cross-compiling for target: $CROSS_TARGET"
+    step "Cross-compilation setup (target: $CROSS_TARGET)"
 
     case "$CROSS_TARGET" in
         linux-aarch64)
@@ -99,15 +100,15 @@ if [ -n "$CROSS_TARGET" ]; then
             LIBCXX_NAME="libstdc++11"
             ;;
         *)
-            echo "Unsupported cross-compilation target: $CROSS_TARGET"
-            echo "Supported targets: linux-aarch64"
+            error "Unsupported cross-compilation target: $CROSS_TARGET"
+            info "Supported targets: linux-aarch64"
             exit 1
             ;;
     esac
 
     if ! command -v "$CROSS_CC" >/dev/null 2>&1; then
-        echo "Cross-compiler $CROSS_CC not found. Install it with:"
-        echo "  sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu"
+        error "Cross-compiler $CROSS_CC not found. Install it with:"
+        info "  sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu"
         exit 1
     fi
 
@@ -115,9 +116,8 @@ if [ -n "$CROSS_TARGET" ]; then
     IFS='.' read -r major minor patch <<< "$CROSS_VERSION_FULL"
     CROSS_VERSION="$major.$minor"
 
-    echo "Cross-compiler: $CROSS_CC ($CROSS_VERSION_FULL)"
+    success "Cross-compiler: $CROSS_CC ($CROSS_VERSION_FULL)"
 
-    # Generate the native build profile (used by Conan for build-time tools)
     source "$KICKCAT_DIR/tools/setup/detect_compiler.sh"
 
     OUTPUT_BUILD_PROFILE="$build_dir/profile_build.txt"
@@ -157,20 +157,18 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 CROSS_EOF
 
-    echo ""
-    echo "=== Host profile (target: $CROSS_TARGET) ==="
+    step "Host profile (target: $CROSS_TARGET)"
     cat "$OUTPUT_CONAN_PROFILE"
-    echo ""
-    echo "=== Build profile (native) ==="
+
+    step "Build profile (native)"
     cat "$OUTPUT_BUILD_PROFILE"
 
     CONAN_PROFILE_ARGS="-pr:h $OUTPUT_CONAN_PROFILE -pr:b $OUTPUT_BUILD_PROFILE"
 
 else
-    # ── Native build ────────────────────────────────────────────────────
+    step "Detecting native compiler"
     source "$KICKCAT_DIR/tools/setup/detect_compiler.sh"
 
-    # Detect architecture and map to Conan arch value
     detect_conan_arch() {
         local machine
         machine=$(uname -m)
@@ -181,14 +179,14 @@ else
             armv6l)             echo "armv6" ;;
             i686|i386)          echo "x86" ;;
             *)
-                echo "Unknown architecture: $machine. Aborting..." >&2
+                error "Unknown architecture: $machine"
                 exit 1
                 ;;
         esac
     }
 
     ARCH_NAME=$(detect_conan_arch)
-    echo "Detected architecture: $(uname -m) -> Conan arch: $ARCH_NAME"
+    info "Architecture: $(uname -m) -> Conan arch: $ARCH_NAME"
 
     # Generate cmake toolchain
     sed \
@@ -208,13 +206,18 @@ else
       -e "s|@BINARY_PATH_CXX@|$(command -v $GREATEST_CXX)|g" \
       "$TEMPLATE_CONAN_PROFILE" > "$OUTPUT_CONAN_PROFILE"
 
+    step "Generated Conan profile"
     cat "$OUTPUT_CONAN_PROFILE"
 
     CONAN_PROFILE_ARGS="-pr $OUTPUT_CONAN_PROFILE -pr:b $OUTPUT_CONAN_PROFILE"
 fi
 
-# Prepare debug dependencies only for local call, not in CI
-if [[ $CIBUILDWHEEL != "1" ]]; then
+step "Installing Conan dependencies"
+if [[ "${CIBUILDWHEEL:-}" != "1" ]]; then
+    info "Installing Debug dependencies..."
     conan install "$KICKCAT_DIR/conan/conanfile_linux.txt" -of="$build_dir" $CONAN_PROFILE_ARGS --build=missing -s build_type=Debug
 fi
+info "Installing Release dependencies..."
 conan install "$KICKCAT_DIR/conan/conanfile_linux.txt" -of="$build_dir" $CONAN_PROFILE_ARGS --build=missing -s build_type=Release
+
+success "Build environment ready in $build_dir"

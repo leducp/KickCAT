@@ -6,6 +6,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/OS/Timer.h"
 
 using namespace kickcat;
 
@@ -192,9 +193,12 @@ int main(int argc, char* argv[])
     constexpr int16_t THRESHOLD_ACCEL = 1000;
     constexpr int16_t THRESHOLD_MAG   = 1000;
 
+    Timer timer{4ms};
+    timer.start();
+
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(4ms);
+        timer.wait_next_tick();
 
         try
         {

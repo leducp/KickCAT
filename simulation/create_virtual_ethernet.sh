@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# constants
-RED='\033[1;31m'
-NC='\033[0m' # No Color
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+source "$SCRIPT_DIR/../scripts/lib/log.sh"
 
 command=$1
 interface=$2
@@ -19,19 +19,14 @@ help()
 checkName()
 {
     if [ -z "$interface" ]; then
-        printError "No interface name supplied"
+        error "No interface name supplied"
         help
         exit 1
     fi
 }
 
-printError()
-{
-    printf "${RED}${1}${NC}\n"
-}
-
 if [ -z "$command" ]; then
-    printError "No command supplied."
+    error "No command supplied."
     help
     exit 1
 fi
@@ -44,23 +39,23 @@ fi
 if [ "$command" == "create" ]; then
     checkName
     if $(ip link add ${2}A type veth peer name ${2}B); then
-        echo "Create a veth pair ${2}A >===< ${2}B successfully."
+        success "Created veth pair ${2}A >===< ${2}B"
         exit 0
     else
-        echo "Cannot create a veth pair ${2}A >===< ${2}B. Aborting"
+        error "Cannot create veth pair ${2}A >===< ${2}B"
         exit 2
     fi
 elif [ "$command" == "delete" ]; then
     checkName
     if $(ip link del ${2}A); then
-        echo "Delete the veth pair ${2}A >===< ${2}B successfully."
-        exit 2
+        success "Deleted veth pair ${2}A >===< ${2}B"
+        exit 0
     else
-        echo "Cannot delete the veth pair ${2}A >===< ${2}B. Aborting"
+        error "Cannot delete veth pair ${2}A >===< ${2}B"
         exit 3
     fi
 else
-    printError "Invalid command."
+    error "Invalid command."
     help
     exit 1
 fi
