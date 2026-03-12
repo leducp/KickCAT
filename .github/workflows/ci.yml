@@ -48,24 +48,26 @@ jobs:
           fi
         shell: bash
 
-      - name: Install Gcovr and Lcov
+      - name: Install Gcovr, Lcov and AF_XDP deps
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt install gcovr lcov
+          sudo apt install gcovr lcov libxdp-dev libbpf-dev clang
 
       - name: Configure CMake
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             export cmake_generator="Unix Makefiles"
             export cmake_coverage="-DCODE_COVERAGE=ON"
+            export cmake_af_xdp="-DENABLE_AF_XDP=ON"
           elif [ "$RUNNER_OS" == "Windows" ]; then
             export cmake_generator="MinGW Makefiles"
             export cmake_coverage="-DCODE_COVERAGE=OFF"
+            export cmake_af_xdp=""
           else
             echo "$RUNNER_OS not supported"
             exit 1
           fi
-          cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_UNIT_TESTS=ON -G "${cmake_generator}" ${cmake_coverage}
+          cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_UNIT_TESTS=ON -G "${cmake_generator}" ${cmake_coverage} ${cmake_af_xdp}
         shell: bash
 
       - name: Build
@@ -110,6 +112,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-conan-action
 
+      - name: Install AF_XDP deps
+        run: sudo apt-get update && sudo apt-get install -y libxdp-dev libbpf-dev clang
+
       - name: Conan install
         run: |
           export conan_profile=${{github.workspace}}/build/profile.txt
@@ -117,8 +122,7 @@ jobs:
         shell: bash
 
       - name: Configure CMake
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -G "Unix Makefiles"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_AF_XDP=ON -G "Unix Makefiles"
         shell: bash
 
       - name: Build
@@ -200,6 +204,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install AF_XDP runtime deps
+        run: sudo apt-get update && sudo apt-get install -y libxdp1 libbpf1
 
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4

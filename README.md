@@ -557,14 +557,13 @@ You can also manually create `od_populator.cc` by implementing the `CoE::createO
 - Consecutive writes (up to 255 datagrams in flight)
 - EtherCAT mailbox gateway (ETG.8200)
 - Distributed Clock (DC) support - experimental
-
+- AF_XDP Linux socket for improved performance *(available, opt-in)*
 
 📋 **Planned:**
 - CoE: Segmented transfer (partial)
 - CoE: Diagnosis message (0x10F3)
 - FoE, EoE, AoE, SoE profiles
 - Auto-discovery of broken wires
-- AF_XDP Linux socket for improved performance
 - Addressing groups (multi-PDO)
 
 ### Slave Stack Status
@@ -623,6 +622,52 @@ For real-time performance on Linux:
    cat /proc/interrupts | grep eth0
    # Set priority
    sudo chrt -f 90 -p <IRQ_thread_PID>
+   ```
+
+7. **Use AF_XDP socket (optional, Linux only)**
+
+   AF_XDP bypasses most of the kernel networking stack by using shared memory
+   ring buffers between user space and the NIC driver. This can reduce latency
+   significantly compared to the default `AF_PACKET` raw socket.
+
+   **Build requirements:** `libxdp-dev`, `libbpf-dev`, `clang` (for BPF compilation).
+
+   ```bash
+   # Install dependencies (Debian/Ubuntu)
+   sudo apt install libxdp-dev libbpf-dev clang
+
+   # Build with AF_XDP support
+   cmake .. -DENABLE_AF_XDP=ON
+   make
+   ```
+
+   **Usage:** prefix your interface name with `xdp:` to select the AF_XDP backend:
+
+   ```bash
+   # AF_XDP socket (requires CAP_NET_ADMIN + CAP_BPF, or root)
+   sudo ./examples/master/easycat/easycat_example xdp:eth0
+
+   # Regular AF_PACKET socket (default, unchanged)
+   sudo ./examples/master/easycat/easycat_example eth0
+   ```
+
+   **Requirements:**
+   - Linux kernel >= 5.4 with `CONFIG_XDP_SOCKETS=y` (see check below)
+   - `CAP_NET_ADMIN` + `CAP_BPF` capabilities (or root)
+   - NIC driver with XDP support (most modern drivers: `i40e`, `ixgbe`, `mlx5`, `igc`, `e1000e`, etc.)
+
+   **Verify kernel support:**
+   ```bash
+   grep CONFIG_XDP_SOCKETS /boot/config-$(uname -r)
+   # Expected: CONFIG_XDP_SOCKETS=y
+   ```
+
+   If `CONFIG_XDP_SOCKETS` is not set or missing, add the following to your kernel
+   configuration and rebuild:
+   ```
+   CONFIG_BPF_SYSCALL=y
+   CONFIG_XDP_SOCKETS=y
+   CONFIG_XDP_SOCKETS_DIAG=y
    ```
 
 ---

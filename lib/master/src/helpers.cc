@@ -6,6 +6,9 @@
 #include "kickcat/SocketNull.h"
 #ifdef __linux__
 #include "kickcat/OS/Linux/Socket.h"
+#ifdef KICKCAT_AF_XDP_ENABLED
+#include "kickcat/OS/Linux/XdpSocket.h"
+#endif
 #elif __PikeOS__
     #include "kickcat/OS/PikeOS/Socket.h"
 #elif __MINGW64__
@@ -74,47 +77,40 @@ namespace kickcat
 
         selectInterface(nominal_if, redundant_if);
 
-        if (nominal_if == "tap:server")
+        auto createSocket = [&](std::string& ifname, std::string const& tap_name) -> std::shared_ptr<AbstractSocket>
         {
-            nominal_if = "tap_nominal";
-            nominal = std::make_shared<TapSocket>(true);
-        }
-        else if (nominal_if == "tap:client")
-        {
-            nominal_if = "tap_nominal";
-            nominal = std::make_shared<TapSocket>(false);
-        }
-        else if (nominal_if.empty())
-        {
-            nominal_if = "None";
-            nominal = std::make_shared<SocketNull>();
-        }
-        else
-        {
-            nominal = std::make_shared<Socket>();
-        }
+            if (ifname == "tap:server")
+            {
+                ifname = tap_name;
+                return std::make_shared<TapSocket>(true);
+            }
+            if (ifname == "tap:client")
+            {
+                ifname = tap_name;
+                return std::make_shared<TapSocket>(false);
+            }
+            if (ifname.empty())
+            {
+                ifname = "None";
+                return std::make_shared<SocketNull>();
+            }
+#ifdef KICKCAT_AF_XDP_ENABLED
+            constexpr char XDP_PREFIX[] = "xdp:";
+            constexpr size_t XDP_PREFIX_LEN = sizeof(XDP_PREFIX) - 1;
+            if (ifname.compare(0, XDP_PREFIX_LEN, XDP_PREFIX) == 0)
+            {
+                ifname = ifname.substr(XDP_PREFIX_LEN);
+                return std::make_shared<XdpSocket>();
+            }
+#endif
+            return std::make_shared<Socket>();
+        };
+
+        nominal = createSocket(nominal_if, "tap_nominal");
         printf("Opening nominal interface:   %s\n", nominal_if.c_str());
         nominal->open(nominal_if);
 
-        if (redundant_if == "tap:server")
-        {
-            redundant_if = "tap_redundant";
-            redundant = std::make_shared<TapSocket>(true);
-        }
-        else if (redundant_if == "tap:client")
-        {
-            redundant_if = "tap_redundant";
-            redundant = std::make_shared<TapSocket>(false);
-        }
-        else if (redundant_if.empty())
-        {
-            redundant_if = "None";
-            redundant = std::make_shared<SocketNull>();
-        }
-        else
-        {
-            redundant = std::make_shared<Socket>();
-        }
+        redundant = createSocket(redundant_if, "tap_redundant");
         printf("Opening redundant interface: %s\n", redundant_if.c_str());
         redundant->open(redundant_if);
 

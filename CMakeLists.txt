@@ -12,6 +12,7 @@ option(BUILD_EXAMPLES     "Build examples" ON)
 
 if (NOT NUTTX)
   option(ENABLE_ESI_PARSER  "Enable Esi Parser" ON)
+  option(ENABLE_AF_XDP      "Enable AF_XDP socket for improved performance (requires libxdp, libbpf, clang)" OFF)
   option(BUILD_UNIT_TESTS   "Build unit tests" OFF)
   option(CODE_COVERAGE      "Enable code coverage - gcovr shall be in the PATH" OFF)
   option(BUILD_SIMULATION   "Build simulation" ON)
