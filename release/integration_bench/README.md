@@ -45,3 +45,4 @@ This script cross-compiles a custom Linux kernel for the Raspberry Pi 3/4 (BCM27
    - Isolates cores 1-3 for RT workloads (`isolcpus`, `nohz_full`, `rcu_nocbs`).
    - Grants user `pi` RT thread priorities up to 90 and unlimited memlock.
    - Runs `/home/pi/boot.sh` at boot (if present) for user applications.
+   - Pins `raspberrypi-kernel` and `raspberrypi-bootloader` packages to prevent `apt upgrade` from overwriting the custom kernel.
