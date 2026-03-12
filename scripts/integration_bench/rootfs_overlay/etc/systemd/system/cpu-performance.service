@@ -1,0 +1,11 @@
+[Unit]
+Description=Set CPU governor to performance
+After=sysinit.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > "$cpu"; done'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Run user boot script (/home/pi/boot.sh)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+User=pi
+ExecCondition=/bin/test -x /home/pi/boot.sh
+ExecStart=/home/pi/boot.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
