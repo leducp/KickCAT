@@ -7,6 +7,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/OS/Timer.h"
 
 using namespace kickcat;
 
@@ -160,9 +161,12 @@ int main(int argc, char* argv[])
 
     printf("Running loop...\n");
 
+    Timer timer{1ms};
+    timer.start();
+
     while (true)
     {
-        sleep(1ms);
+        timer.wait_next_tick();
 
         try
         {

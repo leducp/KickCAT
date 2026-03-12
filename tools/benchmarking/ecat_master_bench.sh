@@ -7,6 +7,11 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+source "$REPO_ROOT/scripts/lib/log.sh"
+
 # Defaults
 DURATION=10
 OUTPUT_DIR="bench_results_$(date +%Y%m%d_%H%M%S)"
@@ -16,22 +21,11 @@ DO_PROFILE=true
 DO_MEMORY=true
 USE_VALGRIND=false
 
-# ANSI Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 
 # Check for root (often required for perf/cyclictest/ethercat)
 if [ "$EUID" -ne 0 ]; then
-  log_warn "This script often requires root privileges for perf, cyclictest, and raw socket access."
-  log_warn "Please run with sudo if you encounter permission errors."
+  warn "This script often requires root privileges for perf, cyclictest, and raw socket access."
+  warn "Please run with sudo if you encounter permission errors."
   sleep 2
 fi
 
@@ -57,29 +51,28 @@ while [[ "$#" -gt 0 ]]; do
             echo "  --valgrind            Force use of valgrind (massif) instead of heaptrack"
             exit 0
             ;;
-        *) log_error "Unknown parameter passed: $1"; exit 1 ;;
+        *) error "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
 
 CMD=("$@")
 
-
-
 if [ ${#CMD[@]} -eq 0 ]; then
-    log_error "No command provided to run the master."
-    echo "Usage: $0 [options] -- <command>"
+    error "No command provided to run the master."
+    info "Usage: $0 [options] -- <command>"
     exit 1
 fi
 
 mkdir -p "$OUTPUT_DIR"
-log_info "Results will be saved to: $OUTPUT_DIR"
-log_info "Target Command: ${CMD[*]}"
+info "Results dir:    $OUTPUT_DIR"
+info "Target command: ${CMD[*]}"
+info "Duration:       ${DURATION}s"
 
 # Dependency Checks
 check_cmd() {
     if ! command -v "$1" &> /dev/null; then
-        log_warn "$1 could not be found. Related tests will be skipped."
+        warn "$1 could not be found. Related tests will be skipped."
         return 1
     fi
     return 0
@@ -87,25 +80,25 @@ check_cmd() {
 
 # Phase 1: Latency & CPU Stats
 if [ "$DO_LATENCY" = true ]; then
-    log_info "Starting Phase 1: Latency (cyclictest) & CPU Stats (perf stat)..."
+    step "Phase 1: Latency (cyclictest) & CPU Stats (perf stat)"
     
     if check_cmd cyclictest; then
-        log_info "Running cyclictest in background..."
+        info "Running cyclictest in background..."
         # Run cyclictest on all CPUs, priority 99, interval 1000us
         cyclictest --smp --priority=95 --interval=1000 --duration="${DURATION}s" \
             > "$OUTPUT_DIR/cyclictest.log" &
         CYCLIC_PID=$!
     else
-        log_error "cyclictest not found, skipping system latency measurement."
+        error "cyclictest not found, skipping system latency measurement."
     fi
 
     if check_cmd perf; then
-        log_info "Running Master with perf stat..."
+        info "Running Master with perf stat..."
         # We use 'timeout' to enforce the duration on the master command if it doesn't self-terminate
         perf stat -o "$OUTPUT_DIR/perf_stat.txt" -d -d -d \
             timeout --signal=SIGINT "${DURATION}s" "${CMD[@]}" &> /dev/null || true
     else
-        log_info "Running Master (no perf)..."
+        info "Running Master (no perf)..."
         timeout --signal=SIGINT "${DURATION}s" "${CMD[@]}" &> /dev/null || true
     fi
 
@@ -114,60 +107,59 @@ if [ "$DO_LATENCY" = true ]; then
         wait "$CYCLIC_PID" || true
     fi
     
-    log_success "Phase 1 Complete."
+    success "Phase 1 Complete."
 fi
 
 # Phase 2: Hotspots (Perf Record)
 if [ "$DO_PROFILE" = true ] && check_cmd perf; then
-    log_info "Starting Phase 2: Hotspot Profiling (perf record)..."
-    log_info "Recording for $DURATION seconds..."
+    step "Phase 2: Hotspot Profiling (perf record)"
+    info "Recording for $DURATION seconds..."
     
     # Record call graphs
     perf record -g -o "$OUTPUT_DIR/perf.data" -- \
         timeout --signal=SIGINT "${DURATION}s" "${CMD[@]}" &> /dev/null || true
         
     if [ -f "$OUTPUT_DIR/perf.data" ]; then
-        log_info "Generating report..."
+        info "Generating report..."
         perf report -i "$OUTPUT_DIR/perf.data" --stdio > "$OUTPUT_DIR/perf_report.txt"
-        log_success "Profile saved to $OUTPUT_DIR/perf.data"
-        log_info "Tip: Use 'perf report -i $OUTPUT_DIR/perf.data' to view interactively"
-        log_info "Tip: Use 'flamegraph.pl' (if installed) to generate visualization."
+        success "Profile saved to $OUTPUT_DIR/perf.data"
+        info "Tip: Use 'perf report -i $OUTPUT_DIR/perf.data' to view interactively"
+        info "Tip: Use 'flamegraph.pl' (if installed) to generate visualization."
     else
-        log_error "perf.data not generated."
+        error "perf.data not generated."
     fi
 fi
 
 # Phase 3: Memory Profiling
 if [ "$DO_MEMORY" = true ]; then
-    log_info "Starting Phase 3: Memory Profiling..."
+    step "Phase 3: Memory Profiling"
     
     # Prefer heaptrack, fallback to valgrind
     if [ "$USE_VALGRIND" = false ] && command -v heaptrack &> /dev/null; then
-        log_info "Using heaptrack..."
+        info "Using heaptrack..."
         heaptrack -o "$OUTPUT_DIR/heaptrack" -- \
             timeout --signal=SIGINT "${DURATION}s" "${CMD[@]}" &> /dev/null || true
-        log_success "Heaptrack data saved to prefix $OUTPUT_DIR/heaptrack"
+        success "Heaptrack data saved to prefix $OUTPUT_DIR/heaptrack"
         
     elif check_cmd valgrind; then
-        log_info "Using valgrind (massif)..."
-        log_warn "Valgrind significantly slows down execution. Real-time behavior will be distorted."
+        info "Using valgrind (massif)..."
+        warn "Valgrind significantly slows down execution. Real-time behavior will be distorted."
         
         valgrind --tool=massif --massif-out-file="$OUTPUT_DIR/massif.out" \
             timeout --signal=SIGINT "${DURATION}s" "${CMD[@]}" &> /dev/null || true
             
-        log_success "Massif output saved to $OUTPUT_DIR/massif.out"
-        log_info "View with: ms_print $OUTPUT_DIR/massif.out"
+        success "Massif output saved to $OUTPUT_DIR/massif.out"
+        info "View with: ms_print $OUTPUT_DIR/massif.out"
     else
-        log_error "Neither heaptrack nor valgrind found. Skipping memory profile."
+        error "Neither heaptrack nor valgrind found. Skipping memory profile."
     fi
 fi
 
-# Summary
-echo "---------------------------------------------------"
-echo "Benchmark Complete."
-echo "Results stored in: $OUTPUT_DIR"
+echo ""
+printf "${GREEN}${BOLD}Done!${RESET} Benchmark complete.\n"
+echo ""
+info "Results stored in: $OUTPUT_DIR"
 if [ -f "$OUTPUT_DIR/cyclictest.log" ]; then
-    echo "Max Latency (cyclictest):"
+    info "Max Latency (cyclictest):"
     grep "Max Latencies" "$OUTPUT_DIR/cyclictest.log" || tail -n 5 "$OUTPUT_DIR/cyclictest.log"
 fi
-echo "---------------------------------------------------"

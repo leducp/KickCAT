@@ -6,6 +6,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 #include "kickcat/CoE/CiA/DS402/StateMachine.h"
+#include "kickcat/OS/Timer.h"
 
 #include "ElmoProtocol.h"
 #include "CanOpenErrors.h"
@@ -139,9 +140,13 @@ int main(int argc, char* argv[])
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     int64_t last_error = 0;
+
+    Timer timer{2ms};
+    timer.start();
+
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(2ms);
+        timer.wait_next_tick();
 
         try
         {

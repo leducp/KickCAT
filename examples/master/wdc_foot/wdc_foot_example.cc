@@ -6,6 +6,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/OS/Timer.h"
 
 using namespace kickcat;
 
@@ -204,9 +205,13 @@ int main(int argc, char* argv[])
 
     output->watchdog_counter = 0;
     int64_t last_error = 0;
+
+    Timer timer{1ms};
+    timer.start();
+
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(1ms);
+        timer.wait_next_tick();
 
         try
         {

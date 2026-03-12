@@ -9,6 +9,7 @@
 #include "kickcat/Gateway.h"
 #include "kickcat/helpers.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/OS/Timer.h"
 
 #ifdef __linux__
     #include "kickcat/OS/Linux/Socket.h"
@@ -123,9 +124,13 @@ int main(int argc, char* argv[])
     MailboxSequencer mailbox_sequencer(bus);
 
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
+
+    Timer timer{10ms};
+    timer.start();
+
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
-        sleep(10ms);
+        timer.wait_next_tick();
 
         try
         {

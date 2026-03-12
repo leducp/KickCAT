@@ -14,6 +14,7 @@
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/OS/Timer.h"
 
 using namespace kickcat;
 
@@ -124,7 +125,7 @@ int main(int argc, char *argv[])
         }
     };
 
-    link->setTimeout(10ms);
+    link->setTimeout(1ms);
     MailboxSequencer mailbox_sequencer(bus);
 
     std::vector<uint64_t> wc_window(60, 0);
@@ -138,12 +139,15 @@ int main(int argc, char *argv[])
     auto last_tick = start_time;
     bool calibrated = false;
 
+    Timer timer{1ms};
+    timer.start();
+
     std::cout << "Starting 1-minute calibration cycle...\n"
               << std::endl;
 
     while (true)
     {
-        sleep(1ms);
+        timer.wait_next_tick();
 
         try
         {
