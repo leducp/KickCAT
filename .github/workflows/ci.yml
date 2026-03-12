@@ -164,15 +164,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
       - uses: ./.github/actions/setup-conan-action
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-linux
           path: build/
+      - name: Determine version
+        run: |
+          source tools/setup/version.sh
+          echo "PKG_VERSION=$VERSION" >> $GITHUB_ENV
       - name: Conan Create
         run: |
-          conan create conan/all --build=missing --version ${{ github.sha }} -pr:b build/profile.txt -pr:h build/profile.txt
+          conan create conan/all --build=missing --version ${{ env.PKG_VERSION }} -pr:b build/profile.txt -pr:h build/profile.txt
+      - name: Export Conan package
+        run: |
+          conan cache save "kickcat/${{ env.PKG_VERSION }}:*" --file kickcat-${{ env.PKG_VERSION }}-linux-x86_64.tgz
+      - name: Upload Conan package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: conan-package
+          path: kickcat-${{ env.PKG_VERSION }}-linux-x86_64.tgz
+          if-no-files-found: error
 
   # Simulation Tests
   simulation_test:
@@ -435,12 +450,18 @@ jobs:
           path: wheelhouse
           merge-multiple: true
 
+      - name: Download Conan package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: conan-package
+          path: conan-package
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
         run: |
-          gh release create "$tag" wheelhouse/*.whl \
+          gh release create "$tag" wheelhouse/*.whl conan-package/*.tgz \
               --repo="$GITHUB_REPOSITORY" \
               --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
               --generate-notes
