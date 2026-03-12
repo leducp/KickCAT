@@ -56,3 +56,4 @@ endif()
 
 
 add_subdirectory(py_bindings)
+add_subdirectory(image-poc)
