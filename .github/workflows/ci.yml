@@ -164,8 +164,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-tags: true
       - uses: ./.github/actions/setup-conan-action
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
@@ -174,8 +172,11 @@ jobs:
           path: build/
       - name: Determine version
         run: |
-          source tools/setup/version.sh
-          echo "PKG_VERSION=$VERSION" >> $GITHUB_ENV
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "PKG_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "PKG_VERSION=${{ github.sha }}" >> $GITHUB_ENV
+          fi
       - name: Conan Create
         run: |
           conan create conan/all --build=missing --version ${{ env.PKG_VERSION }} -pr:b build/profile.txt -pr:h build/profile.txt
