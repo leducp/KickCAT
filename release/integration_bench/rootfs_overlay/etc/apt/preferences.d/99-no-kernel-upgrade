@@ -1,0 +1,7 @@
+Package: raspberrypi-kernel
+Pin: release *
+Pin-Priority: -1
+
+Package: raspberrypi-bootloader
+Pin: release *
+Pin-Priority: -1
