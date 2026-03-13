@@ -163,11 +163,10 @@ The EtherCAT slave requires EEPROM configuration with device information:
 ```bash
 # Connect slave to your PC via Ethernet
 # Write EEPROM (interface ? will be auto-detected)
-sudo ./tools/eeprom 0 write \
-    examples/slave/nuttx/lan9252/freedom-k64f/eeprom.bin \?
+sudo ./tools/eeprom -s 0 -c write -f examples/slave/nuttx/lan9252/freedom-k64f/eeprom.bin -i "?"
 ```
 
-**Note:** The `\?` tells the tool to auto-detect the interface where the slave is connected.
+**Note:** The `?` tells the tool to auto-detect the interface where the slave is connected.
 
 ### Step 4: Run the Master
 
@@ -176,7 +175,7 @@ Now you can control your slave using either C++ or Python:
 **Option A - C++ Master:**
 ```bash
 # Run master example and follow terminal instructions
-sudo ./build/examples/master/freedom-k64f/freedom_k64f_example \?
+sudo ./build/examples/master/freedom-k64f/freedom_k64f_example -i "?"
 ```
 
 **Option B - Python Master:**
@@ -241,7 +240,7 @@ Located in `examples/master/`:
 **C++ Examples:**
 ```bash
 cd build
-./examples/master/easycat/easycat_example eth0
+./examples/master/easycat/easycat_example -i eth0
 ```
 
 **Python Examples:**
@@ -356,7 +355,7 @@ All slave examples use NuttX RTOS. Use the automated build script:
 1. **Start the simulator or flash a slave:**
    ```bash
    # Option A: Use simulator
-   ./build/simulation/simulator eth1 eeprom.bin
+   ./build/simulation/simulator -i eth1 -s simulation/slave_configs/freedom-k64f.json
 
    # Option B: Flash real hardware (e.g., Arduino Due)
    ./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
@@ -366,7 +365,7 @@ All slave examples use NuttX RTOS. Use the automated build script:
 2. **Run a master example:**
    ```bash
    # Use the interface connected to your slave
-   ./build/examples/master/easycat/easycat_example eth0
+   ./build/examples/master/easycat/easycat_example -i eth0
    ```
 
 3. **Expected behavior:**
@@ -433,10 +432,10 @@ Test your EtherCAT applications without physical hardware using the built-in sim
 
 ```bash
 # Start simulator (must be started before master)
-./build/simulation/simulator <interface> <eeprom_file>
+./build/simulation/simulator -i <interface> -s <config.json>
 
 # Example
-./build/simulation/simulator eth1 examples/slave/nuttx/lan9252/arduino-due/eeprom.bin
+./build/simulation/simulator -i eth1 -s simulation/slave_configs/freedom-k64f.json
 ```
 
 **Current Capabilities:**
@@ -489,16 +488,13 @@ Read, write, or dump EEPROM content from your EtherCAT Slave Controller:
 
 ```bash
 # Write EEPROM to slave at position 0
-sudo ./tools/eeprom 0 write path/to/eeprom.bin <interface>
+sudo ./tools/eeprom -s 0 -c write -f path/to/eeprom.bin -i <interface>
 
 # Auto-detect interface
-sudo ./tools/eeprom 0 write path/to/eeprom.bin \?
+sudo ./tools/eeprom -s 0 -c write -f path/to/eeprom.bin -i "?"
 
 # Read EEPROM from slave
-sudo ./tools/eeprom 0 read output.bin <interface>
-
-# Dump EEPROM contents (human-readable)
-sudo ./tools/eeprom 0 dump <interface>
+sudo ./tools/eeprom -s 0 -c read -f output.bin -i <interface>
 ```
 
 ### Object Dictionary Generator
@@ -509,7 +505,7 @@ If your application uses CoE mailbox with SDO, you can generate Object Dictionar
 
 ```bash
 # Generate od_populator.cc from your ESI file
-./tools/od_generator your_device.esi
+./tools/od_generator -f your_device.esi
 
 # This creates: od_populator.cc
 ```
@@ -645,10 +641,10 @@ For real-time performance on Linux:
 
    ```bash
    # AF_XDP socket (requires CAP_NET_ADMIN + CAP_BPF, or root)
-   sudo ./examples/master/easycat/easycat_example xdp:eth0
+   sudo ./examples/master/easycat/easycat_example -i xdp:eth0
 
    # Regular AF_PACKET socket (default, unchanged)
-   sudo ./examples/master/easycat/easycat_example eth0
+   sudo ./examples/master/easycat/easycat_example -i eth0
    ```
 
    **Requirements:**
