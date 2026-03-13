@@ -72,10 +72,15 @@ fi
 
 # Compute times
 CURRENT_TIME=$(date +%s)
-ELAPSED=$((CURRENT_TIME - START_TIME))
-REMAINING=$((START_TIME + DURATION - CURRENT_TIME))
-if [ "$REMAINING" -lt 0 ]; then
+if [[ "$STATE" == "COMPLETED" || "$STATE" == "CRASHED" || "$STATE" == "STOPPED" || "$STATE" == "THRESHOLD_BREACH" ]]; then
+    ELAPSED=$((LAST_UPDATE - START_TIME))
     REMAINING=0
+else
+    ELAPSED=$((CURRENT_TIME - START_TIME))
+    REMAINING=$((START_TIME + DURATION - CURRENT_TIME))
+    if [ "$REMAINING" -lt 0 ]; then
+        REMAINING=0
+    fi
 fi
 
 format_duration() {

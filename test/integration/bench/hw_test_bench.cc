@@ -8,6 +8,7 @@
 #include <cinttypes>
 #include <cstdarg>
 #include <ctime>
+#include <csignal>
 
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
@@ -17,6 +18,13 @@
 #include "kickcat/OS/Timer.h"
 
 using namespace kickcat;
+
+volatile std::sig_atomic_t running = 1;
+
+void signal_handler(int)
+{
+    running = 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -46,6 +54,19 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    auto print_trace = [](const char* label)
+    {
+        auto now = std::time(nullptr);
+        char buf[64];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+        printf("[%s] %s\n", label, buf);
+    };
+
+    print_trace("START");
+
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
+
     std::shared_ptr<AbstractSocket> socket_nominal;
     std::shared_ptr<AbstractSocket> socket_redundancy;
     try
@@ -57,6 +78,7 @@ int main(int argc, char *argv[])
     catch (std::exception const &e)
     {
         printf("%s\n", e.what());
+        print_trace("STOP ON ERROR");
         return 1;
     }
 
@@ -81,6 +103,7 @@ int main(int argc, char *argv[])
         if (bus.slaves().size() != static_cast<size_t>(expected_slaves))
         {
             printf("Error: Detected %zu slaves, but expected %d\n", bus.slaves().size(), expected_slaves);
+            print_trace("STOP ON ERROR");
             return 1;
         }
 
@@ -93,8 +116,10 @@ int main(int argc, char *argv[])
             bus.processDataWrite(noop);
         };
 
+        printf("Switching to SAFE_OP...\n");
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 1s);
+        printf("All slaves in SAFE_OP\n");
 
         for (auto &slave : bus.slaves())
         {
@@ -105,112 +130,118 @@ int main(int argc, char *argv[])
         }
         cyclic_process_data();
 
+        printf("Switching to OPERATIONAL...\n");
         bus.requestState(State::OPERATIONAL);
         bus.waitForState(State::OPERATIONAL, 1s, cyclic_process_data);
+        printf("All slaves in OPERATIONAL\n");
     }
     catch (std::exception const &e)
     {
         printf("%s\n", e.what());
+        print_trace("STOP ON ERROR");
         return 1;
     }
 
-    uint64_t wc_errors_in_sec = 0;
-    uint64_t lost_frames_in_sec = 0;
+    uint64_t lost_in_sec       = 0;
+    uint64_t send_error_in_sec = 0;
+    uint64_t invalid_wkc_in_sec = 0;
+    uint64_t no_handler_in_sec  = 0;
 
     auto callback_error = [&](DatagramState const &state)
     {
-        if (state != DatagramState::OK)
+        switch (state)
         {
-            wc_errors_in_sec++;
+            case DatagramState::LOST:        { lost_in_sec++;        break; }
+            case DatagramState::SEND_ERROR:  { send_error_in_sec++;  break; }
+            case DatagramState::INVALID_WKC: { invalid_wkc_in_sec++; break; }
+            case DatagramState::NO_HANDLER:  { no_handler_in_sec++;  break; }
+            default: { break; }
         }
     };
 
     link->setTimeout(1ms);
     MailboxSequencer mailbox_sequencer(bus);
 
-    std::vector<uint64_t> wc_window(60, 0);
+    constexpr uint64_t MAX_ERRORS_PER_MINUTE = 1;
+
     std::vector<uint64_t> lost_window(60, 0);
+    std::vector<uint64_t> send_error_window(60, 0);
+    std::vector<uint64_t> invalid_wkc_window(60, 0);
+    std::vector<uint64_t> no_handler_window(60, 0);
     size_t window_pos = 0;
 
-    uint64_t baseline_wc = 0;
-    uint64_t baseline_lost = 0;
-
-    auto start_time = std::chrono::steady_clock::now();
-    auto last_tick = start_time;
-    bool calibrated = false;
+    auto last_tick = since_epoch();
 
     Timer timer{1ms};
     timer.start();
 
-    std::cout << "Starting 1-minute calibration cycle...\n"
-              << std::endl;
+    printf("Running with max %" PRIu64 " error(s) per minute:\n", MAX_ERRORS_PER_MINUTE);
+    printf("  - LOST:        %" PRIu64 "\n", MAX_ERRORS_PER_MINUTE);
+    printf("  - SEND_ERROR:  %" PRIu64 "\n", MAX_ERRORS_PER_MINUTE);
+    printf("  - INVALID_WKC: %" PRIu64 "\n", MAX_ERRORS_PER_MINUTE);
+    printf("  - NO_HANDLER:  %" PRIu64 "\n", MAX_ERRORS_PER_MINUTE);
 
-    while (true)
+    while (running)
     {
         timer.wait_next_tick();
 
-        try
-        {
-            bus.sendLogicalRead(callback_error);
-            bus.sendLogicalWrite(callback_error);
-            bus.sendRefreshErrorCounters(callback_error);
-            mailbox_sequencer.step(callback_error);
-            bus.finalizeDatagrams();
+        bus.sendLogicalRead(callback_error);
+        bus.sendLogicalWrite(callback_error);
+        bus.sendRefreshErrorCounters(callback_error);
+        mailbox_sequencer.step(callback_error);
+        bus.finalizeDatagrams();
 
-            bus.processAwaitingFrames();
-        }
-        catch (std::exception const &e)
-        {
-            lost_frames_in_sec++;
-        }
+        bus.processAwaitingFrames();
 
-        auto now = std::chrono::steady_clock::now();
+        auto now = since_epoch();
         if (now - last_tick >= 1s)
         {
             last_tick = now;
 
-            wc_window[window_pos] = wc_errors_in_sec;
-            lost_window[window_pos] = lost_frames_in_sec;
+            lost_window[window_pos]        = lost_in_sec;
+            send_error_window[window_pos]  = send_error_in_sec;
+            invalid_wkc_window[window_pos] = invalid_wkc_in_sec;
+            no_handler_window[window_pos]  = no_handler_in_sec;
 
-            wc_errors_in_sec = 0;
-            lost_frames_in_sec = 0;
+            lost_in_sec       = 0;
+            send_error_in_sec = 0;
+            invalid_wkc_in_sec = 0;
+            no_handler_in_sec  = 0;
 
             window_pos = (window_pos + 1) % 60;
 
-            uint64_t current_wc_sum = std::accumulate(wc_window.begin(), wc_window.end(), 0ULL);
-            uint64_t current_lost_sum = std::accumulate(lost_window.begin(), lost_window.end(), 0ULL);
+            uint64_t current_lost        = std::accumulate(lost_window.begin(), lost_window.end(), 0ULL);
+            uint64_t current_send_error  = std::accumulate(send_error_window.begin(), send_error_window.end(), 0ULL);
+            uint64_t current_invalid_wkc = std::accumulate(invalid_wkc_window.begin(), invalid_wkc_window.end(), 0ULL);
+            uint64_t current_no_handler  = std::accumulate(no_handler_window.begin(), no_handler_window.end(), 0ULL);
 
-            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
-
-            if (!calibrated)
+            if (current_lost > MAX_ERRORS_PER_MINUTE)
             {
-                if (elapsed >= 60)
-                {
-                    calibrated = true;
-                    baseline_wc = current_wc_sum;
-                    baseline_lost = current_lost_sum;
-                    printf("Calibration complete. Baseline WC Errors: %" PRIu64 ", Baseline Lost Frames: %" PRIu64 "\n", baseline_wc, baseline_lost);
-                }
-                else if (elapsed % 10 == 0)
-                {
-                    printf("Calibration in progress... %" PRId64 "s/60s\n", elapsed);
-                }
+                printf("LOST (%" PRIu64 ") exceeded threshold (%" PRIu64 ")\n", current_lost, MAX_ERRORS_PER_MINUTE);
+                print_trace("STOP ON ERROR");
+                return 1;
             }
-            else
+            if (current_send_error > MAX_ERRORS_PER_MINUTE)
             {
-                if (current_wc_sum > baseline_wc)
-                {
-                    printf("Error: WC errors (%" PRIu64 ") exceeded baseline threshold (%" PRIu64 ")\n", current_wc_sum, baseline_wc);
-                    return 1;
-                }
-                if (current_lost_sum > baseline_lost)
-                {
-                    printf("Error: Lost frames (%" PRIu64 ") exceeded baseline threshold (%" PRIu64 ")\n", current_lost_sum, baseline_lost);
-                    return 1;
-                }
+                printf("SEND_ERROR (%" PRIu64 ") exceeded threshold (%" PRIu64 ")\n", current_send_error, MAX_ERRORS_PER_MINUTE);
+                print_trace("STOP ON ERROR");
+                return 1;
+            }
+            if (current_invalid_wkc > MAX_ERRORS_PER_MINUTE)
+            {
+                printf("INVALID_WKC (%" PRIu64 ") exceeded threshold (%" PRIu64 ")\n", current_invalid_wkc, MAX_ERRORS_PER_MINUTE);
+                print_trace("STOP ON ERROR");
+                return 1;
+            }
+            if (current_no_handler > MAX_ERRORS_PER_MINUTE)
+            {
+                printf("NO_HANDLER (%" PRIu64 ") exceeded threshold (%" PRIu64 ")\n", current_no_handler, MAX_ERRORS_PER_MINUTE);
+                print_trace("STOP ON ERROR");
+                return 1;
             }
         }
     }
 
+    print_trace("STOP");
     return 0;
 }
