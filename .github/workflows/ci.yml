@@ -21,14 +21,22 @@ jobs:
         run: pip install ruff
       - name: Check Python formatting and linting
         run: scripts/format_py.sh check
+
   # Build C++ and Build Wheels
   build_x86:
     needs: py_lint
-    name: Build C++ (${{ matrix.os }})
+    name: Build C++ (${{ matrix.os }} - ${{ matrix.preset }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
+        preset:
+          - name: full
+            coverage: true
+            af_xdp: true
+          - name: bare
+            coverage: false
+            af_xdp: false
 
     steps:
       - uses: actions/checkout@v4
@@ -42,38 +50,33 @@ jobs:
           elif [ "$RUNNER_OS" == "Windows" ]; then
             conan install conan/conanfile_windows.txt -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
             mkdir -p ${{github.workspace}}/build
-          else
-            echo "$RUNNER_OS not supported"
-            exit 1
           fi
         shell: bash
 
       - name: Install Gcovr, Lcov and AF_XDP deps
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt install gcovr lcov libxdp-dev libbpf-dev clang
+        if: matrix.os == 'ubuntu-latest' && matrix.preset.coverage
+        run: sudo apt install gcovr lcov libxdp-dev libbpf-dev clang
 
       - name: Configure CMake
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             export cmake_generator="Unix Makefiles"
-            export cmake_coverage="-DCODE_COVERAGE=ON"
-            export cmake_af_xdp="-DENABLE_AF_XDP=ON"
+            export cmake_coverage="${{ matrix.preset.coverage && 'ON' || 'OFF' }}"
+            export cmake_af_xdp="${{ matrix.preset.af_xdp && 'ON' || 'OFF' }}"
           elif [ "$RUNNER_OS" == "Windows" ]; then
             export cmake_generator="MinGW Makefiles"
-            export cmake_coverage="-DCODE_COVERAGE=OFF"
-            export cmake_af_xdp=""
-          else
-            echo "$RUNNER_OS not supported"
-            exit 1
           fi
-          cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_UNIT_TESTS=ON -G "${cmake_generator}" ${cmake_coverage} ${cmake_af_xdp}
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DBUILD_UNIT_TESTS=ON \
+            -DCODE_COVERAGE=${cmake_coverage} \
+            -DENABLE_AF_XDP=${cmake_af_xdp} \
+            -G "${cmake_generator}"
         shell: bash
 
       - name: Build
         run: cmake --build build --config ${{env.BUILD_TYPE}}
 
-      # Unit Tests and Coverage Report
       - name: Unit Test
         working-directory: ${{github.workspace}}/build
         run: |
@@ -81,22 +84,19 @@ jobs:
             make coverage_xml
           elif [ "$RUNNER_OS" == "Windows" ]; then
             ctest . --output-on-failure
-          else
-            echo "$RUNNER_OS not supported"
-            exit 1
           fi
         shell: bash
 
-      - name: Upload Build Artifacts (Linux)
+      - name: Upload Build Artifact
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: build-linux
+          name: build-linux-${{ matrix.preset.name }}
           path: build/
           retention-days: 1
 
       - name: Upload coverage artifact
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.preset.coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage
