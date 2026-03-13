@@ -25,7 +25,7 @@ jobs:
   # Build C++ and Build Wheels
   build_x86:
     needs: py_lint
-    name: Build C++ (${{ matrix.os }} - ${{ matrix.preset }})
+    name: Build C++ (${{ matrix.os }} - ${{ matrix.preset.name }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -80,9 +80,9 @@ jobs:
       - name: Unit Test
         working-directory: ${{github.workspace}}/build
         run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
+          if [ "$RUNNER_OS" == "Linux" ] && [ "${{ matrix.preset.coverage }}" == "true" ]; then
             make coverage_xml
-          elif [ "$RUNNER_OS" == "Windows" ]; then
+          else
             ctest . --output-on-failure
           fi
         shell: bash
@@ -168,7 +168,7 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-linux
+          name: build-linux-full
           path: build/
       - name: Determine version
         run: |
@@ -227,7 +227,7 @@ jobs:
       - name: Download Build Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-linux
+          name: build-linux-full
           path: build/
 
       - name: Download Wheels
