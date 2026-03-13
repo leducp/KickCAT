@@ -25,16 +25,20 @@ jobs:
   # Build C++ and Build Wheels
   build_x86:
     needs: py_lint
-    name: Build C++ (${{ matrix.os }} - ${{ matrix.preset.name }})
+    name: Build C++ (${{ matrix.os }}${{ matrix.preset && format(' - {0}', matrix.preset) || '' }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        preset:
-          - name: full
+        include:
+          - os: ubuntu-latest
+            preset: full
             coverage: true
             af_xdp: true
-          - name: bare
+          - os: ubuntu-latest
+            preset: bare
+            coverage: false
+            af_xdp: false
+          - os: windows-latest
             coverage: false
             af_xdp: false
 
@@ -54,17 +58,19 @@ jobs:
         shell: bash
 
       - name: Install Gcovr, Lcov and AF_XDP deps
-        if: matrix.os == 'ubuntu-latest' && matrix.preset.coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.coverage
         run: sudo apt install gcovr lcov libxdp-dev libbpf-dev clang
 
       - name: Configure CMake
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             export cmake_generator="Unix Makefiles"
-            export cmake_coverage="${{ matrix.preset.coverage && 'ON' || 'OFF' }}"
-            export cmake_af_xdp="${{ matrix.preset.af_xdp && 'ON' || 'OFF' }}"
+            export cmake_coverage="${{ matrix.coverage && 'ON' || 'OFF' }}"
+            export cmake_af_xdp="${{ matrix.af_xdp && 'ON' || 'OFF' }}"
           elif [ "$RUNNER_OS" == "Windows" ]; then
             export cmake_generator="MinGW Makefiles"
+            export cmake_coverage="OFF"
+            export cmake_af_xdp="OFF"
           fi
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
@@ -80,7 +86,7 @@ jobs:
       - name: Unit Test
         working-directory: ${{github.workspace}}/build
         run: |
-          if [ "$RUNNER_OS" == "Linux" ] && [ "${{ matrix.preset.coverage }}" == "true" ]; then
+          if [ "$RUNNER_OS" == "Linux" ] && [ "${{ matrix.coverage }}" == "true" ]; then
             make coverage_xml
           else
             ctest . --output-on-failure
@@ -91,12 +97,12 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: build-linux-${{ matrix.preset.name }}
+          name: build-linux-${{ matrix.preset }}
           path: build/
           retention-days: 1
 
       - name: Upload coverage artifact
-        if: matrix.os == 'ubuntu-latest' && matrix.preset.coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage
