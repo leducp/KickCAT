@@ -111,14 +111,22 @@ jobs:
 
   build_arm64:
     needs: py_lint
-    name: Build C++ (ARM64)
+    name: Build C++ (ARM64 - ${{ matrix.preset }})
     runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        include:
+          - preset: full
+            af_xdp: true
+          - preset: bare
+            af_xdp: false
 
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-conan-action
 
       - name: Install AF_XDP deps
+        if: matrix.af_xdp
         run: sudo apt-get update && sudo apt-get install -y libxdp-dev libbpf-dev clang
 
       - name: Conan install
@@ -128,7 +136,11 @@ jobs:
         shell: bash
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DENABLE_AF_XDP=ON -G "Unix Makefiles"
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DENABLE_AF_XDP=${{ matrix.af_xdp && 'ON' || 'OFF' }} \
+            -G "Unix Makefiles"
         shell: bash
 
       - name: Build
@@ -137,7 +149,7 @@ jobs:
       - name: Upload Build Artifacts (ARM64)
         uses: actions/upload-artifact@v4
         with:
-          name: build-arm64
+          name: build-arm64-${{ matrix.preset }}
           path: build/
           retention-days: 1
 
