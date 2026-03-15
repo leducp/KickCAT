@@ -209,6 +209,7 @@ SLAVES=2
 CPU_CORE=1               # isolated core (isolcpus=1-3)
 DURATION=2592000         # 30 days
 LOGGING_INTERVAL=600     # 10 minutes
+PRIORITY=80              # real-time priority for hw_test_bench
 SAMPLE_INTERVAL=5        # 5 seconds
 WINDOW_SIZE=12           # 12 samples = 60s
 
@@ -227,6 +228,7 @@ usage() {
     echo "  -c, --cpu <core>              CPU core to pin hw_test_bench to (default: 1)"
     echo "  -d, --duration <sec>          Test duration (default: 2592000 / 30 days)"
     echo "  -l, --logging-interval <sec>  Log interval (default: 600 / 10 min)"
+    echo "  -p, --priority <n>            Real-time priority for hw_test_bench (default: 80)"
     echo "      --sample-interval <sec>   Sample interval (default: 5)"
     echo "      --window-size <n>         Rolling average window (default: 12)"
     exit 1
@@ -240,6 +242,7 @@ while [[ "$#" -gt 0 ]]; do
         -c|--cpu)              CPU_CORE="$2";         shift ;;
         -d|--duration)         DURATION="$2";         shift ;;
         -l|--logging-interval) LOGGING_INTERVAL="$2"; shift ;;
+        -p|--priority)         PRIORITY="$2";         shift ;;
         --sample-interval)     SAMPLE_INTERVAL="$2";  shift ;;
         --window-size)         WINDOW_SIZE="$2";      shift ;;
         *) usage ;;
@@ -271,7 +274,7 @@ fi
 
 step "Starting hw_test_bench"
 info "Interface: $INTERFACE, expected slaves: $SLAVES, pinned to CPU $CPU_CORE"
-taskset -c "$CPU_CORE" "$WORK_DIR/hw_test_bench" -i "$INTERFACE" -s "$SLAVES" > "$BENCH_LOG" 2>&1 &
+chrt -f $PRIORITY taskset -c "$CPU_CORE" "$WORK_DIR/hw_test_bench" -i "$INTERFACE" -s "$SLAVES" > "$BENCH_LOG" 2>&1 &
 BENCH_PID=$!
 echo "$BENCH_PID" > "$BENCH_PID_FILE"
 
