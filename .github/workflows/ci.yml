@@ -268,7 +268,7 @@ jobs:
         shell: bash
         run: |
           # 1. Start simulator in background
-          ./build/simulation/network_simulator -i tap_nominal -s ${{ matrix.test_case.slave_config }} > simulator.log 2>&1 &
+          ./build/simulation/network_simulator -i tap:server -s ${{ matrix.test_case.slave_config }} > simulator.log 2>&1 &
           SIM_PID=$!
 
           # 2. Wait a bit for simulator to start

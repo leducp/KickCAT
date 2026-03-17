@@ -2,6 +2,7 @@
 #define KICKCAT_PRINTS_H
 
 #include <unordered_map>
+#include <vector>
 #include <cstdint>
 
 #include "Slave.h"

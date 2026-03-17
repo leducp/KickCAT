@@ -90,6 +90,9 @@ conan install conan/conanfile_linux.txt -of=build/ \
   -pr:b conan/your_profile_target.txt \
   --build=missing -s build_type=Release
 
+# Or create the conan package directly
+conan create conan/all --build=missing --version 2.5 -pr build/profile.txt
+
 # 3. Configure and build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -354,8 +357,9 @@ All slave examples use NuttX RTOS. Use the automated build script:
 
 1. **Start the simulator or flash a slave:**
    ```bash
-   # Option A: Use simulator
-   ./build/simulation/simulator -i eth1 -s simulation/slave_configs/freedom-k64f.json
+   # Option A: Use simulator with TAP socket (preferred, same machine)
+   ./build/simulation/network_simulator -i "?" -s simulation/slave_configs/freedom-k64f.json
+   # Then select "tap:server"
 
    # Option B: Flash real hardware (e.g., Arduino Due)
    ./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
@@ -364,8 +368,11 @@ All slave examples use NuttX RTOS. Use the automated build script:
 
 2. **Run a master example:**
    ```bash
-   # Use the interface connected to your slave
-   ./build/examples/master/easycat/easycat_example -i eth0
+   # With TAP socket (select "tap:client"):
+   sudo ./build/examples/master/easycat/easycat_example -i "?"
+
+   # Or with the interface connected to your slave:
+   sudo ./build/examples/master/easycat/easycat_example -i eth0
    ```
 
 3. **Expected behavior:**
@@ -417,36 +424,57 @@ Expected output:
 
 ## Simulator
 
-Test your EtherCAT applications without physical hardware using the built-in simulator.
+Test your EtherCAT applications without physical hardware using the built-in network simulator.
 
-### Setup
+### Transport Options
+
+When the master and the simulator run on the **same machine**, prefer using **TAP sockets** (shared-memory IPC) instead of a virtual Ethernet pair. TAP sockets are faster and simpler to set up — no kernel `veth` configuration is needed.
+
+When using the `?` interactive selector for the network interface, two TAP entries are available:
+- `tap:server` — to be used by the simulator
+- `tap:client` — to be used by the master
+
+If you need to run the master and simulator on **different machines**, use real network interfaces or a virtual Ethernet pair:
 
 ```bash
-# Create virtual ethernet pair (Linux)
-./create_virtual_ethernet.sh
-
-# Or use real network interfaces between two machines
+# Create a virtual ethernet pair (Linux, same machine, alternative to TAP)
+sudo ./simulation/create_virtual_ethernet.sh create veth
 ```
 
 ### Running the Simulator
 
 ```bash
-# Start simulator (must be started before master)
-./build/simulation/simulator -i <interface> -s <config.json>
+# Start the simulator (must be started before the master)
+# Using TAP socket (preferred, same machine):
+./build/simulation/network_simulator -i "?" -s simulation/slave_configs/freedom-k64f.json
+# Then select "tap:server"
 
-# Example
-./build/simulation/simulator -i eth1 -s simulation/slave_configs/freedom-k64f.json
+# Using a specific interface:
+./build/simulation/network_simulator -i eth1 -s simulation/slave_configs/freedom-k64f.json
+
+# Multiple slaves:
+./build/simulation/network_simulator -i "?" -s simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
+```
+
+Then start the master on the matching transport:
+```bash
+# Using TAP socket (select "tap:client"):
+sudo ./build/examples/master/easycat/easycat_example -i "?"
+
+# Or with a specific interface:
+sudo ./build/examples/master/easycat/easycat_example -i eth0
 ```
 
 **Current Capabilities:**
 - Load EEPROM configurations
 - Emulate basic sync manager behavior
 - Emulate basic FMMU (Fieldbus Memory Management Unit) behavior
+- CoE mailbox with SDO support (via ESI XML)
+- DL status / network topology emulation
 
 **Limitations:**
 - No interrupt emulation
 - No redundancy support yet
-- Basic functionality only
 
 ---
 
@@ -454,8 +482,10 @@ Test your EtherCAT applications without physical hardware using the built-in sim
 
 KickCAT includes several utility tools in the `tools/` directory:
 
-- **EEPROM tools**: Read/write/dump EEPROM from ESC
-- **OD Generator**: Generate Object Dictionary code from ESI files
+- **eeprom**: Read/write/dump EEPROM from ESC
+- **scan_topology**: Scan the bus and display the network topology as an ASCII tree
+- **check_network_stability**: Monitor packet loss and corruption over time (Linux only)
+- **od_generator**: Generate Object Dictionary code from ESI files
 - **EtherCAT GUI**: PySide6-based graphical interface for bus monitoring
 
 Build tools with the main project:
