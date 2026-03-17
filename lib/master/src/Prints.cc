@@ -1,5 +1,6 @@
 #include "Prints.h"
 
+#include <functional>
 #include <iomanip>
 
 namespace kickcat
@@ -127,17 +128,50 @@ namespace kickcat
 
     void print(std::unordered_map<uint16_t, uint16_t> const& topology_mapping)
     {
-        printf( "\n -*-*-*-*- Topology -*-*-*-*-\n" );
-        for (auto const& it : topology_mapping)
+        std::unordered_map<uint16_t, std::vector<uint16_t>> children;
+        std::vector<uint16_t> roots;
+        for (auto const& [child, parent] : topology_mapping)
         {
-            if (it.first != it.second)
+            if (child == parent)
             {
-                printf( "Slave %04x parent : slave %04x \n", it.first, it.second);
+                roots.push_back(child);
             }
             else
             {
-                printf( "Slave %04x parent : master \n", it.first);
+                children[parent].push_back(child);
             }
+        }
+
+        std::function<void(uint16_t, std::string const&, bool)> printNode =
+            [&](uint16_t node, std::string const& prefix, bool last)
+        {
+            char const* branch = "├──";
+            char const* continuation = "│   ";
+            if (last)
+            {
+                branch = "└──";
+                continuation = "    ";
+            }
+
+            printf("%s%s Slave %d\n", prefix.c_str(), branch, node);
+
+            auto it = children.find(node);
+            if (it == children.end())
+            {
+                return;
+            }
+
+            std::string next_prefix = prefix + continuation;
+            for (size_t i = 0; i < it->second.size(); ++i)
+            {
+                printNode(it->second[i], next_prefix, i + 1 == it->second.size());
+            }
+        };
+
+        printf("\n Master\n");
+        for (size_t i = 0; i < roots.size(); ++i)
+        {
+            printNode(roots[i], " ", i + 1 == roots.size());
         }
     }
 

@@ -1,28 +1,19 @@
 #include <algorithm>
 #include <argparse/argparse.hpp>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <nlohmann/json.hpp>
 #include <numeric>
 
+#include "kickcat/CoE/EsiParser.h"
+#include "kickcat/CoE/mailbox/response.h"
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
 #include "kickcat/OS/Time.h"
 #include "kickcat/PDO.h"
+#include "kickcat/helpers.h"
 #include "kickcat/slave/Slave.h"
-
-#include "kickcat/CoE/EsiParser.h"
-#include "kickcat/CoE/mailbox/response.h"
-
-#ifdef __linux__
-#include "kickcat/OS/Linux/Socket.h"
-#elif __MINGW64__
-#include "kickcat/OS/Windows/Socket.h"
-#else
-#error "Unsupported platform"
-#endif
-#include "kickcat/TapSocket.h" // To be included last to ensure Windows compatibility (thanks to their macro hell API)
 
 using namespace kickcat;
 using namespace kickcat::slave;
@@ -63,20 +54,20 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    size_t slaveCount = slave_configs.size();
+    size_t slave_count = slave_configs.size();
     std::vector<std::unique_ptr<EmulatedESC>> escs;
     std::vector<std::unique_ptr<PDO>> pdos;
     std::vector<std::unique_ptr<Slave>> slaves;
     std::vector<std::unique_ptr<mailbox::response::Mailbox>> mailboxes;
-    std::vector<uint8_t* > inputPdo;
-    std::vector<uint8_t* > outputPdo;
+    std::vector<std::vector<uint8_t>> input_pdo;
+    std::vector<std::vector<uint8_t>> output_pdo;
 
-    escs.reserve(slaveCount);
-    pdos.reserve(slaveCount);
-    slaves.reserve(slaveCount);
-    mailboxes.reserve(slaveCount);
-    inputPdo.reserve(slaveCount);
-    outputPdo.reserve(slaveCount);
+    escs.reserve(slave_count);
+    pdos.reserve(slave_count);
+    slaves.reserve(slave_count);
+    mailboxes.reserve(slave_count);
+    input_pdo.reserve(slave_count);
+    output_pdo.reserve(slave_count);
 
     constexpr uint32_t PDO_MAX_SIZE = 32;
     CoE::EsiParser parser;
@@ -127,29 +118,38 @@ int main(int argc, char* argv[])
             mailboxes.push_back(std::move(mbx));
         }
 
-        uint8_t* buffer_in = new uint8_t[PDO_MAX_SIZE];
-        uint8_t* buffer_out = new uint8_t[PDO_MAX_SIZE];
+        input_pdo.emplace_back(PDO_MAX_SIZE);
+        std::iota(input_pdo.back().begin(), input_pdo.back().end(), 0);
+        output_pdo.emplace_back(PDO_MAX_SIZE, 0xFF);
 
-        // init values
-        for (uint32_t i = 0; i < PDO_MAX_SIZE; ++i)
-        {
-            buffer_in[i] = i;
-            buffer_out[i] = 0xFF;
-        }
-
-        inputPdo.push_back(buffer_in);
-        outputPdo.push_back(buffer_out);
-        pdo->setInput(inputPdo.back(), PDO_MAX_SIZE);
-        pdo->setOutput(outputPdo.back(), PDO_MAX_SIZE);
+        pdo->setInput(input_pdo.back().data(), PDO_MAX_SIZE);
+        pdo->setOutput(output_pdo.back().data(), PDO_MAX_SIZE);
 
         escs.push_back(std::move(esc));
         pdos.push_back(std::move(pdo));
         slaves.push_back(std::move(slave));
     }
 
-    printf("Start EtherCAT network simulator on %s with %ld slaves\n", interface.c_str(), escs.size());
-    auto socket = std::make_shared<TapSocket>(true);
-    socket->open(interface);
+    // Configure DL status for each ESC based on its position in the chain.
+    // Port 0 is always connected (upstream to master or previous slave).
+    // Port 1 is connected if there is a downstream slave.
+    for (size_t i = 0; i < escs.size(); ++i)
+    {
+        uint16_t dl_status = 0;
+        dl_status |= (1 << 4);  // PL_port0
+        dl_status |= (1 << 9);  // COM_port0
+
+        if (i + 1 < escs.size())
+        {
+            dl_status |= (1 << 5);  // PL_port1
+            dl_status |= (1 << 11); // COM_port1
+        }
+
+        escs[i]->write(reg::ESC_DL_STATUS, &dl_status, sizeof(dl_status));
+    }
+
+    printf("Start EtherCAT network simulator on %s with %zu slaves\n", interface.c_str(), escs.size());
+    auto [socket, _] = createSockets(interface, "");
     socket->setTimeout(-1ns);
 
     std::vector<nanoseconds> stats;
@@ -160,11 +160,9 @@ int main(int argc, char* argv[])
         slave->start();
     }
 
-    // Variables for toggling pattern
     uint32_t iteration_counter = 0;
-    uint8_t current_value = 0x11; // Start with 0x11
-
-    constexpr uint32_t ITER = 1000; // Number of iterations before updating input buffer
+    uint8_t current_value = 0x11;
+    constexpr uint32_t ITER = 1000;
 
     while (true)
     {
@@ -177,6 +175,7 @@ int main(int argc, char* argv[])
         }
 
         auto t1 = since_epoch();
+
         while (true)
         {
             auto [header, data, wkc] = frame.peekDatagram();
@@ -189,40 +188,35 @@ int main(int argc, char* argv[])
             {
                 esc->processDatagram(header, data, wkc);
             }
+        }
 
-            for (size_t i = 0; i < slaves.size(); ++i)
+        for (size_t i = 0; i < slaves.size(); ++i)
+        {
+            slaves[i]->routine();
+            if (slaves[i]->state() == State::SAFE_OP)
             {
-                slaves[i]->routine();
-                if (slaves[i]->state() == State::SAFE_OP)
+                if (output_pdo[i][1] != 0xFF)
                 {
-                    if (outputPdo[i][1] != 0xFF)
-                    {
-                        slaves[i]->validateOutputData();
-                    }
-                }
-
-                // Fill buffer with current value
-                for (uint32_t j = 0; j < PDO_MAX_SIZE; ++j)
-                {
-                    inputPdo[i][j] = current_value;
+                    slaves[i]->validateOutputData();
                 }
             }
 
-            // Update input buffer every ITER iterations
-            iteration_counter++;
-            if (iteration_counter >= ITER)
-            {
-                iteration_counter = 0;
+            std::fill(input_pdo[i].begin(), input_pdo[i].end(), current_value);
+        }
 
-                // Move to next value: 0x11 -> 0x22 -> 0x33 -> ... -> 0xFF -> 0x00 -> 0x11
-                if (current_value == 0xFF)
-                {
-                    current_value = 0x00;
-                }
-                else
-                {
-                    current_value += 0x11;
-                }
+        // Update input buffer every ITER iterations
+        iteration_counter++;
+        if (iteration_counter >= ITER)
+        {
+            iteration_counter = 0;
+			// Move to next value: 0x11 -> 0x22 -> 0x33 -> ... -> 0xFF -> 0x00 -> 0x11
+            if (current_value == 0xFF)
+            {
+                current_value = 0x00;
+            }
+            else
+            {
+                current_value += 0x11;
             }
         }
 

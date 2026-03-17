@@ -1,6 +1,6 @@
-add_executable(scanTopology scanTopology.cc)
-target_link_libraries(scanTopology kickcat argparse::argparse)
-set_kickcat_properties(scanTopology)
+add_executable(scan_topology scan_topology.cc)
+target_link_libraries(scan_topology kickcat argparse::argparse)
+set_kickcat_properties(scan_topology)
 
 add_executable(debugUseCase debugUseCase.cc)
 target_link_libraries(debugUseCase kickcat argparse::argparse)
