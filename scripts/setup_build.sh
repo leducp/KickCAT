@@ -98,6 +98,7 @@ if [ -n "$CROSS_TARGET" ]; then
             SYSTEM_NAME="Linux"
             COMPILER_NAME="gcc"
             LIBCXX_NAME="libstdc++11"
+            CROSS_ARCH_FLAGS="-march=armv8-a -mtune=generic"
             ;;
         *)
             error "Unsupported cross-compilation target: $CROSS_TARGET"
@@ -151,6 +152,8 @@ if [ -n "$CROSS_TARGET" ]; then
 
     cat >> "$OUTPUT_CMAKE_TOOLCHAIN" <<CROSS_EOF
 set(CMAKE_SYSTEM_PROCESSOR ${SYSTEM_PROCESSOR})
+set(CMAKE_C_FLAGS_INIT "${CROSS_ARCH_FLAGS}")
+set(CMAKE_CXX_FLAGS_INIT "${CROSS_ARCH_FLAGS}")
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
