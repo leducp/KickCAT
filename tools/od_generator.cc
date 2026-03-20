@@ -15,14 +15,35 @@ namespace kickcat
     {
         switch (dataType)
         {
+            case CoE::DataType::BOOLEAN:        { return "uint8_t";     }
+            case CoE::DataType::BYTE:           { return "uint8_t";     }
+            case CoE::DataType::WORD:           { return "uint16_t";    }
+            case CoE::DataType::DWORD:          { return "uint32_t";    }
+            case CoE::DataType::BIT2:
+            case CoE::DataType::BIT3:
+            case CoE::DataType::BIT4:
+            case CoE::DataType::BIT5:
+            case CoE::DataType::BIT6:
+            case CoE::DataType::BIT7:
+            case CoE::DataType::BIT8:           { return "uint8_t";     }
             case CoE::DataType::UNSIGNED8:      { return "uint8_t";     }
             case CoE::DataType::UNSIGNED16:     { return "uint16_t";    }
+            case CoE::DataType::UNSIGNED24:     { return "uint32_t";    }
             case CoE::DataType::UNSIGNED32:     { return "uint32_t";    }
+            case CoE::DataType::UNSIGNED40:
+            case CoE::DataType::UNSIGNED48:
+            case CoE::DataType::UNSIGNED56:
             case CoE::DataType::UNSIGNED64:     { return "uint64_t";    }
             case CoE::DataType::INTEGER8:       { return "int8_t";      }
             case CoE::DataType::INTEGER16:      { return "int16_t";     }
+            case CoE::DataType::INTEGER24:      { return "int32_t";     }
             case CoE::DataType::INTEGER32:      { return "int32_t";     }
+            case CoE::DataType::INTEGER40:
+            case CoE::DataType::INTEGER48:
+            case CoE::DataType::INTEGER56:
             case CoE::DataType::INTEGER64:      { return "int64_t";     }
+            case CoE::DataType::REAL32:         { return "float";       }
+            case CoE::DataType::REAL64:         { return "double";      }
             case CoE::DataType::VISIBLE_STRING: { return "char const*"; }
             default:
             {
