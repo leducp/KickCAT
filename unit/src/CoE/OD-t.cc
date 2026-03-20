@@ -173,11 +173,11 @@ TEST(OD, print_object_and_entries)
         "Identity Object",
         {}
     };
-    CoE::addEntry<uint8_t>(object,0,8,0,7,static_cast<CoE::DataType>(5),"Subindex 000",0x4);
-    CoE::addEntry<uint32_t>(object,1,32,16,7,static_cast<CoE::DataType>(7),"Vendor ID",0x6a5);
-    CoE::addEntry<uint32_t>(object,2,32,48,7,static_cast<CoE::DataType>(7),"Product code",0xb0cad0);
-    CoE::addEntry<uint32_t>(object,3,32,80,7,static_cast<CoE::DataType>(7),"Revision number",0x0);
-    CoE::addEntry<uint32_t>(object,4,32,112,7,static_cast<CoE::DataType>(7),"Serial number",0xcafedeca);
+    CoE::addEntry<uint8_t>(object,0,8,0,Access::READ,DataType::UNSIGNED8,"Subindex 000",0x4);
+    CoE::addEntry<uint32_t>(object,1,32,16,Access::READ,DataType::UNSIGNED32,"Vendor ID",0x6a5);
+    CoE::addEntry<uint32_t>(object,2,32,48,Access::READ,DataType::UNSIGNED32,"Product code",0xb0cad0);
+    CoE::addEntry<uint32_t>(object,3,32,80,Access::READ,DataType::UNSIGNED32,"Revision number",0x0);
+    CoE::addEntry<uint32_t>(object,4,32,112,Access::READ,DataType::UNSIGNED32,"Serial number",0xcafedeca);
 
     Entry entry_null_data;
     entry_null_data.data = nullptr;

@@ -42,6 +42,8 @@ namespace kickcat::CoE
 
         std::tuple<DataType, uint16_t, uint16_t> parseType(tinyxml2::XMLNode* node);
 
+        DataType resolveType(std::string const& type_name);
+
         tinyxml2::XMLNode* findNodeType(tinyxml2::XMLNode* node);
 
         Object create(tinyxml2::XMLNode* node);

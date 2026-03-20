@@ -137,6 +137,117 @@ TEST(EsiParser, load)
     }
 }
 
+TEST(EsiParser, load_complex_with_enums_and_default_value)
+{
+    CoE::EsiParser parser;
+    auto dictionary = parser.loadFile("kickcat_esi_test_complex.xml");
+
+    ASSERT_STREQ(parser.profile(), "5002");
+    ASSERT_STREQ(parser.vendor(),  "KickCAT");
+
+    // 5 objects + 1 SM type object = 6
+    ASSERT_EQ(dictionary.size(), 6);
+
+    // 0x1000 - standard VAR with DefaultData
+    {
+        auto [object, entry] = findObject(dictionary, 0x1000, 0);
+        ASSERT_NE(object, nullptr);
+        ASSERT_NE(entry,  nullptr);
+
+        ASSERT_EQ(object->code, CoE::ObjectCode::VAR);
+        ASSERT_EQ(entry->type, CoE::DataType::UNSIGNED32);
+        ASSERT_EQ(entry->bitlen, 32);
+        ASSERT_NE(entry->data, nullptr);
+
+        uint32_t data;
+        std::memcpy(&data, entry->data, 4);
+        ASSERT_EQ(data, 0x1389);
+    }
+
+    // 0x6010 - VAR using enum type (DT_OperationMode -> USINT) with DefaultValue (decimal)
+    {
+        auto [object, entry] = findObject(dictionary, 0x6010, 0);
+        ASSERT_NE(object, nullptr);
+        ASSERT_NE(entry,  nullptr);
+
+        ASSERT_EQ(object->code, CoE::ObjectCode::VAR);
+        ASSERT_EQ(object->name, "Operation Mode");
+        ASSERT_EQ(entry->type, CoE::DataType::UNSIGNED8);
+        ASSERT_EQ(entry->bitlen, 8);
+        ASSERT_NE(entry->data, nullptr);
+
+        uint8_t data;
+        std::memcpy(&data, entry->data, 1);
+        ASSERT_EQ(data, 2);
+    }
+
+    // 0x6020 - VAR using leaf alias type (DT_Temperature -> INT) with DefaultValue (hex)
+    {
+        auto [object, entry] = findObject(dictionary, 0x6020, 0);
+        ASSERT_NE(object, nullptr);
+        ASSERT_NE(entry,  nullptr);
+
+        ASSERT_EQ(object->code, CoE::ObjectCode::VAR);
+        ASSERT_EQ(object->name, "Temperature");
+        ASSERT_EQ(entry->type, CoE::DataType::INTEGER16);
+        ASSERT_EQ(entry->bitlen, 16);
+        ASSERT_NE(entry->data, nullptr);
+
+        int16_t data;
+        std::memcpy(&data, entry->data, 2);
+        ASSERT_EQ(data, 0x00E1);
+    }
+
+    // 0x2000 - RECORD with enum and alias SubItems, DefaultValue in SubItems
+    {
+        auto [object, entry] = findObject(dictionary, 0x2000, 0);
+        ASSERT_NE(object, nullptr);
+        ASSERT_NE(entry,  nullptr);
+
+        ASSERT_EQ(object->code, CoE::ObjectCode::RECORD);
+        ASSERT_EQ(object->name, "Drive Parameters");
+        ASSERT_EQ(object->entries.size(), 3);
+
+        // SubIndex 0: USINT
+        ASSERT_EQ(entry->type, CoE::DataType::UNSIGNED8);
+        ASSERT_EQ(entry->bitlen, 8);
+        ASSERT_NE(entry->data, nullptr);
+        uint8_t sub0;
+        std::memcpy(&sub0, entry->data, 1);
+        ASSERT_EQ(sub0, 2);
+
+        // SubIndex 1: DT_OperationMode -> USINT, DefaultValue=1
+        auto [obj1, e1] = findObject(dictionary, 0x2000, 1);
+        ASSERT_NE(e1, nullptr);
+        ASSERT_EQ(e1->type, CoE::DataType::UNSIGNED8);
+        ASSERT_EQ(e1->bitlen, 8);
+        ASSERT_EQ(e1->bitoff, 8);
+        ASSERT_NE(e1->data, nullptr);
+        uint8_t mode;
+        std::memcpy(&mode, e1->data, 1);
+        ASSERT_EQ(mode, 1);
+
+        // SubIndex 2: DT_Temperature -> INT, DefaultValue=#x0019 (25)
+        auto [obj2, e2] = findObject(dictionary, 0x2000, 2);
+        ASSERT_NE(e2, nullptr);
+        ASSERT_EQ(e2->type, CoE::DataType::INTEGER16);
+        ASSERT_EQ(e2->bitlen, 16);
+        ASSERT_EQ(e2->bitoff, 16);
+        ASSERT_NE(e2->data, nullptr);
+        int16_t temp;
+        std::memcpy(&temp, e2->data, 2);
+        ASSERT_EQ(temp, 25);
+    }
+
+    // SM type object
+    {
+        auto [object, entry] = findObject(dictionary, 0x1C00, 0);
+        ASSERT_NE(object, nullptr);
+        ASSERT_EQ(object->code, CoE::ObjectCode::ARRAY);
+        ASSERT_EQ(object->entries.size(), 5);
+    }
+}
+
 TEST(EsiParser, load_basic_with_bit_types_and_no_info)
 {
     CoE::EsiParser parser;

@@ -257,6 +257,12 @@ namespace kickcat::CoE
 
     }
 
+    inline void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t bitoff,
+                         uint16_t access, DataType type, std::string const& description, std::nullptr_t)
+    {
+        object.entries.emplace_back(subindex, bitlen, bitoff, access, type, description);
+    }
+
     Dictionary createOD();
     Dictionary& dictionary();
 }
