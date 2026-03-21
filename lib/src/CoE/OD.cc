@@ -111,7 +111,7 @@ namespace kickcat::CoE
         std::stringstream result;
         if (data == nullptr)
         {
-            result << "nullptr\n";
+            result << "nullptr";
             return result.str();
         }
 

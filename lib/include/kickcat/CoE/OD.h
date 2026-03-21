@@ -112,18 +112,35 @@ namespace kickcat::CoE
     {
         switch (type)
         {
+            case DataType::BOOLEAN:
+            case DataType::BYTE:
+            case DataType::WORD:
+            case DataType::DWORD:
+            case DataType::BIT2:
+            case DataType::BIT3:
+            case DataType::BIT4:
+            case DataType::BIT5:
+            case DataType::BIT6:
+            case DataType::BIT7:
+            case DataType::BIT8:
             case DataType::INTEGER8:
             case DataType::INTEGER16:
+            case DataType::INTEGER24:
             case DataType::INTEGER32:
+            case DataType::INTEGER40:
+            case DataType::INTEGER48:
+            case DataType::INTEGER56:
             case DataType::INTEGER64:
             case DataType::UNSIGNED8:
             case DataType::UNSIGNED16:
+            case DataType::UNSIGNED24:
             case DataType::UNSIGNED32:
+            case DataType::UNSIGNED40:
+            case DataType::UNSIGNED48:
+            case DataType::UNSIGNED56:
             case DataType::UNSIGNED64:
             case DataType::REAL32:
             case DataType::REAL64:
-            case DataType::BOOLEAN:
-            case DataType::BYTE:
             case DataType::VISIBLE_STRING:
             {
                 return true;
@@ -238,6 +255,12 @@ namespace kickcat::CoE
             std::memcpy(alloc, &data, size);
         }
 
+    }
+
+    inline void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t bitoff,
+                         uint16_t access, DataType type, std::string const& description, std::nullptr_t)
+    {
+        object.entries.emplace_back(subindex, bitlen, bitoff, access, type, description);
     }
 
     Dictionary createOD();

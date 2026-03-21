@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<EtherCATInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="EtherCATInfo.xsd" Version="1.6">
+	<Vendor>
+		<Id>#x0CAFE</Id>
+		<Name>KickCAT</Name>
+	</Vendor>
+	<Descriptions>
+		<Groups>
+			<Group>
+				<Type>KickCAT Test Devices</Type>
+				<Name>KickCAT Test Devices</Name>
+			</Group>
+		</Groups>
+		<Devices>
+			<Device Physics="YY">
+				<Type ProductCode="#x00005678" RevisionNo="#x2">kickcat_esi_test_complex</Type>
+				<Name>KickCAT ESI Test Complex</Name>
+				<GroupType>KickCAT Test Devices</GroupType>
+				<Profile>
+					<ProfileNo>5002</ProfileNo>
+					<Dictionary>
+						<DataTypes>
+							<DataType>
+								<Name>USINT</Name>
+								<BitSize>8</BitSize>
+							</DataType>
+							<DataType>
+								<Name>UINT</Name>
+								<BitSize>16</BitSize>
+							</DataType>
+							<DataType>
+								<Name>UDINT</Name>
+								<BitSize>32</BitSize>
+							</DataType>
+							<DataType>
+								<Name>INT</Name>
+								<BitSize>16</BitSize>
+							</DataType>
+							<DataType>
+								<Name>BOOL</Name>
+								<BitSize>1</BitSize>
+							</DataType>
+							<!-- Enum type: BaseType + EnumInfo -->
+							<DataType>
+								<Name>DT_OperationMode</Name>
+								<BaseType>USINT</BaseType>
+								<BitSize>8</BitSize>
+								<EnumInfo>
+									<Text>Off</Text>
+									<Enum>0</Enum>
+								</EnumInfo>
+								<EnumInfo>
+									<Text>Velocity</Text>
+									<Enum>1</Enum>
+								</EnumInfo>
+								<EnumInfo>
+									<Text>Position</Text>
+									<Enum>2</Enum>
+								</EnumInfo>
+							</DataType>
+							<!-- Leaf alias type: BaseType, no SubItem/ArrayInfo/EnumInfo -->
+							<DataType>
+								<Name>DT_Temperature</Name>
+								<BaseType>INT</BaseType>
+								<BitSize>16</BitSize>
+							</DataType>
+							<!-- Record type referencing the enum in a SubItem -->
+							<DataType>
+								<Name>DT2000</Name>
+								<BitSize>32</BitSize>
+								<SubItem>
+									<SubIdx>0</SubIdx>
+									<Name>SubIndex 000</Name>
+									<Type>USINT</Type>
+									<BitSize>8</BitSize>
+									<BitOffs>0</BitOffs>
+									<Flags>
+										<Access>ro</Access>
+									</Flags>
+								</SubItem>
+								<SubItem>
+									<SubIdx>1</SubIdx>
+									<Name>Mode</Name>
+									<Type>DT_OperationMode</Type>
+									<BitSize>8</BitSize>
+									<BitOffs>8</BitOffs>
+									<Flags>
+										<Access>rw</Access>
+									</Flags>
+								</SubItem>
+								<SubItem>
+									<SubIdx>2</SubIdx>
+									<Name>Temperature</Name>
+									<Type>DT_Temperature</Type>
+									<BitSize>16</BitSize>
+									<BitOffs>16</BitOffs>
+									<Flags>
+										<Access>ro</Access>
+									</Flags>
+								</SubItem>
+							</DataType>
+							<DataType>
+								<Name>DT1018</Name>
+								<BitSize>144</BitSize>
+								<SubItem>
+									<SubIdx>0</SubIdx>
+									<Name>SubIndex 000</Name>
+									<Type>USINT</Type>
+									<BitSize>8</BitSize>
+									<BitOffs>0</BitOffs>
+									<Flags>
+										<Access>ro</Access>
+									</Flags>
+								</SubItem>
+								<SubItem>
+									<SubIdx>1</SubIdx>
+									<Name>Vendor ID</Name>
+									<Type>UDINT</Type>
+									<BitSize>32</BitSize>
+									<BitOffs>16</BitOffs>
+									<Flags>
+										<Access>ro</Access>
+									</Flags>
+								</SubItem>
+								<SubItem>
+									<SubIdx>2</SubIdx>
+									<Name>Product Code</Name>
+									<Type>UDINT</Type>
+									<BitSize>32</BitSize>
+									<BitOffs>48</BitOffs>
+									<Flags>
+										<Access>ro</Access>
+									</Flags>
+								</SubItem>
+								<SubItem>
+									<SubIdx>3</SubIdx>
+									<Name>Revision Number</Name>
+									<Type>UDINT</Type>
+									<BitSize>32</BitSize>
+									<BitOffs>80</BitOffs>
+									<Flags>
+										<Access>ro</Access>
+									</Flags>
+								</SubItem>
+								<SubItem>
+									<SubIdx>4</SubIdx>
+									<Name>Serial number</Name>
+									<Type>UDINT</Type>
+									<BitSize>32</BitSize>
+									<BitOffs>112</BitOffs>
+									<Flags>
+										<Access>ro</Access>
+									</Flags>
+								</SubItem>
+							</DataType>
+						</DataTypes>
+						<Objects>
+							<!-- VAR with DefaultData (standard basic type) -->
+							<Object>
+								<Index>#x1000</Index>
+								<Name>Device type</Name>
+								<Type>UDINT</Type>
+								<BitSize>32</BitSize>
+								<Info>
+									<DefaultData>89130000</DefaultData>
+								</Info>
+								<Flags>
+									<Access>ro</Access>
+								</Flags>
+							</Object>
+							<!-- RECORD with DefaultData -->
+							<Object>
+								<Index>#x1018</Index>
+								<Name>Identity Object</Name>
+								<Type>DT1018</Type>
+								<BitSize>144</BitSize>
+								<Info>
+									<SubItem>
+										<Name>SubIndex 000</Name>
+										<Info>
+											<DefaultData>04</DefaultData>
+										</Info>
+									</SubItem>
+									<SubItem>
+										<Name>Vendor ID</Name>
+										<Info>
+											<DefaultData>FE0A0000</DefaultData>
+										</Info>
+									</SubItem>
+									<SubItem>
+										<Name>Product Code</Name>
+										<Info>
+											<DefaultData>78560000</DefaultData>
+										</Info>
+									</SubItem>
+									<SubItem>
+										<Name>Revision Number</Name>
+										<Info>
+											<DefaultData>02000000</DefaultData>
+										</Info>
+									</SubItem>
+									<SubItem>
+										<Name>Serial number</Name>
+										<Info>
+											<DefaultData>01000000</DefaultData>
+										</Info>
+									</SubItem>
+								</Info>
+							</Object>
+							<!-- VAR using enum type with DefaultValue (decimal) -->
+							<Object>
+								<Index>#x6010</Index>
+								<Name>Operation Mode</Name>
+								<Type>DT_OperationMode</Type>
+								<BitSize>8</BitSize>
+								<Info>
+									<DefaultValue>2</DefaultValue>
+								</Info>
+								<Flags>
+									<Access>rw</Access>
+								</Flags>
+							</Object>
+							<!-- VAR using leaf alias type with DefaultValue (hex) -->
+							<Object>
+								<Index>#x6020</Index>
+								<Name>Temperature</Name>
+								<Type>DT_Temperature</Type>
+								<BitSize>16</BitSize>
+								<Info>
+									<DefaultValue>#x00E1</DefaultValue>
+								</Info>
+								<Flags>
+									<Access>ro</Access>
+								</Flags>
+							</Object>
+							<!-- RECORD with enum and alias SubItems, using DefaultValue -->
+							<Object>
+								<Index>#x2000</Index>
+								<Name>Drive Parameters</Name>
+								<Type>DT2000</Type>
+								<BitSize>32</BitSize>
+								<Info>
+									<SubItem>
+										<Name>SubIndex 000</Name>
+										<Info>
+											<DefaultData>02</DefaultData>
+										</Info>
+									</SubItem>
+									<SubItem>
+										<Name>Mode</Name>
+										<Info>
+											<DefaultValue>1</DefaultValue>
+										</Info>
+									</SubItem>
+									<SubItem>
+										<Name>Temperature</Name>
+										<Info>
+											<DefaultValue>#x0019</DefaultValue>
+										</Info>
+									</SubItem>
+								</Info>
+							</Object>
+						</Objects>
+					</Dictionary>
+				</Profile>
+				<Fmmu>Outputs</Fmmu>
+				<Fmmu>Inputs</Fmmu>
+				<Fmmu>MBoxState</Fmmu>
+				<Sm MinSize="#x22" MaxSize="#x100" DefaultSize="#x80" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+				<Sm MinSize="#x22" MaxSize="#x100" DefaultSize="#x80" StartAddress="#x1080" ControlByte="#x22" Enable="1">MBoxIn</Sm>
+				<Sm DefaultSize="4" StartAddress="#x1100" ControlByte="#x64" Enable="1">Outputs</Sm>
+				<Sm DefaultSize="2" StartAddress="#x1400" ControlByte="#x20" Enable="1">Inputs</Sm>
+				<Mailbox DataLinkLayer="true">
+					<CoE SdoInfo="true" PdoAssign="false" PdoConfig="false" CompleteAccess="true" SegmentedSdo="true" />
+				</Mailbox>
+				<Eeprom>
+					<ByteSize>2048</ByteSize>
+					<ConfigData>820E04CC8813FF00000040C00000</ConfigData>
+					<BootStrap>0010800080108000</BootStrap>
+				</Eeprom>
+			</Device>
+		</Devices>
+	</Descriptions>
+</EtherCATInfo>

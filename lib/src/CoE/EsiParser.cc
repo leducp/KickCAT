@@ -11,17 +11,35 @@ namespace kickcat::CoE
 
     const std::unordered_map<std::string, DataType> EsiParser::BASIC_TYPES
     {
-        {"BOOL",  DataType::BOOLEAN    },
-        {"BYTE",  DataType::BYTE       },
-        {"SINT",  DataType::INTEGER8   },
-        {"USINT", DataType::UNSIGNED8  },
-        {"INT",   DataType::INTEGER16  },
-        {"UINT",  DataType::UNSIGNED16 },
-        {"DINT",  DataType::INTEGER32  },
-        {"UDINT", DataType::UNSIGNED32 },
-        {"LINT",  DataType::INTEGER64  },
-        {"ULINT", DataType::UNSIGNED64 },
-        {"REAL",  DataType::REAL32     },
+        {"BOOL",   DataType::BOOLEAN     },
+        {"BYTE",   DataType::BYTE        },
+        {"WORD",   DataType::WORD        },
+        {"DWORD",  DataType::DWORD       },
+        {"SINT",   DataType::INTEGER8    },
+        {"INT",    DataType::INTEGER16   },
+        {"INT24",  DataType::INTEGER24   },
+        {"DINT",   DataType::INTEGER32   },
+        {"INT40",  DataType::INTEGER40   },
+        {"INT48",  DataType::INTEGER48   },
+        {"INT56",  DataType::INTEGER56   },
+        {"LINT",   DataType::INTEGER64   },
+        {"USINT",  DataType::UNSIGNED8   },
+        {"UINT",   DataType::UNSIGNED16  },
+        {"UINT24", DataType::UNSIGNED24  },
+        {"UDINT",  DataType::UNSIGNED32  },
+        {"UINT40", DataType::UNSIGNED40  },
+        {"UINT48", DataType::UNSIGNED48  },
+        {"UINT56", DataType::UNSIGNED56  },
+        {"ULINT",  DataType::UNSIGNED64  },
+        {"REAL",   DataType::REAL32      },
+        {"LREAL",  DataType::REAL64      },
+        {"BIT2",   DataType::BIT2        },
+        {"BIT3",   DataType::BIT3        },
+        {"BIT4",   DataType::BIT4        },
+        {"BIT5",   DataType::BIT5        },
+        {"BIT6",   DataType::BIT6        },
+        {"BIT7",   DataType::BIT7        },
+        {"BIT8",   DataType::BIT8        },
     };
 
     const std::unordered_map<std::string, uint8_t> EsiParser::SM_CONF
@@ -89,12 +107,12 @@ namespace kickcat::CoE
         Dictionary dictionary;
 
         // loop over dictionnary
-        auto node_object = objects_->FirstChild();
+        auto node_object = objects_->FirstChildElement();
         while (node_object)
         {
             CoE::Object obj = create(node_object);
             dictionary.push_back(std::move(obj));
-            node_object = node_object->NextSibling();
+            node_object = node_object->NextSiblingElement();
         }
 
         // load sync managers type object
@@ -159,32 +177,57 @@ namespace kickcat::CoE
 
     void EsiParser::loadDefaultData(XMLNode* node, Object& obj, Entry& entry)
     {
-        auto node_default_data = node->FirstChildElement("Info")->FirstChildElement("DefaultData");
-        if (node_default_data == nullptr)
+        auto node_info = node->FirstChildElement("Info");
+        if (node_info == nullptr)
         {
             return;
         }
 
-        std::vector<uint8_t> data;
-        if(entry.type == DataType::VISIBLE_STRING)
+        auto node_default_data = node_info->FirstChildElement("DefaultData");
+        if (node_default_data != nullptr)
         {
-            data = loadString(node_default_data);
-        }
-        else
-        {
-            data = loadHexBinary(node_default_data);
+            std::vector<uint8_t> data;
+            if(entry.type == DataType::VISIBLE_STRING)
+            {
+                data = loadString(node_default_data);
+            }
+            else
+            {
+                data = loadHexBinary(node_default_data);
+            }
+
+            if (data.size() != (entry.bitlen / 8))
+            {
+                esi_warning("Cannot load default data for 0x%04x.%d, expected size mismatch.\n"
+                        "-> Got %ld bits, expected: %d bit\n"
+                        "==> Skipping entry\n",
+                    obj.index, entry.subindex,
+                    data.size() * 8, entry.bitlen);
+            }
+            entry.data = malloc(entry.bitlen / 8);
+            std::memcpy(entry.data, data.data(), data.size());
+            return;
         }
 
-        if (data.size() != (entry.bitlen / 8))
+        auto node_default_value = node_info->FirstChildElement("DefaultValue");
+        if (node_default_value != nullptr)
         {
-            esi_warning("Cannot load default data for 0x%04x.%d, expected size mismatch.\n"
-                    "-> Got %ld bits, expected: %d bit\n"
-                    "==> Skipping entry\n",
-                obj.index, entry.subindex,
-                data.size() * 8, entry.bitlen);
+            std::string text = node_default_value->GetText();
+            int64_t value;
+            if (text.rfind("#x", 0) == 0)
+            {
+                text[0] = '0';
+                value = std::stoll(text, nullptr, 16);
+            }
+            else
+            {
+                value = std::stoll(text, nullptr, 10);
+            }
+
+            uint32_t size = entry.bitlen / 8;
+            entry.data = malloc(size);
+            std::memcpy(entry.data, &value, size);
         }
-        entry.data = malloc(entry.bitlen / 8);
-        std::memcpy(entry.data, data.data(), data.size());
     }
 
     uint16_t EsiParser::loadAccess(XMLNode* node)
@@ -273,6 +316,44 @@ namespace kickcat::CoE
         return flags;
     }
 
+    DataType EsiParser::resolveType(std::string const& type_name)
+    {
+        auto it = BASIC_TYPES.find(type_name);
+        if (it != BASIC_TYPES.end())
+        {
+            return it->second;
+        }
+
+        if (type_name.find("STRING") != std::string::npos)
+        {
+            return DataType::VISIBLE_STRING;
+        }
+
+        auto dtype = dtypes_->FirstChildElement();
+        while (dtype)
+        {
+            auto name_elem = dtype->FirstChildElement("Name");
+            if (name_elem and type_name == name_elem->GetText())
+            {
+                if (dtype->FirstChildElement("SubItem") or dtype->FirstChildElement("ArrayInfo"))
+                {
+                    return DataType::UNKNOWN;
+                }
+
+                auto base = dtype->FirstChildElement("BaseType");
+                if (base)
+                {
+                    return resolveType(base->GetText());
+                }
+
+                break;
+            }
+            dtype = dtype->NextSiblingElement();
+        }
+
+        return DataType::UNKNOWN;
+    }
+
     std::tuple<DataType, uint16_t, uint16_t> EsiParser::parseType(XMLNode* node)
     {
         auto node_type = node->FirstChildElement("Type");
@@ -281,29 +362,26 @@ namespace kickcat::CoE
             node_type = node->FirstChildElement("BaseType");
         }
 
-
-
-        auto it = BASIC_TYPES.find(node_type->GetText());
-        if (it != BASIC_TYPES.end())
+        if (not node_type)
         {
-            uint16_t bitlen = toNumber<uint16_t>(node->FirstChildElement("BitSize"));
-            uint16_t bitoff = 0;
-            auto node_bitoff = node->FirstChildElement("BitOffs");
-            if (node_bitoff)
-            {
-                bitoff = toNumber<uint16_t>(node_bitoff);
-            }
-
-            return {it->second, bitlen, bitoff};
+            return {DataType::UNKNOWN, 0, 0};
         }
 
-        if(strstr(node_type->GetText(), "STRING"))
+        DataType type = resolveType(node_type->GetText());
+        if (type == DataType::UNKNOWN)
         {
-            uint32_t bitlen = toNumber<uint32_t>(node->FirstChildElement("BitSize"));
-            return {DataType::VISIBLE_STRING, bitlen, 0};
+            return {DataType::UNKNOWN, 0, 0};
         }
 
-        return {DataType::UNKNOWN, 0, 0};
+        uint16_t bitlen = toNumber<uint16_t>(node->FirstChildElement("BitSize"));
+        uint16_t bitoff = 0;
+        auto node_bitoff = node->FirstChildElement("BitOffs");
+        if (node_bitoff)
+        {
+            bitoff = toNumber<uint16_t>(node_bitoff);
+        }
+
+        return {type, bitlen, bitoff};
     }
 
 
@@ -311,14 +389,14 @@ namespace kickcat::CoE
     {
         std::string raw_type = node->FirstChildElement("Type")->GetText();
 
-        auto dtype = dtypes_->FirstChild();
+        auto dtype = dtypes_->FirstChildElement();
         while (dtype)
         {
             if (raw_type == dtype->FirstChildElement("Name")->GetText())
             {
                 break;
             }
-            dtype = dtype->NextSibling();
+            dtype = dtype->NextSiblingElement();
         }
 
         return dtype;
@@ -418,7 +496,12 @@ namespace kickcat::CoE
 
         // Set default data value
         // Update name if possible by using the object node
-        auto object_subitem = node->FirstChildElement("Info")->FirstChildElement("SubItem");
+        auto node_info = node->FirstChildElement("Info");
+        if (node_info == nullptr)
+        {
+            return object;
+        }
+        auto object_subitem = node_info->FirstChildElement("SubItem");
         auto entry = object.entries.begin();
         for (auto& object_entry : object.entries)
         {
