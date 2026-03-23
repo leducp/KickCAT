@@ -1,11 +1,16 @@
 [Unit]
 Description=Run user boot script (/home/pi/boot.sh)
-After=multi-user.target
+After=multi-user.target network-online.target
+Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
 User=pi
-ExecCondition=/bin/test -x /home/pi/boot.sh
+WorkingDirectory=/home/pi
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_SYS_NICE
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN CAP_SYS_NICE
+LimitRTPRIO=90
+LimitMEMLOCK=infinity
 ExecStart=/home/pi/boot.sh
 StandardOutput=journal
 StandardError=journal
