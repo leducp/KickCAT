@@ -463,6 +463,39 @@ namespace kickcat
     }
 
 
+    void Bus::configureMailboxStatusCheck(MailboxStatusFMMU mode)
+    {
+        if (mode == MailboxStatusFMMU::NONE)
+        {
+            mailbox_status_fmmu_ = mode;
+            return;
+        }
+
+        uint8_t required_fmmus = 3;
+        if ((mode & MailboxStatusFMMU::READ_CHECK) and (mode & MailboxStatusFMMU::WRITE_CHECK))
+        {
+            required_fmmus = 4;
+        }
+
+        for (auto const& slave : slaves_)
+        {
+            if (slave.sii.supported_mailbox == 0)
+            {
+                continue;
+            }
+
+            if (slave.esc.fmmus < required_fmmus)
+            {
+                bus_error("Slave %d has %d FMMUs, need %d for requested mailbox status FMMU mode\n",
+                    slave.address, slave.esc.fmmus, required_fmmus);
+                THROW_ERROR("Insufficient FMMUs for mailbox status mapping");
+            }
+        }
+
+        mailbox_status_fmmu_ = mode;
+    }
+
+
     void Bus::createMapping(uint8_t* iomap)
     {
         // First we need to know:
@@ -476,6 +509,7 @@ namespace kickcat
         // Note B: a frame cannot handle more than 1486 bytes
         pi_frames_.resize(1);
         pi_frames_[0].address = 0;
+        std::vector<std::vector<Slave*>> frame_mbx_slaves(1);
         uint32_t address = 0;
         for (auto& slave : slaves_)
         {
@@ -483,11 +517,12 @@ namespace kickcat
             int32_t size = std::max(slave.input.bsize, slave.output.bsize);
             if ((address + size) > (pi_frames_.size() * MAX_ETHERCAT_PAYLOAD_SIZE)) // do we overflow current frame ?
             {
-                pi_frames_.back().size = address - pi_frames_.back().address; // frame size = current address - frame address
+                pi_frames_.back().logical_size = address - pi_frames_.back().address; // frame size = current address - frame address
 
                 // current size will overflow the frame at the current offset: set in on the next frame
                 address = static_cast<uint32_t>(pi_frames_.size()) * MAX_ETHERCAT_PAYLOAD_SIZE;
-                pi_frames_.push_back({address, 0, {}, {}});
+                pi_frames_.push_back({address, 0, 0, {}, {}, {}, {}, 0});
+                frame_mbx_slaves.push_back({});
             }
 
             // create block IO entries
@@ -507,10 +542,89 @@ namespace kickcat
 
             // update offset
             address += size;
+
+            if (slave.sii.supported_mailbox != 0)
+            {
+                frame_mbx_slaves.back().push_back(&slave);
+            }
         }
 
         // update last frame size
-        pi_frames_.back().size = address - pi_frames_.back().address;
+        pi_frames_.back().logical_size = address - pi_frames_.back().address;
+
+        // Set pdo_size for all frames (equals logical_size before mailbox status extension)
+        for (auto& frame : pi_frames_)
+        {
+            frame.pdo_size = frame.logical_size;
+        }
+
+        // Extend frames with bit-wise mailbox status mappings
+        if (mailbox_status_fmmu_ != MailboxStatusFMMU::NONE)
+        {
+            for (size_t fi = 0; fi < pi_frames_.size(); ++fi)
+            {
+                auto& frame = pi_frames_[fi];
+                auto const& mbx_slaves = frame_mbx_slaves[fi];
+                if (mbx_slaves.empty())
+                {
+                    continue;
+                }
+
+                // ESC constraint: two read-direction FMMUs using bit-wise mapping on the
+                // same ESC must be separated by at least 3 logical bytes not configured by
+                // any FMMU of the same type (see ESC datasheet, "Restrictions on FMMU settings").
+                // PDO input FMMU (FMMU1) is read-direction, and so are mailbox status FMMUs,
+                // so we insert a 3-byte gap between the PDO region and the status region,
+                // and between the read-check and write-check regions when both are active.
+                uint32_t status_offset = static_cast<uint32_t>(frame.pdo_size);
+                constexpr uint32_t FMMU_BYTE_SEPARATION = 3;
+
+                if (mailbox_status_fmmu_ & MailboxStatusFMMU::READ_CHECK)
+                {
+                    status_offset += FMMU_BYTE_SEPARATION;
+                    for (size_t i = 0; i < mbx_slaves.size(); ++i)
+                    {
+                        frame.mailbox_read_status.push_back({
+                            status_offset + static_cast<uint32_t>(i / 8),
+                            static_cast<uint8_t>(i % 8),
+                            mbx_slaves[i]
+                        });
+                    }
+                    uint32_t read_bytes = (static_cast<uint32_t>(mbx_slaves.size()) + 7) / 8;
+                    status_offset += read_bytes;
+                }
+
+                if (mailbox_status_fmmu_ & MailboxStatusFMMU::WRITE_CHECK)
+                {
+                    status_offset += FMMU_BYTE_SEPARATION;
+                    for (size_t i = 0; i < mbx_slaves.size(); ++i)
+                    {
+                        frame.mailbox_write_status.push_back({
+                            status_offset + static_cast<uint32_t>(i / 8),
+                            static_cast<uint8_t>(i % 8),
+                            mbx_slaves[i]
+                        });
+                    }
+                    uint32_t write_bytes = (static_cast<uint32_t>(mbx_slaves.size()) + 7) / 8;
+                    status_offset += write_bytes;
+                }
+
+                frame.logical_size = static_cast<int32_t>(status_offset);
+
+                // WKC adjustment: only count slaves that gain a read-direction FMMU
+                // but have no TxPDO (input). Slaves with TxPDO already increment WKC
+                // on LRD/LRW, so their mailbox status FMMU adds no extra increment.
+                uint16_t adjust = 0;
+                for (auto const* slave : mbx_slaves)
+                {
+                    if (slave->input.bsize == 0)
+                    {
+                        ++adjust;
+                    }
+                }
+                frame.mailbox_status_wkc_read_adjust = adjust;
+            }
+        }
 
         // Third step: associate client buffer address to block IO and slaves
         // Note: inputs are mapped first, outputs second
@@ -536,6 +650,11 @@ namespace kickcat
 
         // Fourth step: program FMMUs and SyncManagers
         configureFMMUs();
+
+        if (mailbox_status_fmmu_ != MailboxStatusFMMU::NONE)
+        {
+            configureMailboxFMMUs();
+        }
     }
 
 
@@ -551,16 +670,26 @@ namespace kickcat
                     std::memcpy(input.iomap, data + input.offset, input.size);
                 }
 
-                if (wkc != pi_frame.inputs.size())
+                for (auto const& ms : pi_frame.mailbox_read_status)
                 {
-                    bus_error("Invalid working counter: expected %zu, got %d\n", pi_frame.inputs.size(), wkc);
+                    ms.slave->mailbox.can_read = (data[ms.byte_offset] >> ms.bit_position) & 1;
+                }
+                for (auto const& ms : pi_frame.mailbox_write_status)
+                {
+                    ms.slave->mailbox.can_write = not ((data[ms.byte_offset] >> ms.bit_position) & 1);
+                }
+
+                uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.mailbox_status_wkc_read_adjust);
+                if (wkc != expected_wkc)
+                {
+                    bus_error("Invalid working counter: expected %d, got %d\n", expected_wkc, wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
                 return DatagramState::OK;
             };
 
-            link_->addDatagram(Command::LRD, pi_frame.address, nullptr, static_cast<uint16_t>(pi_frame.size), process, error);
+            link_->addDatagram(Command::LRD, pi_frame.address, nullptr, static_cast<uint16_t>(pi_frame.logical_size), process, error);
         }
     }
 
@@ -591,7 +720,7 @@ namespace kickcat
                 }
                 return DatagramState::OK;
             };
-            link_->addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
+            link_->addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.pdo_size), process, error);
         }
 
         if (dc_slave_ != nullptr)
@@ -620,8 +749,9 @@ namespace kickcat
 
             auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2);
-                if (wkc != expected_wkc) //TODO: buggy in master?
+                uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2
+                    + pi_frame.mailbox_status_wkc_read_adjust);
+                if (wkc != expected_wkc)
                 {
                     bus_error("Invalid working counter: expected %d, got %d\n", expected_wkc, wkc);
                     return DatagramState::INVALID_WKC;
@@ -631,10 +761,20 @@ namespace kickcat
                 {
                     std::memcpy(input.iomap, data + input.offset, input.size);
                 }
+
+                for (auto const& ms : pi_frame.mailbox_read_status)
+                {
+                    ms.slave->mailbox.can_read = (data[ms.byte_offset] >> ms.bit_position) & 1;
+                }
+                for (auto const& ms : pi_frame.mailbox_write_status)
+                {
+                    ms.slave->mailbox.can_write = not ((data[ms.byte_offset] >> ms.bit_position) & 1);
+                }
+
                 return DatagramState::OK;
             };
 
-            link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.size), process, error);
+            link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.logical_size), process, error);
         }
 
         if (dc_slave_ != nullptr)
@@ -719,6 +859,75 @@ namespace kickcat
         {
             prepareDatagrams(slave, slave.input,  SyncManagerType::Input);
             prepareDatagrams(slave, slave.output, SyncManagerType::Output);
+        }
+
+        link_->processDatagrams();
+    }
+
+
+    void Bus::configureMailboxFMMUs()
+    {
+        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+        {
+            if (wkc != 1)
+            {
+                return DatagramState::INVALID_WKC;
+            }
+            return DatagramState::OK;
+        };
+
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Invalid working counter while programming mailbox status FMMU", state);
+        };
+
+        for (auto const& frame : pi_frames_)
+        {
+            auto configureBitFMMU = [&](auto const& entries, uint16_t physical_address, uint16_t fmmu_reg_offset)
+            {
+                for (auto const& entry : entries)
+                {
+                    FMMU fmmu;
+                    std::memset(&fmmu, 0, sizeof(FMMU));
+                    fmmu.logical_address    = frame.address + entry.byte_offset;
+                    fmmu.length             = 1;
+                    fmmu.logical_start_bit  = entry.bit_position;
+                    fmmu.logical_stop_bit   = entry.bit_position;
+                    fmmu.physical_address   = physical_address;
+                    fmmu.physical_start_bit = 3; // SM_STATUS_MAILBOX bit
+                    fmmu.type               = 1; // read access (slave to master)
+                    fmmu.activate           = 1;
+
+                    link_->addDatagram(Command::FPWR,
+                        createAddress(entry.slave->address, static_cast<uint16_t>(reg::FMMU + fmmu_reg_offset)),
+                        fmmu, process, error);
+
+                    bus_info("Mailbox FMMU slave %04x - FMMU%d - logical 0x%08x bit %d - physical 0x%04x bit 3\n",
+                        entry.slave->address, fmmu_reg_offset / 0x10,
+                        fmmu.logical_address, entry.bit_position, physical_address);
+                }
+            };
+
+            // FMMU0 and FMMU1 are reserved for PDO (output and input).
+            // FMMU2 is used by the first enabled mailbox check mode.
+            // FMMU3 is used by the second one, only when both modes are active.
+            constexpr uint16_t FMMU2_OFFSET  = 0x20;
+            constexpr uint16_t FMMU_REG_SIZE = 0x10;
+
+            uint16_t fmmu_offset = FMMU2_OFFSET;
+
+            if (mailbox_status_fmmu_ & MailboxStatusFMMU::READ_CHECK)
+            {
+                configureBitFMMU(frame.mailbox_read_status,
+                    static_cast<uint16_t>(reg::SYNC_MANAGER_1 + reg::SM_STATS), fmmu_offset);
+                fmmu_offset += FMMU_REG_SIZE;
+            }
+
+            if (mailbox_status_fmmu_ & MailboxStatusFMMU::WRITE_CHECK)
+            {
+                configureBitFMMU(frame.mailbox_write_status,
+                    static_cast<uint16_t>(reg::SYNC_MANAGER_0 + reg::SM_STATS), fmmu_offset);
+            }
         }
 
         link_->processDatagrams();
