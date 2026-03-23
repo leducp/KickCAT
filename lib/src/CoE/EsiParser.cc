@@ -203,6 +203,7 @@ namespace kickcat::CoE
                         "==> Skipping entry\n",
                     obj.index, entry.subindex,
                     data.size() * 8, entry.bitlen);
+                return;
             }
             entry.data = malloc(entry.bitlen / 8);
             std::memcpy(entry.data, data.data(), data.size());
