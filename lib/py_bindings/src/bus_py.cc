@@ -39,6 +39,7 @@ namespace kickcat
         nb::class_<Bus>(m, "Bus")
             .def(nb::init<std::shared_ptr<Link>>())
             .def("init", &Bus::init)
+            .def("detect_slaves", &Bus::detectSlaves)
             .def("slaves", &Bus::slaves, nb::rv_policy::reference_internal)
             .def("get_state", &Bus::getCurrentState)
             .def("request_state", &Bus::requestState)
