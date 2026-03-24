@@ -128,40 +128,20 @@ TEST(Slave, parse_SII)
 
 TEST(Slave, countOpenPorts)
 {
-
     Slave slave;
     std::memset(&slave.dl_status, 0, sizeof(DLStatus));
 
-    // By default all ports are open (LOOP=0) but no COM
     ASSERT_EQ(0, slave.countOpenPorts());
 
-    // Port 0 established
     slave.dl_status.COM_port0 = 1;
     ASSERT_EQ(1, slave.countOpenPorts());
 
-    // Port 1 established
     slave.dl_status.COM_port1 = 1;
     ASSERT_EQ(2, slave.countOpenPorts());
 
-    // Port 1 loop closed
-    slave.dl_status.LOOP_port1 = 1;
-    ASSERT_EQ(1, slave.countOpenPorts());
-
-    // Port 2 and 3 established
     slave.dl_status.COM_port2 = 1;
     slave.dl_status.COM_port3 = 1;
-    ASSERT_EQ(3, slave.countOpenPorts());
-
-    // Port 2 loop closed
-    slave.dl_status.LOOP_port2 = 1;
-    ASSERT_EQ(2, slave.countOpenPorts());
-
-    // All loops closed
-    slave.dl_status.LOOP_port0 = 1;
-    slave.dl_status.LOOP_port1 = 1;
-    slave.dl_status.LOOP_port2 = 1;
-    slave.dl_status.LOOP_port3 = 1;
-    ASSERT_EQ(0, slave.countOpenPorts());
+    ASSERT_EQ(4, slave.countOpenPorts());
 }
 
 TEST(Slave, error_counters)
