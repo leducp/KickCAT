@@ -380,3 +380,113 @@ TEST_F(Mailbox_Response, full_receive_process_send_cycle)
     ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
     ASSERT_EQ(0xb0cad0, *payload);
 }
+
+
+// --- Tests for handleMessage / popReply / standalone mode ---
+
+class Mailbox_Response_Standalone : public ::testing::Test
+{
+public:
+    void SetUp() override
+    {
+        mbx.enableCoE(createResponseTestDictionary());
+    }
+
+    std::vector<uint8_t> buildRawSDORead(uint16_t index, uint8_t subindex)
+    {
+        uint32_t data;
+        uint32_t data_size = sizeof(data);
+        mailbox::request::SDOMessage msg{RESP_MBX_SIZE, index, subindex, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+
+        std::vector<uint8_t> raw(RESP_MBX_SIZE, 0);
+        std::memcpy(raw.data(), msg.data(), RESP_MBX_SIZE);
+        return raw;
+    }
+
+    Mailbox mbx{RESP_MBX_SIZE, 2};
+};
+
+
+TEST_F(Mailbox_Response_Standalone, handleMessage_dispatches_to_factory)
+{
+    auto raw = buildRawSDORead(0x1018, 1);
+    mbx.handleMessage(std::move(raw));
+
+    mbx.process();
+
+    auto const& reply = mbx.readyToSend();
+    auto header = pointData<mailbox::Header>(reply.data());
+    auto coe = pointData<CoE::Header>(header);
+    auto sdo = pointData<CoE::ServiceData>(coe);
+    auto payload = pointData<uint32_t>(sdo);
+
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
+    ASSERT_EQ(0x6a5, *payload);
+}
+
+
+TEST_F(Mailbox_Response_Standalone, full_handleMessage_process_popReply_cycle)
+{
+    auto raw = buildRawSDORead(0x1018, 2);
+    mbx.handleMessage(std::move(raw));
+    mbx.process();
+
+    auto reply = mbx.popReply();
+    ASSERT_FALSE(reply.empty());
+
+    auto header = pointData<mailbox::Header>(reply.data());
+    auto coe = pointData<CoE::Header>(header);
+    auto sdo = pointData<CoE::ServiceData>(coe);
+    auto payload = pointData<uint32_t>(sdo);
+
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
+    ASSERT_EQ(0xb0cad0, *payload);
+}
+
+
+TEST_F(Mailbox_Response_Standalone, popReply_returns_empty_when_no_reply)
+{
+    auto reply = mbx.popReply();
+    ASSERT_TRUE(reply.empty());
+}
+
+
+TEST_F(Mailbox_Response_Standalone, handleMessage_unsupported_protocol)
+{
+    std::vector<uint8_t> raw(RESP_MBX_SIZE, 0);
+    auto header = pointData<mailbox::Header>(raw.data());
+    header->type = mailbox::Type::VoE;
+
+    mbx.handleMessage(std::move(raw));
+
+    auto reply = mbx.popReply();
+    ASSERT_FALSE(reply.empty());
+
+    auto resp_header = pointData<mailbox::Header>(reply.data());
+    auto err = pointData<mailbox::Error::ServiceData>(resp_header);
+    ASSERT_EQ(mailbox::ERR, resp_header->type);
+    ASSERT_EQ(mailbox::Error::UNSUPPORTED_PROTOCOL, err->detail);
+}
+
+
+TEST_F(Mailbox_Response_Standalone, handleMessage_queue_full)
+{
+    auto raw1 = buildRawSDORead(0x1018, 1);
+    mbx.handleMessage(std::move(raw1));
+
+    auto raw2 = buildRawSDORead(0x1018, 2);
+    mbx.handleMessage(std::move(raw2));
+
+    auto raw3 = buildRawSDORead(0x1018, 1);
+    mbx.handleMessage(std::move(raw3));
+
+    auto reply = mbx.popReply();
+    ASSERT_FALSE(reply.empty());
+
+    auto header = pointData<mailbox::Header>(reply.data());
+    auto err = pointData<mailbox::Error::ServiceData>(header);
+    ASSERT_EQ(mailbox::ERR, header->type);
+    ASSERT_EQ(mailbox::Error::NO_MORE_MEMORY, err->detail);
+}
+
+
