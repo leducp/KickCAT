@@ -265,6 +265,11 @@ namespace kickcat::mailbox::response
     {
     }
 
+    Mailbox::Mailbox(uint16_t max_allocated_ram_by_msg, uint16_t max_msgs)
+        : Mailbox(nullptr, max_allocated_ram_by_msg, max_msgs)
+    {
+    }
+
 
     int32_t Mailbox::configure()
     {
@@ -330,6 +335,12 @@ namespace kickcat::mailbox::response
             return;
         }
 
+        handleMessage(std::move(raw_message));
+    }
+
+
+    void Mailbox::handleMessage(std::vector<uint8_t>&& raw_message)
+    {
         for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
         {
             ProcessingResult state = (*it)->process(raw_message);
@@ -401,6 +412,19 @@ namespace kickcat::mailbox::response
             }
         }
     }
+
+    std::vector<uint8_t> Mailbox::popReply()
+    {
+        if (to_send_.empty())
+        {
+            return {};
+        }
+
+        auto msg = std::move(to_send_.front());
+        to_send_.pop();
+        return msg;
+    }
+
 
     void Mailbox::send()
     {

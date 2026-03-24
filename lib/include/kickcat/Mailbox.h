@@ -180,18 +180,32 @@ namespace kickcat::mailbox::response
         friend class AbstractMessage;
     public:
         Mailbox(AbstractESC* esc, uint16_t max_allocated_ram_by_msg, uint16_t max_msgs = 1);
+        Mailbox(uint16_t max_allocated_ram_by_msg, uint16_t max_msgs = 1);
+
         ~Mailbox() = default;
 
         void enableCoE(CoE::Dictionary&& dictionary);
         CoE::Dictionary& getDictionary(){return dictionary_;}
 
+        // --- ESC-coupled methods (requires to pass the ESC to the constructor) ---
         int32_t configure();
         bool isConfigOk();
         void activate(bool is_activated);
-
         void receive();  // Try to receive a message from the ESC
-        void process();  // Process a message in the to_process_ queue if any
         void send();     // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
+
+        // --- Core methods (ESC-independent) ---
+
+        /// \brief Dispatch a raw mailbox message through existing handlers or factories
+        /// \details Tries existing to_process_ handlers first, then creates new ones via factories.
+        void handleMessage(std::vector<uint8_t>&& raw_message);
+
+        /// \brief Process a message in the to_process_ queue if any
+        void process();
+
+        /// \brief Pop the next reply from the send queue
+        /// \return The raw reply message, or an empty vector if the queue is empty
+        std::vector<uint8_t> popReply();
 
         // Access on the next message to send: mainly for unit test
         std::vector<uint8_t> const& readyToSend() const { return to_send_.front(); }
