@@ -10,6 +10,21 @@
 
 namespace kickcat
 {
+    enum MailboxStatusFMMU : uint8_t
+    {
+        NONE        = 0,
+        READ_CHECK  = (1 << 0),
+        WRITE_CHECK = (1 << 1),
+    };
+    constexpr MailboxStatusFMMU operator|(MailboxStatusFMMU a, MailboxStatusFMMU b)
+    {
+        return static_cast<MailboxStatusFMMU>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+    }
+    constexpr bool operator&(MailboxStatusFMMU a, MailboxStatusFMMU b)
+    {
+        return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
+    }
+
     class Bus
     {
     public:
@@ -53,6 +68,17 @@ namespace kickcat
         // wait for all slaves to reached a state
         // background_task may be used to keep updated PDO while waiting for a particular state.
         void waitForState(State request, nanoseconds timeout, std::function<void()> background_task = [](){});
+
+        /// \brief Select and validate the preferred mailbox status check mode.
+        /// \details Must be called during PRE_OP, before createMapping(). Validates that all
+        ///          mailbox-capable slaves have enough FMMUs for the requested mode. Throws on error.
+        ///          When set, createMapping() transparently integrates bit-wise FMMU mapping so that
+        ///          mailbox status flags (can_read / can_write) are updated in the LRD/LRW callbacks.
+        /// \param mode  READ_CHECK, WRITE_CHECK, or both OR'd together
+        void configureMailboxStatusCheck(MailboxStatusFMMU mode);
+
+        /// \return the currently configured mailbox status FMMU mode
+        MailboxStatusFMMU mailboxStatusFMMUMode() const { return mailbox_status_fmmu_; }
 
         // create the mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state
@@ -163,6 +189,7 @@ namespace kickcat
         void detectMapping();
         void readMappedPDO(Slave& slave, uint16_t index);
         void configureFMMUs();
+        void configureMailboxFMMUs();
 
         // DC helpers
         void fetchReceivedTimes();
@@ -183,12 +210,25 @@ namespace kickcat
             Slave*   slave;     // associated slave of this input
         };
 
+        struct MailboxStatusEntry
+        {
+            uint32_t byte_offset;   // byte offset within frame data
+            uint8_t  bit_position;  // bit position within that byte (0-7)
+            Slave*   slave;
+        };
+
         struct PIFrame
         {
             uint32_t address;               // logical address
-            int32_t size;                   // frame size
+            int32_t  logical_size;          // full logical address range (PDO + mailbox status bits)
+            int32_t  pdo_size;              // process data only (used by LWR)
             std::vector<blockIO> inputs;    // slave to master
             std::vector<blockIO> outputs;
+            std::vector<MailboxStatusEntry> mailbox_read_status;
+            std::vector<MailboxStatusEntry> mailbox_write_status;
+
+            // Adjust wkc in case the slave do not have a PDO read but still answer because of the mbx check
+            uint16_t mailbox_status_wkc_read_adjust{0};
         };
         std::vector<PIFrame> pi_frames_; // PI frame description
 
@@ -198,6 +238,8 @@ namespace kickcat
         uint16_t irq_mask_{0};
 
         Slave* dc_slave_{nullptr};
+
+        MailboxStatusFMMU mailbox_status_fmmu_{MailboxStatusFMMU::NONE};
     };
 
     /**

@@ -835,3 +835,263 @@ TEST_F(BusTest, writeEeprom_data_write_wkc_error)
 
     ASSERT_THROW(bus.writeEeprom(slave, 0x0010, &data, sizeof(data)), Error);
 }
+
+
+// ---------- Mailbox status FMMU tests ----------
+
+TEST_F(BusTest, configureMailboxStatusCheck_read_check_OK)
+{
+    ASSERT_NO_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK));
+    ASSERT_EQ(MailboxStatusFMMU::READ_CHECK, bus.mailboxStatusFMMUMode());
+}
+
+TEST_F(BusTest, configureMailboxStatusCheck_write_check_OK)
+{
+    ASSERT_NO_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::WRITE_CHECK));
+    ASSERT_EQ(MailboxStatusFMMU::WRITE_CHECK, bus.mailboxStatusFMMUMode());
+}
+
+TEST_F(BusTest, configureMailboxStatusCheck_both_OK)
+{
+    auto mode = MailboxStatusFMMU::READ_CHECK | MailboxStatusFMMU::WRITE_CHECK;
+    ASSERT_NO_THROW(bus.configureMailboxStatusCheck(mode));
+    ASSERT_EQ(mode, bus.mailboxStatusFMMUMode());
+}
+
+TEST_F(BusTest, configureMailboxStatusCheck_none)
+{
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK);
+    ASSERT_NO_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::NONE));
+    ASSERT_EQ(MailboxStatusFMMU::NONE, bus.mailboxStatusFMMUMode());
+}
+
+TEST_F(BusTest, configureMailboxStatusCheck_insufficient_fmmus_single)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.esc.fmmus = 2;
+    ASSERT_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK), Error);
+    ASSERT_EQ(MailboxStatusFMMU::NONE, bus.mailboxStatusFMMUMode());
+}
+
+TEST_F(BusTest, configureMailboxStatusCheck_insufficient_fmmus_both)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.esc.fmmus = 3;
+    ASSERT_NO_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK));
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::NONE);
+    ASSERT_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK | MailboxStatusFMMU::WRITE_CHECK), Error);
+}
+
+TEST_F(BusTest, configureMailboxStatusCheck_no_mailbox_slave_skipped)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.sii.supported_mailbox = eeprom::MailboxProtocol::None;
+    slave.esc.fmmus = 2;
+    ASSERT_NO_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK | MailboxStatusFMMU::WRITE_CHECK));
+}
+
+
+TEST_F(BusTest, mailbox_status_fmmu_read_check_LRD)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.is_static_mapping = true;
+    slave.input.bsize = 4;
+    slave.input.sync_manager = 1;
+    slave.output.bsize = 4;
+    slave.output.sync_manager = 0;
+
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK);
+
+    // configureFMMUs: 4 FPWR (SM+FMMU for output & input)
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+    // configureMailboxFMMUs: 1 FPWR for FMMU2 (read check)
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    uint8_t iomap[64];
+    bus.createMapping(iomap);
+
+    // Frame layout: [4 PDO][3 pad][1 status] = 8 bytes
+    // Status byte at offset 7, bit 0 = SM1 mailbox status
+    // WKC = 1 (input PDO, slave already increments for TxPDO so adjust = 0)
+
+    // LRD with status bit set -> can_read = true
+    uint64_t lrd_data = uint64_t(0x01) << 56; // byte 7 = 0x01, bit 0 set
+    mock_link->handleProcess(Command::LRD, lrd_data, 1);
+    slave.mailbox.can_read = false;
+    bus.processDataRead([](DatagramState const&){});
+    ASSERT_TRUE(slave.mailbox.can_read);
+
+    // LRD with status bit clear -> can_read = false
+    uint64_t lrd_clear = 0;
+    mock_link->handleProcess(Command::LRD, lrd_clear, 1);
+    bus.processDataRead([](DatagramState const&){});
+    ASSERT_FALSE(slave.mailbox.can_read);
+}
+
+
+TEST_F(BusTest, mailbox_status_fmmu_both_LRW)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.is_static_mapping = true;
+    slave.input.bsize = 4;
+    slave.input.sync_manager = 1;
+    slave.output.bsize = 4;
+    slave.output.sync_manager = 0;
+
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK | MailboxStatusFMMU::WRITE_CHECK);
+
+    // configureFMMUs: 4 FPWR
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+    // configureMailboxFMMUs: 2 FPWR (FMMU2 for read + FMMU3 for write)
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    uint8_t iomap[64];
+    bus.createMapping(iomap);
+
+    // Frame layout: [4 PDO][3 pad][1 read_status][3 pad][1 write_status] = 12 bytes
+    // Read status: byte 7, bit 0
+    // Write status: byte 11, bit 0
+    // LRW WKC = 1 (read) + 1*2 (write) = 3 (slave has TxPDO so adjust = 0)
+
+    struct Response { uint8_t data[12]; } __attribute__((__packed__));
+    Response resp{};
+    resp.data[7]  = 0x01; // read check: SM1 full -> can_read = true
+    resp.data[11] = 0x00; // write check: SM0 empty -> can_write = !0 = true
+    mock_link->handleProcess(Command::LRW, resp, 3);
+
+    slave.mailbox.can_read = false;
+    slave.mailbox.can_write = false;
+    bus.processDataReadWrite([](DatagramState const&){});
+    ASSERT_TRUE(slave.mailbox.can_read);
+    ASSERT_TRUE(slave.mailbox.can_write);
+
+    // Now test SM0 full -> can_write = false
+    Response resp2{};
+    resp2.data[7]  = 0x00; // read check: SM1 empty -> can_read = false
+    resp2.data[11] = 0x01; // write check: SM0 full -> can_write = !1 = false
+    mock_link->handleProcess(Command::LRW, resp2, 3);
+
+    bus.processDataReadWrite([](DatagramState const&){});
+    ASSERT_FALSE(slave.mailbox.can_read);
+    ASSERT_FALSE(slave.mailbox.can_write);
+}
+
+
+TEST_F(BusTest, mailbox_status_fmmu_LWR_uses_pdo_size)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.is_static_mapping = true;
+    slave.input.bsize = 4;
+    slave.input.sync_manager = 1;
+    slave.output.bsize = 4;
+    slave.output.sync_manager = 0;
+
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK);
+
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    uint8_t iomap[64];
+    bus.createMapping(iomap);
+
+    // LWR WKC should still be 1 (only output PDO, read FMMUs don't respond to LWR)
+    uint32_t lwr_data = 0;
+    mock_link->handleProcess(Command::LWR, lwr_data, 1);
+    bus.processDataWrite([](DatagramState const&){});
+}
+
+
+TEST_F(BusTest, mailbox_status_fmmu_wkc_error_during_programming)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.is_static_mapping = true;
+    slave.input.bsize = 4;
+    slave.input.sync_manager = 1;
+    slave.output.bsize = 4;
+    slave.output.sync_manager = 0;
+
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK);
+
+    // configureFMMUs: 4 FPWR OK
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+    // configureMailboxFMMUs: FPWR with WKC=0 -> error
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 0);
+
+    uint8_t iomap[64];
+    ASSERT_THROW(bus.createMapping(iomap), Error);
+}
+
+
+TEST_F(BusTest, mailbox_sequencer_skip_fmmu_read_check)
+{
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK);
+    MailboxSequencer sequencer(bus);
+    auto noop = [](DatagramState const&){};
+
+    // Step 1: phase 0 skipped (FMMU) -> immediately executes sendReadMessages (phase 1)
+    sequencer.step(noop);
+
+    // Step 2: sendMailboxesWriteChecks (phase 2, not covered by FMMU)
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x00}, 1);
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+
+    // Step 3: sendWriteMessages (phase 3)
+    sequencer.step(noop);
+
+    // Step 4: phase 0 skipped again -> sendReadMessages (phase 1)
+    sequencer.step(noop);
+}
+
+
+TEST_F(BusTest, mailbox_sequencer_skip_fmmu_both)
+{
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK | MailboxStatusFMMU::WRITE_CHECK);
+    MailboxSequencer sequencer(bus);
+    auto noop = [](DatagramState const&){};
+
+    // Step 1: phase 0 skipped, phase 1 executes -> sendReadMessages
+    sequencer.step(noop);
+
+    // Step 2: phase 2 skipped, phase 3 executes -> sendWriteMessages
+    sequencer.step(noop);
+
+    // Step 3: phase 0 skipped -> sendReadMessages again (full cycle in 2 calls)
+    sequencer.step(noop);
+}
+
+
+TEST_F(BusTest, mailbox_sequencer_no_skip_without_fmmu)
+{
+    MailboxSequencer sequencer(bus);
+    auto noop = [](DatagramState const&){};
+
+    // Phase 0: sendMailboxesReadChecks -> NOT skipped
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x00}, 1);
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+
+    // Phase 1: sendReadMessages -> nothing
+    sequencer.step(noop);
+
+    // Phase 2: sendMailboxesWriteChecks -> NOT skipped
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x00}, 1);
+    sequencer.step(noop);
+    bus.processAwaitingFrames();
+
+    // Phase 3: sendWriteMessages -> nothing
+    sequencer.step(noop);
+}
