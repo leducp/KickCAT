@@ -426,6 +426,14 @@ namespace kickcat::mailbox::response
     }
 
 
+    std::vector<uint8_t> Mailbox::processRequest(std::vector<uint8_t>&& raw_message)
+    {
+        handleMessage(std::move(raw_message));
+        process();
+        return popReply();
+    }
+
+
     void Mailbox::send()
     {
         SyncManager sync;
