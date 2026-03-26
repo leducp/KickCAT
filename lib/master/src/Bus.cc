@@ -655,13 +655,6 @@ namespace kickcat
     {
         auto prepareDatagrams = [this](Slave& slave, Slave::PIMapping& mapping, SyncManagerType type)
         {
-
-            if (mapping.bsize == 0)
-            {
-                // there is nothing to do for this mapping
-                return;
-            }
-
             auto error = [](DatagramState const&)
             {
                 THROW_ERROR("Invalid working counter");
@@ -675,6 +668,29 @@ namespace kickcat
                 }
                 return DatagramState::OK;
             };
+
+            if (mapping.bsize == 0)
+            {
+                // Write SM with length=0 and activate=1 so the slave ESM can find and validate it.
+                // Without this, the slave rejects the SAFE_OP transition (AL error 0x001E).
+                if (mapping.sync_manager >= 0 and
+                    static_cast<size_t>(mapping.sync_manager) < slave.sii.syncManagers.size())
+                {
+                    auto& sii_sm = slave.sii.syncManagers[mapping.sync_manager];
+                    SyncManager sm;
+                    std::memset(&sm, 0, sizeof(SyncManager));
+                    sm.start_address = sii_sm->start_address;
+                    sm.length        = 0;
+                    sm.control       = (type == SyncManagerType::Input) ? uint8_t{0x20} : uint8_t{0x64};
+                    sm.activate      = 0x01;
+                    link_->addDatagram(Command::FPWR,
+                        createAddress(slave.address, reg::SYNC_MANAGER + static_cast<uint16_t>(mapping.sync_manager * 8)),
+                        sm, process, error);
+                    bus_info("SM[%" PRIi32 "] type %d - start address 0x%04x - length 0 (bsize=0)\n",
+                        mapping.sync_manager, type, sm.start_address);
+                }
+                return;
+            }
 
             // Get SyncManager configuration from SII
             auto& sii_sm = slave.sii.syncManagers[mapping.sync_manager];

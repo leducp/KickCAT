@@ -85,6 +85,9 @@ int main(int argc, char* argv[])
             printf(" - Slave %d\n", slave.address);
         }
 
+        uint8_t txpdo_count = 0;
+        bus.writeSDO(bus.slaves().at(0), 0x1C13, 0, Bus::Access::PARTIAL, &txpdo_count, sizeof(txpdo_count));
+
         bus.createMapping(io_buffer);
 
         // Optional: Enable IRQ if needed
