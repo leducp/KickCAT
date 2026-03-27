@@ -47,7 +47,15 @@ namespace kickcat
     {
         // we dont really care about the type, we just want a working counter to detect the number of slaves
         uint16_t wkc = 0;
-        wkc = broadcastRead(reg::TYPE, 1);
+        try
+        {
+            wkc = broadcastRead(reg::TYPE, 1);
+        }
+        catch (std::exception const& e)
+        {
+            bus_error("detectSlaves failed: %s\n", e.what());
+            return 0;
+        }
         slaves_.resize(wkc);
         bus_info("%zu slave detected on the network\n", slaves_.size());
         return detectedSlaves();
