@@ -329,10 +329,8 @@ jobs:
         nuttx:
           - label: stable
             ref: nuttx-12.12.0
-            apps_ref: apps-12.12.0
           - label: master
             ref: master
-            apps_ref: master
     env:
       arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
 
@@ -359,14 +357,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/nuttxspace/apps
-          key: nuttx-apps_${{ matrix.nuttx.apps_ref }}
+          key: nuttx-apps_${{ matrix.nuttx.ref }}
       - if: ${{ steps.cache-nuttx-apps.outputs.cache-hit != 'true' }}
         name: Checkout NuttX Apps (${{ matrix.nuttx.label }})
         uses: actions/checkout@v4
         with:
           repository: apache/nuttx-apps
           path: "nuttxspace/apps"
-          ref: "${{ matrix.nuttx.apps_ref }}"
+          ref: "${{ matrix.nuttx.ref }}"
       - name: Install Kconfig dependencies
         run: sudo apt-get update && sudo apt-get install -y kconfig-frontends
       - name: Cache ARM GCC Toolchain
