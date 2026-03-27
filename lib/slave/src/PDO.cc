@@ -12,9 +12,24 @@ namespace kickcat
         {
             auto [indexIn, pdoIn]   = esc_->findSm(SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ);
             auto [indexOut, pdoOut] = esc_->findSm(SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE);
+            
+            if (pdoIn.length > 0)
+            {
+                sm_input_ = SYNC_MANAGER_PI_IN(indexIn, pdoIn.start_address, pdoIn.length);
+            }
+            else
+            {
+                sm_input_ = SyncManagerConfig{indexIn, 0, 0, 0, SyncManagerType::Unused};
+            }
 
-            sm_input_  = SYNC_MANAGER_PI_IN(indexIn, pdoIn.start_address, pdoIn.length);
-            sm_output_ = SYNC_MANAGER_PI_OUT(indexOut, pdoOut.start_address, pdoOut.length);
+            if(pdoOut.length > 0)
+            {
+                sm_output_ = SYNC_MANAGER_PI_OUT(indexOut, pdoOut.start_address, pdoOut.length);
+            }
+            else
+            {
+                sm_output_ = SyncManagerConfig{indexOut, 0, 0, 0, SyncManagerType::Unused};
+            }
         }
         catch (std::exception const& e)
         {
@@ -26,11 +41,11 @@ namespace kickcat
 
     StatusCode PDO::isConfigOk()
     {
-        if (not esc_->isSmValid(sm_input_))
+        if (sm_input_.type != SyncManagerType::Unused and not esc_->isSmValid(sm_input_))
         {
             return StatusCode::INVALID_INPUT_CONFIGURATION;
         }
-        else if (not esc_->isSmValid(sm_output_))
+        if (sm_output_.type != SyncManagerType::Unused and not esc_->isSmValid(sm_output_))
         {
             return StatusCode::INVALID_OUTPUT_CONFIGURATION;
         }
@@ -68,7 +83,7 @@ namespace kickcat
 
     void PDO::updateInput()
     {
-        if (input_ == nullptr)
+        if (input_ == nullptr or sm_input_.type == SyncManagerType::Unused)
         {
             return;
         }
@@ -83,7 +98,7 @@ namespace kickcat
 
     void PDO::updateOutput()
     {
-        if (output_ == nullptr)
+        if (output_ == nullptr or sm_output_.type == SyncManagerType::Unused)
         {
             return;
         }
