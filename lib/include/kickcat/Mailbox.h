@@ -207,6 +207,9 @@ namespace kickcat::mailbox::response
         /// \return The raw reply message, or an empty vector if the queue is empty
         std::vector<uint8_t> popReply();
 
+        /// \brief Synchronous single-shot processing: dispatch, process, and return the reply
+        std::vector<uint8_t> processRequest(std::vector<uint8_t>&& raw_message);
+
         // Access on the next message to send: mainly for unit test
         std::vector<uint8_t> const& readyToSend() const { return to_send_.front(); }
 
