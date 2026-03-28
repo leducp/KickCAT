@@ -50,7 +50,7 @@ add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 
 if (CODE_COVERAGE)
   set(EXCLUDE_FILES "unit/*" ".*gtest.*" "examples/*" ".*gmock.*" ".*/OS/.*" "tools/*"
-                    "conan/*" "*conan2/*" "*simulation/*")
+                    "conan/*" "*conan2/*" "*simulation/*" "test/*")
   setup_target_for_coverage_gcovr_html(
       NAME coverage
       EXECUTABLE kickcat_unit
