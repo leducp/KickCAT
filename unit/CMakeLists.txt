@@ -32,6 +32,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/mailbox/CoE/response-t.cc
                             src/masterOD-t.cc
                             src/slave/slave-t.cc
+                            src/slave/PDO-t.cc
                             src/Time.cc
 )
 
