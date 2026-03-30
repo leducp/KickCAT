@@ -75,12 +75,12 @@ namespace kickcat
             CoE::Object obj{index, CoE::ObjectCode::RECORD, "Slave Configuration", {}};
             CoE::addEntry<uint8_t> (obj, 0,  8,  0,   CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Number of Entries", 7);
             CoE::addEntry<uint16_t>(obj, 1,  16, 8,   CoE::Access::READ, CoE::DataType::UNSIGNED16, "Fixed Station Address", slave.address);
-            CoE::addEntry<uint32_t>(obj, 5,  32, 24,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "Vendor Id",         sii.vendor_id);
-            CoE::addEntry<uint32_t>(obj, 6,  32, 56,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "Product Code",      sii.product_code);
-            CoE::addEntry<uint32_t>(obj, 7,  32, 88,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "Revision Number",   sii.revision_number);
-            CoE::addEntry<uint32_t>(obj, 8,  32, 120, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Serial Number",     sii.serial_number);
-            CoE::addEntry<uint16_t>(obj, 33, 16, 152, CoE::Access::READ, CoE::DataType::UNSIGNED16, "Mailbox Out Size",  sii.mailbox_recv_size);
-            CoE::addEntry<uint16_t>(obj, 34, 16, 168, CoE::Access::READ, CoE::DataType::UNSIGNED16, "Mailbox In Size",   sii.mailbox_send_size);
+            CoE::addEntry<uint32_t>(obj, 5,  32, 24,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "Vendor Id",         sii.info.vendor_id);
+            CoE::addEntry<uint32_t>(obj, 6,  32, 56,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "Product Code",      sii.info.product_code);
+            CoE::addEntry<uint32_t>(obj, 7,  32, 88,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "Revision Number",   sii.info.revision_number);
+            CoE::addEntry<uint32_t>(obj, 8,  32, 120, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Serial Number",     sii.info.serial_number);
+            CoE::addEntry<uint16_t>(obj, 33, 16, 152, CoE::Access::READ, CoE::DataType::UNSIGNED16, "Mailbox Out Size",  sii.info.standard_recv_mbx_size);
+            CoE::addEntry<uint16_t>(obj, 34, 16, 168, CoE::Access::READ, CoE::DataType::UNSIGNED16, "Mailbox In Size",   sii.info.standard_send_mbx_size);
 
             dict.push_back(std::move(obj));
 

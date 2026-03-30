@@ -116,18 +116,18 @@ namespace kickcat
         // create callbacks reception for mailbox (that do not depends on a request initiated by the master)
         for (auto& slave : slaves_)
         {
-            if (slave.sii.supported_mailbox & eeprom::MailboxProtocol::CoE)
+            if (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE)
             {
                 // CoE emergency callback
                 auto emg = std::make_shared<mailbox::request::EmergencyMessage>(slave.mailbox);
                 slave.mailbox.to_process.push_back(emg);
             }
 
-            if ((slave.sii.supported_mailbox & eeprom::MailboxProtocol::EoE) or
-                (slave.sii.supported_mailbox & eeprom::MailboxProtocol::FoE) or
-                (slave.sii.supported_mailbox & eeprom::MailboxProtocol::SoE) or
-                (slave.sii.supported_mailbox & eeprom::MailboxProtocol::CoE) or
-                (slave.sii.supported_mailbox & eeprom::MailboxProtocol::AoE))
+            if ((slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::EoE) or
+                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::FoE) or
+                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::SoE) or
+                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE) or
+                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::AoE))
             {
                 // check callback to display what's missing
                 auto chk = std::make_shared<mailbox::request::CheckMessage>(slave.mailbox);
@@ -361,7 +361,7 @@ namespace kickcat
 
         for (auto& slave : slaves_)
         {
-            if (slave.sii.supported_mailbox)
+            if (slave.sii.info.mailbox_protocol)
             {
                 SyncManager SM[2];
                 slave.mailbox.generateSMConfig(SM);
@@ -396,7 +396,7 @@ namespace kickcat
                 continue;
             }
 
-            if (slave.sii.supported_mailbox& eeprom::MailboxProtocol::CoE)
+            if (slave.sii.info.mailbox_protocol& eeprom::MailboxProtocol::CoE)
             {
                 // Slave support CAN over EtherCAT -> use mailbox/SDO to get mapping size
                 uint8_t sm[512];
@@ -441,19 +441,22 @@ namespace kickcat
             else
             {
                 // unsupported mailbox: use SII to get the mapping size
-                auto siiMapping = [&](Slave::PIMapping* mapping, std::vector<eeprom::PDOEntry const*>& PDOs, SyncManagerType type)
+                auto siiMapping = [&](Slave::PIMapping* mapping, std::vector<eeprom::PDOMapping> const& PDOs, SyncManagerType type)
                 {
                     mapping->sync_manager = -1;
                     mapping->size = 0;
                     for (auto const& pdo : PDOs)
                     {
-                        mapping->size += pdo->bitlen;
+                        for (auto const& entry : pdo.entries)
+                        {
+                            mapping->size += entry.bitlen;
+                        }
                     }
                     mapping->bsize = bits_to_bytes(mapping->size);
                     for (uint32_t i = 0; i < slave.sii.syncManagers.size(); ++i)
                     {
-                        auto sm = slave.sii.syncManagers[i];
-                        if (sm->type == type)
+                        auto const& sm = slave.sii.syncManagers[i];
+                        if (sm.type == type)
                         {
                             mapping->sync_manager = i;
                         }
@@ -487,7 +490,7 @@ namespace kickcat
 
         for (auto const& slave : slaves_)
         {
-            if (slave.sii.supported_mailbox == 0)
+            if (slave.sii.info.mailbox_protocol == 0)
             {
                 continue;
             }
@@ -551,7 +554,7 @@ namespace kickcat
             // update offset
             address += size;
 
-            if (slave.sii.supported_mailbox != 0)
+            if (slave.sii.info.mailbox_protocol != 0)
             {
                 frame_mbx_slaves.back().push_back(&slave);
             }
@@ -842,7 +845,7 @@ namespace kickcat
                 targeted_fmmu += 0x10;          // FMMU1 - inputs (slave to master)
             }
 
-            sm.start_address = sii_sm->start_address;
+            sm.start_address = sii_sm.start_address;
             sm.length        = static_cast<uint16_t>(mapping.bsize);
             sm.status        = 0x00; // RO register
             sm.activate      = 0x01; // Sync Manager enable
@@ -856,7 +859,7 @@ namespace kickcat
             fmmu.length             = static_cast<uint16_t>(mapping.bsize);
             fmmu.logical_start_bit  = 0;   // we map every bits
             fmmu.logical_stop_bit   = 0x7; // we map every bits
-            fmmu.physical_address   = sii_sm->start_address;
+            fmmu.physical_address   = sii_sm.start_address;
             fmmu.physical_start_bit = 0;
             fmmu.activate           = 1;
             link_->addDatagram(Command::FPWR, createAddress(slave.address, targeted_fmmu), fmmu, process, error);
@@ -1041,39 +1044,50 @@ namespace kickcat
 
     void Bus::fetchEeprom()
     {
-        std::vector<Slave*> slaves;
+        // Per-slave accumulation buffers (indexed same as slaves_)
+        std::vector<std::vector<uint32_t>> buffers(slaves_.size());
+
+        std::vector<Slave*> pending;
         for (auto& slave : slaves_)
         {
-            slaves.push_back(&slave);
+            pending.push_back(&slave);
         }
+
+        auto getBuffer = [&](Slave& s) -> std::vector<uint32_t>&
+        {
+            auto idx = static_cast<std::size_t>(&s - slaves_.data());
+            return buffers[idx];
+        };
 
         // Get SII
         int32_t pos = 0;
-        while (not slaves.empty())
+        while (not pending.empty())
         {
-            readEeprom(static_cast<uint16_t>(pos), slaves,
-            [](Slave& s, uint32_t word)
+            readEeprom(static_cast<uint16_t>(pos), pending,
+            [&](Slave& s, uint32_t word)
             {
-                s.sii.eeprom.push_back(word);
+                getBuffer(s).push_back(word);
             });
 
             pos += 2;
 
-            slaves.erase(std::remove_if(slaves.begin(), slaves.end(),
-            [](Slave* s)
+            pending.erase(std::remove_if(pending.begin(), pending.end(),
+            [&](Slave* s)
             {
-                // First section (64 words == 32 double words) may have bytes with the eeprom::Category::End value
-                return ((((s->sii.eeprom.back() >> 16) == eeprom::Category::End) or
-                         ((s->sii.eeprom.back() & eeprom::Category::End) == eeprom::Category::End)) and
-                          (s->sii.eeprom.size() > 32));
+                auto& buf = getBuffer(*s);
+                return (((buf.back() >> 16) == eeprom::Category::End) or
+                        ((buf.back() & eeprom::Category::End) == eeprom::Category::End)) and
+                         (buf.size() > 32);
             }),
-            slaves.end());
+            pending.end());
         }
 
         // Parse SII
-        for (auto& slave : slaves_)
+        for (std::size_t i = 0; i < slaves_.size(); ++i)
         {
-            slave.parseSII();
+            auto& buf = buffers[i];
+            slaves_[i].parseSII(reinterpret_cast<uint8_t const*>(buf.data()),
+                                buf.size() * sizeof(uint32_t));
         }
     }
 
@@ -1186,7 +1200,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            if (slave.sii.supported_mailbox == 0)
+            if (slave.sii.info.mailbox_protocol == 0)
             {
                 continue;
             }
@@ -1214,7 +1228,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            if (slave.sii.supported_mailbox == 0)
+            if (slave.sii.info.mailbox_protocol == 0)
             {
                 continue;
             }

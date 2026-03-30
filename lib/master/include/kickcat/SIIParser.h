@@ -1,52 +1,61 @@
 #ifndef KICKCAT_SII_PARSER_H
 #define KICKCAT_SII_PARSER_H
 
+#include <cstring>
+#include <string>
 #include <vector>
+
 #include "kickcat/protocol.h"
 
 namespace kickcat::eeprom
 {
     // see ETG2010_S_R_V1.0.1 SII Specification
-    // NOTE: strings, general, syncManagers, TxPDO and RxPDO point into the eeprom buffer.
-    //       If the eeprom vector is modified, call parse() again to re-establish them.
+
+    struct PDOMapping
+    {
+        uint16_t index;
+        uint8_t  sync_manager;
+        uint8_t  synchronization;
+        uint8_t  name_index;
+        uint16_t flags;
+        std::vector<PDOEntry> entries;
+    };
+
+    struct RawCategory
+    {
+        uint16_t type;
+        std::vector<uint8_t> data;
+    };
+
     struct SII
     {
-        std::vector<uint32_t> eeprom;
+        InfoEntry info{};
 
-        // Identity
-        uint32_t vendor_id;
-        uint32_t product_code;
-        uint32_t revision_number;
-        uint32_t serial_number;
+        uint32_t eepromSizeBytes() const { return (info.size + 1) * 128; }
 
-        // Bootstrap Mailbox
-        uint16_t mailboxBootstrap_recv_offset;
-        uint16_t mailboxBootstrap_recv_size;
-        uint16_t mailboxBootstrap_send_offset;
-        uint16_t mailboxBootstrap_send_size;
+        // Categories (owning)
+        std::vector<std::string>         strings;
+        GeneralEntry                     general{};
+        std::vector<uint8_t>             fmmus;
+        std::vector<SyncManagerEntry>    syncManagers;
+        std::vector<PDOMapping>          TxPDO;
+        std::vector<PDOMapping>          RxPDO;
+        std::vector<uint8_t>             dc;
+        std::vector<uint8_t>             dataTypes;
+        std::vector<RawCategory>         unknownCategories;
 
-        // Mailbox
-        uint16_t mailbox_recv_offset;
-        uint16_t mailbox_recv_size;
-        uint16_t mailbox_send_offset;
-        uint16_t mailbox_send_size;
-        eeprom::MailboxProtocol supported_mailbox;
+        void parse(uint8_t const* data, std::size_t size);
 
-        // Size
-        uint32_t eeprom_size;  // in bytes
-        uint16_t eeprom_version;
+        template<typename T>
+        void parse(std::vector<T> const& data)
+        {
+            parse(reinterpret_cast<uint8_t const*>(data.data()), data.size() * sizeof(T));
+        }
 
-        // Categories
-        std::vector<std::string_view> strings;
-        eeprom::GeneralEntry const* general;
-        std::vector<uint8_t> fmmus;
-        std::vector<eeprom::SyncManagerEntry const*> syncManagers;
-        std::vector<eeprom::PDOEntry const*> TxPDO;
-        std::vector<eeprom::PDOEntry const*> RxPDO;
-
-        void parse();
+        std::vector<uint8_t> serialize() const;
     };
+
+    uint16_t computeInfoCRC(InfoEntry const& info);
 }
 
 #endif
-

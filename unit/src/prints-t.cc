@@ -49,7 +49,7 @@ TEST(Prints, slave_uninitialized_prints)
 TEST(Prints, slave_initialized_prints)
 {
     Slave slave;
-    slave.sii.eeprom =
+    std::vector<uint32_t> eeprom =
     {
         //
         0x00000000,
@@ -157,7 +157,7 @@ TEST(Prints, slave_initialized_prints)
         0xFFFFFFFF
     };
 
-    slave.parseSII();
+    slave.parseSII(reinterpret_cast<uint8_t const*>(eeprom.data()), eeprom.size() * sizeof(uint32_t));
     // ensure that print infos displays more stuff when SII is loaded
     testing::internal::CaptureStdout();
     printInfo(slave);
@@ -167,7 +167,7 @@ TEST(Prints, slave_initialized_prints)
     testing::internal::CaptureStdout();
     printPDOs(slave);
     output = testing::internal::GetCapturedStdout();
-    ASSERT_LT(100, output.size()); // No PDO to print
+    ASSERT_LT(100, output.size());
 
     testing::internal::CaptureStdout();
     printf("%s", toString(slave.error_counters).c_str());
@@ -180,7 +180,7 @@ TEST(Prints, slave_initialized_prints)
     ASSERT_LT(200, output.size());
 
     testing::internal::CaptureStdout();
-    printf("%s", toString(*slave.sii.general).c_str());
+    printf("%s", toString(slave.sii.general).c_str());
     output = testing::internal::GetCapturedStdout();
     ASSERT_LT(200, output.size());
 }

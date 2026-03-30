@@ -32,15 +32,15 @@ TEST(EEPROM_factory, createMinimalEEPROM)
     ASSERT_EQ(0,  eeprom.port1_delay);
     ASSERT_EQ(0,  eeprom.reserved3);
 
-    ASSERT_EQ(0, eeprom.bootstrap_receive_mailbox_offset);
-    ASSERT_EQ(0, eeprom.bootstrap_receive_mailbox_size);
-    ASSERT_EQ(0, eeprom.bootstrap_send_mailbox_offset);
-    ASSERT_EQ(0, eeprom.bootstrap_send_mailbox_size);
+    ASSERT_EQ(0, eeprom.bootstrap_recv_mbx_offset);
+    ASSERT_EQ(0, eeprom.bootstrap_recv_mbx_size);
+    ASSERT_EQ(0, eeprom.bootstrap_send_mbx_offset);
+    ASSERT_EQ(0, eeprom.bootstrap_send_mbx_size);
 
-    ASSERT_EQ(0, eeprom.standard_receive_mailbox_offset);
-    ASSERT_EQ(0, eeprom.standard_receive_mailbox_size);
-    ASSERT_EQ(0, eeprom.standard_send_mailbox_offset);
-    ASSERT_EQ(0, eeprom.standard_send_mailbox_size);
+    ASSERT_EQ(0, eeprom.standard_recv_mbx_offset);
+    ASSERT_EQ(0, eeprom.standard_recv_mbx_size);
+    ASSERT_EQ(0, eeprom.standard_send_mbx_offset);
+    ASSERT_EQ(0, eeprom.standard_send_mbx_size);
 
     ASSERT_EQ(0, eeprom.mailbox_protocol);
     for (size_t i = 0; i < 32; ++i)

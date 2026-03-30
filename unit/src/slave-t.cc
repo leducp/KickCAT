@@ -7,7 +7,7 @@ using namespace kickcat;
 TEST(Slave, parse_SII)
 {
     Slave slave;
-    slave.sii.eeprom =
+    std::vector<uint32_t> eeprom =
     {
         //
         0x00000000,
@@ -116,10 +116,14 @@ TEST(Slave, parse_SII)
         0xFFFFFFFF
     };
 
-    slave.parseSII();
+    slave.parseSII(reinterpret_cast<uint8_t const*>(eeprom.data()), eeprom.size() * sizeof(uint32_t));
     ASSERT_EQ(2, slave.sii.strings.size()); // 2 strings since 0 is unused
     ASSERT_EQ(4, slave.sii.fmmus.size());
     ASSERT_EQ(1, slave.sii.syncManagers.size());
+    ASSERT_EQ(1, slave.sii.TxPDO.size());
+    ASSERT_EQ(1, slave.sii.TxPDO[0].entries.size());
+    ASSERT_EQ(1, slave.sii.RxPDO.size());
+    ASSERT_EQ(2, slave.sii.RxPDO[0].entries.size());
 }
 
 TEST(Slave, countOpenPorts)

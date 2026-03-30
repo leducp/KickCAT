@@ -1,12 +1,13 @@
 #include "SIIParser.h"
 #include "debug.h"
 
+#include <cstring>
 
 namespace kickcat::eeprom
 {
     void parseStrings(SII& sii, uint8_t const* section_start)
     {
-        sii.strings.push_back(std::string_view());  // index 0 is an empty string
+        sii.strings.push_back(std::string());  // index 0 is an empty string
         uint8_t const* pos = section_start;
 
         uint8_t number_of_strings = *pos;
@@ -17,7 +18,7 @@ namespace kickcat::eeprom
             uint8_t len = *pos;
             pos += 1;
 
-            sii.strings.push_back(std::string_view(reinterpret_cast<char const*>(pos), len));
+            sii.strings.emplace_back(reinterpret_cast<char const*>(pos), len);
             pos += len;
         }
     }
@@ -37,136 +38,300 @@ namespace kickcat::eeprom
 
         while (pos < end)
         {
-            sii.syncManagers.push_back(reinterpret_cast<eeprom::SyncManagerEntry const*>(pos));
-            pos += sizeof(eeprom::SyncManagerEntry);
+            SyncManagerEntry entry;
+            std::memcpy(&entry, pos, sizeof(SyncManagerEntry));
+            sii.syncManagers.push_back(entry);
+            pos += sizeof(SyncManagerEntry);
         }
     }
 
-    void parsePDO(uint8_t const* section_start, std::vector<eeprom::PDOEntry const*>& pdo)
+    void parsePDO(uint8_t const* section_start, std::vector<PDOMapping>& pdos)
     {
         uint8_t const* pos = section_start;
 
-        //uint16_t index = *reinterpret_cast<uint16_t const*>(pos); // not used yet
+        PDOMapping mapping{};
+        std::memcpy(&mapping.index, pos, sizeof(uint16_t));
         pos += 2;
 
         uint8_t number_of_entries = *pos;
         pos += 1;
 
-        //uint8_t sync_manager = *pos; // not used yet
+        mapping.sync_manager = *pos;
         pos += 1;
 
-        //uint8_t synchronization = *pos; // not use yet
+        mapping.synchronization = *pos;
         pos += 1;
 
-        //uint8_t name_index = *pos; // not used yet
+        mapping.name_index = *pos;
         pos += 1;
 
-        // flags (word) - unused
+        std::memcpy(&mapping.flags, pos, sizeof(uint16_t));
         pos += 2;
 
         for (int32_t i = 0; i < number_of_entries; ++i)
         {
-            pdo.push_back(reinterpret_cast<eeprom::PDOEntry const*>(pos));
-            pos += sizeof(eeprom::PDOEntry);
+            PDOEntry entry;
+            std::memcpy(&entry, pos, sizeof(PDOEntry));
+            mapping.entries.push_back(entry);
+            pos += sizeof(PDOEntry);
         }
+
+        pdos.push_back(std::move(mapping));
     }
 
-    void SII::parse()
+    void SII::parse(uint8_t const* data, std::size_t size)
     {
-        uint32_t temp_word = 0;
+        if (size < sizeof(InfoEntry))
+        {
+            THROW_ERROR("EEPROM data too small for InfoEntry header");
+        }
 
-        // Identity
-        vendor_id       = eeprom.at(eeprom::VENDOR_ID / sizeof(uint16_t));
-        product_code    = eeprom.at(eeprom::PRODUCT_CODE / sizeof(uint16_t));
-        revision_number = eeprom.at(eeprom::REVISION_NUMBER / sizeof(uint16_t));
-        serial_number   = eeprom.at(eeprom::SERIAL_NUMBER / sizeof(uint16_t));
+        // Info area: direct memcpy
+        std::memcpy(&info, data, sizeof(InfoEntry));
 
-        // Mailbox info
-        temp_word = eeprom.at((eeprom::BOOTSTRAP_MAILBOX + eeprom::RECV_MBO_OFFSET) / sizeof(uint16_t));
-        mailboxBootstrap_recv_offset = static_cast<uint16_t>(temp_word);
-        mailboxBootstrap_recv_size   = static_cast<uint16_t>(temp_word >> 16);
+        // Clear previous category data
+        strings.clear();
+        general = GeneralEntry{};
+        fmmus.clear();
+        syncManagers.clear();
+        TxPDO.clear();
+        RxPDO.clear();
+        dc.clear();
+        dataTypes.clear();
+        unknownCategories.clear();
 
-        temp_word = eeprom.at((eeprom::BOOTSTRAP_MAILBOX + eeprom::SEND_MBO_OFFSET) / sizeof(uint16_t));
-        mailboxBootstrap_send_offset = static_cast<uint16_t>(temp_word);
-        mailboxBootstrap_send_size   = static_cast<uint16_t>(temp_word >> 16);
+        // Categories start at word 0x40 = byte 0x80
+        std::size_t const category_start = START_CATEGORY * 2;
+        if (size <= category_start + 4)
+        {
+            return;
+        }
 
-        temp_word           = eeprom.at((eeprom::STANDARD_MAILBOX + eeprom::RECV_MBO_OFFSET) / sizeof(uint16_t));
-        mailbox_recv_offset = static_cast<uint16_t>(temp_word);
-        mailbox_recv_size   = static_cast<uint16_t>(temp_word >> 16);
-
-        temp_word           = eeprom.at((eeprom::STANDARD_MAILBOX + eeprom::SEND_MBO_OFFSET) / sizeof(uint16_t));
-        mailbox_send_offset = static_cast<uint16_t>(temp_word);
-        mailbox_send_size   = static_cast<uint16_t>(temp_word >> 16);
-
-        temp_word         = eeprom.at(eeprom::MAILBOX_PROTOCOL / sizeof(uint16_t));
-        supported_mailbox = static_cast<eeprom::MailboxProtocol>(temp_word);
-
-        // EEPROM
-        temp_word   = eeprom.at(eeprom::EEPROM_SIZE / sizeof(uint16_t));
-        eeprom_size = (temp_word & 0xFF) + 1;  // 0 means 1024 bits
-        eeprom_size *= 128;                    // Kibit to bytes
-        eeprom_version = static_cast<uint16_t>(temp_word >> 16);
-
-        // Categories
-        uint8_t const* pos           = reinterpret_cast<uint8_t*>(eeprom.data()) + eeprom::START_CATEGORY * 2;
-        uint8_t const* const max_pos = reinterpret_cast<uint8_t*>(eeprom.data() + eeprom.size() - 4);
+        uint8_t const* pos           = data + category_start;
+        uint8_t const* const max_pos = data + size - 4;
         while (pos < max_pos)
         {
-            uint16_t const* category     = reinterpret_cast<uint16_t const*>(pos);
-            uint16_t category_size       = *(category + 1) * sizeof(uint16_t);
+            uint16_t category_type;
+            uint16_t category_words;
+            std::memcpy(&category_type,  pos,     sizeof(uint16_t));
+            std::memcpy(&category_words, pos + 2, sizeof(uint16_t));
+            uint16_t category_size       = category_words * sizeof(uint16_t);
             uint8_t const* category_data = pos + 4;
             pos += (4 + category_size);
 
-            switch (*category)
+            switch (category_type)
             {
-                case eeprom::Category::Strings:
+                case Category::Strings:
                 {
                     parseStrings(*this, category_data);
                     break;
                 }
-                case eeprom::Category::DataTypes:
+                case Category::DataTypes:
                 {
-                    slave_warning("DataTypes section: parsing not implemented\n");
+                    dataTypes.assign(category_data, category_data + category_size);
                     break;
                 }
-                case eeprom::Category::General:
+                case Category::General:
                 {
-                    general = reinterpret_cast<eeprom::GeneralEntry const*>(category_data);
+                    std::memcpy(&general, category_data, sizeof(GeneralEntry));
                     break;
                 }
-                case eeprom::Category::FMMU:
+                case Category::FMMU:
                 {
                     parseFMMU(*this, category_data, category_size);
                     break;
                 }
-                case eeprom::Category::SyncM:
+                case Category::SyncM:
                 {
                     parseSyncM(*this, category_data, category_size);
                     break;
                 }
-                case eeprom::Category::TxPDO:
+                case Category::TxPDO:
                 {
                     parsePDO(category_data, TxPDO);
                     break;
                 }
-                case eeprom::Category::RxPDO:
+                case Category::RxPDO:
                 {
                     parsePDO(category_data, RxPDO);
                     break;
                 }
-                case eeprom::Category::DC:
+                case Category::DC:
                 {
-                    slave_warning("DC section: parsing not implemented\n");
+                    dc.assign(category_data, category_data + category_size);
                     break;
                 }
-                case eeprom::Category::End:
+                case Category::End:
                 {
-                    break;
+                    return;
                 }
                 default:
                 {
+                    unknownCategories.push_back({category_type, {category_data, category_data + category_size}});
                 }
             }
         };
+    }
+
+
+    namespace
+    {
+        template<typename T>
+        void append(std::vector<uint8_t>& out, T const& value)
+        {
+            static_assert(std::is_trivially_copyable_v<T>);
+            auto const* bytes = reinterpret_cast<uint8_t const*>(&value);
+            out.insert(out.end(), bytes, bytes + sizeof(T));
+        }
+
+        void append(std::vector<uint8_t>& out, uint8_t const* data, std::size_t size)
+        {
+            out.insert(out.end(), data, data + size);
+        }
+
+        void appendCategory(std::vector<uint8_t>& out, uint16_t type, uint8_t const* data, std::size_t size_bytes)
+        {
+            append(out, type);
+            append(out, static_cast<uint16_t>(size_bytes / sizeof(uint16_t)));
+            append(out, data, size_bytes);
+        }
+    }
+
+
+    std::vector<uint8_t> SII::serialize() const
+    {
+        std::vector<uint8_t> out;
+        out.reserve(512);
+
+        // Info area
+        InfoEntry info_copy = info;
+        info_copy.crc = computeInfoCRC(info_copy);
+        append(out, info_copy);
+
+        // Strings category
+        if (strings.size() > 1)
+        {
+            std::vector<uint8_t> strings_data;
+            // strings[0] is reserved empty string, actual strings start at index 1
+            uint8_t count = static_cast<uint8_t>(strings.size() - 1);
+            strings_data.push_back(count);
+            for (std::size_t i = 1; i < strings.size(); ++i)
+            {
+                strings_data.push_back(static_cast<uint8_t>(strings[i].size()));
+                strings_data.insert(strings_data.end(), strings[i].begin(), strings[i].end());
+            }
+            // Pad to word boundary
+            if (strings_data.size() % 2 != 0)
+            {
+                strings_data.push_back(0);
+            }
+            appendCategory(out, Category::Strings, strings_data.data(), strings_data.size());
+        }
+
+        // DataTypes category (raw)
+        if (not dataTypes.empty())
+        {
+            appendCategory(out, Category::DataTypes, dataTypes.data(), dataTypes.size());
+        }
+
+        // General category
+        appendCategory(out, Category::General, reinterpret_cast<uint8_t const*>(&general), sizeof(GeneralEntry));
+
+        // FMMU category
+        if (not fmmus.empty())
+        {
+            std::vector<uint8_t> fmmu_data(fmmus);
+            if (fmmu_data.size() % 2 != 0)
+            {
+                fmmu_data.push_back(0);
+            }
+            appendCategory(out, Category::FMMU, fmmu_data.data(), fmmu_data.size());
+        }
+
+        // SyncManager category
+        if (not syncManagers.empty())
+        {
+            std::size_t sm_size = syncManagers.size() * sizeof(SyncManagerEntry);
+            appendCategory(out, Category::SyncM, reinterpret_cast<uint8_t const*>(syncManagers.data()), sm_size);
+        }
+
+        // TxPDO categories
+        for (auto const& mapping : TxPDO)
+        {
+            std::vector<uint8_t> pdo_data;
+            append(pdo_data, mapping.index);
+            pdo_data.push_back(static_cast<uint8_t>(mapping.entries.size()));
+            pdo_data.push_back(mapping.sync_manager);
+            pdo_data.push_back(mapping.synchronization);
+            pdo_data.push_back(mapping.name_index);
+            append(pdo_data, mapping.flags);
+            for (auto const& entry : mapping.entries)
+            {
+                append(pdo_data, entry);
+            }
+            appendCategory(out, Category::TxPDO, pdo_data.data(), pdo_data.size());
+        }
+
+        // RxPDO categories
+        for (auto const& mapping : RxPDO)
+        {
+            std::vector<uint8_t> pdo_data;
+            append(pdo_data, mapping.index);
+            pdo_data.push_back(static_cast<uint8_t>(mapping.entries.size()));
+            pdo_data.push_back(mapping.sync_manager);
+            pdo_data.push_back(mapping.synchronization);
+            pdo_data.push_back(mapping.name_index);
+            append(pdo_data, mapping.flags);
+            for (auto const& entry : mapping.entries)
+            {
+                append(pdo_data, entry);
+            }
+            appendCategory(out, Category::RxPDO, pdo_data.data(), pdo_data.size());
+        }
+
+        // DC category (raw)
+        if (not dc.empty())
+        {
+            appendCategory(out, Category::DC, dc.data(), dc.size());
+        }
+
+        // Unknown/vendor-specific categories (round-trip preservation)
+        for (auto const& raw : unknownCategories)
+        {
+            appendCategory(out, raw.type, raw.data.data(), raw.data.size());
+        }
+
+        // End marker
+        append(out, static_cast<uint16_t>(Category::End));
+        append(out, uint16_t{0});
+
+        return out;
+    }
+
+
+    uint16_t computeInfoCRC(InfoEntry const& info)
+    {
+        // CRC over the first 7 words (14 bytes) of the EEPROM, per ETG2010
+        // Uses the ESC CRC-8 polynomial: x^8 + x^2 + x + 1 (0x07)
+        uint8_t const* data = reinterpret_cast<uint8_t const*>(&info);
+        uint8_t crc = 0xFF;
+
+        for (std::size_t i = 0; i < 14; ++i)
+        {
+            crc ^= data[i];
+            for (int bit = 0; bit < 8; ++bit)
+            {
+                if (crc & 0x80)
+                {
+                    crc = (crc << 1) ^ 0x07;
+                }
+                else
+                {
+                    crc = crc << 1;
+                }
+            }
+        }
+
+        return crc;
     }
 }
