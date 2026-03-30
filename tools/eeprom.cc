@@ -183,11 +183,9 @@ int main(int argc, char* argv[])
 
     if (order == Order::READ)
     {
-        char const* raw_data = reinterpret_cast<char const*>(slave.sii.eeprom.data());
+        auto data = slave.sii.serialize();
         std::ofstream f(file, std::ofstream::binary);
-
-        // Write dumped data
-        f.write(raw_data, slave.sii.eeprom.size() * sizeof(uint32_t));
+        f.write(reinterpret_cast<char const*>(data.data()), data.size());
         f.close();
         printf("Saving eeprom to %s: done\n", file.c_str());
     }

@@ -8,18 +8,18 @@
 namespace kickcat
 {
 
-    void Slave::parseSII()
+    void Slave::parseSII(uint8_t const* data, std::size_t size)
     {
-        sii.parse();
+        sii.parse(data, size);
 
-        mailbox.recv_offset = sii.mailbox_recv_offset;
-        mailbox.recv_size = sii.mailbox_recv_size;
-        mailbox.send_offset= sii.mailbox_send_offset;
-        mailbox.send_size= sii.mailbox_send_size;
-        mailbox_bootstrap.recv_offset = sii.mailboxBootstrap_recv_offset;
-        mailbox_bootstrap.recv_size = sii.mailboxBootstrap_recv_size;
-        mailbox_bootstrap.send_offset= sii.mailboxBootstrap_send_offset;
-        mailbox_bootstrap.send_size= sii.mailboxBootstrap_send_size;
+        mailbox.recv_offset = sii.info.standard_recv_mbx_offset;
+        mailbox.recv_size   = sii.info.standard_recv_mbx_size;
+        mailbox.send_offset = sii.info.standard_send_mbx_offset;
+        mailbox.send_size   = sii.info.standard_send_mbx_size;
+        mailbox_bootstrap.recv_offset = sii.info.bootstrap_recv_mbx_offset;
+        mailbox_bootstrap.recv_size   = sii.info.bootstrap_recv_mbx_size;
+        mailbox_bootstrap.send_offset = sii.info.bootstrap_send_mbx_offset;
+        mailbox_bootstrap.send_size   = sii.info.bootstrap_send_mbx_size;
     }
 
     ErrorCounters const& Slave::errorCounters() const

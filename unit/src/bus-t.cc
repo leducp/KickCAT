@@ -148,17 +148,18 @@ public:
         ASSERT_EQ(1, bus.detectedSlaves());
 
         auto const& slave = bus.slaves().at(0);
-        ASSERT_EQ(0xCAFEDECA, slave.sii.vendor_id);
-        ASSERT_EQ(0xA5A5A5A5, slave.sii.product_code);
-        ASSERT_EQ(0x5A5A5A5A, slave.sii.revision_number);
-        ASSERT_EQ(0x12345678, slave.sii.serial_number);
+        ASSERT_EQ(0xCAFEDECA, slave.sii.info.vendor_id);
+        ASSERT_EQ(0xA5A5A5A5, slave.sii.info.product_code);
+        ASSERT_EQ(0x5A5A5A5A, slave.sii.info.revision_number);
+        ASSERT_EQ(0x12345678, slave.sii.info.serial_number);
         ASSERT_EQ(0x1000,     slave.mailbox.recv_offset);
         ASSERT_EQ(0x2000,     slave.mailbox.send_offset);
         ASSERT_EQ(0x0100,     slave.mailbox.recv_size);
         ASSERT_EQ(0x0200,     slave.mailbox.send_size);
 
         ASSERT_EQ(1, slave.sii.TxPDO.size());
-        ASSERT_EQ(2, slave.sii.RxPDO.size());
+        ASSERT_EQ(1, slave.sii.RxPDO.size());
+        ASSERT_EQ(2, slave.sii.RxPDO[0].entries.size());
     }
 
     template<typename T>
@@ -243,7 +244,7 @@ TEST_F(BusTest, error_counters)
 TEST_F(BusTest, logical_cmd)
 {
     auto& slave = bus.slaves().at(0);
-    slave.sii.supported_mailbox = eeprom::MailboxProtocol::None;
+    slave.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
 
     // configureFMMUs: 4 datagrams (SM+FMMU for input + SM+FMMU for output), all wkc=1
     for (int i = 0; i < 4; ++i)
@@ -885,7 +886,7 @@ TEST_F(BusTest, configureMailboxStatusCheck_insufficient_fmmus_both)
 TEST_F(BusTest, configureMailboxStatusCheck_no_mailbox_slave_skipped)
 {
     auto& slave = bus.slaves().at(0);
-    slave.sii.supported_mailbox = eeprom::MailboxProtocol::None;
+    slave.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
     slave.esc.fmmus = 2;
     ASSERT_NO_THROW(bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK | MailboxStatusFMMU::WRITE_CHECK));
 }

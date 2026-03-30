@@ -258,20 +258,20 @@ TEST(MasterODPopulate, creates_config_objects_from_sii)
 
     std::vector<Slave> slaves(2);
     slaves[0].address = 0x1001;
-    slaves[0].sii.vendor_id       = 0xDEADBEEF;
-    slaves[0].sii.product_code    = 0xCAFE;
-    slaves[0].sii.revision_number = 0x0003;
-    slaves[0].sii.serial_number   = 0x12345678;
-    slaves[0].sii.mailbox_recv_size = 512;
-    slaves[0].sii.mailbox_send_size = 256;
+    slaves[0].sii.info.vendor_id       = 0xDEADBEEF;
+    slaves[0].sii.info.product_code    = 0xCAFE;
+    slaves[0].sii.info.revision_number = 0x0003;
+    slaves[0].sii.info.serial_number   = 0x12345678;
+    slaves[0].sii.info.standard_recv_mbx_size = 512;
+    slaves[0].sii.info.standard_send_mbx_size = 256;
 
     slaves[1].address = 0x1002;
-    slaves[1].sii.vendor_id       = 0xBAADF00D;
-    slaves[1].sii.product_code    = 0xBEEF;
-    slaves[1].sii.revision_number = 0x0001;
-    slaves[1].sii.serial_number   = 0xABCD;
-    slaves[1].sii.mailbox_recv_size = 128;
-    slaves[1].sii.mailbox_send_size = 128;
+    slaves[1].sii.info.vendor_id       = 0xBAADF00D;
+    slaves[1].sii.info.product_code    = 0xBEEF;
+    slaves[1].sii.info.revision_number = 0x0001;
+    slaves[1].sii.info.serial_number   = 0xABCD;
+    slaves[1].sii.info.standard_recv_mbx_size = 128;
+    slaves[1].sii.info.standard_send_mbx_size = 128;
 
     auto dict = od.createDictionary();
     od.populate(dict, slaves);
@@ -322,8 +322,8 @@ TEST(MasterODPopulate, entry_pointers_survive_dictionary_move)
     MasterOD od(id);
 
     std::vector<Slave> slaves(2);
-    slaves[0].sii.vendor_id = 0x11;
-    slaves[1].sii.vendor_id = 0x22;
+    slaves[0].sii.info.vendor_id = 0x11;
+    slaves[1].sii.info.vendor_id = 0x22;
 
     auto dict = od.createDictionary();
     od.populate(dict, slaves);

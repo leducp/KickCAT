@@ -22,15 +22,15 @@ namespace kickcat
         eeprom.port0_delay = 0;
         eeprom.port1_delay = 0;
 
-        eeprom.bootstrap_receive_mailbox_offset = 0x0000;
-        eeprom.bootstrap_receive_mailbox_size = 0;
-        eeprom.bootstrap_send_mailbox_offset = 0x0000;
-        eeprom.bootstrap_send_mailbox_size = 0;
+        eeprom.bootstrap_recv_mbx_offset = 0x0000;
+        eeprom.bootstrap_recv_mbx_size = 0;
+        eeprom.bootstrap_send_mbx_offset = 0x0000;
+        eeprom.bootstrap_send_mbx_size = 0;
 
-        eeprom.standard_receive_mailbox_offset = 0x0000;
-        eeprom.standard_receive_mailbox_size = 0;
-        eeprom.standard_send_mailbox_offset = 0x0000;
-        eeprom.standard_send_mailbox_size = 0;
+        eeprom.standard_recv_mbx_offset = 0x0000;
+        eeprom.standard_recv_mbx_size = 0;
+        eeprom.standard_send_mbx_offset = 0x0000;
+        eeprom.standard_send_mbx_size = 0;
 
         eeprom.mailbox_protocol = 0x0000;
 

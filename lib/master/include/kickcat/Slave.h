@@ -13,7 +13,7 @@ namespace kickcat
 {
     struct Slave
     {
-        void parseSII();
+        void parseSII(uint8_t const* data, std::size_t size);
 
         ErrorCounters const& errorCounters() const;
         int computeErrorCounters() const;

@@ -550,16 +550,16 @@ namespace kickcat
             uint16_t reserved3;
 
             // mailbox bootstrap
-            uint16_t bootstrap_receive_mailbox_offset;
-            uint16_t bootstrap_receive_mailbox_size;
-            uint16_t bootstrap_send_mailbox_offset;
-            uint16_t bootstrap_send_mailbox_size;
+            uint16_t bootstrap_recv_mbx_offset;
+            uint16_t bootstrap_recv_mbx_size;
+            uint16_t bootstrap_send_mbx_offset;
+            uint16_t bootstrap_send_mbx_size;
 
             // mailbox standard
-            uint16_t standard_receive_mailbox_offset;
-            uint16_t standard_receive_mailbox_size;
-            uint16_t standard_send_mailbox_offset;
-            uint16_t standard_send_mailbox_size;
+            uint16_t standard_recv_mbx_offset;
+            uint16_t standard_recv_mbx_size;
+            uint16_t standard_send_mbx_offset;
+            uint16_t standard_send_mbx_size;
 
             uint16_t mailbox_protocol;
 
