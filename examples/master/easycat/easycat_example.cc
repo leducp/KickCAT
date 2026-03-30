@@ -109,6 +109,11 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    for (auto& slave : bus.slaves())
+    {
+        printInfo(slave);
+    }
+
     auto cyclic_process_data = [&]()
     {
         auto noop = [](DatagramState const&){};
