@@ -45,15 +45,16 @@ KickCAT is a thin EtherCAT stack designed to be embedded in complex software wit
 #### Linux (Recommended)
 
 ```bash
-# 1. Setup build environment
+# 1. Configure build options (optional — defaults are sensible)
+./scripts/configure.sh build --with=unit_tests
+
+# 2. Setup build environment (installs Conan deps + runs CMake)
 ./scripts/setup_build.sh build
 
-# 2. Configure and build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make
+# 3. Build
+cd build && make
 
-# 3. Grant network capabilities (required for raw socket access)
+# 4. Grant network capabilities (required for raw socket access)
 sudo setcap 'cap_net_raw,cap_net_admin=+ep' ./tools/your_binary
 ```
 
@@ -85,7 +86,7 @@ python3 -m venv kickcat_venv
 source kickcat_venv/bin/activate
 pip install conan
 
-conan install conan/conanfile_linux.txt -of=build/ \
+conan install conan/conanfile.py -of=build/ \
   -pr:h conan/your_profile_host.txt \
   -pr:b conan/your_profile_target.txt \
   --build=missing -s build_type=Release
@@ -715,12 +716,12 @@ For real-time performance on Linux:
 ### Unit Tests
 
 ```bash
-# Enable unit tests in CMake
-cd build
-cmake .. -DBUILD_UNIT_TESTS=ON
-make
+# Enable unit tests and set up
+./scripts/configure.sh build --with=unit_tests
+./scripts/setup_build.sh build
 
-# Run tests
+# Build and run tests
+cd build && make
 make test
 ```
 
@@ -731,10 +732,12 @@ Install gcovr and build with coverage:
 # Install gcovr
 uv pip install gcovr
 
-# Build with coverage
-cd build
-cmake .. -DBUILD_UNIT_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-make
+# Enable tests + coverage
+./scripts/configure.sh build --with=unit_tests --with=code_coverage
+./scripts/setup_build.sh build
+
+# Build and generate coverage
+cd build && make
 make coverage
 ```
 
@@ -765,13 +768,12 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 git clone https://github.com/leducp/KickCAT.git
 cd KickCAT
 
-# Setup build environment
+# Configure and setup build environment
+./scripts/configure.sh build --with=unit_tests
 ./scripts/setup_build.sh build
 
-# Build with tests
-cd build
-cmake .. -DBUILD_UNIT_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-make
+# Build
+cd build && make
 ```
 
 ---

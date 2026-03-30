@@ -49,24 +49,27 @@ set_target_properties(kickcat_unit
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-if (CODE_COVERAGE)
+if (ENABLE_CODE_COVERAGE)
   set(EXCLUDE_FILES "unit/*" ".*gtest.*" "examples/*" ".*gmock.*" ".*/OS/.*" "tools/*"
                     "conan/*" "*conan2/*" "*simulation/*" "test/*")
   setup_target_for_coverage_gcovr_html(
       NAME coverage
-      EXECUTABLE kickcat_unit
+      EXECUTABLE $<TARGET_FILE:kickcat_unit>
+      DEPENDENCIES kickcat_unit
       EXCLUDE ${EXCLUDE_FILES}
       )
 
   setup_target_for_coverage_gcovr_xml(
       NAME coverage_xml
-      EXECUTABLE kickcat_unit
+      EXECUTABLE $<TARGET_FILE:kickcat_unit>
+      DEPENDENCIES kickcat_unit
       EXCLUDE ${EXCLUDE_FILES}
       )
 
   setup_target_for_coverage_lcov(
       NAME coverage_lcov
-      EXECUTABLE kickcat_unit
+      EXECUTABLE $<TARGET_FILE:kickcat_unit>
+      DEPENDENCIES kickcat_unit
       EXCLUDE ${EXCLUDE_FILES}
       )
 endif()
