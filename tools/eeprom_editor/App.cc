@@ -1,37 +1,35 @@
-#include "App.h"
-
 #include <cstdio>
 #include <fstream>
 #include <iterator>
 
-#include "imgui.h"
-#include "portable-file-dialogs.h"
+#include <imgui.h>
+#include <portable-file-dialogs.h>
 
 #include "kickcat/EEPROM/EEPROM_factory.h"
 
+#include "App.h"
+#include "Editors.h"
+
 namespace kickcat::eeprom_editor
 {
-    namespace
+    constexpr float SIDEBAR_WIDTH = 220.0f;
+
+    struct CategoryInfo
     {
-        constexpr float SIDEBAR_WIDTH = 220.0f;
+        Category id;
+        char const* label;
+    };
 
-        struct CategoryInfo
-        {
-            Category id;
-            char const* label;
-        };
-
-        constexpr CategoryInfo CATEGORIES[] =
-        {
-            { Category::Info,         "Info (Header)"  },
-            { Category::Strings,      "Strings"        },
-            { Category::General,      "General"        },
-            { Category::SyncManagers, "Sync Managers"  },
-            { Category::FMMU,         "FMMU"           },
-            { Category::TxPDO,        "TxPDO"          },
-            { Category::RxPDO,        "RxPDO"          },
-        };
-    }
+    constexpr CategoryInfo CATEGORIES[] =
+    {
+        { Category::Info,         "Info (Header)"  },
+        { Category::Strings,      "Strings"        },
+        { Category::General,      "General"        },
+        { Category::SyncManagers, "Sync Managers"  },
+        { Category::FMMU,         "FMMU"           },
+        { Category::TxPDO,        "TxPDO"          },
+        { Category::RxPDO,        "RxPDO"          },
+    };
 
     App::App()
     {
@@ -142,9 +140,8 @@ namespace kickcat::eeprom_editor
             return;
         }
 
-        std::vector<uint8_t> data(
-            (std::istreambuf_iterator<char>(file)),
-            std::istreambuf_iterator<char>());
+        std::vector<uint8_t> data{std::istreambuf_iterator<char>(file),
+                                   std::istreambuf_iterator<char>()};
 
         try
         {
@@ -241,7 +238,14 @@ namespace kickcat::eeprom_editor
         }
         if (io.KeyCtrl and ImGui::IsKeyPressed(ImGuiKey_S))
         {
-            if (io.KeyShift) { saveFileAs(); } else { saveFile(); }
+            if (io.KeyShift)
+            {
+                saveFileAs();
+            }
+            else
+            {
+                saveFile();
+            }
         }
         if (io.KeyCtrl and ImGui::IsKeyPressed(ImGuiKey_Q))
         {
@@ -267,24 +271,24 @@ namespace kickcat::eeprom_editor
 
     void App::renderContentPanel()
     {
-        struct PanelInfo { char const* title; };
-        PanelInfo panel{};
+        bool changed = false;
 
         switch (active_category_)
         {
-            case Category::Info:         { panel = {"Info (Header) -- Words 0x00-0x3F"}; break; }
-            case Category::Strings:      { panel = {"Strings -- Category 10"};           break; }
-            case Category::General:      { panel = {"General -- Category 30"};           break; }
-            case Category::SyncManagers: { panel = {"Sync Managers -- Category 41"};     break; }
-            case Category::FMMU:         { panel = {"FMMU -- Category 40"};              break; }
-            case Category::TxPDO:        { panel = {"TxPDO (Inputs) -- Category 50"};    break; }
-            case Category::RxPDO:        { panel = {"RxPDO (Outputs) -- Category 51"};   break; }
+            case Category::Info:         { changed = info::render(sii_);                    break; }
+            case Category::Strings:      { changed = strings::render(sii_);                 break; }
+            case Category::General:      { changed = general::render(sii_);                 break; }
+            case Category::SyncManagers: { changed = syncm::render(sii_);                   break; }
+            case Category::FMMU:         { changed = fmmu::render(sii_);                    break; }
+            case Category::TxPDO:        { changed = pdo::render(sii_, pdo::Direction::Tx); break; }
+            case Category::RxPDO:        { changed = pdo::render(sii_, pdo::Direction::Rx); break; }
         }
 
-        ImGui::TextColored(ImVec4(0.42f, 0.55f, 0.84f, 1.0f), "%s", panel.title);
-        ImGui::Separator();
-        ImGui::Spacing();
-        ImGui::Text("Category editor coming in PR4");
+        if (changed)
+        {
+            modified_   = true;
+            serialized_ = sii_.serialize();
+        }
     }
 
     void App::renderHexPanel()

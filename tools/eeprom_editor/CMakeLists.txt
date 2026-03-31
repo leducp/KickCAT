@@ -17,16 +17,28 @@ FetchContent_MakeAvailable(glfw)
 
 # ImGui backend sources shipped in the Conan package under res/bindings/
 get_filename_component(_IMGUI_PKG_DIR "${imgui_INCLUDE_DIR}" DIRECTORY)
-set(IMGUI_BACKENDS_DIR "${_IMGUI_PKG_DIR}/res/bindings")
+set(IMGUI_RES_DIR "${_IMGUI_PKG_DIR}/res")
+set(IMGUI_BACKENDS_DIR "${IMGUI_RES_DIR}/bindings")
 
 add_executable(eeprom_editor
     main.cc
     App.cc
+    EditorUtils.cc
+    InfoEditor.cc
+    StringsEditor.cc
+    GeneralEditor.cc
+    SyncManagerEditor.cc
+    FMMUEditor.cc
+    PDOEditor.cc
     ${IMGUI_BACKENDS_DIR}/imgui_impl_glfw.cpp
     ${IMGUI_BACKENDS_DIR}/imgui_impl_opengl3.cpp
+    ${IMGUI_RES_DIR}/misc/cpp/imgui_stdlib.cpp
 )
 
-target_include_directories(eeprom_editor PRIVATE ${IMGUI_BACKENDS_DIR})
+target_include_directories(eeprom_editor PRIVATE
+    ${IMGUI_BACKENDS_DIR}
+    ${IMGUI_RES_DIR}
+)
 
 target_link_libraries(eeprom_editor PRIVATE
     kickcat
