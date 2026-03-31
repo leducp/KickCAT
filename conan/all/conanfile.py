@@ -69,7 +69,8 @@ class KickCATRecipe(ConanFile):
         tc = CMakeToolchain(self)
         tc.cache_variables["ENABLE_ESI_PARSER"] = bool(self.options.with_esi_parser)
         tc.cache_variables["BUILD_UNIT_TESTS"] = "OFF"
-        tc.cache_variables["BUILD_EXAMPLES"] = "OFF"
+        tc.cache_variables["BUILD_MASTER_EXAMPLES"] = "OFF"
+        tc.cache_variables["BUILD_SLAVE_EXAMPLES"] = "OFF"
         tc.cache_variables["BUILD_SIMULATION"] = "OFF"
         tc.cache_variables["BUILD_TOOLS"] = "OFF"
         tc.generate()

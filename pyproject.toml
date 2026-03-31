@@ -27,10 +27,11 @@ CMAKE_INTERPROCEDURAL_OPTIMIZATION = true
 CMAKE_SHARED_LINKER_FLAGS_RELEASE = "-Wl,--gc-sections -Wl,--strip-all"
 ENABLE_ESI_PARSER = "OFF"
 BUILD_UNIT_TESTS  = "OFF"
-CODE_COVERAGE     = "OFF"
+ENABLE_CODE_COVERAGE = "OFF"
 BUILD_SIMULATION  = "OFF"
 BUILD_TOOLS       = "OFF"
-BUILD_EXAMPLES    = "OFF"
+BUILD_MASTER_EXAMPLES = "OFF"
+BUILD_SLAVE_EXAMPLES  = "OFF"
 
 [tool.cibuildwheel]
 # https://github.com/pypa/cibuildwheel/blob/main/docs/options.md

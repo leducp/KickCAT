@@ -32,52 +32,40 @@ jobs:
         include:
           - os: ubuntu-latest
             preset: full
+            configure_args: "--with=unit_tests --with=code_coverage --with=af_xdp"
+            apt_packages: "gcovr lcov libxdp-dev libbpf-dev clang"
             coverage: true
-            af_xdp: true
           - os: ubuntu-latest
             preset: bare
+            configure_args: "--with=unit_tests"
             coverage: false
-            af_xdp: false
           - os: windows-latest
             coverage: false
-            af_xdp: false
 
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-conan-action
 
-      - name: Conan install
+      - name: Install system dependencies
+        if: matrix.apt_packages
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
+
+      - name: Setup build (Linux)
+        if: runner.os == 'Linux'
         run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            export conan_profile=${{github.workspace}}/build/profile.txt
-            ./scripts/setup_build.sh ${{github.workspace}}/build
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-            conan install conan/conanfile_windows.txt -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt --build=missing -s build_type=${{env.BUILD_TYPE}}
-            mkdir -p ${{github.workspace}}/build
-          fi
+          scripts/configure.sh ${{github.workspace}}/build -ni ${{ matrix.configure_args }}
+          ./scripts/setup_build.sh ${{github.workspace}}/build --build-type ${{env.BUILD_TYPE}}
         shell: bash
 
-      - name: Install Gcovr, Lcov and AF_XDP deps
-        if: matrix.os == 'ubuntu-latest' && matrix.coverage
-        run: sudo apt install gcovr lcov libxdp-dev libbpf-dev clang
-
-      - name: Configure CMake
+      - name: Setup build (Windows)
+        if: runner.os == 'Windows'
         run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            export cmake_generator="Unix Makefiles"
-            export cmake_coverage="${{ matrix.coverage && 'ON' || 'OFF' }}"
-            export cmake_af_xdp="${{ matrix.af_xdp && 'ON' || 'OFF' }}"
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-            export cmake_generator="MinGW Makefiles"
-            export cmake_coverage="OFF"
-            export cmake_af_xdp="OFF"
-          fi
+          conan install conan/conanfile.py -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt -o "&:unit_tests=True" --build=missing -s build_type=${{env.BUILD_TYPE}}
+          mkdir -p ${{github.workspace}}/build
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
             -DBUILD_UNIT_TESTS=ON \
-            -DCODE_COVERAGE=${cmake_coverage} \
-            -DENABLE_AF_XDP=${cmake_af_xdp} \
-            -G "${cmake_generator}"
+            -G "MinGW Makefiles"
         shell: bash
 
       - name: Build
@@ -117,30 +105,22 @@ jobs:
       matrix:
         include:
           - preset: full
-            af_xdp: true
+            configure_args: "--with=af_xdp"
+            apt_packages: "libxdp-dev libbpf-dev clang"
           - preset: bare
-            af_xdp: false
 
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-conan-action
 
-      - name: Install AF_XDP deps
-        if: matrix.af_xdp
-        run: sudo apt-get update && sudo apt-get install -y libxdp-dev libbpf-dev clang
+      - name: Install system dependencies
+        if: matrix.apt_packages
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
 
-      - name: Conan install
+      - name: Setup build
         run: |
-          export conan_profile=${{github.workspace}}/build/profile.txt
-          ./scripts/setup_build.sh ${{github.workspace}}/build
-        shell: bash
-
-      - name: Configure CMake
-        run: |
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DENABLE_AF_XDP=${{ matrix.af_xdp && 'ON' || 'OFF' }} \
-            -G "Unix Makefiles"
+          ${{ matrix.configure_args && format('scripts/configure.sh {0}/build -ni {1}', github.workspace, matrix.configure_args) || '' }}
+          ./scripts/setup_build.sh ${{github.workspace}}/build --build-type ${{env.BUILD_TYPE}}
         shell: bash
 
       - name: Build
