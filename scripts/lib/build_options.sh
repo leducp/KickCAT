@@ -9,6 +9,7 @@ declare -A OPT_DEFAULTS=(
     [esi_parser]=ON
     [simulation]=ON
     [tools]=ON
+    [eeprom_editor]=OFF
     [code_coverage]=OFF
     [af_xdp]=OFF
 )
@@ -20,6 +21,7 @@ declare -A OPT_DESCRIPTIONS=(
     [esi_parser]="Enable ESI XML parser"
     [simulation]="Build simulation"
     [tools]="Build tools"
+    [eeprom_editor]="Build EEPROM editor GUI"
     [code_coverage]="Enable code coverage"
     [af_xdp]="Enable AF_XDP socket"
 )
@@ -31,6 +33,7 @@ declare -A OPT_CMAKE_FLAGS=(
     [esi_parser]="ENABLE_ESI_PARSER"
     [simulation]="BUILD_SIMULATION"
     [tools]="BUILD_TOOLS"
+    [eeprom_editor]="BUILD_EEPROM_EDITOR"
     [code_coverage]="ENABLE_CODE_COVERAGE"
     [af_xdp]="ENABLE_AF_XDP"
 )
@@ -42,6 +45,7 @@ declare -A OPT_CONAN_FLAGS=(
     [esi_parser]="esi_parser"
     [simulation]="simulation"
     [tools]="tools"
+    [eeprom_editor]="eeprom_editor"
 )
 
 # Load .buildconfig into the CONFIG associative array.
