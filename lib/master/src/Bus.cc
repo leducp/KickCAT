@@ -396,7 +396,7 @@ namespace kickcat
                 continue;
             }
 
-            if (slave.sii.info.mailbox_protocol& eeprom::MailboxProtocol::CoE)
+            if (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE)
             {
                 // Slave support CAN over EtherCAT -> use mailbox/SDO to get mapping size
                 uint8_t sm[512];
@@ -532,7 +532,7 @@ namespace kickcat
 
                 // current size will overflow the frame at the current offset: set in on the next frame
                 address = static_cast<uint32_t>(pi_frames_.size()) * MAX_ETHERCAT_PAYLOAD_SIZE;
-                pi_frames_.push_back({address, 0, 0, {}, {}, {}, {}, 0});
+                pi_frames_.push_back({address, 0, 0, {}, {}, {}, {}, 0, {}});
                 frame_mbx_slaves.push_back({});
             }
 
@@ -659,7 +659,13 @@ namespace kickcat
             }
         }
 
-        // Fourth step: program FMMUs and SyncManagers
+        // Fourth step: pre-allocate write buffers for cyclic path
+        for (auto& frame : pi_frames_)
+        {
+            frame.write_buffer.resize(frame.logical_size);
+        }
+
+        // Fifth step: program FMMUs and SyncManagers
         configureFMMUs();
 
         if (mailbox_status_fmmu_ != MailboxStatusFMMU::NONE)
@@ -673,7 +679,7 @@ namespace kickcat
     {
         for (auto const& pi_frame : pi_frames_)
         {
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
 				// copy before: a wrong wkc doesn't mean that all data shall be discarded
                 for (auto& input : pi_frame.inputs)
@@ -714,15 +720,14 @@ namespace kickcat
 
     void Bus::sendLogicalWrite(std::function<void(DatagramState const&)> const& error)
     {
-        for (auto const& pi_frame : pi_frames_)
+        for (auto& pi_frame : pi_frames_)
         {
-            uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
             for (auto const& output : pi_frame.outputs)
             {
-                std::memcpy(buffer + output.offset, output.iomap, output.size);
+                std::memcpy(pi_frame.write_buffer.data() + output.offset, output.iomap, output.size);
             }
 
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
                 if (wkc != pi_frame.outputs.size())
                 {
@@ -731,7 +736,7 @@ namespace kickcat
                 }
                 return DatagramState::OK;
             };
-            link_->addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.pdo_size), process, error);
+            link_->addDatagram(Command::LWR, pi_frame.address, pi_frame.write_buffer.data(), static_cast<uint16_t>(pi_frame.pdo_size), process, error);
         }
 
         if (dc_slave_ != nullptr)
@@ -750,15 +755,14 @@ namespace kickcat
 
     void Bus::sendLogicalReadWrite(std::function<void(DatagramState const&)> const& error)
     {
-        for (auto const& pi_frame : pi_frames_)
+        for (auto& pi_frame : pi_frames_)
         {
-            uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
             for (auto const& output : pi_frame.outputs)
             {
-                std::memcpy(buffer + output.offset, output.iomap, output.size);
+                std::memcpy(pi_frame.write_buffer.data() + output.offset, output.iomap, output.size);
             }
 
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
                 uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2
                     + pi_frame.mailbox_status_wkc_read_adjust);
@@ -785,7 +789,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.logical_size), process, error);
+            link_->addDatagram(Command::LRW, pi_frame.address, pi_frame.write_buffer.data(), static_cast<uint16_t>(pi_frame.logical_size), process, error);
         }
 
         if (dc_slave_ != nullptr)

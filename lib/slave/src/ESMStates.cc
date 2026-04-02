@@ -234,14 +234,7 @@ namespace kickcat::ESM
             return Context::build(control.requestedState());
         }
 
-        auto requestedState = control.requestedState();
-        if (requestedState != State::BOOT and requestedState != State::INIT and requestedState != State::PRE_OP
-            and requestedState != State::SAFE_OP and requestedState != State::OPERATIONAL)
-        {
-            return Context::build(State::SAFE_OP, StatusCode::UNKNOWN_REQUESTED_STATE);
-        }
-
-        return Context::build(control.requestedState());
+        return Context::build(State::OPERATIONAL);
     }
 
 }

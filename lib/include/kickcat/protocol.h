@@ -27,7 +27,7 @@ namespace kickcat
         }
         else
         {
-            THROW_ERROR("Size unsupported");
+            static_assert(sizeof(T) == 2 || sizeof(T) == 4, "hton: unsupported size");
         }
     }
 

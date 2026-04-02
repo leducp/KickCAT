@@ -229,6 +229,9 @@ namespace kickcat
 
             // Adjust wkc in case the slave do not have a PDO read but still answer because of the mbx check
             uint16_t mailbox_status_wkc_read_adjust{0};
+
+            // Pre-allocated buffer for output staging (avoids stack allocation in cyclic path)
+            std::vector<uint8_t> write_buffer;
         };
         std::vector<PIFrame> pi_frames_; // PI frame description
 
