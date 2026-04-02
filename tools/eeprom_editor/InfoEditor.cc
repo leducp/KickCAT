@@ -7,7 +7,7 @@ namespace kickcat::eeprom_editor::info
         bool changed = false;
         auto& info = sii.info;
 
-        ImGui::TextColored(ImVec4(0.42f, 0.55f, 0.84f, 1.0f), "Info (Header) -- Words 0x00-0x3F");
+        ImGui::TextColored(COLOR_TITLE, "Info (Header) -- Words 0x00-0x3F");
         ImGui::Separator();
         ImGui::Spacing();
 

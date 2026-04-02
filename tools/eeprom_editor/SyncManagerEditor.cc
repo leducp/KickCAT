@@ -18,7 +18,7 @@ namespace kickcat::eeprom_editor::syncm
         bool changed = false;
         auto& sms = sii.syncManagers;
 
-        ImGui::TextColored(ImVec4(0.42f, 0.55f, 0.84f, 1.0f), "Sync Managers -- Category 41");
+        ImGui::TextColored(COLOR_TITLE, "Sync Managers -- Category 41");
         ImGui::Separator();
 
         constexpr ImGuiTableFlags table_flags =

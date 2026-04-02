@@ -9,7 +9,7 @@ namespace kickcat::eeprom_editor::strings
         bool changed = false;
         auto& strings = sii.strings;
 
-        ImGui::TextColored(ImVec4(0.42f, 0.55f, 0.84f, 1.0f), "Strings -- Category 10");
+        ImGui::TextColored(COLOR_TITLE, "Strings -- Category 10");
         ImGui::Separator();
 
         if (strings.empty())

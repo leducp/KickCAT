@@ -22,7 +22,7 @@ namespace kickcat::eeprom_editor
 
         if (out_of_range)
         {
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.88f, 0.33f, 0.33f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Border, COLOR_RED);
         }
 
         ImGui::SetNextItemWidth(60.0f);

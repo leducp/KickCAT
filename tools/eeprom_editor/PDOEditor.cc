@@ -10,17 +10,17 @@ namespace kickcat::eeprom_editor::pdo
 
         bool const is_tx = (direction == Direction::Tx);
 
+        char const* title = "RxPDO (Outputs) -- Category 51";
         auto* mappings_ptr = &sii.RxPDO;
-        char const* title  = "RxPDO (Outputs) -- Category 51";
         if (is_tx)
         {
-            mappings_ptr = &sii.TxPDO;
             title        = "TxPDO (Inputs) -- Category 50";
+            mappings_ptr = &sii.TxPDO;
         }
         auto& mappings = *mappings_ptr;
         auto& strings  = sii.strings;
 
-        ImGui::TextColored(ImVec4(0.42f, 0.55f, 0.84f, 1.0f), "%s", title);
+        ImGui::TextColored(COLOR_TITLE, "%s", title);
         ImGui::Separator();
 
         int delete_mapping = -1;

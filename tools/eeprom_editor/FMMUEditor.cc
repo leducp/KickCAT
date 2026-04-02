@@ -1,5 +1,4 @@
 #include <array>
-#include <imgui.h>
 
 #include "Editors.h"
 
@@ -18,7 +17,7 @@ namespace kickcat::eeprom_editor::fmmu
         bool changed = false;
         auto& fmmus = sii.fmmus;
 
-        ImGui::TextColored(ImVec4(0.42f, 0.55f, 0.84f, 1.0f), "FMMU -- Category 40");
+        ImGui::TextColored(COLOR_TITLE, "FMMU -- Category 40");
         ImGui::Separator();
 
         constexpr ImGuiTableFlags table_flags =

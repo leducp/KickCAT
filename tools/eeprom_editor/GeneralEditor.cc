@@ -17,7 +17,7 @@ namespace kickcat::eeprom_editor::general
         bool changed = false;
         auto& g = sii.general;
 
-        ImGui::TextColored(ImVec4(0.42f, 0.55f, 0.84f, 1.0f), "General -- Category 30");
+        ImGui::TextColored(COLOR_TITLE, "General -- Category 30");
         ImGui::Separator();
 
         if (ImGui::CollapsingHeader("String References", ImGuiTreeNodeFlags_DefaultOpen))
