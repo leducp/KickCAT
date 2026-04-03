@@ -2,7 +2,7 @@
 
 Lock-free shared-memory messaging library for inter-process communication.
 
-KickMsg provides MPMC publish/subscribe over POSIX shared memory with zero-copy receive, per-subscriber ring isolation, and crash resilience — all without locks or kernel-mediated synchronization on the hot path.
+KickMsg provides MPMC publish/subscribe over shared memory with zero-copy receive, per-subscriber ring isolation, and crash resilience — all without locks or kernel-mediated synchronization on the hot path.
 
 ## Features
 
@@ -11,7 +11,7 @@ KickMsg provides MPMC publish/subscribe over POSIX shared memory with zero-copy 
 - **Per-subscriber isolation**: a slow subscriber only overflows its own ring — fast subscribers are unaffected
 - **Crash resilient**: publisher crashes never deadlock the channel; bounded slot leaks are recoverable via GC
 - **Topic-centric naming**: subscribers connect by topic name, not publisher identity
-- **C++17**, no external dependencies beyond POSIX
+- **C++17**, no external dependencies beyond OS layer
 
 ## Channel Patterns
 

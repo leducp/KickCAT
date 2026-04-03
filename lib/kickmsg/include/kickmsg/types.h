@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <cstring>
 
+#include "kickcat/OS/Time.h"
+
 namespace kickmsg
 {
 
@@ -34,7 +36,7 @@ namespace kickmsg
         // higher risk of falsely evicting a slow-but-alive publisher under
         // heavy scheduling pressure.  Longer = safer under load but adds
         // latency when a real crash occurs.
-        std::chrono::microseconds commit_timeout{DEFAULT_COMMIT_TIMEOUT_US};
+        microseconds commit_timeout{DEFAULT_COMMIT_TIMEOUT_US};
     };
 
     // ---- Shared-memory layout structures ----
@@ -102,13 +104,13 @@ namespace kickmsg
 
     inline bool is_power_of_two(std::size_t n)
     {
-        return n > 0 && (n & (n - 1)) == 0;
+        return n > 0 and (n & (n - 1)) == 0;
     }
 
-    inline SubRingHeader* sub_ring_at(void* base, Header const* hdr, uint32_t idx)
+    inline SubRingHeader* sub_ring_at(void* base, Header const* h, uint32_t idx)
     {
-        auto* p = static_cast<uint8_t*>(base) + hdr->sub_rings_offset;
-        return reinterpret_cast<SubRingHeader*>(p + idx * hdr->sub_ring_stride);
+        auto* p = static_cast<uint8_t*>(base) + h->sub_rings_offset;
+        return reinterpret_cast<SubRingHeader*>(p + idx * h->sub_ring_stride);
     }
 
     inline Entry* ring_entries(SubRingHeader* ring)
@@ -117,10 +119,10 @@ namespace kickmsg
             reinterpret_cast<uint8_t*>(ring) + sizeof(SubRingHeader));
     }
 
-    inline SlotMeta* slot_at(void* base, Header const* hdr, uint32_t idx)
+    inline SlotMeta* slot_at(void* base, Header const* h, uint32_t idx)
     {
-        auto* p = static_cast<uint8_t*>(base) + hdr->pool_offset;
-        return reinterpret_cast<SlotMeta*>(p + idx * hdr->slot_stride);
+        auto* p = static_cast<uint8_t*>(base) + h->pool_offset;
+        return reinterpret_cast<SlotMeta*>(p + idx * h->slot_stride);
     }
 
     inline uint8_t* slot_data(SlotMeta* slot)
@@ -128,9 +130,9 @@ namespace kickmsg
         return reinterpret_cast<uint8_t*>(slot + 1);
     }
 
-    inline char* header_creator_name(Header* hdr)
+    inline char* header_creator_name(Header* h)
     {
-        return reinterpret_cast<char*>(hdr) + sizeof(Header);
+        return reinterpret_cast<char*>(h) + sizeof(Header);
     }
 
     // FNV-1a hash of config fields, used to detect parameter mismatches
@@ -180,16 +182,16 @@ namespace kickmsg
             slot->next_free.store(tagged_idx(old_top), std::memory_order_relaxed);
             new_top = tagged_pack(tagged_gen(old_top) + 1, slot_idx);
         }
-        while (!top.compare_exchange_weak(old_top, new_top,
+        while (not top.compare_exchange_weak(old_top, new_top,
                    std::memory_order_release, std::memory_order_relaxed));
     }
 
-    inline uint32_t treiber_pop(std::atomic<uint64_t>& top, void* base, Header const* hdr)
+    inline uint32_t treiber_pop(std::atomic<uint64_t>& top, void* base, Header const* h)
     {
         uint64_t old_top = top.load(std::memory_order_acquire);
         while (tagged_idx(old_top) != INVALID_SLOT)
         {
-            auto*    slot = slot_at(base, hdr, tagged_idx(old_top));
+            auto*    slot = slot_at(base, h, tagged_idx(old_top));
             uint32_t next = slot->next_free.load(std::memory_order_relaxed);
             uint64_t new_top = tagged_pack(tagged_gen(old_top) + 1, next);
             if (top.compare_exchange_weak(old_top, new_top,

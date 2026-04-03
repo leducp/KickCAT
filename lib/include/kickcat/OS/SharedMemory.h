@@ -1,33 +1,59 @@
-#ifndef KICKAT_LINUX_SHARED_MEMORY_H
-#define KICKAT_LINUX_SHARED_MEMORY_H
+#ifndef KICKCAT_OS_SHARED_MEMORY_H
+#define KICKCAT_OS_SHARED_MEMORY_H
 
+#include <cstddef>
 #include <string>
 
 #include "kickcat/types.h"
 
 namespace kickcat
 {
-    /// \brief Create if needed, then open and map (read/write) a shared memory segment
+    /// \brief RAII wrapper around a named shared-memory region.
+    ///
+    /// Platform-specific implementations live in src/OS/{Unix,Windows}/.
     class SharedMemory
     {
     public:
-        SharedMemory();
-        SharedMemory(SharedMemory const& shm) = delete;
-        SharedMemory& operator=(SharedMemory const& shm) = delete;
+        SharedMemory() = default;
+        SharedMemory(SharedMemory const&) = delete;
+        SharedMemory& operator=(SharedMemory const&) = delete;
+        SharedMemory(SharedMemory&& other) noexcept;
+        SharedMemory& operator=(SharedMemory&& other) noexcept;
         ~SharedMemory();
 
-        /// \param  name    Name of the shared memory.
-        /// \param  size    Size of the shared memory in bytes.
-        /// \param  address Address where the shm segment shall be mapped. Automatic address if nullptr
+        /// Create (or open) a shared-memory region and truncate to \p size bytes.
+        /// Maps it read/write. Optional \p address hint for mmap (nullptr = auto).
         void open(std::string const& name, std::size_t size, void* address = nullptr);
 
-        /// \return The address of the shm in this process.
-        void* address() { return address_; }
+        /// Create a new shared-memory region. Truncates to \p size bytes.
+        /// Throws if the region already exists.
+        void create(std::string const& name, std::size_t size);
+
+        /// Attempt to create a new shared-memory region.
+        /// Returns true if created, false if it already exists.
+        bool try_create(std::string const& name, std::size_t size);
+
+        /// Open an existing shared-memory region (read/write).
+        /// Discovers the size from the OS.
+        /// Throws if the region does not exist.
+        void open(std::string const& name);
+
+        /// Unmap and close the handle. Called automatically by the destructor.
+        void close();
+
+        /// Remove the shared-memory object from the filesystem.
+        static void unlink(std::string const& name);
+
+        void*       address() const { return address_; }
+        std::size_t size()    const { return size_; }
+        bool        is_open() const { return address_ != nullptr; }
 
     private:
-        std::size_t size_{};    ///< Size in bytes of the shared memory.
-        void* address_{};       ///< Address of the shared memory in this processus.
-        os_shm fd_{};           ///< File descriptor of the shared memory.
+        void map(std::size_t size, void* address = nullptr);
+
+        std::size_t size_{0};
+        void*       address_{nullptr};
+        os_shm      fd_{};
     };
 }
 

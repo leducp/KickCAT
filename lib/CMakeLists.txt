@@ -50,6 +50,7 @@ elseif (WIN32)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/SharedMemory.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Futex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Timer.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
@@ -137,9 +138,10 @@ add_library(kickcat_time ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/SinceEpoch.cc)
 target_include_directories(kickcat_time
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
 
-target_link_libraries(kickcat ${OS_LIBRARIES} kickcat_time)
+target_link_libraries(kickcat ${OS_LIBRARIES} kickcat_time kickmsg)
 
 set_kickcat_properties(kickcat)
 
+add_subdirectory(kickmsg)
 add_subdirectory(master)
 add_subdirectory(slave)
