@@ -1,0 +1,8 @@
+[requires]
+gtest/1.15.0
+
+[generators]
+CMakeDeps
+
+[options]
+gtest*:build_gmock=True
