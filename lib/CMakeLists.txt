@@ -4,6 +4,7 @@ set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Frame.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Mailbox.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/Treiber.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/TapSocket.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/SIIParser.cc
 
