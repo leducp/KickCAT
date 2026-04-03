@@ -88,6 +88,11 @@ namespace kickmsg
         std::atomic<uint32_t> next_free;
     };
 
+    static_assert(sizeof(SlotMeta) == 8,
+        "SlotMeta must be 8 bytes (two uint32_t atomics, no padding)");
+    static_assert(sizeof(Entry) == 16,
+        "Entry must be 16 bytes (one uint64_t + two uint32_t atomics, no padding)");
+
     // ---- Helpers ----
 
     inline std::size_t align_up(std::size_t val, std::size_t alignment)

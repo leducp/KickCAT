@@ -3,3 +3,4 @@
 # TSan cannot reason about seqlock correctness.
 race:kickmsg::Publisher::send
 race:kickmsg::Subscriber::try_receive
+race:kickmsg::Subscriber::try_receive_view

@@ -24,6 +24,11 @@ constexpr uint32_t UL_COMPARE_AND_WAIT_SHARED = 0x00000003;
 constexpr uint32_t ULF_NO_ERRNO               = 0x01000000;
 constexpr uint32_t ULF_WAKE_ALL               = 0x00000100;
 
+// __ulock_wait compares the low 32 bits; requires little-endian.
+// All Apple Silicon and x86 Macs are little-endian.
+static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
+    "Futex implementation requires little-endian byte order");
+
 namespace kickmsg
 {
 

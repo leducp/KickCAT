@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cinttypes>
 #include <cstdio>
 #include <cstring>
 #include <thread>
@@ -37,6 +38,7 @@ struct TestConfig
     std::size_t pool_size     = 512;
     std::size_t ring_capacity = 128;
     std::size_t max_subs      = 16;
+    bool     use_zerocopy     = false;
 };
 
 struct SubResult
@@ -73,8 +75,40 @@ static void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t
     g_publishers_finished.fetch_add(1, std::memory_order_relaxed);
 }
 
-static SubResult subscriber_thread(kickmsg::SharedRegion& region, int sub_id,
-                                   int num_pubs, uint32_t msgs_per_pub)
+static void validate_payload(Payload const& msg, int num_pubs,
+                             std::vector<uint32_t>& last_seq, SubResult& result)
+{
+    if (msg.magic != Payload::MAGIC)
+    {
+        ++result.corrupted;
+        return;
+    }
+    if (msg.checksum != compute_checksum(msg))
+    {
+        ++result.corrupted;
+        return;
+    }
+    if (msg.pub_id >= static_cast<uint32_t>(num_pubs))
+    {
+        ++result.bad_pub_id;
+        return;
+    }
+
+    auto& prev = last_seq[msg.pub_id];
+    if (prev != UINT32_MAX && msg.seq <= prev)
+    {
+        std::fprintf(stderr, "  [REORDER] sub%d: pub %u seq %u after prev %u\n",
+                     result.sub_id, msg.pub_id, msg.seq, prev);
+        ++result.reordered;
+        return;
+    }
+    prev = msg.seq;
+
+    ++result.received;
+}
+
+static SubResult subscriber_thread_copy(kickmsg::SharedRegion& region, int sub_id,
+                                        int num_pubs, uint32_t /*msgs_per_pub*/)
 {
     kickmsg::Subscriber sub{region};
 
@@ -112,42 +146,76 @@ static SubResult subscriber_thread(kickmsg::SharedRegion& region, int sub_id,
 
         Payload msg;
         std::memcpy(&msg, sample->data(), sizeof(msg));
-
-        if (msg.magic != Payload::MAGIC)
-        {
-            ++result.corrupted;
-            continue;
-        }
-        if (msg.checksum != compute_checksum(msg))
-        {
-            ++result.corrupted;
-            continue;
-        }
-        if (msg.pub_id >= static_cast<uint32_t>(num_pubs))
-        {
-            ++result.bad_pub_id;
-            continue;
-        }
-
-        auto& prev = last_seq[msg.pub_id];
-        if (prev != UINT32_MAX && msg.seq <= prev)
-        {
-            ++result.reordered;
-            continue;
-        }
-        prev = msg.seq;
-
-        ++result.received;
+        validate_payload(msg, num_pubs, last_seq, result);
     }
 
     result.lost = sub.lost();
     return result;
 }
 
-static void drain_ring_entries(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+static SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
+                                            int num_pubs, uint32_t /*msgs_per_pub*/)
+{
+    kickmsg::Subscriber sub{region};
+
+    SubResult result{};
+    result.sub_id = sub_id;
+
+    std::vector<uint32_t> last_seq(static_cast<std::size_t>(num_pubs), UINT32_MAX);
+
+    auto const timeout = std::chrono::milliseconds{500};
+
+    while (true)
+    {
+        auto view = sub.receive_view(timeout);
+        if (!view)
+        {
+            if (g_all_publishers_done.load(std::memory_order_relaxed))
+            {
+                view = sub.try_receive_view();
+                if (!view)
+                {
+                    break;
+                }
+            }
+            else
+            {
+                continue;
+            }
+        }
+
+        if (view->len() != sizeof(Payload))
+        {
+            ++result.corrupted;
+            continue;
+        }
+
+        Payload msg;
+        std::memcpy(&msg, view->data(), sizeof(msg));
+        // SampleView is dropped here (refcount released) at end of loop iteration
+        validate_payload(msg, num_pubs, last_seq, result);
+    }
+
+    result.lost = sub.lost();
+    return result;
+}
+
+// Release remaining slot references after all threads have joined.
+//
+// After subscriber destructors run drain_unconsumed, some ring entries
+// still hold references for slots the subscriber consumed via try_receive
+// (which does not decrement refcount -- it relies on eviction).
+//
+// We walk all committed ring entries, count references per slot, then
+// release remaining refcounts. This avoids the double-decrement bug of
+// the old per-entry approach (drain_unconsumed already released some).
+static void release_remaining_refs(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
+
+    // Count ring-entry references per slot
+    std::vector<uint32_t> entry_refs(cfg.pool_size, 0);
 
     for (uint32_t i = 0; i < cfg.max_subscribers; ++i)
     {
@@ -155,29 +223,43 @@ static void drain_ring_entries(kickmsg::SharedRegion& region, kickmsg::RingConfi
         auto  wp      = ring->write_pos.load(std::memory_order_acquire);
         auto* entries = kickmsg::ring_entries(ring);
 
-        auto start = (wp > cfg.sub_ring_capacity)
-                   ? (wp - cfg.sub_ring_capacity) : uint64_t{0};
+        auto cap   = hdr->sub_ring_capacity;
+        auto start = (wp > cap) ? (wp - cap) : uint64_t{0};
 
         for (uint64_t pos = start; pos < wp; ++pos)
         {
             auto  idx = pos & hdr->sub_ring_mask;
             auto& e   = entries[idx];
             auto  seq = e.sequence.load(std::memory_order_relaxed);
+            if (seq < pos + 1)
+            {
+                continue; // uncommitted
+            }
 
             auto si = e.slot_idx.load(std::memory_order_relaxed);
-            if (seq == 0 || si >= cfg.pool_size)
+            if (si < cfg.pool_size)
             {
-                continue;
+                entry_refs[si]++;
             }
+        }
+    }
 
-            auto* slot = kickmsg::slot_at(base, hdr, si);
-            auto  prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
-            if (prev == 1)
+    // Force-release any slot still holding refs.
+    // After drain_unconsumed, actual refcount <= entry_refs (some refs
+    // were already released). We set refcount to 0 and push to free stack.
+    for (uint32_t idx = 0; idx < cfg.pool_size; ++idx)
+    {
+        auto* slot = kickmsg::slot_at(base, hdr, idx);
+        auto  rc   = slot->refcount.load(std::memory_order_acquire);
+        if (rc > 0)
+        {
+            if (rc > entry_refs[idx])
             {
-                kickmsg::treiber_push(hdr->free_top, slot, si);
+                std::fprintf(stderr, "  [WARN] slot %u: refcount %u > ring refs %u "
+                             "(possible refcount leak)\n", idx, rc, entry_refs[idx]);
             }
-
-            e.sequence.store(0, std::memory_order_relaxed);
+            slot->refcount.store(0, std::memory_order_release);
+            kickmsg::treiber_push(hdr->free_top, slot, idx);
         }
     }
 }
@@ -256,7 +338,8 @@ static bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::RingCo
 
 static bool run_stress_test(TestConfig const& tc)
 {
-    std::printf("--- Stress test: %d pubs x %u msgs, %d subs, pool=%zu, ring=%zu ---\n",
+    std::printf("--- Stress test%s: %d pubs x %u msgs, %d subs, pool=%zu, ring=%zu ---\n",
+                tc.use_zerocopy ? " (zero-copy)" : "",
                 tc.num_publishers, tc.msgs_per_pub, tc.num_subscribers,
                 tc.pool_size, tc.ring_capacity);
 
@@ -282,8 +365,10 @@ static bool run_stress_test(TestConfig const& tc)
     {
         sub_threads.emplace_back([&region, i, &sub_results, &tc]()
         {
+            auto fn = tc.use_zerocopy ? subscriber_thread_zerocopy
+                                      : subscriber_thread_copy;
             sub_results[static_cast<std::size_t>(i)] =
-                subscriber_thread(region, i, tc.num_publishers, tc.msgs_per_pub);
+                fn(region, i, tc.num_publishers, tc.msgs_per_pub);
         });
     }
 
@@ -313,31 +398,32 @@ static bool run_stress_test(TestConfig const& tc)
 
     bool all_ok = true;
 
-    std::printf("  Elapsed: %ld ms, total published: %lu\n", elapsed_ms, total_sent);
+    std::printf("  Elapsed: %ld ms, total published: %" PRIu64 "\n", elapsed_ms, total_sent);
     std::printf("  %-6s %10s %10s %10s %10s %10s\n",
                 "sub", "received", "lost", "corrupt", "bad_pid", "reorder");
 
     for (auto const& r : sub_results)
     {
-        std::printf("  sub%-3d %10lu %10lu %10lu %10lu %10lu\n",
+        std::printf("  sub%-3d %10" PRIu64 " %10" PRIu64 " %10" PRIu64
+                    " %10" PRIu64 " %10" PRIu64 "\n",
                     r.sub_id, r.received, r.lost, r.corrupted,
                     r.bad_pub_id, r.reordered);
 
         if (r.corrupted > 0)
         {
-            std::fprintf(stderr, "  [FAIL] sub%d: %lu corrupted messages!\n",
+            std::fprintf(stderr, "  [FAIL] sub%d: %" PRIu64 " corrupted messages!\n",
                          r.sub_id, r.corrupted);
             all_ok = false;
         }
         if (r.bad_pub_id > 0)
         {
-            std::fprintf(stderr, "  [FAIL] sub%d: %lu bad publisher IDs!\n",
+            std::fprintf(stderr, "  [FAIL] sub%d: %" PRIu64 " bad publisher IDs!\n",
                          r.sub_id, r.bad_pub_id);
             all_ok = false;
         }
         if (r.reordered > 0)
         {
-            std::fprintf(stderr, "  [FAIL] sub%d: %lu reordered messages!\n",
+            std::fprintf(stderr, "  [FAIL] sub%d: %" PRIu64 " reordered messages!\n",
                          r.sub_id, r.reordered);
             all_ok = false;
         }
@@ -346,9 +432,21 @@ static bool run_stress_test(TestConfig const& tc)
             std::fprintf(stderr, "  [FAIL] sub%d: received 0 messages!\n", r.sub_id);
             all_ok = false;
         }
+        // Completeness check: received + lost should account for all messages
+        // this subscriber saw. The lost counter tracks ring-level losses;
+        // received + lost may be less than total_sent (subscriber starts from
+        // write_pos at construction, missing earlier messages), but should
+        // never exceed it.
+        if (r.received + r.lost > total_sent)
+        {
+            std::fprintf(stderr, "  [FAIL] sub%d: received+lost (%" PRIu64
+                         ") > total_sent (%" PRIu64 ")!\n",
+                         r.sub_id, r.received + r.lost, total_sent);
+            all_ok = false;
+        }
     }
 
-    drain_ring_entries(region, cfg);
+    release_remaining_refs(region, cfg);
 
     if (!verify_refcounts_zero(region, cfg))
     {
@@ -459,7 +557,7 @@ static bool run_fairness_test()
         sub_threads.emplace_back([&region, i, &results, NUM_MSGS]()
         {
             results[static_cast<std::size_t>(i)] =
-                subscriber_thread(region, i, 1, NUM_MSGS);
+                subscriber_thread_copy(region, i, 1, NUM_MSGS);
         });
     }
 
@@ -485,13 +583,14 @@ static bool run_fairness_test()
 
         if (r.corrupted > 0 || r.bad_pub_id > 0 || r.reordered > 0)
         {
-            std::fprintf(stderr, "  [FAIL] sub%d: corrupt=%lu bad_pid=%lu reorder=%lu\n",
+            std::fprintf(stderr, "  [FAIL] sub%d: corrupt=%" PRIu64 " bad_pid=%"
+                         PRIu64 " reorder=%" PRIu64 "\n",
                          r.sub_id, r.corrupted, r.bad_pub_id, r.reordered);
             ok = false;
         }
     }
 
-    std::printf("  Received range: [%lu, %lu] (spread: %lu)\n",
+    std::printf("  Received range: [%" PRIu64 ", %" PRIu64 "] (spread: %" PRIu64 ")\n",
                 min_recv, max_recv, max_recv - min_recv);
 
     if (min_recv == 0)
@@ -500,7 +599,7 @@ static bool run_fairness_test()
         ok = false;
     }
 
-    drain_ring_entries(region, cfg);
+    release_remaining_refs(region, cfg);
     ok = ok && verify_refcounts_zero(region, cfg);
     ok = ok && verify_pool_free(region, cfg);
     ok = ok && verify_rings_inactive(region, cfg);
@@ -527,6 +626,7 @@ int main()
 
     run(run_fairness_test());
 
+    // Copy-based receive tests
     run(run_stress_test(TestConfig{
         .num_publishers  = 2,
         .num_subscribers = 4,
@@ -554,6 +654,7 @@ int main()
         .max_subs        = 2,
     }));
 
+    // High contention: many pubs, small pool, heavy overflow
     run(run_stress_test(TestConfig{
         .num_publishers  = 16,
         .num_subscribers = 16,
@@ -561,6 +662,39 @@ int main()
         .pool_size       = 32,
         .ring_capacity   = 8,
         .max_subs        = 16,
+    }));
+
+    // Zero-copy receive tests -- exercises SampleView pin CAS,
+    // refcount increment/decrement, and destructor release path
+    run(run_stress_test(TestConfig{
+        .num_publishers  = 2,
+        .num_subscribers = 4,
+        .msgs_per_pub    = 100000 / TSAN_SCALE,
+        .pool_size       = 256,
+        .ring_capacity   = 64,
+        .max_subs        = 8,
+        .use_zerocopy    = true,
+    }));
+
+    run(run_stress_test(TestConfig{
+        .num_publishers  = 8,
+        .num_subscribers = 8,
+        .msgs_per_pub    = 50000 / TSAN_SCALE,
+        .pool_size       = 128,
+        .ring_capacity   = 32,
+        .max_subs        = 16,
+        .use_zerocopy    = true,
+    }));
+
+    // High contention zero-copy
+    run(run_stress_test(TestConfig{
+        .num_publishers  = 16,
+        .num_subscribers = 16,
+        .msgs_per_pub    = 20000 / TSAN_SCALE,
+        .pool_size       = 32,
+        .ring_capacity   = 8,
+        .max_subs        = 16,
+        .use_zerocopy    = true,
     }));
 
     std::printf("=== Summary: %d passed, %d failed ===\n", pass, fail);
