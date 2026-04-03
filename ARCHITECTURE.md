@@ -704,7 +704,7 @@ guarantee. If Apple changes this ABI in a future release, a fallback to
 `kqueue` with `EVFILT_USER` or `dispatch_semaphore` would be needed.
 
 The core engine (`types.h`, `Region.h`, `Publisher.h`, `Subscriber.h`,
-`Node.h`) uses only `std::atomic` C++20 and these two abstractions --
+`Node.h`) uses only `std::atomic` C++17 and these two abstractions --
 no platform `#ifdef` leaks into the messaging logic.
 
 To add a new OS, implement:

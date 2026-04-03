@@ -26,7 +26,7 @@ else()
     target_link_libraries(kickmsg PUBLIC rt pthread)
 endif()
 
-target_compile_features(kickmsg PUBLIC cxx_std_20)
+target_compile_features(kickmsg PUBLIC cxx_std_17)
 
 option(KICKMSG_BUILD_TESTS    "Build KickMsg tests"    OFF)
 option(KICKMSG_ENABLE_TSAN    "Build TSan stress test"  OFF)
