@@ -10,10 +10,11 @@ namespace kickmsg
 {
     using namespace std::chrono;
 
-    constexpr uint64_t    MAGIC        = 0x4B49434B4D534721ULL; // "KICKMSG!"
-    constexpr uint32_t    VERSION      = 1;
-    constexpr uint32_t    INVALID_SLOT = UINT32_MAX;
-    constexpr std::size_t CACHE_LINE   = 64;
+    constexpr uint64_t    MAGIC           = 0x4B49434B4D534721ULL; // "KICKMSG!"
+    constexpr uint32_t    VERSION         = 1;
+    constexpr uint32_t    INVALID_SLOT    = UINT32_MAX;
+    constexpr uint64_t    LOCKED_SEQUENCE = UINT64_MAX;
+    constexpr std::size_t CACHE_LINE      = 64;
 
     constexpr uint64_t DEFAULT_COMMIT_TIMEOUT_US = 100'000; // 100 ms
 

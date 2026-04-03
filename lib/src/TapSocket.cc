@@ -35,13 +35,13 @@ namespace kickcat
 
         if (init_)
         {
-            // Server: create both regions and take side A (publish on a2b, subscribe on b2a)
+            // Server creates both regions and takes side A (publish a2b, subscribe b2a)
             region_out_ = kickmsg::SharedRegion::create(name_a2b.c_str(), kickmsg::ChannelType::PubSub, cfg, "kickcat");
             region_in_  = kickmsg::SharedRegion::create(name_b2a.c_str(), kickmsg::ChannelType::PubSub, cfg, "kickcat");
         }
         else
         {
-            // Client: open both regions and take side B (publish on b2a, subscribe on a2b)
+            // Client opens both regions and takes side B (publish b2a, subscribe a2b)
             region_in_  = kickmsg::SharedRegion::open(name_a2b.c_str());
             region_out_ = kickmsg::SharedRegion::open(name_b2a.c_str());
         }
@@ -71,7 +71,7 @@ namespace kickcat
         }
         else if (timeout_ < 0ns)
         {
-            // Infinite blocking: use a large timeout and retry
+            // Infinite blocking: retry with a large timeout
             while (true)
             {
                 sample = subscriber_->receive(1s);

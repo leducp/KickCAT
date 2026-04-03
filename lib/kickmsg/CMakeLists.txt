@@ -1,5 +1,9 @@
 add_library(kickmsg STATIC
     src/types.cc
+    src/Publisher.cc
+    src/Subscriber.cc
+    src/Region.cc
+    src/Node.cc
 )
 
 target_include_directories(kickmsg PUBLIC
@@ -12,6 +16,7 @@ target_include_directories(kickmsg PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
+target_link_libraries(kickmsg PUBLIC kickcat)
 set_kickcat_properties(kickmsg)
 
 if(BUILD_UNIT_TESTS)

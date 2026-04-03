@@ -25,7 +25,7 @@ struct Payload
     uint32_t checksum;
 };
 
-static uint32_t compute_checksum(Payload const& p)
+uint32_t compute_checksum(Payload const& p)
 {
     return p.magic ^ p.pub_id ^ p.seq ^ 0xDEADBEEF;
 }
@@ -54,7 +54,7 @@ struct SubResult
 static std::atomic<bool> g_all_publishers_done{false};
 static std::atomic<int>  g_publishers_finished{0};
 
-static void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t count)
+void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t count)
 {
     kickmsg::Publisher pub{region};
 
@@ -66,7 +66,7 @@ static void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t
         msg.seq    = i;
         msg.checksum = compute_checksum(msg);
 
-        while (!pub.send(&msg, sizeof(msg)))
+        while (not pub.send(&msg, sizeof(msg)))
         {
             std::this_thread::yield();
         }
@@ -75,8 +75,17 @@ static void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t
     g_publishers_finished.fetch_add(1, std::memory_order_relaxed);
 }
 
-static void validate_payload(Payload const& msg, int num_pubs,
-                             std::vector<uint32_t>& last_seq, SubResult& result)
+struct MsgTrace
+{
+    uint32_t pub_id;
+    uint32_t seq;
+};
+
+static constexpr std::size_t TRACE_SIZE = 16;
+
+void validate_payload(Payload const& msg, int num_pubs,
+                      std::vector<uint32_t>& last_seq, SubResult& result,
+                      MsgTrace* trace, std::size_t& trace_pos)
 {
     if (msg.magic != Payload::MAGIC)
     {
@@ -94,14 +103,40 @@ static void validate_payload(Payload const& msg, int num_pubs,
         return;
     }
 
+    // Record in trace ring
+    trace[trace_pos % TRACE_SIZE] = {msg.pub_id, msg.seq};
+    ++trace_pos;
+
     auto& prev = last_seq[msg.pub_id];
     if (prev != UINT32_MAX and msg.seq <= prev)
     {
         auto delta = static_cast<int32_t>(prev) - static_cast<int32_t>(msg.seq);
         std::fprintf(stderr, "  [REORDER] sub%d: pub %u seq %u after prev %u (delta=%d, lost=%" PRIu64 ", recv=%" PRIu64 ")\n",
                      result.sub_id, msg.pub_id, msg.seq, prev, delta, result.lost, result.received);
+
+        // Dump recent messages for context
+        if (result.reordered == 0)
+        {
+            std::fprintf(stderr, "  Recent messages (oldest first):\n");
+            std::size_t start = 0;
+            if (trace_pos > TRACE_SIZE)
+            {
+                start = trace_pos - TRACE_SIZE;
+            }
+            for (auto i = start; i < trace_pos; ++i)
+            {
+                auto& t = trace[i % TRACE_SIZE];
+                char const* marker = "";
+                if (t.pub_id == msg.pub_id)
+                {
+                    marker = " <--";
+                }
+                std::fprintf(stderr, "    [%zu] pub %u seq %u%s\n",
+                             i, t.pub_id, t.seq, marker);
+            }
+        }
+
         ++result.reordered;
-        // Don't update prev — keep tracking from the highest seen
         return;
     }
     prev = msg.seq;
@@ -109,8 +144,8 @@ static void validate_payload(Payload const& msg, int num_pubs,
     ++result.received;
 }
 
-static SubResult subscriber_thread_copy(kickmsg::SharedRegion& region, int sub_id,
-                                        int num_pubs, uint32_t /*msgs_per_pub*/)
+SubResult subscriber_thread_copy(kickmsg::SharedRegion& region, int sub_id,
+                                 int num_pubs, uint32_t /*msgs_per_pub*/)
 {
     kickmsg::Subscriber sub{region};
 
@@ -118,18 +153,20 @@ static SubResult subscriber_thread_copy(kickmsg::SharedRegion& region, int sub_i
     result.sub_id = sub_id;
 
     std::vector<uint32_t> last_seq(static_cast<std::size_t>(num_pubs), UINT32_MAX);
+    MsgTrace trace[TRACE_SIZE]{};
+    std::size_t trace_pos = 0;
 
     auto const timeout = std::chrono::milliseconds{500};
 
     while (true)
     {
         auto sample = sub.receive(timeout);
-        if (!sample)
+        if (not sample)
         {
             if (g_all_publishers_done.load(std::memory_order_relaxed))
             {
                 sample = sub.try_receive();
-                if (!sample)
+                if (not sample)
                 {
                     break;
                 }
@@ -148,15 +185,15 @@ static SubResult subscriber_thread_copy(kickmsg::SharedRegion& region, int sub_i
 
         Payload msg;
         std::memcpy(&msg, sample->data(), sizeof(msg));
-        validate_payload(msg, num_pubs, last_seq, result);
+        validate_payload(msg, num_pubs, last_seq, result, trace, trace_pos);
     }
 
     result.lost = sub.lost();
     return result;
 }
 
-static SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
-                                            int num_pubs, uint32_t /*msgs_per_pub*/)
+SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
+                                     int num_pubs, uint32_t /*msgs_per_pub*/)
 {
     kickmsg::Subscriber sub{region};
 
@@ -164,18 +201,20 @@ static SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int s
     result.sub_id = sub_id;
 
     std::vector<uint32_t> last_seq(static_cast<std::size_t>(num_pubs), UINT32_MAX);
+    MsgTrace trace[TRACE_SIZE]{};
+    std::size_t trace_pos = 0;
 
     auto const timeout = std::chrono::milliseconds{500};
 
     while (true)
     {
         auto view = sub.receive_view(timeout);
-        if (!view)
+        if (not view)
         {
             if (g_all_publishers_done.load(std::memory_order_relaxed))
             {
                 view = sub.try_receive_view();
-                if (!view)
+                if (not view)
                 {
                     break;
                 }
@@ -194,8 +233,7 @@ static SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int s
 
         Payload msg;
         std::memcpy(&msg, view->data(), sizeof(msg));
-        // SampleView is dropped here (refcount released) at end of loop iteration
-        validate_payload(msg, num_pubs, last_seq, result);
+        validate_payload(msg, num_pubs, last_seq, result, trace, trace_pos);
     }
 
     result.lost = sub.lost();
@@ -211,7 +249,7 @@ static SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int s
 // We walk all committed ring entries, count references per slot, then
 // release remaining refcounts. This avoids the double-decrement bug of
 // the old per-entry approach (drain_unconsumed already released some).
-static void release_remaining_refs(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+void release_remaining_refs(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -226,16 +264,20 @@ static void release_remaining_refs(kickmsg::SharedRegion& region, kickmsg::RingC
         auto* entries = kickmsg::ring_entries(ring);
 
         auto cap   = hdr->sub_ring_capacity;
-        auto start = (wp > cap) ? (wp - cap) : uint64_t{0};
+        uint64_t start = 0;
+        if (wp > cap)
+        {
+            start = wp - cap;
+        }
 
         for (uint64_t pos = start; pos < wp; ++pos)
         {
             auto  idx = pos & hdr->sub_ring_mask;
             auto& e   = entries[idx];
             auto  seq = e.sequence.load(std::memory_order_relaxed);
-            if (seq < pos + 1)
+            if (seq < pos + 1 or seq == kickmsg::LOCKED_SEQUENCE)
             {
-                continue; // uncommitted
+                continue; // uncommitted or locked
             }
 
             auto si = e.slot_idx.load(std::memory_order_relaxed);
@@ -266,7 +308,7 @@ static void release_remaining_refs(kickmsg::SharedRegion& region, kickmsg::RingC
     }
 }
 
-static bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -303,7 +345,7 @@ static bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::RingConfig 
     return true;
 }
 
-static bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -320,7 +362,7 @@ static bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::RingCo
     return true;
 }
 
-static bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -338,10 +380,15 @@ static bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::RingCo
     return true;
 }
 
-static bool run_stress_test(TestConfig const& tc)
+bool run_stress_test(TestConfig const& tc)
 {
+    char const* zc_label = "";
+    if (tc.use_zerocopy)
+    {
+        zc_label = " (zero-copy)";
+    }
     std::printf("--- Stress test%s: %d pubs x %u msgs, %d subs, pool=%zu, ring=%zu ---\n",
-                tc.use_zerocopy ? " (zero-copy)" : "",
+                zc_label,
                 tc.num_publishers, tc.msgs_per_pub, tc.num_subscribers,
                 tc.pool_size, tc.ring_capacity);
 
@@ -367,8 +414,11 @@ static bool run_stress_test(TestConfig const& tc)
     {
         sub_threads.emplace_back([&region, i, &sub_results, &tc]()
         {
-            auto fn = tc.use_zerocopy ? subscriber_thread_zerocopy
-                                      : subscriber_thread_copy;
+            auto fn = subscriber_thread_copy;
+            if (tc.use_zerocopy)
+            {
+                fn = subscriber_thread_zerocopy;
+            }
             sub_results[static_cast<std::size_t>(i)] =
                 fn(region, i, tc.num_publishers, tc.msgs_per_pub);
         });
@@ -400,9 +450,13 @@ static bool run_stress_test(TestConfig const& tc)
 
     bool all_ok = true;
 
+    char const* mode_label = "copy";
+    if (tc.use_zerocopy)
+    {
+        mode_label = "zerocopy";
+    }
     std::printf("  Config: %d pub, %d sub, %s\n",
-                tc.num_publishers, tc.num_subscribers,
-                tc.use_zerocopy ? "zerocopy" : "copy");
+                tc.num_publishers, tc.num_subscribers, mode_label);
     std::printf("  Elapsed: %ld ms, total published: %" PRIu64 "\n", elapsed_ms, total_sent);
     std::printf("  %-6s %10s %10s %10s %10s %10s\n",
                 "sub", "received", "lost", "corrupt", "bad_pid", "reorder");
@@ -451,28 +505,32 @@ static bool run_stress_test(TestConfig const& tc)
         }
     }
 
+    auto reclaimed = region.collect_garbage();
+    if (reclaimed > 0)
+    {
+        std::printf("  GC reclaimed %zu slots\n", reclaimed);
+    }
+
     release_remaining_refs(region, cfg);
 
-    if (!verify_refcounts_zero(region, cfg))
-    {
-        all_ok = false;
-    }
-    if (!verify_pool_free(region, cfg))
-    {
-        all_ok = false;
-    }
-    if (!verify_rings_inactive(region, cfg))
-    {
-        all_ok = false;
-    }
+    all_ok &= verify_refcounts_zero(region, cfg);
+    all_ok &= verify_pool_free(region, cfg);
+    all_ok &= verify_rings_inactive(region, cfg);
 
     region.unlink();
 
-    std::printf("  %s\n\n", all_ok ? "[PASS]" : "[FAIL]");
+    if (all_ok)
+    {
+        std::printf("  [PASS]\n\n");
+    }
+    else
+    {
+        std::printf("  [FAIL]\n\n");
+    }
     return all_ok;
 }
 
-static bool run_treiber_stress()
+bool run_treiber_stress()
 {
     std::printf("--- Treiber stack stress: 8 threads x 100000 pop/push cycles ---\n");
 
@@ -530,11 +588,18 @@ static bool run_treiber_stress()
 
     region.unlink();
 
-    std::printf("  %s\n\n", ok ? "[PASS]" : "[FAIL]");
+    if (ok)
+    {
+        std::printf("  [PASS]\n\n");
+    }
+    else
+    {
+        std::printf("  [FAIL]\n\n");
+    }
     return ok;
 }
 
-static bool run_fairness_test()
+bool run_fairness_test()
 {
     std::printf("--- Fairness test: 1 pub x 100000 msgs, 16 subs (ring=256, pool=512) ---\n");
 
@@ -586,7 +651,7 @@ static bool run_fairness_test()
         min_recv = std::min(min_recv, r.received);
         max_recv = std::max(max_recv, r.received);
 
-        if (r.corrupted > 0 || r.bad_pub_id > 0 || r.reordered > 0)
+        if (r.corrupted > 0 or r.bad_pub_id > 0 or r.reordered > 0)
         {
             std::fprintf(stderr, "  [FAIL] sub%d: corrupt=%" PRIu64 " bad_pid=%"
                          PRIu64 " reorder=%" PRIu64 "\n",
@@ -604,14 +669,27 @@ static bool run_fairness_test()
         ok = false;
     }
 
+    auto reclaimed = region.collect_garbage();
+    if (reclaimed > 0)
+    {
+        std::printf("  GC reclaimed %zu slots\n", reclaimed);
+    }
+
     release_remaining_refs(region, cfg);
-    ok = ok && verify_refcounts_zero(region, cfg);
-    ok = ok && verify_pool_free(region, cfg);
-    ok = ok && verify_rings_inactive(region, cfg);
+    ok &= verify_refcounts_zero(region, cfg);
+    ok &= verify_pool_free(region, cfg);
+    ok &= verify_rings_inactive(region, cfg);
 
     region.unlink();
 
-    std::printf("  %s\n\n", ok ? "[PASS]" : "[FAIL]");
+    if (ok)
+    {
+        std::printf("  [PASS]\n\n");
+    }
+    else
+    {
+        std::printf("  [FAIL]\n\n");
+    }
     return ok;
 }
 
@@ -624,7 +702,14 @@ int main()
 
     auto run = [&](bool result)
     {
-        result ? ++pass : ++fail;
+        if (result)
+        {
+            ++pass;
+        }
+        else
+        {
+            ++fail;
+        }
     };
 
     run(run_treiber_stress());
@@ -703,5 +788,9 @@ int main()
     }));
 
     std::printf("=== Summary: %d passed, %d failed ===\n", pass, fail);
-    return fail > 0 ? 1 : 0;
+    if (fail > 0)
+    {
+        return 1;
+    }
+    return 0;
 }

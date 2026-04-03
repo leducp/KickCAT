@@ -217,54 +217,88 @@ publishers may race concurrently on the same channel.
 
 ```
 Publisher
-   │
-   ▼
+   |
+   v
 1. treiber_pop(free_top)           Allocate a slot from the free stack.
-   → Slot[3]                       CAS on free_top (ABA-safe).
-   │
-   ▼
-2. memcpy payload → Slot[3].data   Write payload into the slot.
-   │
-   ▼
+   -> Slot[3]                      CAS on free_top (ABA-safe).
+   |
+   v
+2. memcpy payload -> Slot[3].data  Write payload into the slot.
+   |
+   v
 3. Slot[3].refcount = N            Pre-set to number of active subscribers.
-   │                               Done BEFORE publishing to any ring, so
-   │                               the slot cannot be freed prematurely.
-   ▼
+   |                               Done BEFORE publishing to any ring, so
+   |                               the slot cannot be freed prematurely.
+   v
 4. For each active Ring[i]:
-   │
-   ├─► CAS write_pos: 42 → 43     Claim position 42 (MPSC-safe).
-   │   Multiple publishers may     Losers retry with updated value.
-   │   race here; CAS serializes.
-   │
-   ├─► If ring full (wrap):
-   │     wait_for_commit()         Bounded wait (COMMIT_TIMEOUT, 100ms).
-   │     ├─ Committed:             Entry is valid. Read its slot_idx
-   │     │    release_slot()       and decrement refcount (not set to 0,
-   │     │                         just -1 for this ring's reference).
-   │     │                         If refcount reaches 0 → treiber_push.
-   │     └─ Timeout (crash):       Previous writer crashed. Skip
-   │          skip release          release_slot() because slot_idx may
-   │                                be garbage. The pool slot referenced
-   │                                by the abandoned entry is leaked.
-   │                                The ring entry itself is overwritten
-   │                                and stays operational.
-   │
-   ├─► entry.slot_idx   = 3       Write entry fields (relaxed).
-   │   entry.payload_len = 128
-   │
-   └─► entry.sequence   = 43      Commit (release store).
-                                   This is the commit barrier:
-                                   - Subscribers see it as "data ready"
-                                   - Next publisher at this position (after
-                                     wrap) sees it as "previous write done"
-   │
-   ▼
+   |
+   |-- CAS write_pos: 42 -> 43    Claim position 42 (MPSC-safe).
+   |   Multiple publishers may     Losers retry with updated value.
+   |   race here; CAS serializes.
+   |
+   |-- If ring full (wrap):
+   |     wait_and_capture_slot()   Spin-wait (check clock every 1024
+   |     |                         iterations) up to commit_timeout
+   |     |                         (default 100ms). Skips entries in
+   |     |                         LOCKED_SEQUENCE state (another
+   |     |                         publisher is mid-commit).
+   |     |-- Committed:            Entry is valid. Read its slot_idx
+   |     |     release_slot()      and decrement refcount (not set to 0,
+   |     |                         just -1 for this ring's reference).
+   |     |                         If refcount reaches 0 -> treiber_push.
+   |     '-- Timeout (crash):      Previous writer crashed. Skip
+   |           skip release         release_slot() because slot_idx may
+   |                                be garbage. The pool slot referenced
+   |                                by the abandoned entry is leaked.
+   |                                The ring entry itself is overwritten
+   |                                and stays operational.
+   |
+   |-- Two-phase commit:
+   |   |
+   |   | Phase 1 - CAS lock:
+   |   |   CAS entry.sequence       Atomically swap from prev_seq to
+   |   |     prev_seq -> LOCKED      LOCKED_SEQUENCE (UINT64_MAX).
+   |   |                             This exclusively owns the entry:
+   |   |                             no other publisher can CAS from
+   |   |                             LOCKED_SEQUENCE since they expect
+   |   |                             prev_seq.
+   |   |   Retry up to 64 times     If another publisher holds the lock
+   |   |     if expected ==          (entry is LOCKED_SEQUENCE), retry.
+   |   |     LOCKED_SEQUENCE         The holder will release quickly
+   |   |                             (just two relaxed stores + one
+   |   |                             release store).
+   |   |   If expected is neither    Entry was committed by another
+   |   |     prev_seq nor LOCKED     publisher. Give up on this ring.
+   |   |
+   |   | Write entry fields (relaxed, safe because we hold the lock):
+   |   |   entry.slot_idx    = 3
+   |   |   entry.payload_len = 128
+   |   |
+   |   | Phase 2 - commit:
+   |   '   entry.sequence = 43      Release-store commits the entry.
+   |                                 Subscribers and future publishers
+   |                                 at this position will see all
+   |                                 preceding stores.
+   |
+   '-- futex_wake_all(write_pos)   Wake any sleeping subscribers.
+   |
+   v
 5. Adjust refcount for inactive   fetch_sub(inactive_count).
-   rings.                         If refcount → 0: treiber_push.
-   │
-   ▼
-6. futex_wake_all(write_pos)      Wake any sleeping subscribers.
+   rings.                         If refcount -> 0: treiber_push.
 ```
+
+### Why a two-phase commit?
+
+Without the lock, two publishers that CAS `write_pos` to adjacent
+positions could interleave their `slot_idx` and `sequence` stores on
+overlapping entries (after a ring wrap). The `LOCKED_SEQUENCE` sentinel
+prevents this: only one publisher at a time can write an entry's data
+fields, and the final release-store of the real sequence makes the
+entry visible atomically.
+
+Subscribers treat `LOCKED_SEQUENCE` the same as "not yet committed"
+and return `nullopt`, so the lock is invisible to them except as a
+brief delay.
 
 ### Why pre-set refcount before publishing?
 
@@ -282,13 +316,13 @@ ring's reference is released:
 ```
 Slot[5] refcount = 2   (Ring[0] and Ring[1] both reference it)
 
-Ring[0] wraps → evicts Slot[5]:
-  refcount.fetch_sub(1) → was 2, now 1
-  1 ≠ 0 → slot stays alive (Ring[1] still references it)
+Ring[0] wraps -> evicts Slot[5]:
+  refcount.fetch_sub(1) -> was 2, now 1
+  1 != 0 -> slot stays alive (Ring[1] still references it)
 
 Ring[1] subscriber reads Slot[5]:
-  refcount.fetch_sub(1) → was 1, now 0
-  0 → treiber_push(Slot[5]) back to free stack
+  refcount.fetch_sub(1) -> was 1, now 0
+  0 -> treiber_push(Slot[5]) back to free stack
 ```
 
 
@@ -300,80 +334,85 @@ reader-reader or reader-writer contention on it.
 
 ```
 Subscriber X (read_pos_ = 41, local)
-   │
-   ▼
+   |
+   v
 1. write_pos(42) > read_pos_(41)?   Check for new data.
-   Yes → data available.            No → return nullopt or futex_wait.
-   │
-   ▼
+   Yes -> data available.           No -> return nullopt or futex_wait.
+   |
+   v
 2. entry = entries[41 & mask]        Read the ring entry.
    seq1 = entry.sequence (acquire)
-   │
-   │  Three outcomes:
-   │
-   ├─► seq1 == expected (42)         Data ready → proceed to read.
-   │
-   ├─► seq1 > expected (42)          Subscriber fell behind. The entry
-   │     (e.g. seq1 = 47)            was overwritten while we weren't
-   │     lost_ += (47 - 42)          looking. Skip ahead, count as lost.
-   │     read_pos_++                  Continue loop → retry next entry.
-   │     continue
-   │
-   └─► seq1 < expected (42)          Entry not yet committed. A publisher
+   |
+   |  Four outcomes:
+   |
+   |-- seq1 == expected (42)         Data ready -> proceed to read.
+   |
+   |-- seq1 > expected (42)          Subscriber fell behind. The entry
+   |     (e.g. seq1 = 47)            was overwritten while we weren't
+   |     lost_ += (47 - 42)          looking. Skip ahead, count as lost.
+   |     read_pos_++                  Continue loop -> retry next entry.
+   |     continue
+   |
+   |-- seq1 == LOCKED_SEQUENCE       A publisher is mid-commit on this
+   |     return nullopt               entry. Come back later.
+   |
+   '-- seq1 < expected (42)          Entry not yet committed. A publisher
          return nullopt               claimed this position (write_pos was
                                       incremented) but hasn't stored the
                                       sequence yet. Come back later.
                                       Not a deadlock: if the publisher
                                       crashed, the next publisher at this
                                       position will eventually overwrite
-                                      the entry (after COMMIT_TIMEOUT),
+                                      the entry (after commit_timeout),
                                       and the subscriber will then see
                                       seq > expected (skip path above).
-   │
-   ▼
+   |
+   v
 3. Read slot_idx and payload_len from the entry.
-   │
-   ├──── Copy mode: try_receive() ─────────────────────────────┐
-   │                                                           │
-   │  memcpy Slot[slot_idx].data → local recv_buf_             │
-   │  seq2 = entry.sequence (acquire)                          │
-   │  seq2 == seq1?  → yes: data consistent                    │
-   │                → no:  entry was overwritten during the     │
-   │                       memcpy (race with a publisher that   │
-   │                       wrapped around). Count as lost,      │
-   │                       retry.                               │
-   │  read_pos_++                                               │
-   │  return SampleRef { recv_buf_, payload_len }               │
-   │                                                           │
-   │  Note: SampleRef points into recv_buf_ (subscriber-local  │
-   │  buffer). Calling try_receive() again overwrites it.      │
-   │  Copy data from SampleRef before the next call.           │
-   │                                                           │
-   ├──── Zero-copy mode: try_receive_view() ───────────────────┤
-   │                                                           │
-   │  CAS Slot.refcount: rc → rc+1   Pin the slot (only if     │
-   │    (retry while rc > 0)          rc > 0, i.e. slot alive) │
-   │    (if rc == 0: slot freed       between seq1 read and    │
-   │     between seq1 and now,        now. Count as lost.)     │
-   │     skip as lost message)                                 │
-   │  seq2 = entry.sequence (acquire)                          │
-   │  seq2 == seq1?  → yes: pin valid                          │
-   │                → no:  entry overwritten after we pinned.   │
-   │                       Undo pin: fetch_sub(1).              │
-   │                       If refcount → 0: treiber_push.       │
-   │                       Count as lost, retry.                │
-   │  read_pos_++                                               │
-   │  return SampleView { Slot, payload_len }                   │
-   │    │                                                      │
-   │    └──▶ ~SampleView():                                     │
-   │         refcount.fetch_sub(1)                              │
-   │         if refcount → 0: treiber_push(slot)                │
-   │                                                           │
-   │  SampleView holds a direct pointer into shared memory.    │
-   │  The refcount pin keeps the slot alive until the view     │
-   │  is destroyed. Best for large payloads where memcpy       │
-   │  would dominate latency.                                  │
-   └───────────────────────────────────────────────────────────┘
+   |
+   |---- Both modes: refcount pin --------------------------------|
+   |                                                              |
+   |  Both try_receive() and try_receive_view() pin the slot      |
+   |  via CAS before reading data. This prevents the publisher    |
+   |  from freeing the slot while the subscriber reads it.        |
+   |                                                              |
+   |  CAS Slot.refcount: rc -> rc+1   Pin the slot (only if      |
+   |    (retry while rc > 0)          rc > 0, i.e. slot alive)   |
+   |    (if rc == 0: slot freed       between seq1 read and      |
+   |     between seq1 and now,        now. Count as lost.)       |
+   |     skip as lost message)                                   |
+   |                                                              |
+   |  seq2 = entry.sequence (acquire)  Seqlock validation: if    |
+   |  seq2 == seq1?                    the entry was overwritten  |
+   |    -> yes: pin valid              after we pinned, the       |
+   |    -> no:  undo pin, count lost   slot_idx may be stale.    |
+   |                                                              |
+   |---- Copy mode: try_receive() --------------------------------|
+   |                                                              |
+   |  memcpy Slot[slot_idx].data -> local recv_buf_               |
+   |  Unpin: refcount.fetch_sub(1)                                |
+   |    If refcount -> 0: treiber_push(slot)                      |
+   |  read_pos_++                                                 |
+   |  return SampleRef { recv_buf_, payload_len }                 |
+   |                                                              |
+   |  Note: SampleRef points into recv_buf_ (subscriber-local    |
+   |  buffer). Calling try_receive() again overwrites it.         |
+   |  Copy data from SampleRef before the next call.              |
+   |                                                              |
+   |---- Zero-copy mode: try_receive_view() ----------------------|
+   |                                                              |
+   |  read_pos_++                                                 |
+   |  return SampleView { Slot, payload_len }                     |
+   |    |                                                         |
+   |    '--> ~SampleView():                                       |
+   |         refcount.fetch_sub(1)                                |
+   |         if refcount -> 0: treiber_push(slot)                 |
+   |                                                              |
+   |  SampleView holds a direct pointer into shared memory.       |
+   |  The refcount pin keeps the slot alive until the view        |
+   |  is destroyed. Best for large payloads where memcpy          |
+   |  would dominate latency.                                     |
+   '--------------------------------------------------------------'
 ```
 
 
@@ -453,19 +492,25 @@ After sequence store               No issue. Entry is committed.
 ### Timeout mechanism
 
 When a publisher wraps around to a ring entry that was previously
-claimed but never committed, it calls `wait_for_commit()`:
+claimed but never committed, it calls `wait_and_capture_slot()`:
 
 ```
-wait_for_commit(entry, expected_seq, timeout):
+wait_and_capture_slot(entry, expected_seq, timeout):
     deadline = now() + timeout
     loop (check clock every 1024 iterations):
-        if entry.sequence >= expected_seq → return true   (committed)
-        if now() >= deadline             → return false   (timeout)
+        seq = entry.sequence (acquire)
+        if seq >= expected_seq and seq != LOCKED_SEQUENCE:
+            return entry.slot_idx          (committed, capture the old slot)
+        if now() >= deadline:
+            return INVALID_SLOT            (timeout)
 ```
 
-On timeout, the publisher:
+The function skips entries in `LOCKED_SEQUENCE` state because another
+publisher is mid-commit on that entry and will release shortly.
+
+On timeout (returns `INVALID_SLOT`), the publisher:
 1. Skips `release_slot()` (the old `slot_idx` may be garbage)
-2. Overwrites the entry with its own data and commits normally
+2. Overwrites the entry with its own data via the two-phase commit
 3. The ring resumes normal operation
 
 The timeout is configurable per channel via `RingConfig::commit_timeout`
@@ -482,11 +527,11 @@ The timeout is configurable per channel via `RingConfig::commit_timeout`
 
 The subscriber never deadlocks either. If a publisher crashes
 mid-commit:
-1. The subscriber sees `seq < expected` and returns `nullopt`
-   (data not ready yet)
+1. The subscriber sees `seq < expected` or `seq == LOCKED_SEQUENCE`
+   and returns `nullopt` (data not ready yet)
 2. Eventually, another publisher wraps to the same position,
-   times out on `wait_for_commit`, and overwrites the entry
-   with a higher sequence number
+   times out on `wait_and_capture_slot`, and overwrites the entry
+   via the two-phase commit with a higher sequence number
 3. The subscriber then sees `seq > expected` (skip path),
    counts the gap as lost messages, and resumes
 
@@ -686,15 +731,19 @@ Both architectures support native 64-bit atomic CAS on aligned values, so
 there is no risk of torn reads. The correctness is portable; only the
 per-operation latency differs (by a few nanoseconds).
 
-### Platform Abstraction
+### Platform Abstraction (KickCAT Integration)
 
-All platform-specific code is isolated in two interfaces:
+kickmsg is a library within the KickCAT project and relies on KickCAT's
+OS abstraction layer for platform-specific functionality. The two
+interfaces used are:
 
 ```
-Abstraction      Linux                           macOS (Darwin)
-──────────────────────────────────────────────────────────────────────
-SharedMemory     shm_open / ftruncate / mmap     (same, POSIX)
-Futex            SYS_futex (FUTEX_WAIT/_WAKE)    __ulock_wait/_wake
+Abstraction      Provided by         Linux                    macOS (Darwin)
+────────────────────────────────────────────────────────────────────────────────
+SharedMemory     kickcat/OS/          shm_open / ftruncate     (same, POSIX)
+                 SharedMemory.h       / mmap
+Futex            kickcat/OS/          SYS_futex                __ulock_wait
+                 Futex.h              (FUTEX_WAIT/_WAKE)       /_wake
 ```
 
 **macOS caveat:** `__ulock_wait` / `__ulock_wake` are private Apple APIs.
@@ -707,9 +756,8 @@ The core engine (`types.h`, `Region.h`, `Publisher.h`, `Subscriber.h`,
 `Node.h`) uses only `std::atomic` C++17 and these two abstractions --
 no platform `#ifdef` leaks into the messaging logic.
 
-To add a new OS, implement:
-- `src/OS/<Platform>/SharedMemory.cc` (~50 lines) -- or reuse `Unix/`
-- `src/OS/<Platform>/Futex.cc` (~15 lines)
+To add a new OS, implement the Futex and SharedMemory interfaces in
+KickCAT's `src/OS/<Platform>/` directory.
 
 
 ## Why `futex` instead of `mutex` + `condvar`?
