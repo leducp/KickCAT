@@ -22,40 +22,60 @@ namespace kickcat
     {
         shm_.open(interface, 512_KiB);
 
-        struct Metadata* metadata = reinterpret_cast<struct Metadata*>(shm_.address());
-        Mutex mutex(&metadata->mutex);
-        QUEUE::Context* queue_a_address = reinterpret_cast<QUEUE::Context*>(reinterpret_cast<uint8_t*>(shm_.address()) + sizeof(Metadata));
-        QUEUE::Context* queue_b_address = queue_a_address + 1;
+        auto* base = static_cast<uint8_t*>(shm_.address());
+        header_ = reinterpret_cast<Header*>(base);
+
+        // Layout: [Header] [SlotPool] [Context A] [Context B] [Pool data]
+        slot_pool_ = reinterpret_cast<SlotPool*>(base + align_up(sizeof(Header), CACHE_LINE));
+        auto* ctx_a = reinterpret_cast<QUEUE::Context*>(reinterpret_cast<uint8_t*>(slot_pool_) + sizeof(SlotPool));
+        auto* ctx_b = reinterpret_cast<QUEUE::Context*>(reinterpret_cast<uint8_t*>(ctx_a) + sizeof(QUEUE::Context));
+        pool_base_  = reinterpret_cast<uint8_t*>(ctx_b) + sizeof(QUEUE::Context);
+
         if (init_)
         {
-            std::memset(shm_.address(), 0, 512_KiB);
-            mutex.init();
+            std::memset(base, 0, 512_KiB);
+            header_->magic   = MAGIC;
+            header_->version = VERSION;
+            header_->side_a_connected = 0;
+            header_->side_b_connected = 0;
+            slot_pool_->free_top = tagged_pack(0, INVALID_SLOT);
 
-            QUEUE queue_a{queue_a_address};
+            // Push all slots into the free-stack
+            for (uint32_t i = 0; i < POOL_SIZE; ++i)
+            {
+                treiber_push(slot_pool_->free_top, pool_base_, QUEUE::SLOT_STRIDE, i);
+            }
+
+            QUEUE queue_a{*ctx_a, *slot_pool_, pool_base_};
             queue_a.initContext();
 
-            QUEUE queue_b{queue_b_address};
+            QUEUE queue_b{*ctx_b, *slot_pool_, pool_base_};
             queue_b.initContext();
         }
-
-        LockGuard lock(mutex);
-        if (metadata->a_to_b == 0)
+        else
         {
-            allocated_ = &metadata->a_to_b;
-            *allocated_ = 1;
-            in_  = std::make_unique<QUEUE>(queue_a_address);
-            out_ = std::make_unique<QUEUE>(queue_b_address);
+            if (header_->magic != MAGIC or header_->version != VERSION)
+            {
+                THROW_ERROR("open(): Incompatible shared memory layout (wrong magic or version)");
+            }
+        }
 
+        // Role assignment via atomic CAS — no mutex needed
+        uint8_t expected = 0;
+        if (header_->side_a_connected.compare_exchange_strong(expected, 1, std::memory_order_acq_rel))
+        {
+            allocated_ = &header_->side_a_connected;
+            in_  = std::make_unique<QUEUE>(*ctx_a, *slot_pool_, pool_base_);
+            out_ = std::make_unique<QUEUE>(*ctx_b, *slot_pool_, pool_base_);
             return;
         }
 
-        if (metadata->b_to_a == 0)
+        expected = 0;
+        if (header_->side_b_connected.compare_exchange_strong(expected, 1, std::memory_order_acq_rel))
         {
-            allocated_ = &metadata->b_to_a;
-            *allocated_ = 1;
-            in_  = std::make_unique<QUEUE>(queue_b_address);
-            out_ = std::make_unique<QUEUE>(queue_a_address);
-
+            allocated_ = &header_->side_b_connected;
+            in_  = std::make_unique<QUEUE>(*ctx_b, *slot_pool_, pool_base_);
+            out_ = std::make_unique<QUEUE>(*ctx_a, *slot_pool_, pool_base_);
             return;
         }
 
@@ -66,7 +86,8 @@ namespace kickcat
     {
         if (allocated_)
         {
-            *allocated_ = 0;
+            allocated_->store(0, std::memory_order_release);
+            allocated_ = nullptr;
         }
     }
 
@@ -93,7 +114,7 @@ namespace kickcat
 
     int32_t TapSocket::write(void const* frame, int32_t frame_size)
     {
-        auto item = out_->allocate(timeout_);
+        auto item = out_->allocate();
         if (item.address == nullptr)
         {
             return -EAGAIN;
