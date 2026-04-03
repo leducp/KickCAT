@@ -28,6 +28,13 @@ endif()
 
 target_compile_features(kickmsg PUBLIC cxx_std_17)
 
+# Install rules
+install(TARGETS kickmsg
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+install(DIRECTORY include/kickmsg DESTINATION include)
+
 option(KICKMSG_BUILD_TESTS    "Build KickMsg tests"    OFF)
 option(KICKMSG_ENABLE_TSAN    "Build TSan stress test"  OFF)
 option(KICKMSG_BUILD_EXAMPLES "Build KickMsg examples"  OFF)
