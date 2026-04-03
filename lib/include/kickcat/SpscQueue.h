@@ -10,6 +10,14 @@
 
 namespace kickcat
 {
+    /// Shared slot pool header — lives in shared memory.
+    /// free_top is cache-line aligned to avoid false sharing with surrounding fields,
+    /// since it is the hot contention point between producer (pop) and consumer (push).
+    struct SlotPool
+    {
+        alignas(CACHE_LINE) std::atomic<uint64_t> free_top;
+    };
+
     struct SpscEntry
     {
         std::atomic<uint64_t> sequence;    // commit barrier: set to (pos + 1) once entry is ready
@@ -36,6 +44,8 @@ namespace kickcat
         static constexpr std::size_t SLOT_STRIDE = align_up(sizeof(SlotMeta) + sizeof(T), CACHE_LINE);
 
         /// Shared memory layout for one direction.
+        /// write_pos and read_pos are cache-line aligned to avoid false sharing
+        /// between producer (writes write_pos) and consumer (writes read_pos).
         struct Context
         {
             alignas(CACHE_LINE) std::atomic<uint64_t> write_pos;
@@ -50,21 +60,21 @@ namespace kickcat
             T* address;
         };
 
-        SpscQueue(Context& ctx, std::atomic<uint64_t>& free_top, void* pool_base)
-            : ctx_{&ctx}, free_top_{&free_top}, pool_base_{pool_base}
+        SpscQueue(Context& ctx, SlotPool& pool, void* pool_base)
+            : ctx_{&ctx}, pool_{&pool}, pool_base_{pool_base}
         {}
 
         /// Initialize the context (zeroes ring, resets positions).
         /// Must be called exactly once by the process that creates the shared memory.
         void initContext()
         {
-            ctx_->write_pos.store(0, std::memory_order_relaxed);
-            ctx_->read_pos = 0;
+            ctx_->write_pos = 0;
+            ctx_->read_pos  = 0;
             for (uint32_t i = 0; i < N; ++i)
             {
-                ctx_->entries[i].sequence.store(0, std::memory_order_relaxed);
-                ctx_->entries[i].slot_idx.store(INVALID_SLOT, std::memory_order_relaxed);
-                ctx_->entries[i].payload_len.store(0, std::memory_order_relaxed);
+                ctx_->entries[i].sequence    = 0;
+                ctx_->entries[i].slot_idx    = INVALID_SLOT;
+                ctx_->entries[i].payload_len = 0;
             }
         }
 
@@ -72,7 +82,7 @@ namespace kickcat
         /// Returns an item with address == nullptr if no slot is available.
         Item allocate()
         {
-            uint32_t idx = treiber_pop(*free_top_, pool_base_, SLOT_STRIDE);
+            uint32_t idx = treiber_pop(pool_->free_top, pool_base_, SLOT_STRIDE);
             if (idx == INVALID_SLOT)
             {
                 return {INVALID_SLOT, 0, nullptr};
@@ -86,21 +96,21 @@ namespace kickcat
         /// will not see this entry until sequence is written.
         void ready(Item const& item)
         {
-            uint64_t pos = ctx_->write_pos.load(std::memory_order_relaxed);
+            uint64_t pos = ctx_->write_pos; // single producer — reading our own value
             auto& e = ctx_->entries[pos & MASK];
 
             // If ring is full, evict the oldest entry and return its slot to the free-stack
             if (pos >= N)
             {
-                uint32_t old_slot = e.slot_idx.load(std::memory_order_relaxed);
+                uint32_t old_slot = e.slot_idx;
                 if (old_slot != INVALID_SLOT)
                 {
-                    treiber_push(*free_top_, pool_base_, SLOT_STRIDE, old_slot);
+                    treiber_push(pool_->free_top, pool_base_, SLOT_STRIDE, old_slot);
                 }
             }
 
-            e.slot_idx.store(item.index, std::memory_order_relaxed);
-            e.payload_len.store(item.len, std::memory_order_relaxed);
+            e.slot_idx    = item.index;
+            e.payload_len = item.len;
             // Commit barrier: consumer sees entry only after this release store.
             // Pairs with the acquire load in get().
             e.sequence.store(pos + 1, std::memory_order_release);
@@ -141,8 +151,10 @@ namespace kickcat
                 return {INVALID_SLOT, 0, nullptr};
             }
 
-            uint32_t slot_idx    = e.slot_idx.load(std::memory_order_relaxed);
-            uint32_t payload_len = e.payload_len.load(std::memory_order_relaxed);
+            // Safe without explicit ordering: the acquire on sequence above
+            // already guarantees we see the values written by the producer.
+            uint32_t slot_idx    = e.slot_idx;
+            uint32_t payload_len = e.payload_len;
 
             ctx_->read_pos = rp + 1;
 
@@ -153,7 +165,7 @@ namespace kickcat
         /// Consumer: return a consumed slot to the free-stack.
         void free(Item const& item)
         {
-            treiber_push(*free_top_, pool_base_, SLOT_STRIDE, item.index);
+            treiber_push(pool_->free_top, pool_base_, SLOT_STRIDE, item.index);
         }
 
         constexpr static std::size_t item_size() { return sizeof(T); }
@@ -194,9 +206,9 @@ namespace kickcat
             }
         }
 
-        Context*               ctx_;
-        std::atomic<uint64_t>* free_top_;
-        void*                  pool_base_;
+        Context*  ctx_;
+        SlotPool* pool_;
+        void*     pool_base_;
     };
 }
 

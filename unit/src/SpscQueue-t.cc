@@ -15,12 +15,12 @@ public:
     void SetUp() override
     {
         // Init free_top to empty
-        free_top_.store(tagged_pack(0, INVALID_SLOT), std::memory_order_relaxed);
+        slot_pool_.free_top = tagged_pack(0, INVALID_SLOT);
 
         // Push all slots into the free-stack
         for (uint32_t i = 0; i < POOL_SIZE; ++i)
         {
-            treiber_push(free_top_, pool_, Queue::SLOT_STRIDE, i);
+            treiber_push(slot_pool_.free_top, pool_, Queue::SLOT_STRIDE, i);
         }
 
         queue_a_.initContext();
@@ -31,7 +31,7 @@ public:
 
     static constexpr uint32_t POOL_SIZE = 128; // 64 per direction
 
-    alignas(CACHE_LINE) std::atomic<uint64_t> free_top_{};
+    SlotPool slot_pool_{};
     alignas(CACHE_LINE) uint8_t pool_[POOL_SIZE * Queue::SLOT_STRIDE]{};
 
     struct SharedRegion
@@ -40,8 +40,8 @@ public:
         Queue::Context ctx_b;
     } shm_{};
 
-    Queue queue_a_{shm_.ctx_a, free_top_, pool_};
-    Queue queue_b_{shm_.ctx_b, free_top_, pool_};
+    Queue queue_a_{shm_.ctx_a, slot_pool_, pool_};
+    Queue queue_b_{shm_.ctx_b, slot_pool_, pool_};
 };
 
 TEST_F(TestSpscQueue, push_pop_nominal)

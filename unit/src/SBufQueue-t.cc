@@ -3,9 +3,9 @@
 #include "mocks/Time.h"
 
 #include "kickcat/SBufQueue.h"
-#include "kickcat/TapSocket.h" // reuse the SBufQueue instance for the test
 
 using namespace kickcat;
+using SBUF_QUEUE = SBufQueue<uint8_t[1522], 64>;
 
 class TestSBufQueue :  public ::testing::Test
 {
@@ -14,15 +14,15 @@ public:
     {
         queue_.initContext();
 
-        ASSERT_EQ(TapSocket::QUEUE::depth(), queue_.freed());
-        ASSERT_EQ(TapSocket::QUEUE::item_size(), 1522);
+        ASSERT_EQ(SBUF_QUEUE::depth(), queue_.freed());
+        ASSERT_EQ(SBUF_QUEUE::item_size(), 1522);
         ASSERT_EQ(0, queue_.readied());
 
         resetSinceEpoch(); // reset since_epoch() mocked starting point
     }
 
-    TapSocket::QUEUE::Context context_;
-    TapSocket::QUEUE queue_ {context_};
+    SBUF_QUEUE::Context context_;
+    SBUF_QUEUE queue_{context_};
 };
 
 TEST_F(TestSBufQueue, push_pop_nominal)
