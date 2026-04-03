@@ -2,29 +2,19 @@
 #define KICKCAT_TAP_SOCKET_H
 
 #include <memory>
+#include <string>
 
 #include "kickcat/AbstractSocket.h"
-#include "kickcat/SpscQueue.h"
-#include "kickcat/OS/SharedMemory.h"
+#include "kickmsg/Region.h"
+#include "kickmsg/Publisher.h"
+#include "kickmsg/Subscriber.h"
 
 namespace kickcat
 {
     class TapSocket final : public AbstractSocket
     {
     public:
-        using QUEUE = SpscQueue<uint8_t[1522], 64>;
-
-        static constexpr uint32_t MAGIC   = 0x4B435441; // "KCTA"
-        static constexpr uint32_t VERSION = 2;
-        static constexpr uint32_t POOL_PER_DIRECTION = QUEUE::depth();
-
-        struct Header
-        {
-            uint32_t magic;
-            uint32_t version;
-            std::atomic<uint8_t> side_a_connected;
-            std::atomic<uint8_t> side_b_connected;
-        };
+        static constexpr std::size_t MAX_FRAME_SIZE = 1522;
 
         TapSocket(bool init = false);
         virtual ~TapSocket();
@@ -38,15 +28,16 @@ namespace kickcat
         int32_t write(void const* frame, int32_t frame_size) override;
 
     private:
+        static kickmsg::RingConfig defaultConfig();
+
         bool init_;
         nanoseconds timeout_;
-        SharedMemory shm_{};
 
-        Header* header_{nullptr};
-        std::atomic<uint8_t>* allocated_{nullptr};
+        kickmsg::SharedRegion region_in_;
+        kickmsg::SharedRegion region_out_;
 
-        std::unique_ptr<QUEUE> in_{nullptr};
-        std::unique_ptr<QUEUE> out_{nullptr};
+        std::unique_ptr<kickmsg::Publisher>  publisher_;
+        std::unique_ptr<kickmsg::Subscriber> subscriber_;
     };
 }
 

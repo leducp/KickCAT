@@ -1,8 +1,11 @@
-macro(kickmsg_example target source)
-    add_executable(${target} ${source})
-    target_link_libraries(${target} PRIVATE kickmsg)
-endmacro()
+add_executable(hello_pubsub    hello_pubsub.cc)
+add_executable(hello_zerocopy  hello_zerocopy.cc)
+add_executable(hello_broadcast hello_broadcast.cc)
 
-kickmsg_example(hello_pubsub    hello_pubsub.cc)
-kickmsg_example(hello_zerocopy  hello_zerocopy.cc)
-kickmsg_example(hello_broadcast hello_broadcast.cc)
+target_link_libraries(hello_pubsub    PRIVATE kickmsg kickcat)
+target_link_libraries(hello_zerocopy  PRIVATE kickmsg kickcat)
+target_link_libraries(hello_broadcast PRIVATE kickmsg kickcat)
+
+set_kickcat_properties(hello_pubsub)
+set_kickcat_properties(hello_zerocopy)
+set_kickcat_properties(hello_broadcast)

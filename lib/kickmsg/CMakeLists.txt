@@ -1,28 +1,23 @@
-cmake_minimum_required(VERSION 3.20)
-project(kickmsg LANGUAGES CXX)
+add_library(kickmsg STATIC
+    src/types.cc
+)
 
-# kickmsg is header-only: OS layer (Futex, SharedMemory) is provided by kickcat.
-add_library(kickmsg INTERFACE)
-
-target_include_directories(kickmsg INTERFACE
+target_include_directories(kickmsg PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
 # kickcat provides Futex and SharedMemory implementations
-target_include_directories(kickmsg INTERFACE
+target_include_directories(kickmsg PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-target_compile_features(kickmsg INTERFACE cxx_std_17)
+set_kickcat_properties(kickmsg)
 
-option(KICKMSG_BUILD_TESTS    "Build KickMsg tests"    OFF)
-option(KICKMSG_BUILD_EXAMPLES "Build KickMsg examples"  OFF)
-
-if(KICKMSG_BUILD_TESTS)
+if(BUILD_UNIT_TESTS)
     add_subdirectory(tests)
 endif()
 
-if(KICKMSG_BUILD_EXAMPLES)
+if(BUILD_MASTER_EXAMPLES)
     add_subdirectory(examples)
 endif()
