@@ -19,12 +19,12 @@ namespace kickcat
 
     kickmsg::RingConfig TapSocket::defaultConfig()
     {
-        return {
-            .max_subscribers   = 1,
-            .sub_ring_capacity = 64,
-            .pool_size         = 128,
-            .max_payload_size  = MAX_FRAME_SIZE,
-        };
+        kickmsg::RingConfig cfg;
+        cfg.max_subscribers   = 1;
+        cfg.sub_ring_capacity = 64;
+        cfg.pool_size         = 128;
+        cfg.max_payload_size  = MAX_FRAME_SIZE;
+        return cfg;
     }
 
     void TapSocket::open(std::string const& interface)

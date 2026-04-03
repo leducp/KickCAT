@@ -273,19 +273,51 @@ namespace kickmsg
                     continue;
                 }
 
+                // Pin the slot via refcount to prevent the publisher from freeing it
+                // while we memcpy. Same protocol as try_receive_view().
                 auto* slot = slot_at(base_, header_, slot_idx);
-                std::memcpy(recv_buf_.data(), slot_data(slot), payload_len);
-
-                auto seq2 = e.sequence.load(std::memory_order_acquire);
-                if (seq2 != seq1)
+                uint32_t rc = slot->refcount.load(std::memory_order_acquire);
+                while (rc > 0)
                 {
-                    ++lost_;
-                    ++read_pos_;
-                    continue;
+                    if (slot->refcount.compare_exchange_weak(rc, rc + 1,
+                            std::memory_order_acq_rel, std::memory_order_acquire))
+                    {
+                        goto pinned;
+                    }
                 }
-
+                // refcount == 0: slot already freed, count as lost
+                ++lost_;
                 ++read_pos_;
-                return SampleRef{recv_buf_.data(), payload_len};
+                continue;
+
+            pinned:
+                {
+                    // Seqlock check: verify the entry wasn't overwritten during pin
+                    auto seq2 = e.sequence.load(std::memory_order_acquire);
+                    if (seq2 != seq1)
+                    {
+                        auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+                        if (prev == 1)
+                        {
+                            treiber_push(header_->free_top, slot, slot_idx);
+                        }
+                        ++lost_;
+                        ++read_pos_;
+                        continue;
+                    }
+
+                    std::memcpy(recv_buf_.data(), slot_data(slot), payload_len);
+
+                    // Unpin the slot
+                    auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+                    if (prev == 1)
+                    {
+                        treiber_push(header_->free_top, slot, slot_idx);
+                    }
+
+                    ++read_pos_;
+                    return SampleRef{recv_buf_.data(), payload_len};
+                }
             }
             return std::nullopt;
         }
