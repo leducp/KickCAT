@@ -31,6 +31,10 @@ namespace kickcat
     /// Single producer writes frames, single consumer reads them.
     /// Designed to live entirely in shared memory for cross-process IPC.
     ///
+    /// Non-lossy bounded queue: the pool acts as backpressure — when all slots
+    /// are in-flight (published but not yet consumed and freed), allocate() fails.
+    /// The pool must hold exactly N slots per direction sharing this pool.
+    ///
     /// Template parameters:
     ///   T — frame buffer type (e.g. uint8_t[1522])
     ///   N — ring capacity, must be a power of two
@@ -44,8 +48,7 @@ namespace kickcat
         static constexpr std::size_t SLOT_STRIDE = align_up(sizeof(SlotMeta) + sizeof(T), CACHE_LINE);
 
         /// Shared memory layout for one direction.
-        /// write_pos and read_pos are cache-line aligned to avoid false sharing
-        /// between producer (writes write_pos) and consumer (writes read_pos).
+        /// write_pos is cache-line aligned to avoid false sharing with read_pos.
         struct Context
         {
             alignas(CACHE_LINE) std::atomic<uint64_t> write_pos;
@@ -79,7 +82,7 @@ namespace kickcat
         }
 
         /// Producer: allocate a free slot to write into.
-        /// Returns an item with address == nullptr if no slot is available.
+        /// Returns an item with address == nullptr if no slot is available (pool exhausted).
         Item allocate()
         {
             uint32_t idx = treiber_pop(pool_->free_top, pool_base_, SLOT_STRIDE);
@@ -99,16 +102,6 @@ namespace kickcat
             uint64_t pos = ctx_->write_pos; // single producer — reading our own value
             auto& e = ctx_->entries[pos & MASK];
 
-            // If ring is full, evict the oldest entry and return its slot to the free-stack
-            if (pos >= N)
-            {
-                uint32_t old_slot = e.slot_idx;
-                if (old_slot != INVALID_SLOT)
-                {
-                    treiber_push(pool_->free_top, pool_base_, SLOT_STRIDE, old_slot);
-                }
-            }
-
             e.slot_idx    = item.index;
             e.payload_len = item.len;
             // Commit barrier: consumer sees entry only after this release store.
@@ -127,7 +120,6 @@ namespace kickcat
         {
             uint64_t rp = ctx_->read_pos;
 
-            // Fast path: check if data is already available
             // Acquire: pairs with write_pos release store in ready()
             uint64_t wp = ctx_->write_pos.load(std::memory_order_acquire);
             if (wp <= rp)
@@ -151,11 +143,8 @@ namespace kickcat
                 return {INVALID_SLOT, 0, nullptr};
             }
 
-            // Safe without explicit ordering: the acquire on sequence above
-            // already guarantees we see the values written by the producer.
             uint32_t slot_idx    = e.slot_idx;
             uint32_t payload_len = e.payload_len;
-
             ctx_->read_pos = rp + 1;
 
             auto* meta = slot_meta_at(pool_base_, SLOT_STRIDE, slot_idx);
@@ -177,8 +166,7 @@ namespace kickcat
         {
             if (timeout < 0ns)
             {
-                // Infinite wait
-                for (;;)
+                while (true)
                 {
                     uint64_t wp = ctx_->write_pos.load(std::memory_order_acquire);
                     if (wp > read_pos)
@@ -190,7 +178,7 @@ namespace kickcat
             }
 
             auto deadline = since_epoch() + timeout;
-            for (;;)
+            while (true)
             {
                 uint64_t wp = ctx_->write_pos.load(std::memory_order_acquire);
                 if (wp > read_pos)

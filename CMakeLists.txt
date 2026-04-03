@@ -16,6 +16,12 @@ option(BUILD_TOOLS             "Build tools" ON)
 option(ENABLE_ESI_PARSER       "Enable ESI XML parser" ON)
 option(ENABLE_AF_XDP           "Enable AF_XDP socket for improved performance (requires libxdp, libbpf, clang)" OFF)
 option(ENABLE_CODE_COVERAGE    "Enable code coverage (requires gcovr)" OFF)
+option(ENABLE_TSAN             "Enable ThreadSanitizer" OFF)
+
+if (ENABLE_TSAN)
+  add_compile_options(-fsanitize=thread -g)
+  add_link_options(-fsanitize=thread)
+endif()
 
 if (NUTTX)
   set(BUILD_MASTER_EXAMPLES OFF CACHE BOOL "" FORCE)

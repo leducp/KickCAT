@@ -18,6 +18,31 @@ namespace kickcat
         close();
     }
 
+    // Shared memory layout per direction:
+    //   [SlotPool] [Context] [Pool data: POOL_PER_DIRECTION * SLOT_STRIDE bytes]
+    struct DirectionLayout
+    {
+        SlotPool*             slot_pool;
+        TapSocket::QUEUE::Context* ctx;
+        void*                 pool_base;
+    };
+
+    static DirectionLayout layout_direction(uint8_t* base)
+    {
+        auto* sp  = reinterpret_cast<SlotPool*>(base);
+        auto* ctx = reinterpret_cast<TapSocket::QUEUE::Context*>(
+            base + sizeof(SlotPool));
+        auto* pool = base + sizeof(SlotPool) + sizeof(TapSocket::QUEUE::Context);
+        return {sp, ctx, pool};
+    }
+
+    static constexpr std::size_t direction_size()
+    {
+        return sizeof(SlotPool)
+             + sizeof(TapSocket::QUEUE::Context)
+             + TapSocket::POOL_PER_DIRECTION * TapSocket::QUEUE::SLOT_STRIDE;
+    }
+
     void TapSocket::open(std::string const& interface)
     {
         shm_.open(interface, 512_KiB);
@@ -25,11 +50,11 @@ namespace kickcat
         auto* base = static_cast<uint8_t*>(shm_.address());
         header_ = reinterpret_cast<Header*>(base);
 
-        // Layout: [Header] [SlotPool] [Context A] [Context B] [Pool data]
-        slot_pool_ = reinterpret_cast<SlotPool*>(base + align_up(sizeof(Header), CACHE_LINE));
-        auto* ctx_a = reinterpret_cast<QUEUE::Context*>(reinterpret_cast<uint8_t*>(slot_pool_) + sizeof(SlotPool));
-        auto* ctx_b = reinterpret_cast<QUEUE::Context*>(reinterpret_cast<uint8_t*>(ctx_a) + sizeof(QUEUE::Context));
-        pool_base_  = reinterpret_cast<uint8_t*>(ctx_b) + sizeof(QUEUE::Context);
+        // Layout: [Header] [Direction A] [Direction B]
+        auto* dir_a_base = base + align_up(sizeof(Header), CACHE_LINE);
+        auto* dir_b_base = dir_a_base + align_up(direction_size(), CACHE_LINE);
+        auto dir_a = layout_direction(dir_a_base);
+        auto dir_b = layout_direction(dir_b_base);
 
         if (init_)
         {
@@ -38,19 +63,20 @@ namespace kickcat
             header_->version = VERSION;
             header_->side_a_connected = 0;
             header_->side_b_connected = 0;
-            slot_pool_->free_top = tagged_pack(0, INVALID_SLOT);
 
-            // Push all slots into the free-stack
-            for (uint32_t i = 0; i < POOL_SIZE; ++i)
+            // Initialize each direction's pool and ring
+            auto init_direction = [](DirectionLayout const& dir)
             {
-                treiber_push(slot_pool_->free_top, pool_base_, QUEUE::SLOT_STRIDE, i);
-            }
-
-            QUEUE queue_a{*ctx_a, *slot_pool_, pool_base_};
-            queue_a.initContext();
-
-            QUEUE queue_b{*ctx_b, *slot_pool_, pool_base_};
-            queue_b.initContext();
+                dir.slot_pool->free_top = tagged_pack(0, INVALID_SLOT);
+                for (uint32_t i = 0; i < POOL_PER_DIRECTION; ++i)
+                {
+                    treiber_push(dir.slot_pool->free_top, dir.pool_base, QUEUE::SLOT_STRIDE, i);
+                }
+                QUEUE queue{*dir.ctx, *dir.slot_pool, dir.pool_base};
+                queue.initContext();
+            };
+            init_direction(dir_a);
+            init_direction(dir_b);
         }
         else
         {
@@ -65,8 +91,8 @@ namespace kickcat
         if (header_->side_a_connected.compare_exchange_strong(expected, 1, std::memory_order_acq_rel))
         {
             allocated_ = &header_->side_a_connected;
-            in_  = std::make_unique<QUEUE>(*ctx_a, *slot_pool_, pool_base_);
-            out_ = std::make_unique<QUEUE>(*ctx_b, *slot_pool_, pool_base_);
+            in_  = std::make_unique<QUEUE>(*dir_a.ctx, *dir_a.slot_pool, dir_a.pool_base);
+            out_ = std::make_unique<QUEUE>(*dir_b.ctx, *dir_b.slot_pool, dir_b.pool_base);
             return;
         }
 
@@ -74,8 +100,8 @@ namespace kickcat
         if (header_->side_b_connected.compare_exchange_strong(expected, 1, std::memory_order_acq_rel))
         {
             allocated_ = &header_->side_b_connected;
-            in_  = std::make_unique<QUEUE>(*ctx_b, *slot_pool_, pool_base_);
-            out_ = std::make_unique<QUEUE>(*ctx_a, *slot_pool_, pool_base_);
+            in_  = std::make_unique<QUEUE>(*dir_b.ctx, *dir_b.slot_pool, dir_b.pool_base);
+            out_ = std::make_unique<QUEUE>(*dir_a.ctx, *dir_a.slot_pool, dir_a.pool_base);
             return;
         }
 

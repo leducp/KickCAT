@@ -152,3 +152,4 @@ TEST_F(TestSpscQueue, item_size_and_depth)
     ASSERT_EQ(1522, Queue::item_size());
     ASSERT_EQ(64u, Queue::depth());
 }
+

@@ -11,6 +11,7 @@ declare -A OPT_DEFAULTS=(
     [tools]=ON
     [code_coverage]=OFF
     [af_xdp]=OFF
+    [tsan]=OFF
 )
 
 declare -A OPT_DESCRIPTIONS=(
@@ -22,6 +23,7 @@ declare -A OPT_DESCRIPTIONS=(
     [tools]="Build tools"
     [code_coverage]="Enable code coverage"
     [af_xdp]="Enable AF_XDP socket"
+    [tsan]="Enable ThreadSanitizer"
 )
 
 declare -A OPT_CMAKE_FLAGS=(
@@ -33,6 +35,7 @@ declare -A OPT_CMAKE_FLAGS=(
     [tools]="BUILD_TOOLS"
     [code_coverage]="ENABLE_CODE_COVERAGE"
     [af_xdp]="ENABLE_AF_XDP"
+    [tsan]="ENABLE_TSAN"
 )
 
 # Only options that gate a Conan dependency

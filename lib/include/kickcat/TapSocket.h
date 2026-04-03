@@ -16,7 +16,7 @@ namespace kickcat
 
         static constexpr uint32_t MAGIC   = 0x4B435441; // "KCTA"
         static constexpr uint32_t VERSION = 2;
-        static constexpr uint32_t POOL_SIZE = 2 * QUEUE::depth(); // shared pool for both directions
+        static constexpr uint32_t POOL_PER_DIRECTION = QUEUE::depth();
 
         struct Header
         {
@@ -43,9 +43,7 @@ namespace kickcat
         SharedMemory shm_{};
 
         Header* header_{nullptr};
-        SlotPool* slot_pool_{nullptr};
         std::atomic<uint8_t>* allocated_{nullptr};
-        void* pool_base_{nullptr};
 
         std::unique_ptr<QUEUE> in_{nullptr};
         std::unique_ptr<QUEUE> out_{nullptr};
