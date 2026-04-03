@@ -11,6 +11,8 @@
 #include "kickcat/Error.h"
 #include "kickcat/OS/Time.h"
 
+static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "KickCAT requires a little-endian platform");
+
 namespace kickcat
 {
     // Host to Network byte order helper (Reminder: EtherCAT is LE, network is BE)

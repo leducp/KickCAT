@@ -37,6 +37,7 @@ elseif (UNIX)
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/UdpDiagSocket.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Linux/Futex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Timer.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
