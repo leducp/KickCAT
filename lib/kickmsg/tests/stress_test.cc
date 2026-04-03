@@ -95,11 +95,13 @@ static void validate_payload(Payload const& msg, int num_pubs,
     }
 
     auto& prev = last_seq[msg.pub_id];
-    if (prev != UINT32_MAX && msg.seq <= prev)
+    if (prev != UINT32_MAX and msg.seq <= prev)
     {
-        std::fprintf(stderr, "  [REORDER] sub%d: pub %u seq %u after prev %u\n",
-                     result.sub_id, msg.pub_id, msg.seq, prev);
+        auto delta = static_cast<int32_t>(prev) - static_cast<int32_t>(msg.seq);
+        std::fprintf(stderr, "  [REORDER] sub%d: pub %u seq %u after prev %u (delta=%d, lost=%" PRIu64 ", recv=%" PRIu64 ")\n",
+                     result.sub_id, msg.pub_id, msg.seq, prev, delta, result.lost, result.received);
         ++result.reordered;
+        // Don't update prev — keep tracking from the highest seen
         return;
     }
     prev = msg.seq;
@@ -398,6 +400,9 @@ static bool run_stress_test(TestConfig const& tc)
 
     bool all_ok = true;
 
+    std::printf("  Config: %d pub, %d sub, %s\n",
+                tc.num_publishers, tc.num_subscribers,
+                tc.use_zerocopy ? "zerocopy" : "copy");
     std::printf("  Elapsed: %ld ms, total published: %" PRIu64 "\n", elapsed_ms, total_sent);
     std::printf("  %-6s %10s %10s %10s %10s %10s\n",
                 "sub", "received", "lost", "corrupt", "bad_pid", "reorder");

@@ -256,6 +256,9 @@ namespace kickmsg
                 {
                     if (seq1 > read_pos_ + 1)
                     {
+                        // Entry was overwritten — advance by one and retry.
+                        // We walk through all positions including un-overwritten ones
+                        // between here and the overwrite point, preserving per-publisher order.
                         ++lost_;
                         ++read_pos_;
                         continue;
@@ -381,6 +384,9 @@ namespace kickmsg
                 {
                     if (seq1 > read_pos_ + 1)
                     {
+                        // Entry was overwritten — advance by one and retry.
+                        // We walk through all positions including un-overwritten ones
+                        // between here and the overwrite point, preserving per-publisher order.
                         ++lost_;
                         ++read_pos_;
                         continue;

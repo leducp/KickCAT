@@ -97,6 +97,17 @@ namespace kickmsg
                     }
                 }
 
+                // Check if our position was stolen by a later publisher that wrapped
+                // and timed out on wait_for_commit. If write_pos advanced past our
+                // position by more than a full ring, the entry has been reused.
+                auto current_wp = ring->write_pos.load(std::memory_order_acquire);
+                if (current_wp - pos > capacity)
+                {
+                    // Our entry was stolen — abandon this ring delivery.
+                    // The slot refcount will be adjusted by the excess calculation below.
+                    continue;
+                }
+
                 e.slot_idx.store(slot_idx, std::memory_order_relaxed);
                 e.payload_len.store(len, std::memory_order_relaxed);
                 e.sequence.store(pos + 1, std::memory_order_release);
