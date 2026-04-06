@@ -590,9 +590,9 @@ namespace kickcat
     void EmulatedESC::checkWatchdog()
     {
         nanoseconds delay = pdoWatchdog();
-        if (delay == 0ns) //Handle the watchdog disable case
-        {  
-            return;
+        if (delay == 0ns)
+        {
+            return; // watchdog deactivated
         }
         
         auto now = since_epoch(); // Create the current time
