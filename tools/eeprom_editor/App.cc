@@ -430,38 +430,37 @@ namespace kickcat::eeprom_editor
 
         if (actual_crc == expected_crc)
         {
-            ImGui::TextColored(COLOR_GREEN,
-                               "CRC 0x%02X OK", actual_crc);
+            ImGui::TextColored(COLOR_GREEN, "CRC 0x%02X OK", actual_crc);
         }
         else
         {
-            ImGui::TextColored(COLOR_RED,
-                               "CRC 0x%02X != 0x%02X", actual_crc, expected_crc);
+            ImGui::TextColored(COLOR_RED, "CRC 0x%02X != 0x%02X", actual_crc, expected_crc);
         }
 
         statusSeparator();
 
-        if (isBusy())
         {
-            std::lock_guard lock(worker_status_mutex_);
-            ImGui::TextColored(COLOR_BLUE, "%s", worker_status_.c_str());
-            ImGui::SameLine();
-            ImGui::ProgressBar(worker_progress_.load(), ImVec2(150, ImGui::GetFrameHeight()));
-        }
-        else if (not worker_error_.empty())
-        {
-            ImGui::TextColored(COLOR_RED, "%s", worker_error_.c_str());
-        }
-        else if (isConnected())
-        {
-            ImGui::TextColored(COLOR_GREEN,
-                               "Connected: %s (%d slaves)",
-                               connected_interface_.c_str(),
-                               static_cast<int>(bus_->slaves().size()));
-        }
-        else
-        {
-            ImGui::TextDisabled("Not connected");
+            LockGuard lock(worker_status_mutex_);
+            if (isBusy())
+            {
+                ImGui::TextColored(COLOR_BLUE, "%s", worker_status_.c_str());
+                ImGui::SameLine();
+                ImGui::ProgressBar(worker_progress_.load(), ImVec2(150, ImGui::GetFrameHeight()));
+            }
+            else if (not worker_error_.empty())
+            {
+                ImGui::TextColored(COLOR_RED, "%s", worker_error_.c_str());
+            }
+            else if (isConnected())
+            {
+                ImGui::TextColored(COLOR_GREEN, "Connected: %s (%d slaves)",
+                                connected_interface_.c_str(),
+                                static_cast<int>(bus_->slaves().size()));
+            }
+            else
+            {
+                ImGui::TextDisabled("Not connected");
+            }
         }
     }
 
@@ -497,12 +496,11 @@ namespace kickcat::eeprom_editor
     {
         joinWorker();
 
-        show_connect_dialog_ = false;
         needs_privilege_escalation_ = false;
         worker_progress_ = 0.0f;
         worker_done_ = false;
         {
-            std::lock_guard lock(worker_status_mutex_);
+            LockGuard lock(worker_status_mutex_);
             worker_status_ = "Initializing...";
             worker_error_.clear();
         }
@@ -525,14 +523,14 @@ namespace kickcat::eeprom_editor
                 bus->configureWaitLatency(1ms, 10ms);
 
                 {
-                    std::lock_guard lock(worker_status_mutex_);
+                    LockGuard lock(worker_status_mutex_);
                     worker_status_ = "Detecting slaves...";
                 }
                 worker_progress_ = 0.25f;
 
                 if (bus->detectSlaves() == 0)
                 {
-                    std::lock_guard lock(worker_status_mutex_);
+                    LockGuard lock(worker_status_mutex_);
                     worker_error_ = "No slaves detected on " + interface_name;
                     worker_done_ = true;
                     return;
@@ -543,7 +541,7 @@ namespace kickcat::eeprom_editor
                 bus->setAddresses();
 
                 {
-                    std::lock_guard lock(worker_status_mutex_);
+                    LockGuard lock(worker_status_mutex_);
                     worker_status_ = "Reading EEPROMs...";
                 }
                 worker_progress_ = 0.5f;
@@ -560,7 +558,7 @@ namespace kickcat::eeprom_editor
             }
             catch (std::system_error const& e)
             {
-                std::lock_guard lock(worker_status_mutex_);
+                LockGuard lock(worker_status_mutex_);
                 if (e.code().value() == EPERM or e.code().value() == EACCES)
                 {
                     needs_privilege_escalation_ = true;
@@ -574,7 +572,7 @@ namespace kickcat::eeprom_editor
             }
             catch (std::exception const& e)
             {
-                std::lock_guard lock(worker_status_mutex_);
+                LockGuard lock(worker_status_mutex_);
                 worker_error_ = std::string("Connection failed: ") + e.what();
                 worker_done_ = true;
             }
@@ -595,15 +593,10 @@ namespace kickcat::eeprom_editor
         try
         {
             auto& slave = bus_->slaves().at(slave_index);
-            auto data = slave.sii.serialize();
-
-            sii_ = eeprom::SII{};
-            sii_.parse(data);
+            sii_ = slave.sii;
             serialized_ = sii_.serialize();
             file_path_.clear();
             modified_ = false;
-
-            show_slave_dialog_ = false;
         }
         catch (std::exception const& e)
         {
@@ -615,11 +608,10 @@ namespace kickcat::eeprom_editor
     {
         joinWorker();
 
-        show_slave_dialog_ = false;
         worker_progress_ = 0.0f;
         worker_done_ = false;
         {
-            std::lock_guard lock(worker_status_mutex_);
+            LockGuard lock(worker_status_mutex_);
             worker_status_ = "Flashing EEPROM...";
             worker_error_.clear();
         }
@@ -636,7 +628,7 @@ namespace kickcat::eeprom_editor
                 auto& slave = bus_->slaves().at(slave_index);
 
                 {
-                    std::lock_guard lock(worker_status_mutex_);
+                    LockGuard lock(worker_status_mutex_);
                     worker_status_ = "Writing EEPROM...";
                 }
 
@@ -652,7 +644,7 @@ namespace kickcat::eeprom_editor
             }
             catch (std::exception const& e)
             {
-                std::lock_guard lock(worker_status_mutex_);
+                LockGuard lock(worker_status_mutex_);
                 worker_error_ = std::string("Flash failed at ") +
                                 std::to_string(static_cast<int>(worker_progress_.load() * 100)) +
                                 "%: " + e.what();
@@ -668,13 +660,14 @@ namespace kickcat::eeprom_editor
         if (show_connect_dialog_)
         {
             ImGui::OpenPopup("Connect to EtherCAT Network");
+            show_connect_dialog_ = false;
         }
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(450, 350), ImGuiCond_Appearing);
 
-        if (ImGui::BeginPopupModal("Connect to EtherCAT Network", &show_connect_dialog_))
+        if (ImGui::BeginPopupModal("Connect to EtherCAT Network"))
         {
             ImGui::Text("Select a network interface:");
             ImGui::Separator();
@@ -694,6 +687,7 @@ namespace kickcat::eeprom_editor
                         if (ImGui::IsMouseDoubleClicked(0))
                         {
                             connectToInterface(cached_interfaces_[i].name);
+                            ImGui::CloseCurrentPopup();
                         }
                     }
                 }
@@ -711,13 +705,13 @@ namespace kickcat::eeprom_editor
             if (ImGui::Button("Connect", ImVec2(120, 0)))
             {
                 connectToInterface(cached_interfaces_[selected_slave_index_].name);
+                ImGui::CloseCurrentPopup();
             }
             if (not can_connect) { ImGui::EndDisabled(); }
 
             ImGui::SameLine();
             if (ImGui::Button("Cancel", ImVec2(120, 0)))
             {
-                show_connect_dialog_ = false;
                 ImGui::CloseCurrentPopup();
             }
 
@@ -791,13 +785,14 @@ namespace kickcat::eeprom_editor
         if (show_slave_dialog_)
         {
             ImGui::OpenPopup(title);
+            show_slave_dialog_ = false;
         }
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_Appearing);
 
-        if (ImGui::BeginPopupModal(title, &show_slave_dialog_))
+        if (ImGui::BeginPopupModal(title))
         {
             if (is_flash)
             {
@@ -828,13 +823,13 @@ namespace kickcat::eeprom_editor
                 {
                     loadFromSlave(selected_slave_index_);
                 }
+                ImGui::CloseCurrentPopup();
             }
             if (not can_act) { ImGui::EndDisabled(); }
 
             ImGui::SameLine();
             if (ImGui::Button("Cancel", ImVec2(120, 0)))
             {
-                show_slave_dialog_ = false;
                 ImGui::CloseCurrentPopup();
             }
 
@@ -883,13 +878,14 @@ namespace kickcat::eeprom_editor
         if (show_privilege_dialog_)
         {
             ImGui::OpenPopup("Privilege Required");
+            show_privilege_dialog_ = false;
         }
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(520, 0), ImGuiCond_Always);
 
-        if (ImGui::BeginPopupModal("Privilege Required", &show_privilege_dialog_))
+        if (ImGui::BeginPopupModal("Privilege Required"))
         {
             ImGui::TextWrapped(
                 "Raw Ethernet access requires the CAP_NET_RAW capability.\n\n"
@@ -966,7 +962,6 @@ namespace kickcat::eeprom_editor
             ImGui::SameLine();
             if (ImGui::Button("Cancel", ImVec2(120, 0)))
             {
-                show_privilege_dialog_ = false;
                 privilege_granted_ = false;
                 privilege_error_.clear();
                 ImGui::CloseCurrentPopup();

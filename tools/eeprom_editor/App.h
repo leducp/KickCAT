@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -12,6 +11,7 @@
 #include "vendor/imgui_memory_editor.h"
 
 #include "kickcat/AbstractSocket.h"
+#include "kickcat/OS/Mutex.h"
 #include "kickcat/SIIParser.h"
 
 namespace kickcat
@@ -104,7 +104,7 @@ namespace kickcat::eeprom_editor
         std::thread worker_;
         std::atomic<float> worker_progress_{0.0f};
         std::atomic<bool> worker_done_{false};
-        std::mutex worker_status_mutex_;
+        Mutex worker_status_mutex_;
         std::string worker_status_;
         std::string worker_error_;
     };
