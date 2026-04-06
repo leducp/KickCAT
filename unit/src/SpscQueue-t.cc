@@ -5,6 +5,7 @@
 #include "kickcat/SpscQueue.h"
 
 using namespace kickcat;
+using namespace kickmsg;
 
 class TestSpscQueue : public ::testing::Test
 {

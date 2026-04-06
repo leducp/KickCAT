@@ -7,6 +7,7 @@
 #include "kickcat/SpscQueue.h"
 
 using namespace kickcat;
+using namespace kickmsg;
 
 // Stress tests use a small queue (depth=16) with a small frame
 // to maximize wraparound and Treiber contention.

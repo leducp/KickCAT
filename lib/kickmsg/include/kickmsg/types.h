@@ -121,13 +121,16 @@ namespace kickmsg
     SubRingHeader* sub_ring_at(void* base, Header const* h, uint32_t idx);
     Entry*         ring_entries(SubRingHeader* ring);
     SlotMeta*      slot_at(void* base, Header const* h, uint32_t idx);
+    SlotMeta*      slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx);
     uint8_t*       slot_data(SlotMeta* slot);
     char*          header_creator_name(Header* h);
 
     uint64_t compute_config_hash(ChannelType type, RingConfig const& cfg);
 
     void     treiber_push(std::atomic<uint64_t>& top, SlotMeta* slot, uint32_t slot_idx);
+    void     treiber_push(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride, uint32_t slot_idx);
     uint32_t treiber_pop(std::atomic<uint64_t>& top, void* base, Header const* h);
+    uint32_t treiber_pop(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride);
 
 } // namespace kickmsg
 

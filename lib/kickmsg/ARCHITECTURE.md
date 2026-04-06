@@ -850,6 +850,46 @@ choice:
 The `lost()` counter lets the application detect overflow and act on it
 (e.g., log a warning, skip to the latest sample, or resize the ring).
 
+### Pool and Ring Sizing
+
+The `pool_size` and `sub_ring_capacity` parameters interact:
+
+- **`sub_ring_capacity`** is the per-subscriber jitter absorption buffer.
+  When a subscriber is descheduled, its ring fills up. Once full, new
+  messages are dropped for that subscriber regardless of free pool slots.
+  At a publish rate of R Hz, a ring of capacity C gives C/R seconds of
+  tolerance before loss.
+
+- **`pool_size`** must be at least `sub_ring_capacity * 2`. Each active
+  subscriber can hold up to `sub_ring_capacity` slot references (its
+  entire ring window). Pool slots are only freed when **all** subscribers
+  have consumed or evicted them (refcount reaches 0). If
+  `pool_size < sub_ring_capacity * 2`, the publisher will exhaust the
+  pool and fail to allocate even when individual subscribers have room.
+
+**Sizing rule:** `pool_size >= sub_ring_capacity * 2` (hard minimum).
+In practice, `pool_size = sub_ring_capacity * 4` provides comfortable
+headroom for bursty traffic and mixed subscriber speeds.
+
+The `sub_ring_capacity` is the primary tuning knob:
+
+```
+Publish rate    Ring capacity    Tolerance before loss
+──────────────────────────────────────────────────────
+  1 kHz            64              64 ms
+  1 kHz           256             256 ms
+ 10 kHz            64             6.4 ms
+ 10 kHz           256              26 ms
+100 kHz            64             640 us
+100 kHz           256             2.6 ms
+```
+
+At 1 kHz (typical control loop), even the default ring capacity of 64
+provides 64 ms of scheduling tolerance -- well beyond typical OS jitter
+(< 10 ms). Under heavy system stress with `stress-ng`, a ring of 256
+recovers ~70% of messages vs ~35% with ring=64 (10 subscribers, burst
+publish at full rate).
+
 ### Zero-copy pin CAS bound
 
 In `try_receive_view()`, the subscriber CAS-pins a slot by incrementing

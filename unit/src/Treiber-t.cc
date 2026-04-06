@@ -4,9 +4,9 @@
 #include <algorithm>
 #include <numeric>
 
-#include "kickcat/Treiber.h"
+#include "kickmsg/types.h"
 
-using namespace kickcat;
+using namespace kickmsg;
 
 class TestTreiber : public ::testing::Test
 {
@@ -17,10 +17,7 @@ public:
 
     void SetUp() override
     {
-        // Zero-init pool
         std::memset(pool_, 0, sizeof(pool_));
-
-        // Init free_top to empty
         free_top_.store(tagged_pack(0, INVALID_SLOT), std::memory_order_relaxed);
     }
 
@@ -40,19 +37,16 @@ TEST_F(TestTreiber, push_then_pop_returns_same_slot)
     uint32_t idx = treiber_pop(free_top_, pool_, SLOT_STRIDE);
     ASSERT_EQ(5u, idx);
 
-    // Now empty again
     ASSERT_EQ(INVALID_SLOT, treiber_pop(free_top_, pool_, SLOT_STRIDE));
 }
 
 TEST_F(TestTreiber, push_all_pop_all)
 {
-    // Push all slots
     for (uint32_t i = 0; i < POOL_SIZE; ++i)
     {
         treiber_push(free_top_, pool_, SLOT_STRIDE, i);
     }
 
-    // Pop all slots — should get all indices back (LIFO order)
     std::vector<uint32_t> popped;
     for (uint32_t i = 0; i < POOL_SIZE; ++i)
     {
@@ -61,13 +55,11 @@ TEST_F(TestTreiber, push_all_pop_all)
         popped.push_back(idx);
     }
 
-    // Verify we got all unique indices 0..POOL_SIZE-1
     std::sort(popped.begin(), popped.end());
     std::vector<uint32_t> expected(POOL_SIZE);
     std::iota(expected.begin(), expected.end(), 0);
     ASSERT_EQ(expected, popped);
 
-    // Stack is empty
     ASSERT_EQ(INVALID_SLOT, treiber_pop(free_top_, pool_, SLOT_STRIDE));
 }
 
@@ -92,33 +84,27 @@ TEST_F(TestTreiber, slot_data_access)
     uint32_t idx = treiber_pop(free_top_, pool_, SLOT_STRIDE);
     ASSERT_EQ(3u, idx);
 
-    SlotMeta* meta = slot_meta_at(pool_, SLOT_STRIDE, idx);
+    SlotMeta* meta = slot_at(pool_, SLOT_STRIDE, idx);
     uint8_t* data = slot_data(meta);
 
-    // Write and read back data
     std::memset(data, 0xAB, DATA_SIZE);
     ASSERT_EQ(0xAB, data[0]);
     ASSERT_EQ(0xAB, data[DATA_SIZE - 1]);
 
-    // Return slot
     treiber_push(free_top_, pool_, SLOT_STRIDE, idx);
 }
 
 TEST_F(TestTreiber, interleaved_push_pop)
 {
-    // Push 0, 1, 2
     treiber_push(free_top_, pool_, SLOT_STRIDE, 0);
     treiber_push(free_top_, pool_, SLOT_STRIDE, 1);
     treiber_push(free_top_, pool_, SLOT_STRIDE, 2);
 
-    // Pop one (should be 2, LIFO)
     uint32_t idx = treiber_pop(free_top_, pool_, SLOT_STRIDE);
     ASSERT_EQ(2u, idx);
 
-    // Push 5
     treiber_push(free_top_, pool_, SLOT_STRIDE, 5);
 
-    // Pop remaining: 5, 1, 0
     idx = treiber_pop(free_top_, pool_, SLOT_STRIDE);
     ASSERT_EQ(5u, idx);
 

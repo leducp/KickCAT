@@ -20,6 +20,12 @@ namespace kickmsg
         return reinterpret_cast<SlotMeta*>(p + idx * h->slot_stride);
     }
 
+    SlotMeta* slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx)
+    {
+        auto* p = static_cast<uint8_t*>(pool_base);
+        return reinterpret_cast<SlotMeta*>(p + idx * slot_stride);
+    }
+
     uint8_t* slot_data(SlotMeta* slot)
     {
         return reinterpret_cast<uint8_t*>(slot + 1);
@@ -72,11 +78,21 @@ namespace kickmsg
 
     uint32_t treiber_pop(std::atomic<uint64_t>& top, void* base, Header const* h)
     {
+        return treiber_pop(top, static_cast<uint8_t*>(base) + h->pool_offset, h->slot_stride);
+    }
+
+    void treiber_push(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride, uint32_t slot_idx)
+    {
+        treiber_push(top, slot_at(pool_base, slot_stride, slot_idx), slot_idx);
+    }
+
+    uint32_t treiber_pop(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride)
+    {
         // Acquire: pairs with the release in push to see the pushed slot's next_free.
         uint64_t old_top = top.load(std::memory_order_acquire);
         while (tagged_idx(old_top) != INVALID_SLOT)
         {
-            auto*    slot = slot_at(base, h, tagged_idx(old_top));
+            auto*    slot = slot_at(pool_base, slot_stride, tagged_idx(old_top));
             uint32_t next = slot->next_free.load(std::memory_order_relaxed);
             uint64_t new_top = tagged_pack(tagged_gen(old_top) + 1, next);
             // Acq_rel: release publishes the new top, acquire synchronizes with the last push.
