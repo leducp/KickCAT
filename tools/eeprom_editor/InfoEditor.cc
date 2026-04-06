@@ -14,23 +14,20 @@ namespace kickcat::eeprom_editor::info
         if (ImGui::CollapsingHeader("Config Data", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("PDI Control", info.pdi_control,
-                [&](uint16_t v){ info.pdi_control = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("PDI Control", info.pdi_control,
+                [&](uint16_t v){ info.pdi_control = v; }, 4);
 
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("PDI Config", info.pdi_configuration,
-                [&](uint16_t v){ info.pdi_configuration = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("PDI Config", info.pdi_configuration,
+                [&](uint16_t v){ info.pdi_configuration = v; }, 4);
 
             ImGui::SetNextItemWidth(100.0f);
             changed |= fieldInput("Sync Impulse", info.sync_impulse_length,
                 [&](uint16_t v){ info.sync_impulse_length = v; }, ImGuiDataType_U16);
 
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("PDI Config 2", info.pdi_configuration_2,
-                [&](uint16_t v){ info.pdi_configuration_2 = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("PDI Config 2", info.pdi_configuration_2,
+                [&](uint16_t v){ info.pdi_configuration_2 = v; }, 4);
 
             ImGui::SetNextItemWidth(100.0f);
             changed |= fieldInput("Station Alias", info.station_alias,
@@ -46,24 +43,20 @@ namespace kickcat::eeprom_editor::info
         if (ImGui::CollapsingHeader("Identity", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::SetNextItemWidth(140.0f);
-            changed |= fieldInput("Vendor ID", info.vendor_id,
-                [&](uint32_t v){ info.vendor_id = v; },
-                ImGuiDataType_U32, "0x%08X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Vendor ID", info.vendor_id,
+                [&](uint32_t v){ info.vendor_id = v; }, 8);
 
             ImGui::SetNextItemWidth(140.0f);
-            changed |= fieldInput("Product Code", info.product_code,
-                [&](uint32_t v){ info.product_code = v; },
-                ImGuiDataType_U32, "0x%08X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Product Code", info.product_code,
+                [&](uint32_t v){ info.product_code = v; }, 8);
 
             ImGui::SetNextItemWidth(140.0f);
-            changed |= fieldInput("Revision", info.revision_number,
-                [&](uint32_t v){ info.revision_number = v; },
-                ImGuiDataType_U32, "0x%08X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Revision", info.revision_number,
+                [&](uint32_t v){ info.revision_number = v; }, 8);
 
             ImGui::SetNextItemWidth(140.0f);
-            changed |= fieldInput("Serial", info.serial_number,
-                [&](uint32_t v){ info.serial_number = v; },
-                ImGuiDataType_U32, "0x%08X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Serial", info.serial_number,
+                [&](uint32_t v){ info.serial_number = v; }, 8);
         }
 
         if (ImGui::CollapsingHeader("Hardware Delays"))
@@ -84,18 +77,16 @@ namespace kickcat::eeprom_editor::info
         if (ImGui::CollapsingHeader("Bootstrap Mailbox"))
         {
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("Recv Offset##boot", info.bootstrap_recv_mbx_offset,
-                [&](uint16_t v){ info.bootstrap_recv_mbx_offset = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Recv Offset##boot", info.bootstrap_recv_mbx_offset,
+                [&](uint16_t v){ info.bootstrap_recv_mbx_offset = v; }, 4);
 
             ImGui::SetNextItemWidth(100.0f);
             changed |= fieldInput("Recv Size##boot", info.bootstrap_recv_mbx_size,
                 [&](uint16_t v){ info.bootstrap_recv_mbx_size = v; }, ImGuiDataType_U16);
 
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("Send Offset##boot", info.bootstrap_send_mbx_offset,
-                [&](uint16_t v){ info.bootstrap_send_mbx_offset = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Send Offset##boot", info.bootstrap_send_mbx_offset,
+                [&](uint16_t v){ info.bootstrap_send_mbx_offset = v; }, 4);
 
             ImGui::SetNextItemWidth(100.0f);
             changed |= fieldInput("Send Size##boot", info.bootstrap_send_mbx_size,
@@ -105,18 +96,16 @@ namespace kickcat::eeprom_editor::info
         if (ImGui::CollapsingHeader("Standard Mailbox"))
         {
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("Recv Offset##std", info.standard_recv_mbx_offset,
-                [&](uint16_t v){ info.standard_recv_mbx_offset = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Recv Offset##std", info.standard_recv_mbx_offset,
+                [&](uint16_t v){ info.standard_recv_mbx_offset = v; }, 4);
 
             ImGui::SetNextItemWidth(100.0f);
             changed |= fieldInput("Recv Size##std", info.standard_recv_mbx_size,
                 [&](uint16_t v){ info.standard_recv_mbx_size = v; }, ImGuiDataType_U16);
 
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("Send Offset##std", info.standard_send_mbx_offset,
-                [&](uint16_t v){ info.standard_send_mbx_offset = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Send Offset##std", info.standard_send_mbx_offset,
+                [&](uint16_t v){ info.standard_send_mbx_offset = v; }, 4);
 
             ImGui::SetNextItemWidth(100.0f);
             changed |= fieldInput("Send Size##std", info.standard_send_mbx_size,

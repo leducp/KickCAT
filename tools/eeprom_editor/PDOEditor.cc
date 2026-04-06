@@ -39,9 +39,8 @@ namespace kickcat::eeprom_editor::pdo
                 ImGui::Indent(8.0f);
 
                 ImGui::SetNextItemWidth(100.0f);
-                changed |= ImGui::InputScalar("Index##mapping", ImGuiDataType_U16, &mapping.index,
-                                               nullptr, nullptr, "0x%04X",
-                                               ImGuiInputTextFlags_CharsHexadecimal);
+                changed |= hexFieldInput("Index##mapping", mapping.index,
+                    [&](uint16_t v){ mapping.index = v; }, 4);
 
                 ImGui::SetNextItemWidth(60.0f);
                 changed |= ImGui::InputScalar("Sync Manager##mapping", ImGuiDataType_U8,
@@ -54,9 +53,8 @@ namespace kickcat::eeprom_editor::pdo
                 changed |= stringIndexInput("Name##mapping", &mapping.name_index, strings);
 
                 ImGui::SetNextItemWidth(100.0f);
-                changed |= ImGui::InputScalar("Flags##mapping", ImGuiDataType_U16, &mapping.flags,
-                                               nullptr, nullptr, "0x%04X",
-                                               ImGuiInputTextFlags_CharsHexadecimal);
+                changed |= hexFieldInput("Flags##mapping", mapping.flags,
+                    [&](uint16_t v){ mapping.flags = v; }, 4);
 
                 ImGui::Spacing();
 
@@ -85,9 +83,8 @@ namespace kickcat::eeprom_editor::pdo
 
                         ImGui::TableSetColumnIndex(0);
                         ImGui::SetNextItemWidth(-FLT_MIN);
-                        changed |= fieldInput("##idx", entry.index,
-                            [&](uint16_t v){ entry.index = v; },
-                            ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+                        changed |= hexFieldInput("##idx", entry.index,
+                            [&](uint16_t v){ entry.index = v; }, 4);
 
                         ImGui::TableSetColumnIndex(1);
                         ImGui::SetNextItemWidth(-FLT_MIN);
@@ -109,9 +106,8 @@ namespace kickcat::eeprom_editor::pdo
 
                         ImGui::TableSetColumnIndex(5);
                         ImGui::SetNextItemWidth(-FLT_MIN);
-                        changed |= fieldInput("##fl", entry.flags,
-                            [&](uint16_t v){ entry.flags = v; },
-                            ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+                        changed |= hexFieldInput("##fl", entry.flags,
+                            [&](uint16_t v){ entry.flags = v; }, 4);
 
                         ImGui::TableSetColumnIndex(6);
                         if (ImGui::SmallButton("Del"))

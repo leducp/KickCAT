@@ -1,7 +1,10 @@
 #ifndef KICKCAT_EEPROM_EDITOR_EDITORS_H
 #define KICKCAT_EEPROM_EDITOR_EDITORS_H
 
+#include <cinttypes>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -32,6 +35,31 @@ namespace kickcat::eeprom_editor
         {
             setter(value);
             return true;
+        }
+        return false;
+    }
+
+    // InputScalar mangles "0x%04X" format during scan sanitization, making hex
+    // fields silently reject edits.  This helper uses InputText + strtoul instead.
+    template <typename T, typename Setter>
+    bool hexFieldInput(char const* label, T value, Setter setter, int width)
+    {
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "0x%0*" PRIX64, width, static_cast<uint64_t>(value));
+
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags_CharsHexadecimal
+                                  | ImGuiInputTextFlags_CharsUppercase
+                                  | ImGuiInputTextFlags_AutoSelectAll;
+
+        if (ImGui::InputText(label, buf, sizeof(buf), flags))
+        {
+            char* end = nullptr;
+            unsigned long long parsed = std::strtoull(buf, &end, 16);
+            if (end != buf)
+            {
+                setter(static_cast<T>(parsed));
+                return true;
+            }
         }
         return false;
     }

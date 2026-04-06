@@ -50,9 +50,8 @@ namespace kickcat::eeprom_editor::syncm
 
                 ImGui::TableSetColumnIndex(1);
                 ImGui::SetNextItemWidth(-FLT_MIN);
-                changed |= fieldInput("##addr", sm.start_address,
-                    [&](uint16_t v){ sm.start_address = v; },
-                    ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+                changed |= hexFieldInput("##addr", sm.start_address,
+                    [&](uint16_t v){ sm.start_address = v; }, 4);
 
                 ImGui::TableSetColumnIndex(2);
                 ImGui::SetNextItemWidth(-FLT_MIN);
@@ -61,15 +60,13 @@ namespace kickcat::eeprom_editor::syncm
 
                 ImGui::TableSetColumnIndex(3);
                 ImGui::SetNextItemWidth(-FLT_MIN);
-                changed |= fieldInput("##ctrl", sm.control_register,
-                    [&](uint8_t v){ sm.control_register = v; },
-                    ImGuiDataType_U8, "0x%02X", ImGuiInputTextFlags_CharsHexadecimal);
+                changed |= hexFieldInput("##ctrl", sm.control_register,
+                    [&](uint8_t v){ sm.control_register = v; }, 2);
 
                 ImGui::TableSetColumnIndex(4);
                 ImGui::SetNextItemWidth(-FLT_MIN);
-                changed |= fieldInput("##stat", sm.status_register,
-                    [&](uint8_t v){ sm.status_register = v; },
-                    ImGuiDataType_U8, "0x%02X", ImGuiInputTextFlags_CharsHexadecimal);
+                changed |= hexFieldInput("##stat", sm.status_register,
+                    [&](uint8_t v){ sm.status_register = v; }, 2);
 
                 ImGui::TableSetColumnIndex(5);
                 ImGui::SetNextItemWidth(-FLT_MIN);

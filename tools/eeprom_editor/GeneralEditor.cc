@@ -110,14 +110,12 @@ namespace kickcat::eeprom_editor::general
             tooltipMarker("Negative = feeding current into bus");
 
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("Flags##gen", g.flags,
-                [&](uint8_t v){ g.flags = v; },
-                ImGuiDataType_U8, "0x%02X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Flags##gen", g.flags,
+                [&](uint8_t v){ g.flags = v; }, 2);
 
             ImGui::SetNextItemWidth(100.0f);
-            changed |= fieldInput("Phys. Memory Addr", g.physical_memory_address,
-                [&](uint16_t v){ g.physical_memory_address = v; },
-                ImGuiDataType_U16, "0x%04X", ImGuiInputTextFlags_CharsHexadecimal);
+            changed |= hexFieldInput("Phys. Memory Addr", g.physical_memory_address,
+                [&](uint16_t v){ g.physical_memory_address = v; }, 4);
         }
 
         return changed;
