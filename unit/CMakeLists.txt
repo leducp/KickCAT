@@ -14,8 +14,6 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/SBufQueue-t.cc
                             src/slave-t.cc
                             src/socket-t.cc
-                            src/SpscQueue-t.cc
-                            src/SpscQueue-stress-t.cc
                             src/Treiber-t.cc
                             src/EEPROM_factory-t.cc
                             src/EmulatedESC-t.cc
