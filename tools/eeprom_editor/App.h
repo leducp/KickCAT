@@ -33,7 +33,7 @@ namespace kickcat::eeprom_editor
         RxPDO
     };
 
-    enum class SlaveAction { Load, Flash };
+    enum class DeviceAction { Connect, Load, Flash };
 
     class App
     {
@@ -68,9 +68,9 @@ namespace kickcat::eeprom_editor
         void renderContentPanel();
         void renderHexPanel();
         void renderStatusBar();
-        void renderConnectDialog();
-        void renderSlaveDialog();
-        bool renderSlaveTable();  // returns true on double-click
+        void renderDeviceDialog();
+        bool renderInterfaceList();  // returns true on double-click
+        bool renderSlaveTable();     // returns true on double-click
         void renderPrivilegeDialog();
 
         // EEPROM state
@@ -87,9 +87,8 @@ namespace kickcat::eeprom_editor
         std::string connected_interface_;
 
         // Dialog state
-        bool show_connect_dialog_{false};
-        bool show_slave_dialog_{false};
-        SlaveAction slave_action_{SlaveAction::Load};
+        bool show_device_dialog_{false};
+        DeviceAction device_action_{DeviceAction::Connect};
         int selected_slave_index_{-1};
         std::string device_error_;
         std::vector<NetworkInterface> cached_interfaces_;

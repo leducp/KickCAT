@@ -16,13 +16,7 @@
 #include "kickcat/EEPROM/EEPROM_factory.h"
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
-#include "kickcat/SocketNull.h"
-
-#ifdef __linux__
-    #include "kickcat/OS/Linux/Socket.h"
-#elif __MINGW64__
-    #include "kickcat/OS/Windows/Socket.h"
-#endif
+#include "kickcat/helpers.h"
 
 #include "App.h"
 #include "Editors.h"
@@ -124,8 +118,7 @@ namespace kickcat::eeprom_editor
         renderStatusBar();
 
         // Modal dialogs (rendered as overlays)
-        renderConnectDialog();
-        renderSlaveDialog();
+        renderDeviceDialog();
         renderPrivilegeDialog();
     }
 
@@ -269,7 +262,8 @@ namespace kickcat::eeprom_editor
                     device_error_.clear();
                     cached_interfaces_ = listInterfaces();
                     selected_slave_index_ = -1;
-                    show_connect_dialog_ = true;
+                    device_action_ = DeviceAction::Connect;
+                    show_device_dialog_ = true;
                 }
                 if (ImGui::MenuItem("Disconnect", nullptr, false, isConnected() and not busy))
                 {
@@ -281,15 +275,15 @@ namespace kickcat::eeprom_editor
                 {
                     selected_slave_index_ = -1;
                     device_error_.clear();
-                    slave_action_ = SlaveAction::Load;
-                    show_slave_dialog_ = true;
+                    device_action_ = DeviceAction::Load;
+                    show_device_dialog_ = true;
                 }
                 if (ImGui::MenuItem("Flash to Slave...", nullptr, false, has_slaves))
                 {
                     selected_slave_index_ = -1;
                     device_error_.clear();
-                    slave_action_ = SlaveAction::Flash;
-                    show_slave_dialog_ = true;
+                    device_action_ = DeviceAction::Flash;
+                    show_device_dialog_ = true;
                 }
                 ImGui::EndMenu();
             }
@@ -510,12 +504,8 @@ namespace kickcat::eeprom_editor
         {
             try
             {
-                auto socket_nominal = std::make_shared<Socket>();
-                socket_nominal->open(interface_name);
-
-                auto socket_redundancy = std::make_shared<SocketNull>();
+                auto [socket_nominal, socket_redundancy] = createSockets(interface_name, "");
                 auto report_redundancy = [](){};
-
                 auto link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
                 link->setTimeout(2ms);
 
@@ -655,68 +645,32 @@ namespace kickcat::eeprom_editor
 
     // ── Dialog rendering ───────────────────────────────────────────────
 
-    void App::renderConnectDialog()
+    bool App::renderInterfaceList()
     {
-        if (show_connect_dialog_)
+        bool double_clicked = false;
+
+        if (ImGui::BeginChild("##iface_list", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2.5f)))
         {
-            ImGui::OpenPopup("Connect to EtherCAT Network");
-            show_connect_dialog_ = false;
-        }
-
-        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(450, 350), ImGuiCond_Appearing);
-
-        if (ImGui::BeginPopupModal("Connect to EtherCAT Network"))
-        {
-            ImGui::Text("Select a network interface:");
-            ImGui::Separator();
-
-            if (ImGui::BeginChild("##iface_list", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2.5f)))
+            for (int i = 0; i < static_cast<int>(cached_interfaces_.size()); ++i)
             {
-                for (int i = 0; i < static_cast<int>(cached_interfaces_.size()); ++i)
-                {
-                    auto const& iface = cached_interfaces_[i];
-                    char label[256];
-                    std::snprintf(label, sizeof(label), "%s  (%s)", iface.name.c_str(), iface.description.c_str());
+                auto const& iface = cached_interfaces_[i];
+                char label[256];
+                std::snprintf(label, sizeof(label), "%s  (%s)", iface.name.c_str(), iface.description.c_str());
 
-                    bool is_selected = (selected_slave_index_ == i);
-                    if (ImGui::Selectable(label, is_selected, ImGuiSelectableFlags_AllowDoubleClick))
+                bool is_selected = (selected_slave_index_ == i);
+                if (ImGui::Selectable(label, is_selected, ImGuiSelectableFlags_AllowDoubleClick))
+                {
+                    selected_slave_index_ = i;
+                    if (ImGui::IsMouseDoubleClicked(0))
                     {
-                        selected_slave_index_ = i;
-                        if (ImGui::IsMouseDoubleClicked(0))
-                        {
-                            connectToInterface(cached_interfaces_[i].name);
-                            ImGui::CloseCurrentPopup();
-                        }
+                        double_clicked = true;
                     }
                 }
             }
-            ImGui::EndChild();
-
-            if (not device_error_.empty())
-            {
-                ImGui::TextColored(COLOR_RED, "%s", device_error_.c_str());
-            }
-
-            bool can_connect = (selected_slave_index_ >= 0 and
-                                selected_slave_index_ < static_cast<int>(cached_interfaces_.size()));
-            if (not can_connect) { ImGui::BeginDisabled(); }
-            if (ImGui::Button("Connect", ImVec2(120, 0)))
-            {
-                connectToInterface(cached_interfaces_[selected_slave_index_].name);
-                ImGui::CloseCurrentPopup();
-            }
-            if (not can_connect) { ImGui::EndDisabled(); }
-
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0)))
-            {
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::EndPopup();
         }
+        ImGui::EndChild();
+
+        return double_clicked;
     }
 
     bool App::renderSlaveTable()
@@ -776,65 +730,117 @@ namespace kickcat::eeprom_editor
         return double_clicked;
     }
 
-    void App::renderSlaveDialog()
+    void App::renderDeviceDialog()
     {
-        bool is_flash = (slave_action_ == SlaveAction::Flash);
-        char const* title  = is_flash ? "Flash EEPROM to Slave" : "Load EEPROM from Slave";
-        char const* action = is_flash ? "Flash" : "Load";
+        char const* title        = nullptr;
+        char const* action_label = nullptr;
+        char const* prompt       = nullptr;
+        ImVec2 size{};
 
-        if (show_slave_dialog_)
+        switch (device_action_)
+        {
+            case DeviceAction::Connect:
+            {
+                title        = "Connect to EtherCAT Network";
+                action_label = "Connect";
+                prompt       = "Select a network interface:";
+                size         = {450, 350};
+                break;
+            }
+            case DeviceAction::Load:
+            {
+                title        = "Load EEPROM from Slave";
+                action_label = "Load";
+                prompt       = "Select the target slave:";
+                size         = {600, 400};
+                break;
+            }
+            case DeviceAction::Flash:
+            {
+                title        = "Flash EEPROM to Slave";
+                action_label = "Flash";
+                prompt       = "Select the target slave:";
+                size         = {600, 400};
+                break;
+            }
+        }
+
+        if (show_device_dialog_)
         {
             ImGui::OpenPopup(title);
-            show_slave_dialog_ = false;
+            show_device_dialog_ = false;
         }
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(size, ImGuiCond_Appearing);
 
-        if (ImGui::BeginPopupModal(title))
+        if (not ImGui::BeginPopupModal(title))
         {
-            if (is_flash)
-            {
-                ImGui::TextColored(COLOR_YELLOW,
-                    "WARNING: This will overwrite the slave's EEPROM with the current editor content.");
-                ImGui::Separator();
-            }
+            return;
+        }
 
-            ImGui::Text("Select the target slave:");
+        if (device_action_ == DeviceAction::Flash)
+        {
+            ImGui::TextColored(COLOR_YELLOW,
+                "WARNING: This will overwrite the slave's EEPROM with the current editor content.");
             ImGui::Separator();
+        }
 
-            bool confirmed = renderSlaveTable() and selected_slave_index_ >= 0;
+        ImGui::Text("%s", prompt);
+        ImGui::Separator();
 
-            if (not device_error_.empty())
+        bool confirmed = false;
+        if (device_action_ == DeviceAction::Connect)
+        {
+            confirmed = renderInterfaceList();
+        }
+        else
+        {
+            confirmed = renderSlaveTable() and selected_slave_index_ >= 0;
+        }
+
+        if (not device_error_.empty())
+        {
+            ImGui::TextColored(COLOR_RED, "%s", device_error_.c_str());
+        }
+
+        bool can_act = (selected_slave_index_ >= 0);
+        if (not can_act) { ImGui::BeginDisabled(); }
+        if (confirmed or ImGui::Button(action_label, ImVec2(120, 0)))
+        {
+            switch (device_action_)
             {
-                ImGui::TextColored(COLOR_RED, "%s", device_error_.c_str());
-            }
-
-            bool can_act = (selected_slave_index_ >= 0);
-            if (not can_act) { ImGui::BeginDisabled(); }
-            if (confirmed or ImGui::Button(action, ImVec2(120, 0)))
-            {
-                if (is_flash)
+                case DeviceAction::Connect:
                 {
-                    flashToSlave(selected_slave_index_);
+                    connectToInterface(cached_interfaces_[selected_slave_index_].name);
+                    break;
                 }
-                else
+                case DeviceAction::Load:
                 {
                     loadFromSlave(selected_slave_index_);
+                    break;
                 }
-                ImGui::CloseCurrentPopup();
+                case DeviceAction::Flash:
+                {
+                    flashToSlave(selected_slave_index_);
+                    break;
+                }
             }
-            if (not can_act) { ImGui::EndDisabled(); }
-
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel", ImVec2(120, 0)))
-            {
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::EndPopup();
+            ImGui::CloseCurrentPopup();
         }
+        if (not can_act)
+        {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0)))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
 #ifdef __linux__
@@ -849,7 +855,8 @@ namespace kickcat::eeprom_editor
         }
 
         // kdesu (KDE) — search known locations
-        constexpr char const* KDESU_PATHS[] = {
+        constexpr char const* KDESU_PATHS[] =
+        {
             "/usr/lib/x86_64-linux-gnu/libexec/kf6/kdesu",
             "/usr/lib/x86_64-linux-gnu/libexec/kf5/kdesu",
             "/usr/lib/libexec/kf6/kdesu",
@@ -927,7 +934,10 @@ namespace kickcat::eeprom_editor
             }
             else
             {
-                if (cmd.empty()) { ImGui::BeginDisabled(); }
+                if (cmd.empty())
+                {
+                    ImGui::BeginDisabled();
+                }
                 if (ImGui::Button("Grant Capability", ImVec2(160, 0)))
                 {
                     int ret = std::system(cmd.c_str());
@@ -941,7 +951,10 @@ namespace kickcat::eeprom_editor
                                                         "  sudo /usr/sbin/setcap cap_net_raw,cap_net_admin+ep ") + exe_buf;
                     }
                 }
-                if (cmd.empty()) { ImGui::EndDisabled(); }
+                if (cmd.empty())
+                {
+                    ImGui::EndDisabled();
+                }
 
                 if (cmd.empty() and have_path)
                 {
