@@ -15,6 +15,7 @@ class KickCATDev(ConanFile):
         "simulation":       [True, False],
         "tools":            [True, False],
         "master_examples":  [True, False],
+        "eeprom_editor":    [True, False],
     }
     default_options = {
         "unit_tests":       False,
@@ -22,6 +23,7 @@ class KickCATDev(ConanFile):
         "simulation":       True,
         "tools":            True,
         "master_examples":  True,
+        "eeprom_editor":    False,
     }
 
     generators = "CMakeDeps"
@@ -38,6 +40,10 @@ class KickCATDev(ConanFile):
 
         if self.options.tools or self.options.master_examples or self.options.simulation:
             self.requires("argparse/3.2")
+
+        if self.options.eeprom_editor:
+            self.requires("imgui/1.92.6")
+            self.requires("portable-file-dialogs/0.1.0")
 
         if self.settings.os == "Windows":
             self.requires("npcap/1.70")

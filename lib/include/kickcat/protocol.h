@@ -563,7 +563,7 @@ namespace kickcat
 
             uint16_t mailbox_protocol;
 
-            uint16_t reserved4[32];
+            uint16_t reserved4[33];
             uint16_t size;
             uint16_t version;
         }__attribute__((__packed__));

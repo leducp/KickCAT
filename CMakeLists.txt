@@ -16,6 +16,7 @@ option(BUILD_TOOLS             "Build tools" ON)
 option(ENABLE_ESI_PARSER       "Enable ESI XML parser" ON)
 option(ENABLE_AF_XDP           "Enable AF_XDP socket for improved performance (requires libxdp, libbpf, clang)" OFF)
 option(ENABLE_CODE_COVERAGE    "Enable code coverage (requires gcovr)" OFF)
+option(BUILD_EEPROM_EDITOR     "Build EEPROM editor GUI (requires imgui, glfw)" OFF)
 
 if (NUTTX)
   set(BUILD_MASTER_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -25,6 +26,7 @@ if (NUTTX)
   set(ENABLE_ESI_PARSER     OFF CACHE BOOL "" FORCE)
   set(ENABLE_AF_XDP         OFF CACHE BOOL "" FORCE)
   set(ENABLE_CODE_COVERAGE  OFF CACHE BOOL "" FORCE)
+  set(BUILD_EEPROM_EDITOR   OFF CACHE BOOL "" FORCE)
 endif()
 
 
@@ -77,5 +79,8 @@ if (BUILD_TOOLS)
   add_subdirectory(tools)
 endif()
 
+if (BUILD_EEPROM_EDITOR)
+  add_subdirectory(tools/eeprom_editor)
+endif()
 
 add_subdirectory(py_bindings)
