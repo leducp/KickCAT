@@ -44,19 +44,24 @@ namespace kickmsg
 
         ChannelType channel_type() const { return header()->channel_type; }
 
-        /// Reclaim leaked slots and repair poisoned ring entries.
+        /// Repair ring entries stuck at LOCKED_SEQUENCE (publisher crashed mid-commit).
+        /// Rolls the sequence back to the expected previous value, unblocking future
+        /// publishers at that position.
         ///
-        /// Leaked slots: refcount > 0 but no ring entry references them (caused by
-        /// publisher crash between allocate and publish, or drain_unconsumed race).
+        /// Safe to call under live traffic: the worst outcome is a benign double-store
+        /// if a slow (but alive) publisher commits at the same time.
+        /// Returns the number of entries repaired.
+        std::size_t repair_locked_entries();
+
+        /// Reclaim orphaned slots (refcount > 0 but not referenced by any ring entry).
+        /// These are caused by publisher crashes between allocate and publish, or by
+        /// the drain_unconsumed race on subscriber shutdown.
         ///
-        /// Poisoned entries: sequence stuck at LOCKED_SEQUENCE because a publisher
-        /// crashed while holding the two-phase commit lock. These are repaired by
-        /// rolling the sequence back to the expected previous value, unblocking
-        /// future publishers.
-        ///
-        /// Must be called from a single thread while no publishers are active,
-        /// or accepted as a best-effort scan during operation.
-        std::size_t collect_garbage();
+        /// NOT safe under live traffic: a publisher between refcount pre-set and ring
+        /// push has rc > 0 with no ring entry yet. Reclaiming it causes silent data
+        /// corruption. Call only when all publishers are quiesced.
+        /// Returns the number of slots reclaimed.
+        std::size_t reclaim_orphaned_slots();
 
     private:
         SharedMemory shm_;

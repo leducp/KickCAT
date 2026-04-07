@@ -197,11 +197,11 @@ TEST_F(RegionTest, CollectGarbageReclaimsOrphanedSlots)
 
     EXPECT_EQ(count_free(), 13u);
 
-    auto reclaimed = region.collect_garbage();
+    auto reclaimed = region.reclaim_orphaned_slots();
     EXPECT_EQ(reclaimed, 3u);
     EXPECT_EQ(count_free(), 16u);
 
-    EXPECT_EQ(region.collect_garbage(), 0u);
+    EXPECT_EQ(region.reclaim_orphaned_slots(), 0u);
 }
 
 TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
@@ -224,7 +224,7 @@ TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
         ASSERT_TRUE(pub.send(&val, sizeof(val)));
     }
 
-    auto reclaimed = region.collect_garbage();
+    auto reclaimed = region.reclaim_orphaned_slots();
     EXPECT_EQ(reclaimed, 0u);
 
     for (int i = 0; i < 4; ++i)
@@ -233,5 +233,5 @@ TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
         ASSERT_TRUE(msg.has_value());
     }
 
-    EXPECT_EQ(region.collect_garbage(), 0u);
+    EXPECT_EQ(region.reclaim_orphaned_slots(), 0u);
 }

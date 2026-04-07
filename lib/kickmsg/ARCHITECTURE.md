@@ -605,34 +605,45 @@ collection pass is needed for long-running systems.
   publishers and subscribers are paused. A live-traffic variant is
   possible with snapshot fencing but adds complexity.
 
-### Algorithm
+### Two separate operations
+
+Recovery is split into two methods with different safety profiles:
+
+**`repair_locked_entries()`** — safe under live traffic.
+
+Scans all ring entries. If `sequence == LOCKED_SEQUENCE` (publisher crashed
+mid-commit), rolls back to the expected previous sequence, unblocking future
+publishers. The worst case under live traffic is a benign double-store if a
+slow (but alive) publisher commits at the same time.
 
 ```
-collect_garbage(region):
-    hdr = region.header()
+repair_locked_entries(region):
+    for each ring i in [0, max_subs):
+        for pos in [oldest_live, write_pos):
+            if entries[pos].sequence == LOCKED_SEQUENCE:
+                entries[pos].sequence = expected_prev_seq(pos)
+```
 
-    // 1. Build a set of all slot indices referenced by any ring entry
+**`reclaim_orphaned_slots()`** — requires publisher quiescence.
+
+Scans all ring entries to build a set of referenced slot indices, then
+reclaims any slot with refcount > 0 that is not in the referenced set.
+NOT safe under live traffic: a publisher between refcount pre-set and
+ring push has rc > 0 but no ring entry yet. Reclaiming it would cause
+silent data corruption.
+
+```
+reclaim_orphaned_slots(region):
     referenced = {}
     for each ring i in [0, max_subs):
-        entries = ring_entries(ring_at(i))
-        wp = ring.write_pos
-        capacity = hdr.sub_ring_capacity
-        start = wp > capacity ? wp - capacity : 0
-        for pos in [start, wp):
-            e = entries[pos & mask]
-            if e.sequence >= pos + 1:         // committed
-                referenced.insert(e.slot_idx)
+        for pos in [oldest_live, write_pos):
+            if entries[pos].sequence >= pos + 1:
+                referenced.insert(entries[pos].slot_idx)
 
-    // 2. Reclaim orphaned slots
-    reclaimed = 0
     for idx in [0, pool_size):
-        slot = slot_at(idx)
-        if slot.refcount > 0 and idx not in referenced:
-            slot.refcount = 0
-            treiber_push(free_top, slot, idx)
-            reclaimed++
-
-    return reclaimed
+        if slot[idx].refcount > 0 and idx not in referenced:
+            slot[idx].refcount = 0
+            treiber_push(free_top, slot[idx], idx)
 ```
 
 ### What this recovers
@@ -850,6 +861,49 @@ choice:
 The `lost()` counter lets the application detect overflow and act on it
 (e.g., log a warning, skip to the latest sample, or resize the ring).
 
+### Pool exhaustion
+
+When the slot pool is empty, `allocate()` returns `nullptr` and
+`send()` returns `false`. The publisher must handle this — typically
+by yielding and retrying, or by dropping the message. No exception is
+thrown and no slot is leaked.
+
+This happens when all pool slots are in-flight (allocated, published,
+but not yet consumed and released by all subscribers). Increasing
+`pool_size` or reducing the number of active subscribers alleviates it.
+
+### CAS-lock contention
+
+During the two-phase commit, the publisher CAS-locks the ring entry
+before writing data. If another publisher holds the lock, the current
+publisher retries up to 64 times. If all retries fail, delivery to
+that subscriber ring is silently abandoned — the message is lost for
+that subscriber only. The excess refcount adjustment handles the
+slot lifecycle correctly.
+
+This only occurs under very high MPMC contention (many publishers
+competing for the same ring entry). In practice, the lock is held
+for two relaxed stores + one release store (~nanoseconds), so the
+64-retry budget is generous.
+
+### Unrecoverable slot leak (Class B)
+
+If a publisher crashes between `treiber_pop` (slot allocated, refcount=0)
+and `refcount.store(max_subs)`, the slot has refcount=0 and is neither
+in the free stack nor referenced by any ring entry. The GC cannot
+distinguish it from a legitimately free slot and will not reclaim it.
+
+This is a bounded leak: at most one slot per publisher crash in that
+specific window (a few instructions wide). The slot is recovered on
+the next `SharedRegion::create` (full reinitialization).
+
+**Operational guidance:** if your deployment involves frequent publisher
+crashes (e.g. during development, or in a watchdog-restart architecture),
+size the pool with enough headroom to absorb the expected number of
+orphans between region recreations. For a pool of 256 slots and a
+crash rate of one per hour, the leak is negligible. If crashes are
+frequent enough to matter, the region should be recreated.
+
 ### Pool and Ring Sizing
 
 The `pool_size` and `sub_ring_capacity` parameters interact:
@@ -860,16 +914,18 @@ The `pool_size` and `sub_ring_capacity` parameters interact:
   At a publish rate of R Hz, a ring of capacity C gives C/R seconds of
   tolerance before loss.
 
-- **`pool_size`** must be at least `sub_ring_capacity * 2`. Each active
-  subscriber can hold up to `sub_ring_capacity` slot references (its
-  entire ring window). Pool slots are only freed when **all** subscribers
-  have consumed or evicted them (refcount reaches 0). If
-  `pool_size < sub_ring_capacity * 2`, the publisher will exhaust the
-  pool and fail to allocate even when individual subscribers have room.
+- **`pool_size`** must be at least `sub_ring_capacity * max_subscribers`.
+  Each active subscriber can hold up to `sub_ring_capacity` slot
+  references (its entire ring window). Pool slots are only freed when
+  **all** subscribers have consumed or evicted them (refcount reaches 0).
+  With M slow subscribers each holding a full ring window, the pool
+  needs M * C slots to avoid starvation. If the pool is too small,
+  the publisher exhausts it and `allocate()` fails even when individual
+  subscribers have room.
 
-**Sizing rule:** `pool_size >= sub_ring_capacity * 2` (hard minimum).
-In practice, `pool_size = sub_ring_capacity * 4` provides comfortable
-headroom for bursty traffic and mixed subscriber speeds.
+**Sizing rule:** `pool_size >= sub_ring_capacity * max_subscribers`
+(hard minimum). In practice, add 2x headroom for bursty traffic:
+`pool_size = sub_ring_capacity * max_subscribers * 2`.
 
 The `sub_ring_capacity` is the primary tuning knob:
 

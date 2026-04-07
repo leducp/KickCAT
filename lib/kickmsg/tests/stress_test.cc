@@ -505,10 +505,15 @@ bool run_stress_test(TestConfig const& tc)
         }
     }
 
-    auto reclaimed = region.collect_garbage();
+    auto repaired = region.repair_locked_entries();
+    if (repaired > 0)
+    {
+        std::printf("  GC repaired %zu locked entries\n", repaired);
+    }
+    auto reclaimed = region.reclaim_orphaned_slots();
     if (reclaimed > 0)
     {
-        std::printf("  GC reclaimed %zu slots\n", reclaimed);
+        std::printf("  GC reclaimed %zu orphaned slots\n", reclaimed);
     }
 
     release_remaining_refs(region, cfg);
@@ -669,10 +674,15 @@ bool run_fairness_test()
         ok = false;
     }
 
-    auto reclaimed = region.collect_garbage();
+    auto repaired = region.repair_locked_entries();
+    if (repaired > 0)
+    {
+        std::printf("  GC repaired %zu locked entries\n", repaired);
+    }
+    auto reclaimed = region.reclaim_orphaned_slots();
     if (reclaimed > 0)
     {
-        std::printf("  GC reclaimed %zu slots\n", reclaimed);
+        std::printf("  GC reclaimed %zu orphaned slots\n", reclaimed);
     }
 
     release_remaining_refs(region, cfg);

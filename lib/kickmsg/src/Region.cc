@@ -167,11 +167,43 @@ namespace kickmsg
         }
     }
 
-    std::size_t SharedRegion::collect_garbage()
+    std::size_t SharedRegion::repair_locked_entries()
+    {
+        auto* b   = base();
+        auto* h   = header();
+        std::size_t repaired = 0;
+
+        for (uint64_t i = 0; i < h->max_subs; ++i)
+        {
+            auto* ring    = sub_ring_at(b, h, static_cast<uint32_t>(i));
+            auto* entries = ring_entries(ring);
+            auto  wp      = ring->write_pos.load(std::memory_order_acquire);
+            auto  cap     = h->sub_ring_capacity;
+
+            uint64_t start = (wp > cap) ? (wp - cap) : 0;
+            for (uint64_t pos = start; pos < wp; ++pos)
+            {
+                auto& e   = entries[pos & h->sub_ring_mask];
+                auto  seq = e.sequence.load(std::memory_order_acquire);
+
+                if (seq == LOCKED_SEQUENCE)
+                {
+                    uint64_t prev_seq = (pos >= cap) ? (pos - cap + 1) : 0;
+                    e.sequence.store(prev_seq, std::memory_order_release);
+                    ++repaired;
+                }
+            }
+        }
+
+        return repaired;
+    }
+
+    std::size_t SharedRegion::reclaim_orphaned_slots()
     {
         auto* b = base();
         auto* h = header();
 
+        // Build a set of all slot indices referenced by committed ring entries.
         std::vector<bool> referenced(h->pool_size, false);
 
         for (uint64_t i = 0; i < h->max_subs; ++i)
@@ -187,17 +219,8 @@ namespace kickmsg
                 auto& e   = entries[pos & h->sub_ring_mask];
                 auto  seq = e.sequence.load(std::memory_order_acquire);
 
-                // Repair poisoned entries: a publisher crashed while holding
-                // the lock. Roll back to the expected previous sequence so
-                // future publishers can CAS-lock this entry normally.
-                if (seq == LOCKED_SEQUENCE)
-                {
-                    uint64_t prev_seq = (pos >= cap) ? (pos - cap + 1) : 0;
-                    e.sequence.store(prev_seq, std::memory_order_release);
-                    continue;
-                }
-
-                if (seq >= pos + 1)
+                // Skip uncommitted and locked entries.
+                if (seq >= pos + 1 and seq != LOCKED_SEQUENCE)
                 {
                     auto idx = e.slot_idx.load(std::memory_order_relaxed);
                     if (idx < h->pool_size)
@@ -208,6 +231,7 @@ namespace kickmsg
             }
         }
 
+        // Reclaim unreferenced slots with refcount > 0.
         std::size_t reclaimed = 0;
         for (uint64_t idx = 0; idx < h->pool_size; ++idx)
         {
