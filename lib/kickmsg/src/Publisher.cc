@@ -198,7 +198,10 @@ namespace kickmsg
             auto seq = e.sequence.load(std::memory_order_acquire);
             if (seq >= expected_seq and seq != LOCKED_SEQUENCE)
             {
-                return e.slot_idx.load(std::memory_order_relaxed);
+                // Acquire: pairs with drain_unconsumed's release store of INVALID_SLOT
+                // after releasing the ring's reference. Without acquire, a publisher
+                // on AArch64/RISC-V could read a stale slot_idx and double-decrement.
+                return e.slot_idx.load(std::memory_order_acquire);
             }
             ++i;
             if ((i & (CHECK_INTERVAL - 1)) == 0)

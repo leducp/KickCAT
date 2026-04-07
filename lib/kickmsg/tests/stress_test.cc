@@ -56,7 +56,6 @@ struct SubResult
 };
 
 static std::atomic<bool> g_all_publishers_done{false};
-static std::atomic<int>  g_publishers_finished{0};
 
 void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t count)
 {
@@ -82,7 +81,6 @@ void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t count)
         }
     }
 
-    g_publishers_finished.fetch_add(1, std::memory_order_relaxed);
 }
 
 struct MsgTrace
@@ -341,7 +339,6 @@ bool run_stress_test(TestConfig const& tc)
                 tc.pool_size, tc.ring_capacity);
 
     g_all_publishers_done.store(false, std::memory_order_relaxed);
-    g_publishers_finished.store(0, std::memory_order_relaxed);
 
     kickmsg::ChannelConfig cfg;
     cfg.max_subscribers   = tc.max_subs;
@@ -350,6 +347,7 @@ bool run_stress_test(TestConfig const& tc)
     cfg.max_payload_size  = sizeof(Payload);
 
     char const* shm_name = "/kickmsg_stress_test";
+    kickmsg::SharedMemory::unlink(shm_name);
     auto region = kickmsg::SharedRegion::create(
         shm_name, kickmsg::ChannelType::PubSub, cfg, "stress_test");
 
@@ -492,6 +490,7 @@ bool run_treiber_stress()
     cfg.max_payload_size  = 8;
 
     char const* shm_name = "/kickmsg_treiber_stress";
+    kickmsg::SharedMemory::unlink(shm_name);
     auto region = kickmsg::SharedRegion::create(
         shm_name, kickmsg::ChannelType::PubSub, cfg, "treiber");
 
@@ -555,7 +554,6 @@ bool run_fairness_test()
     std::printf("--- Fairness test: 1 pub x 100000 msgs, 16 subs (ring=256, pool=512) ---\n");
 
     g_all_publishers_done.store(false, std::memory_order_relaxed);
-    g_publishers_finished.store(0, std::memory_order_relaxed);
 
     constexpr int      NUM_SUBS  = 16;
     uint32_t const     NUM_MSGS  = 100000 / TSAN_SCALE;
@@ -567,6 +565,7 @@ bool run_fairness_test()
     cfg.max_payload_size  = sizeof(Payload);
 
     char const* shm_name = "/kickmsg_fairness_test";
+    kickmsg::SharedMemory::unlink(shm_name);
     auto region = kickmsg::SharedRegion::create(
         shm_name, kickmsg::ChannelType::PubSub, cfg, "fairness");
 
@@ -648,6 +647,194 @@ bool run_fairness_test()
     return ok;
 }
 
+bool run_subscriber_churn()
+{
+    std::printf("--- Subscriber churn: subs join/leave while publisher is active ---\n");
+
+    char const* shm_name = "/kickmsg_churn_test";
+    kickmsg::SharedMemory::unlink(shm_name);
+
+    kickmsg::ChannelConfig cfg;
+    cfg.max_subscribers   = 4;
+    cfg.sub_ring_capacity = 32;
+    cfg.pool_size         = 128;
+    cfg.max_payload_size  = sizeof(Payload);
+
+    auto region = kickmsg::SharedRegion::create(
+        shm_name, kickmsg::ChannelType::PubSub, cfg, "churn");
+
+    constexpr uint32_t NUM_MSGS = 10000 / TSAN_SCALE;
+    std::atomic<bool> pub_done{false};
+
+    // Publisher runs continuously
+    std::thread pub_thread([&]()
+    {
+        kickmsg::Publisher pub(region);
+        for (uint32_t i = 0; i < NUM_MSGS; ++i)
+        {
+            Payload msg;
+            msg.magic    = Payload::MAGIC;
+            msg.pub_id   = 0;
+            msg.seq      = i;
+            msg.checksum = compute_checksum(msg);
+
+            while (pub.send(&msg, sizeof(msg)) < 0)
+            {
+                kickcat::sleep(0ns);
+            }
+        }
+        pub_done = true;
+    });
+
+    // Subscriber threads join, consume a few messages, then leave — repeatedly
+    constexpr int CHURN_ROUNDS = 20 / TSAN_SCALE;
+    std::atomic<bool> error{false};
+
+    auto churner = [&]()
+    {
+        for (int round = 0; round < CHURN_ROUNDS and not pub_done and not error; ++round)
+        {
+            kickmsg::Subscriber sub(region);
+
+            // Consume a few messages
+            for (int j = 0; j < 10; ++j)
+            {
+                auto sample = sub.try_receive();
+                if (sample and sample->len() == sizeof(Payload))
+                {
+                    Payload msg;
+                    std::memcpy(&msg, sample->data(), sizeof(msg));
+                    if (msg.magic != Payload::MAGIC or msg.checksum != compute_checksum(msg))
+                    {
+                        error = true;
+                    }
+                }
+            }
+            // Subscriber destructor runs here: active=0, in_flight spin, drain
+        }
+    };
+
+    std::vector<std::thread> churners;
+    for (int i = 0; i < 4; ++i)
+    {
+        churners.emplace_back(churner);
+    }
+
+    pub_thread.join();
+    for (auto& t : churners)
+    {
+        t.join();
+    }
+
+    bool ok = not error;
+
+    // After all threads joined, every slot should be back in the pool
+    auto repaired = region.repair_locked_entries();
+    auto reclaimed = region.reclaim_orphaned_slots();
+    if (repaired > 0)
+    {
+        std::printf("  GC repaired %zu locked entries\n", repaired);
+    }
+    if (reclaimed > 0)
+    {
+        std::printf("  GC reclaimed %zu orphaned slots\n", reclaimed);
+    }
+
+    ok &= verify_refcounts_zero(region, cfg);
+    ok &= verify_pool_free(region, cfg);
+
+    region.unlink();
+
+    if (ok)
+    {
+        std::printf("  [PASS]\n\n");
+    }
+    else
+    {
+        std::printf("  [FAIL]\n\n");
+    }
+    return ok;
+}
+
+bool run_gc_recovery()
+{
+    std::printf("--- GC recovery: repair locked entries + reclaim orphaned slots ---\n");
+
+    char const* shm_name = "/kickmsg_gc_test";
+    kickmsg::SharedMemory::unlink(shm_name);
+
+    kickmsg::ChannelConfig cfg;
+    cfg.max_subscribers   = 2;
+    cfg.sub_ring_capacity = 8;
+    cfg.pool_size         = 16;
+    cfg.max_payload_size  = 64;
+
+    auto region = kickmsg::SharedRegion::create(
+        shm_name, kickmsg::ChannelType::PubSub, cfg, "gc_test");
+
+    auto* base = region.base();
+    auto* h    = region.header();
+
+    bool ok = true;
+
+    // Simulate a publisher crash mid-commit: poison one entry with LOCKED_SEQUENCE.
+    // To have a valid ring entry, we need an active subscriber and a committed entry first.
+    {
+        kickmsg::Subscriber sub(region);
+        kickmsg::Publisher  pub(region);
+        uint32_t val = 42;
+        pub.send(&val, sizeof(val));
+        // sub and pub destructor run: drain releases everything
+    }
+
+    // Now poison the committed entry
+    {
+        auto* ring    = kickmsg::sub_ring_at(base, h, 0);
+        auto* entries = kickmsg::ring_entries(ring);
+        auto  wp      = ring->write_pos.load(std::memory_order_acquire);
+        if (wp > 0)
+        {
+            entries[(wp - 1) & h->sub_ring_mask].sequence = kickmsg::LOCKED_SEQUENCE;
+        }
+    }
+
+    auto repaired = region.repair_locked_entries();
+    if (repaired != 1)
+    {
+        std::fprintf(stderr, "  [FAIL] repair_locked_entries returned %zu, expected 1\n", repaired);
+        ok = false;
+    }
+
+    // Simulate an orphaned slot: pop one from the free stack (no ring references it)
+    // and set its refcount > 0 as if a publisher crashed after refcount pre-set.
+    {
+        auto idx = kickmsg::treiber_pop(h->free_top, base, h);
+        auto* slot = kickmsg::slot_at(base, h, idx);
+        slot->refcount = 3;
+    }
+
+    auto reclaimed = region.reclaim_orphaned_slots();
+    if (reclaimed != 1)
+    {
+        std::fprintf(stderr, "  [FAIL] reclaim_orphaned_slots returned %zu, expected 1\n", reclaimed);
+        ok = false;
+    }
+
+    ok &= verify_pool_free(region, cfg);
+
+    region.unlink();
+
+    if (ok)
+    {
+        std::printf("  [PASS]\n\n");
+    }
+    else
+    {
+        std::printf("  [FAIL]\n\n");
+    }
+    return ok;
+}
+
 int main()
 {
     std::printf("=== KickMsg Lock-Free Stress Tests ===\n\n");
@@ -668,6 +855,10 @@ int main()
     };
 
     run(run_treiber_stress());
+
+    run(run_subscriber_churn());
+
+    run(run_gc_recovery());
 
     run(run_fairness_test());
 

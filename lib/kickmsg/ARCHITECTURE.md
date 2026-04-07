@@ -602,10 +602,17 @@ The key invariant: `in_flight` is incremented by publishers BEFORE
 checking `active`, so once `in_flight == 0` after `active = 0`, no
 publisher can be mid-commit. `write_pos` is truly final.
 
-The drain walks `[oldest, wp)` — not just `[read_pos, wp)` — because
-`try_receive()` pins and unpins the slot (net-zero refcount change),
-leaving the ring's original reference (rc=1) on consumed entries.
-Those entries in `[oldest, read_pos)` must also be released.
+The drain walks `[max(oldest, start_pos), wp)` — not just
+`[read_pos, wp)` — because `try_receive()` pins and unpins the slot
+(net-zero refcount change), leaving the ring's original reference
+(rc=1) on consumed entries. Those entries in `[start_pos, read_pos)`
+must also be released. `start_pos` is the `write_pos` captured at
+subscriber construction, ensuring a reused ring slot doesn't
+double-release entries from a previous subscriber.
+
+After releasing each entry's slot, drain sets `entry.slot_idx` to
+`INVALID_SLOT` to prevent a future publisher's eviction from
+double-decrementing the refcount.
 
 For `try_receive_view()`, a live `SampleView` holds an extra pin
 (rc=2: ring ref + view pin). The drain releases the ring ref (rc→1);

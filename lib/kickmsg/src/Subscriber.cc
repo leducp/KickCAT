@@ -8,6 +8,7 @@ namespace kickmsg
         : base_{region.base()}
         , header_{region.header()}
         , ring_idx_{UINT32_MAX}
+        , start_pos_{0}
         , read_pos_{0}
         , lost_{0}
     {
@@ -20,8 +21,9 @@ namespace kickmsg
             if (ring->active.compare_exchange_strong(expected, 1,
                     std::memory_order_acq_rel))
             {
-                ring_idx_ = i;
-                read_pos_ = ring->write_pos.load(std::memory_order_acquire);
+                ring_idx_  = i;
+                start_pos_ = ring->write_pos.load(std::memory_order_acquire);
+                read_pos_  = start_pos_;
                 break;
             }
         }
@@ -56,6 +58,7 @@ namespace kickmsg
         : base_{other.base_}
         , header_{other.header_}
         , ring_idx_{other.ring_idx_}
+        , start_pos_{other.start_pos_}
         , read_pos_{other.read_pos_}
         , lost_{other.lost_}
         , recv_buf_{std::move(other.recv_buf_)}
@@ -78,11 +81,12 @@ namespace kickmsg
                 drain_unconsumed(ring);
             }
 
-            base_     = other.base_;
-            header_      = other.header_;
-            ring_idx_ = other.ring_idx_;
-            read_pos_ = other.read_pos_;
-            lost_     = other.lost_;
+            base_      = other.base_;
+            header_    = other.header_;
+            ring_idx_  = other.ring_idx_;
+            start_pos_ = other.start_pos_;
+            read_pos_  = other.read_pos_;
+            lost_      = other.lost_;
             recv_buf_ = std::move(other.recv_buf_);
 
             other.ring_idx_ = UINT32_MAX;
@@ -353,8 +357,14 @@ namespace kickmsg
             return;
         }
 
-        // The live window is [oldest, wp).
+        // Only release entries this subscriber is responsible for:
+        // [max(oldest, start_pos_), wp). Entries before start_pos_ belong
+        // to a previous subscriber on this ring slot and were already released.
         uint64_t oldest = (wp > capacity) ? (wp - capacity) : 0;
+        if (oldest < start_pos_)
+        {
+            oldest = start_pos_;
+        }
 
         // Release this ring's reference for ALL committed entries in the live window:
         // - [oldest, read_pos_): consumed by try_receive (pin/unpin is net-zero,
@@ -383,6 +393,11 @@ namespace kickmsg
                 {
                     treiber_push(header_->free_top, slot, slot_idx);
                 }
+                // Mark entry as released so a future publisher wrapping to this
+                // position won't double-decrement via release_slot.
+                // Release: ensures the refcount decrement above is visible before
+                // the publisher reads INVALID_SLOT via wait_and_capture_slot.
+                e.slot_idx.store(INVALID_SLOT, std::memory_order_release);
             }
         }
     }

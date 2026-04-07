@@ -175,6 +175,7 @@ namespace kickmsg
         void*                base_;
         Header*              header_;
         uint32_t             ring_idx_;
+        uint64_t             start_pos_;
         uint64_t             read_pos_;
         uint64_t             lost_;
         std::vector<uint8_t> recv_buf_;
