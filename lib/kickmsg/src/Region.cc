@@ -23,7 +23,7 @@ namespace kickmsg
 
         auto ring_stride = align_up(
             sizeof(SubRingHeader) + cfg.sub_ring_capacity * sizeof(Entry), CACHE_LINE);
-        auto slot_stride = align_up(sizeof(SlotMeta) + cfg.max_payload_size, CACHE_LINE);
+        auto slot_stride = align_up(sizeof(SlotHeader) + cfg.max_payload_size, CACHE_LINE);
 
         auto sub_rings_offset = header_size;
         auto pool_offset      = sub_rings_offset + cfg.max_subscribers * ring_stride;
@@ -109,7 +109,7 @@ namespace kickmsg
         auto header_size = align_up(sizeof(Header) + creator_len, CACHE_LINE);
         auto ring_stride = align_up(
             sizeof(SubRingHeader) + cfg.sub_ring_capacity * sizeof(Entry), CACHE_LINE);
-        auto slot_stride = align_up(sizeof(SlotMeta) + cfg.max_payload_size, CACHE_LINE);
+        auto slot_stride = align_up(sizeof(SlotHeader) + cfg.max_payload_size, CACHE_LINE);
         auto sub_rings_offset = header_size;
         auto pool_offset      = sub_rings_offset + cfg.max_subscribers * ring_stride;
         auto total_size       = pool_offset + cfg.pool_size * slot_stride;

@@ -14,19 +14,19 @@ namespace kickmsg
             reinterpret_cast<uint8_t*>(ring) + sizeof(SubRingHeader));
     }
 
-    SlotMeta* slot_at(void* base, Header const* h, uint32_t idx)
+    SlotHeader* slot_at(void* base, Header const* h, uint32_t idx)
     {
         auto* p = static_cast<uint8_t*>(base) + h->pool_offset;
-        return reinterpret_cast<SlotMeta*>(p + idx * h->slot_stride);
+        return reinterpret_cast<SlotHeader*>(p + idx * h->slot_stride);
     }
 
-    SlotMeta* slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx)
+    SlotHeader* slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx)
     {
         auto* p = static_cast<uint8_t*>(pool_base);
-        return reinterpret_cast<SlotMeta*>(p + idx * slot_stride);
+        return reinterpret_cast<SlotHeader*>(p + idx * slot_stride);
     }
 
-    uint8_t* slot_data(SlotMeta* slot)
+    uint8_t* slot_data(SlotHeader* slot)
     {
         return reinterpret_cast<uint8_t*>(slot + 1);
     }
@@ -63,7 +63,7 @@ namespace kickmsg
         return h;
     }
 
-    void treiber_push(std::atomic<uint64_t>& top, SlotMeta* slot, uint32_t slot_idx)
+    void treiber_push(std::atomic<uint64_t>& top, SlotHeader* slot, uint32_t slot_idx)
     {
         uint64_t old_top = top.load(std::memory_order_relaxed);
         uint64_t new_top;

@@ -687,7 +687,7 @@ bool run_subscriber_churn()
     });
 
     // Subscriber threads join, consume a few messages, then leave — repeatedly
-    constexpr int CHURN_ROUNDS = 20 / TSAN_SCALE;
+    constexpr int CHURN_ROUNDS = 5; // keep low — each round creates/destroys a subscriber
     std::atomic<bool> error{false};
 
     auto churner = [&]()

@@ -71,7 +71,7 @@ namespace kickmsg
         alignas(CACHE_LINE) std::atomic<uint64_t> free_top;
     };
 
-    struct Entry
+    struct __attribute__((packed)) Entry
     {
         std::atomic<uint64_t> sequence;
         std::atomic<uint32_t> slot_idx;
@@ -85,7 +85,7 @@ namespace kickmsg
         alignas(CACHE_LINE) std::atomic<uint64_t> write_pos;
     };
 
-    struct SlotMeta
+    struct __attribute__((packed)) SlotHeader
     {
         std::atomic<uint32_t> refcount;
         std::atomic<uint32_t> next_free;
@@ -123,14 +123,14 @@ namespace kickmsg
 
     SubRingHeader* sub_ring_at(void* base, Header const* h, uint32_t idx);
     Entry*         ring_entries(SubRingHeader* ring);
-    SlotMeta*      slot_at(void* base, Header const* h, uint32_t idx);
-    SlotMeta*      slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx);
-    uint8_t*       slot_data(SlotMeta* slot);
+    SlotHeader*      slot_at(void* base, Header const* h, uint32_t idx);
+    SlotHeader*      slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx);
+    uint8_t*       slot_data(SlotHeader* slot);
     char*          header_creator_name(Header* h);
 
     uint64_t compute_config_hash(ChannelType type, ChannelConfig const& cfg);
 
-    void     treiber_push(std::atomic<uint64_t>& top, SlotMeta* slot, uint32_t slot_idx);
+    void     treiber_push(std::atomic<uint64_t>& top, SlotHeader* slot, uint32_t slot_idx);
     void     treiber_push(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride, uint32_t slot_idx);
     uint32_t treiber_pop(std::atomic<uint64_t>& top, void* base, Header const* h);
     uint32_t treiber_pop(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride);

@@ -395,9 +395,11 @@ namespace kickmsg
                 }
                 // Mark entry as released so a future publisher wrapping to this
                 // position won't double-decrement via release_slot.
-                // Release: ensures the refcount decrement above is visible before
-                // the publisher reads INVALID_SLOT via wait_and_capture_slot.
-                e.slot_idx.store(INVALID_SLOT, std::memory_order_release);
+                // seq_cst: the release/acquire chain through active and in_flight
+                // does not formally guarantee the publisher sees this store.
+                // seq_cst establishes a total order visible to all threads.
+                // Cost: one full barrier per drained entry, only during destruction.
+                e.slot_idx.store(INVALID_SLOT, std::memory_order_seq_cst);
             }
         }
     }

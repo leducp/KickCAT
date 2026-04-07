@@ -13,7 +13,7 @@ class TestTreiber : public ::testing::Test
 public:
     static constexpr uint32_t POOL_SIZE   = 16;
     static constexpr std::size_t DATA_SIZE  = 64;
-    static constexpr std::size_t SLOT_STRIDE = align_up(sizeof(SlotMeta) + DATA_SIZE, CACHE_LINE);
+    static constexpr std::size_t SLOT_STRIDE = align_up(sizeof(SlotHeader) + DATA_SIZE, CACHE_LINE);
 
     void SetUp() override
     {
@@ -84,7 +84,7 @@ TEST_F(TestTreiber, slot_data_access)
     uint32_t idx = treiber_pop(free_top_, pool_, SLOT_STRIDE);
     ASSERT_EQ(3u, idx);
 
-    SlotMeta* meta = slot_at(pool_, SLOT_STRIDE, idx);
+    SlotHeader* meta = slot_at(pool_, SLOT_STRIDE, idx);
     uint8_t* data = slot_data(meta);
 
     std::memset(data, 0xAB, DATA_SIZE);
