@@ -22,7 +22,7 @@ int main()
     kickmsg::SharedMemory::unlink(SHM_NAME);
 
     // Configure the channel
-    kickmsg::RingConfig cfg;
+    kickmsg::ChannelConfig cfg;
     cfg.max_subscribers   = 2;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;
@@ -39,7 +39,10 @@ int main()
     // Send a few messages
     for (uint32_t i = 0; i < 5; ++i)
     {
-        pub.send(&i, sizeof(i));
+        if (pub.send(&i, sizeof(i)) < 0)
+        {
+            std::cerr << "Failed to send message " << i << "\n";
+        }
     }
 
     // Receive them (copy-based: data is copied into subscriber's buffer)

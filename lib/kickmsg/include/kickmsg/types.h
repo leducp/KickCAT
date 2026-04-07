@@ -24,7 +24,7 @@ namespace kickmsg
         Broadcast = 2,
     };
 
-    struct RingConfig
+    struct ChannelConfig
     {
         std::size_t max_subscribers   = 16;
         std::size_t sub_ring_capacity = 64;
@@ -91,10 +91,12 @@ namespace kickmsg
         std::atomic<uint32_t> next_free;
     };
 
-    static_assert(sizeof(SlotMeta) == 8,
-        "SlotMeta must be 8 bytes (two uint32_t atomics, no padding)");
-    static_assert(sizeof(Entry) == 16,
-        "Entry must be 16 bytes (one uint64_t + two uint32_t atomics, no padding)");
+    static_assert(std::atomic<uint64_t>::is_always_lock_free,
+        "KickMsg requires lock-free 64-bit atomics. "
+        "32-bit platforms (RV32, MIPS32) are not supported.");
+    static_assert(std::atomic<uint32_t>::is_always_lock_free,
+        "KickMsg requires lock-free 32-bit atomics.");
+
 
     // ---- constexpr helpers (stay in header) ----
 
@@ -126,7 +128,7 @@ namespace kickmsg
     uint8_t*       slot_data(SlotMeta* slot);
     char*          header_creator_name(Header* h);
 
-    uint64_t compute_config_hash(ChannelType type, RingConfig const& cfg);
+    uint64_t compute_config_hash(ChannelType type, ChannelConfig const& cfg);
 
     void     treiber_push(std::atomic<uint64_t>& top, SlotMeta* slot, uint32_t slot_idx);
     void     treiber_push(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride, uint32_t slot_idx);

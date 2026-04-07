@@ -28,7 +28,7 @@ KickMsg provides MPMC publish/subscribe over shared memory with zero-copy receiv
 #include <kickmsg/Subscriber.h>
 
 // Create a channel
-kickmsg::RingConfig cfg;
+kickmsg::ChannelConfig cfg;
 cfg.max_subscribers   = 4;
 cfg.sub_ring_capacity = 64;
 cfg.pool_size         = 256;

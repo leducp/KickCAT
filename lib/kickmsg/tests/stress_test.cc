@@ -250,17 +250,7 @@ SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
     return result;
 }
 
-// Release remaining slot references after all threads have joined.
-//
-// After subscriber destructors run drain_unconsumed, some ring entries
-// still hold references for slots the subscriber consumed via try_receive
-// (which does not decrement refcount -- it relies on eviction).
-//
-// We walk all committed ring entries, count references per slot, then
-// release remaining refcounts. This avoids the double-decrement bug of
-// the old per-entry approach (drain_unconsumed already released some).
-
-bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::ChannelConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -297,7 +287,7 @@ bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::RingConfig const& 
     return true;
 }
 
-bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::ChannelConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -310,11 +300,17 @@ bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::RingConfig co
             std::fprintf(stderr, "  [FAIL] ring %u still active after test\n", i);
             return false;
         }
+        if (ring->in_flight.load(std::memory_order_relaxed) != 0)
+        {
+            std::fprintf(stderr, "  [FAIL] ring %u has in_flight=%u after test\n",
+                         i, ring->in_flight.load(std::memory_order_relaxed));
+            return false;
+        }
     }
     return true;
 }
 
-bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
+bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::ChannelConfig const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -347,7 +343,7 @@ bool run_stress_test(TestConfig const& tc)
     g_all_publishers_done.store(false, std::memory_order_relaxed);
     g_publishers_finished.store(0, std::memory_order_relaxed);
 
-    kickmsg::RingConfig cfg;
+    kickmsg::ChannelConfig cfg;
     cfg.max_subscribers   = tc.max_subs;
     cfg.sub_ring_capacity = tc.ring_capacity;
     cfg.pool_size         = tc.pool_size;
@@ -489,7 +485,7 @@ bool run_treiber_stress()
 {
     std::printf("--- Treiber stack stress: 8 threads x 100000 pop/push cycles ---\n");
 
-    kickmsg::RingConfig cfg;
+    kickmsg::ChannelConfig cfg;
     cfg.max_subscribers   = 1;
     cfg.sub_ring_capacity = 4;
     cfg.pool_size         = 64;
@@ -564,7 +560,7 @@ bool run_fairness_test()
     constexpr int      NUM_SUBS  = 16;
     uint32_t const     NUM_MSGS  = 100000 / TSAN_SCALE;
 
-    kickmsg::RingConfig cfg;
+    kickmsg::ChannelConfig cfg;
     cfg.max_subscribers   = NUM_SUBS;
     cfg.sub_ring_capacity = 256;
     cfg.pool_size         = 512;

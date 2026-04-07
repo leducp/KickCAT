@@ -21,9 +21,9 @@ protected:
         shm_names_.push_back(std::move(name));
     }
 
-    kickmsg::RingConfig small_cfg()
+    kickmsg::ChannelConfig small_cfg()
     {
-        kickmsg::RingConfig cfg;
+        kickmsg::ChannelConfig cfg;
         cfg.max_subscribers   = 4;
         cfg.sub_ring_capacity = 8;
         cfg.pool_size         = 16;

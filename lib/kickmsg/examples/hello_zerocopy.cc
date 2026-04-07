@@ -23,7 +23,7 @@ int main()
     char const* SHM_NAME = "/kickmsg_hello_zerocopy";
     kickmsg::SharedMemory::unlink(SHM_NAME);
 
-    kickmsg::RingConfig cfg;
+    kickmsg::ChannelConfig cfg;
     cfg.max_subscribers   = 2;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;
@@ -37,7 +37,10 @@ int main()
 
     // Publish a large-ish payload
     char const* message = "Hello from shared memory! No copies on the receive path.";
-    pub.send(message, std::strlen(message));
+    if (pub.send(message, std::strlen(message)) < 0)
+    {
+        std::cerr << "Failed to send message\n";
+    }
 
     // Zero-copy receive: view points directly into shared memory
     auto view = sub.try_receive_view();
@@ -54,7 +57,10 @@ int main()
 
     // Verify the slot was released: we can send another message reusing it
     uint32_t seq = 42;
-    pub.send(&seq, sizeof(seq));
+    if (pub.send(&seq, sizeof(seq)) < 0)
+    {
+        std::cerr << "Failed to send seq\n";
+    }
 
     auto view2 = sub.try_receive_view();
     if (view2)

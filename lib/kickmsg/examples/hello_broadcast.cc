@@ -23,7 +23,7 @@ int main()
     kickmsg::SharedMemory::unlink("/demo_broadcast_system");
     kickmsg::SharedMemory::unlink("/demo_nodeA_mbx_reply");
 
-    kickmsg::RingConfig cfg;
+    kickmsg::ChannelConfig cfg;
     cfg.max_subscribers   = 4;
     cfg.sub_ring_capacity = 16;
     cfg.pool_size         = 32;
@@ -48,7 +48,10 @@ int main()
         // Reply to nodeA's mailbox
         auto reply_pub = node_b.open_mailbox("nodeA", "reply");
         std::string reply = "nodeB v1.2.3";
-        reply_pub.send(reply.data(), reply.size());
+        if (reply_pub.send(reply.data(), reply.size()) < 0)
+        {
+            std::cerr << "[nodeB] Failed to send reply\n";
+        }
         std::cout << "[nodeB] Sent reply to nodeA's mailbox\n";
     });
 
@@ -62,7 +65,10 @@ int main()
 
     // Broadcast a request
     std::string request = "version?";
-    pub.send(request.data(), request.size());
+    if (pub.send(request.data(), request.size()) < 0)
+    {
+        std::cerr << "[nodeA] Failed to broadcast request\n";
+    }
     std::cout << "[nodeA] Broadcast: '" << request << "'\n";
 
     // Wait for the reply on our personal mailbox

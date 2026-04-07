@@ -71,7 +71,7 @@ namespace kickmsg
 
             // Announce presence before checking active, so the subscriber's
             // destructor can wait for us to finish via in_flight == 0.
-            ring->in_flight.fetch_add(1, std::memory_order_acquire);
+            ring->in_flight.fetch_add(1, std::memory_order_release);
 
             if (ring->active.load(std::memory_order_acquire) == 0)
             {

@@ -126,7 +126,7 @@ The region header is self-describing and forward-compatible:
 Header (at offset 0)
 ┌───────────────────────────────────────────────────────────┐
 │  magic              0x4B49434B4D534721 ("KICKMSG!")       │
-│  version            1                                     │
+│  version            2                                     │
 │  channel_type       PubSub | Broadcast                    │
 │  total_size         total mmap size in bytes               │
 │  sub_rings_offset   byte offset to first subscriber ring  │
@@ -238,7 +238,16 @@ Publisher
    |                               Done BEFORE publishing to any ring, so
    |                               the slot cannot be freed prematurely.
    v
-4. For each active Ring[i]:
+4. For each Ring[i]:
+   |
+   |-- in_flight.fetch_add(1)      Announce presence BEFORE checking active.
+   |                                The subscriber destructor spins until
+   |                                in_flight == 0 to ensure write_pos is
+   |                                final before draining.
+   |
+   |-- if active == 0:             Ring has no subscriber.
+   |     in_flight.fetch_sub(1)    Release and skip to next ring.
+   |     continue
    |
    |-- CAS write_pos: 42 -> 43    Claim position 42 (MPSC-safe).
    |   Multiple publishers may     Losers retry with updated value.
@@ -276,7 +285,8 @@ Publisher
    |   |                             (just two relaxed stores + one
    |   |                             release store).
    |   |   If expected is neither    Entry was committed by another
-   |   |     prev_seq nor LOCKED     publisher. Give up on this ring.
+   |   |     prev_seq nor LOCKED     publisher. in_flight.fetch_sub(1),
+   |   |                             give up on this ring.
    |   |
    |   | Write entry fields (relaxed, safe because we hold the lock):
    |   |   entry.slot_idx    = 3
@@ -287,6 +297,9 @@ Publisher
    |                                 Subscribers and future publishers
    |                                 at this position will see all
    |                                 preceding stores.
+   |
+   |-- in_flight.fetch_sub(1)      Release ring — subscriber destructor
+   |                                can now observe in_flight == 0.
    |
    '-- futex_wake_all(write_pos)   Wake any sleeping subscribers.
    |
@@ -439,9 +452,17 @@ A slot goes through the following states:
     ▼
   PUBLISHED (referenced by N ring entries and/or SampleViews)
     │
-    │  Sources of refcount decrement:
+    │  Sources of refcount decrement (one per ring):
     │  - Ring overflow eviction     (publisher evicts oldest entry)
-    │  - try_receive() completion   (copy done, reference consumed)
+    │  - drain_unconsumed()         (subscriber destructor releases
+    │                                the ring's reference for all
+    │                                entries in the live window)
+    │
+    │  Note: try_receive() pins (rc+1) and unpins (rc-1) the slot
+    │  during memcpy — net zero. The ring's original reference is
+    │  released later by eviction or drain, not by try_receive().
+    │
+    │  Additional pin source:
     │  - ~SampleView() destruction  (zero-copy pin released)
     │
     │  Each decrement is fetch_sub(1). Only the one that
@@ -521,7 +542,7 @@ On timeout (returns `INVALID_SLOT`), the publisher:
 2. Overwrites the entry with its own data via the two-phase commit
 3. The ring resumes normal operation
 
-The timeout is configurable per channel via `RingConfig::commit_timeout`
+The timeout is configurable per channel via `ChannelConfig::commit_timeout`
 (default: 100 ms). The tradeoff:
 
 - **Shorter timeout** → faster recovery after a crash, but higher risk
@@ -692,16 +713,21 @@ After write_pos CAS, before          Entry is overwritten after
 ### API
 
 ```cpp
-std::size_t reclaimed = region.collect_garbage();
+// Safe under live traffic — repairs poisoned ring entries.
+std::size_t repaired = region.repair_locked_entries();
+
+// Requires publisher quiescence — reclaims orphaned slots.
+std::size_t reclaimed = region.reclaim_orphaned_slots();
 ```
 
-`SharedRegion::collect_garbage()` walks all rings and the entire pool,
-reclaims orphaned slots, and returns the number of slots recovered.
+`repair_locked_entries()` scans all ring entries and rolls back any
+stuck at `LOCKED_SEQUENCE`. Safe to call at any time.
 
-The caller must ensure no publishers or subscribers are actively using
-the region, or accept best-effort results. A standalone CLI utility
-that opens the region read-write, runs GC, and reports results could
-also be built on top of this method.
+`reclaim_orphaned_slots()` walks all rings to build a referenced-slot
+set, then frees any unreferenced slot with refcount > 0. NOT safe
+under live traffic — a publisher between refcount pre-set and ring
+push would have its slot reclaimed, causing data corruption. Call
+only when all publishers are quiesced.
 
 
 ## ABA Safety
@@ -756,9 +782,20 @@ What varies across architectures is the **cost** of atomic operations:
   to x86, but remain single instructions -- not full memory barriers.
   `relaxed` loads/stores are free on ARM as well.
 
-Both architectures support native 64-bit atomic CAS on aligned values, so
-there is no risk of torn reads. The correctness is portable; only the
-per-operation latency differs (by a few nanoseconds).
+Additional supported architectures:
+
+- **RISC-V (RV64)**: weak memory model (RVWMO). Lock-free 64-bit atomics
+  via `LR`/`SC` pairs. Acquire/release use `fence` instructions.
+  Performance characteristics similar to AArch64.
+- **MIPS64**: provides 64-bit `LL`/`SC` for lock-free CAS.
+
+**Excluded**: 32-bit platforms (RV32, MIPS32, ARMv7) lack native 64-bit
+atomic operations. The library enforces this at compile time via
+`static_assert(std::atomic<uint64_t>::is_always_lock_free)`.
+
+All supported architectures provide native 64-bit atomic CAS on aligned
+values, so there is no risk of torn reads. The correctness is portable;
+only the per-operation latency differs (by a few nanoseconds).
 
 ### Platform Abstraction (KickCAT Integration)
 
@@ -816,7 +853,7 @@ Blocking subscribers to wait for new data could be done with a
 All patterns are conventions on top of the same MPMC pool + rings engine.
 The backbone does not enforce these constraints; they are established by
 the `Node` API which controls how shared-memory regions are named and
-how `RingConfig` defaults are set.
+how `ChannelConfig` defaults are set.
 
 ```
 PubSub (1-to-N)         Broadcast (N-to-N)         Mailbox (N-to-1)
@@ -882,9 +919,11 @@ The `lost()` counter lets the application detect overflow and act on it
 ### Pool exhaustion
 
 When the slot pool is empty, `allocate()` returns `nullptr` and
-`send()` returns `false`. The publisher must handle this — typically
-by yielding and retrying, or by dropping the message. No exception is
-thrown and no slot is leaked.
+`send()` returns `-EAGAIN`. If the payload exceeds `max_payload_size`,
+`send()` returns `-EMSGSIZE`. On success, `send()` returns the number
+of bytes written. The publisher must handle errors — typically by
+yielding and retrying on `-EAGAIN`, or failing on `-EMSGSIZE`.
+No exception is thrown and no slot is leaked.
 
 This happens when all pool slots are in-flight (allocated, published,
 but not yet consumed and released by all subscribers). Increasing

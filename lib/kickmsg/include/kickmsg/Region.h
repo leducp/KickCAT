@@ -25,13 +25,13 @@ namespace kickmsg
         ~SharedRegion() = default;
 
         static SharedRegion create(char const* name, ChannelType type,
-                                   RingConfig const& cfg,
+                                   ChannelConfig const& cfg,
                                    char const* creator_name = "");
 
         static SharedRegion open(char const* name);
 
         static SharedRegion create_or_open(char const* name, ChannelType type,
-                                           RingConfig const& cfg,
+                                           ChannelConfig const& cfg,
                                            char const* creator_name = "");
 
         void unlink();

@@ -20,9 +20,9 @@ protected:
         kickmsg::SharedMemory::unlink(SHM_NAME);
     }
 
-    kickmsg::RingConfig default_cfg()
+    kickmsg::ChannelConfig default_cfg()
     {
-        kickmsg::RingConfig cfg;
+        kickmsg::ChannelConfig cfg;
         cfg.max_subscribers   = 4;
         cfg.sub_ring_capacity = 8;
         cfg.pool_size         = 16;
@@ -82,6 +82,52 @@ TEST_F(PublisherTest, AllocateTooLargeReturnsNull)
     kickmsg::Publisher pub(region);
 
     EXPECT_EQ(pub.allocate(cfg.max_payload_size + 1), nullptr);
+}
+
+TEST_F(PublisherTest, SendReturnsEmsgsize)
+{
+    auto cfg    = default_cfg();
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    kickmsg::Publisher pub(region);
+
+    uint8_t buf[128]{};
+    EXPECT_EQ(pub.send(buf, cfg.max_payload_size + 1), -EMSGSIZE);
+}
+
+TEST_F(PublisherTest, SendReturnsEagainOnPoolExhaustion)
+{
+    kickmsg::ChannelConfig cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 2;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    kickmsg::Subscriber sub(region);
+    kickmsg::Publisher  pub(region);
+
+    uint32_t val = 1;
+    // Fill the pool (2 slots)
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+    // Pool exhausted
+    EXPECT_EQ(pub.send(&val, sizeof(val)), -EAGAIN);
+}
+
+TEST_F(PublisherTest, DroppedCounterZeroInNormalUse)
+{
+    auto cfg    = default_cfg();
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+
+    kickmsg::Subscriber sub(region);
+    kickmsg::Publisher  pub(region);
+
+    for (int i = 0; i < 5; ++i)
+    {
+        ASSERT_GE(pub.send(&i, sizeof(i)), 0);
+    }
+
+    EXPECT_EQ(pub.dropped(), 0u);
 }
 
 TEST_F(PublisherTest, MultipleMessages)

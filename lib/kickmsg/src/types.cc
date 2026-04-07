@@ -38,7 +38,7 @@ namespace kickmsg
 
     // FNV-1a hash of config fields, used to detect parameter mismatches
     // when opening an existing region.
-    uint64_t compute_config_hash(ChannelType type, RingConfig const& cfg)
+    uint64_t compute_config_hash(ChannelType type, ChannelConfig const& cfg)
     {
         constexpr uint64_t FNV_OFFSET = 14695981039346656037ULL;
         constexpr uint64_t FNV_PRIME  = 1099511628211ULL;

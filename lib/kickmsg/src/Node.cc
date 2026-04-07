@@ -9,7 +9,7 @@ namespace kickmsg
     {
     }
 
-    Publisher Node::advertise(char const* topic, RingConfig const& cfg)
+    Publisher Node::advertise(char const* topic, ChannelConfig const& cfg)
     {
         auto shm_name = make_topic_name(topic);
         regions_.emplace_back(
@@ -24,7 +24,7 @@ namespace kickmsg
         return Subscriber(regions_.back());
     }
 
-    BroadcastHandle Node::join_broadcast(char const* channel, RingConfig const& cfg)
+    BroadcastHandle Node::join_broadcast(char const* channel, ChannelConfig const& cfg)
     {
         auto shm_name = make_broadcast_name(channel);
         regions_.emplace_back(
@@ -34,9 +34,9 @@ namespace kickmsg
         return BroadcastHandle{Publisher{region}, Subscriber{region}};
     }
 
-    Subscriber Node::create_mailbox(char const* tag, RingConfig const& cfg)
+    Subscriber Node::create_mailbox(char const* tag, ChannelConfig const& cfg)
     {
-        RingConfig mbx_cfg = cfg;
+        ChannelConfig mbx_cfg = cfg;
         mbx_cfg.max_subscribers = 1;
         auto shm_name = make_mailbox_name(name_.c_str(), tag);
         regions_.emplace_back(
