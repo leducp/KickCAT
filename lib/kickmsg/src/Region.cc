@@ -36,7 +36,6 @@ namespace kickmsg
         std::memset(region.base(), 0, total_size);
 
         auto* h = region.header();
-        h->magic             = MAGIC;
         h->version           = VERSION;
         h->channel_type      = type;
         h->total_size        = total_size;
@@ -74,7 +73,11 @@ namespace kickmsg
             ring->write_pos.store(0, std::memory_order_relaxed);
         }
 
+        // Write magic LAST — create_or_open() polls magic as the "init complete"
+        // sentinel. The release fence ensures all preceding stores are visible
+        // before magic becomes MAGIC.
         std::atomic_thread_fence(std::memory_order_release);
+        h->magic = MAGIC;
         return region;
     }
 

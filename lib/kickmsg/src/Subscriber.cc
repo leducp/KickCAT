@@ -325,8 +325,20 @@ namespace kickmsg
 
     void Subscriber::drain_unconsumed(SubRingHeader* ring)
     {
-        auto wp       = ring->write_pos.load(std::memory_order_acquire);
-        auto capacity = header_->sub_ring_capacity;
+        auto* entries = ring_entries(ring);
+        auto  capacity = header_->sub_ring_capacity;
+
+        // Re-read write_pos until stable: after active=0 (release), a publisher
+        // that already read active=1 may still be mid-commit. Once write_pos
+        // stops advancing, all in-flight publishers have finished.
+        uint64_t wp = 0;
+        uint64_t prev_wp = 0;
+        do
+        {
+            prev_wp = wp;
+            wp = ring->write_pos.load(std::memory_order_acquire);
+        }
+        while (wp != prev_wp);
 
         if (wp <= read_pos_)
         {
@@ -338,7 +350,6 @@ namespace kickmsg
             read_pos_ = wp - capacity;
         }
 
-        auto* entries = ring_entries(ring);
         while (read_pos_ < wp)
         {
             auto  idx = read_pos_ & header_->sub_ring_mask;

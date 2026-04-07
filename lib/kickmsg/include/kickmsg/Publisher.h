@@ -23,10 +23,35 @@ namespace kickmsg
         {
         }
 
+        ~Publisher();
+
         Publisher(Publisher const&) = delete;
         Publisher& operator=(Publisher const&) = delete;
-        Publisher(Publisher&&) noexcept = default;
-        Publisher& operator=(Publisher&&) noexcept = default;
+
+        Publisher(Publisher&& other) noexcept
+            : base_{other.base_}
+            , header_{other.header_}
+            , commit_timeout_{other.commit_timeout_}
+            , pending_slot_{other.pending_slot_}
+            , pending_len_{other.pending_len_}
+        {
+            other.pending_slot_ = INVALID_SLOT;
+        }
+
+        Publisher& operator=(Publisher&& other) noexcept
+        {
+            if (this != &other)
+            {
+                release_pending();
+                base_           = other.base_;
+                header_         = other.header_;
+                commit_timeout_ = other.commit_timeout_;
+                pending_slot_   = other.pending_slot_;
+                pending_len_    = other.pending_len_;
+                other.pending_slot_ = INVALID_SLOT;
+            }
+            return *this;
+        }
 
         void* allocate(std::size_t len);
         std::size_t publish();
@@ -36,6 +61,7 @@ namespace kickmsg
         static uint32_t wait_and_capture_slot(Entry& e, uint64_t expected_seq,
                                               microseconds timeout);
         void release_slot(uint32_t idx);
+        void release_pending();
 
         void*        base_;
         Header*      header_;

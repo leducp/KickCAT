@@ -2,12 +2,32 @@
 
 namespace kickmsg
 {
+    Publisher::~Publisher()
+    {
+        release_pending();
+    }
+
+    void Publisher::release_pending()
+    {
+        if (pending_slot_ != INVALID_SLOT)
+        {
+            // Return the uncommitted slot to the free-stack.
+            auto* slot = slot_at(base_, header_, pending_slot_);
+            treiber_push(header_->free_top, slot, pending_slot_);
+            pending_slot_ = INVALID_SLOT;
+            pending_len_  = 0;
+        }
+    }
+
     void* Publisher::allocate(std::size_t len)
     {
         if (len > header_->slot_data_size)
         {
             return nullptr;
         }
+
+        // Release any previously allocated but unpublished slot.
+        release_pending();
 
         auto slot_idx = treiber_pop(header_->free_top, base_, header_);
         if (slot_idx == INVALID_SLOT)
