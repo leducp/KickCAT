@@ -99,7 +99,7 @@ namespace kickcat
     int32_t TapSocket::write(void const* frame, int32_t frame_size)
     {
         int32_t toCopy = std::min(static_cast<int32_t>(MAX_FRAME_SIZE), frame_size);
-        if (not publisher_->send(frame, static_cast<std::size_t>(toCopy)))
+        if (publisher_->send(frame, static_cast<std::size_t>(toCopy)) < 0)
         {
             return -EAGAIN;
         }

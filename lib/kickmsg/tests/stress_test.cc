@@ -1,3 +1,5 @@
+#include "kickcat/OS/Time.h"
+
 #include "kickmsg/Publisher.h"
 #include "kickmsg/Subscriber.h"
 
@@ -9,6 +11,8 @@
 #include <cstring>
 #include <thread>
 #include <vector>
+
+using namespace kickcat;
 
 #if defined(__SANITIZE_THREAD__) || defined(__has_feature) && __has_feature(thread_sanitizer)
     constexpr int TSAN_SCALE = 100;
@@ -66,9 +70,15 @@ void publisher_thread(kickmsg::SharedRegion& region, int pub_id, uint32_t count)
         msg.seq    = i;
         msg.checksum = compute_checksum(msg);
 
-        while (not pub.send(&msg, sizeof(msg)))
+        int32_t rc;
+        while ((rc = pub.send(&msg, sizeof(msg))) < 0)
         {
-            std::this_thread::yield();
+            if (rc != -EAGAIN)
+            {
+                std::fprintf(stderr, "  [FATAL] publisher %d: send() returned %d\n", pub_id, rc);
+                std::abort();
+            }
+            kickcat::sleep(0ns);
         }
     }
 
@@ -249,64 +259,6 @@ SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
 // We walk all committed ring entries, count references per slot, then
 // release remaining refcounts. This avoids the double-decrement bug of
 // the old per-entry approach (drain_unconsumed already released some).
-void release_remaining_refs(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
-{
-    auto* base = region.base();
-    auto* hdr  = region.header();
-
-    // Count ring-entry references per slot
-    std::vector<uint32_t> entry_refs(cfg.pool_size, 0);
-
-    for (uint32_t i = 0; i < cfg.max_subscribers; ++i)
-    {
-        auto* ring    = kickmsg::sub_ring_at(base, hdr, i);
-        auto  wp      = ring->write_pos.load(std::memory_order_acquire);
-        auto* entries = kickmsg::ring_entries(ring);
-
-        auto cap   = hdr->sub_ring_capacity;
-        uint64_t start = 0;
-        if (wp > cap)
-        {
-            start = wp - cap;
-        }
-
-        for (uint64_t pos = start; pos < wp; ++pos)
-        {
-            auto  idx = pos & hdr->sub_ring_mask;
-            auto& e   = entries[idx];
-            auto  seq = e.sequence.load(std::memory_order_relaxed);
-            if (seq < pos + 1 or seq == kickmsg::LOCKED_SEQUENCE)
-            {
-                continue; // uncommitted or locked
-            }
-
-            auto si = e.slot_idx.load(std::memory_order_relaxed);
-            if (si < cfg.pool_size)
-            {
-                entry_refs[si]++;
-            }
-        }
-    }
-
-    // Force-release any slot still holding refs.
-    // After drain_unconsumed, actual refcount <= entry_refs (some refs
-    // were already released). We set refcount to 0 and push to free stack.
-    for (uint32_t idx = 0; idx < cfg.pool_size; ++idx)
-    {
-        auto* slot = kickmsg::slot_at(base, hdr, idx);
-        auto  rc   = slot->refcount.load(std::memory_order_acquire);
-        if (rc > 0)
-        {
-            if (rc > entry_refs[idx])
-            {
-                std::fprintf(stderr, "  [WARN] slot %u: refcount %u > ring refs %u "
-                             "(possible refcount leak)\n", idx, rc, entry_refs[idx]);
-            }
-            slot->refcount.store(0, std::memory_order_release);
-            kickmsg::treiber_push(hdr->free_top, slot, idx);
-        }
-    }
-}
 
 bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::RingConfig const& cfg)
 {
@@ -516,8 +468,6 @@ bool run_stress_test(TestConfig const& tc)
         std::printf("  GC reclaimed %zu orphaned slots\n", reclaimed);
     }
 
-    release_remaining_refs(region, cfg);
-
     all_ok &= verify_refcounts_zero(region, cfg);
     all_ok &= verify_pool_free(region, cfg);
     all_ok &= verify_rings_inactive(region, cfg);
@@ -564,7 +514,7 @@ bool run_treiber_stress()
             if (idx == kickmsg::INVALID_SLOT)
             {
                 contention_hits.fetch_add(1, std::memory_order_relaxed);
-                std::this_thread::yield();
+                kickcat::sleep(0ns);
                 --i;
                 continue;
             }
@@ -685,7 +635,6 @@ bool run_fairness_test()
         std::printf("  GC reclaimed %zu orphaned slots\n", reclaimed);
     }
 
-    release_remaining_refs(region, cfg);
     ok &= verify_refcounts_zero(region, cfg);
     ok &= verify_pool_free(region, cfg);
     ok &= verify_rings_inactive(region, cfg);
@@ -727,75 +676,89 @@ int main()
     run(run_fairness_test());
 
     // Copy-based receive tests
-    run(run_stress_test(TestConfig{
-        .num_publishers  = 2,
-        .num_subscribers = 4,
-        .msgs_per_pub    = 100000 / TSAN_SCALE,
-        .pool_size       = 256,
-        .ring_capacity   = 64,
-        .max_subs        = 8,
-    }));
+    {
+        TestConfig tc;
+        tc.num_publishers  = 2;
+        tc.num_subscribers = 4;
+        tc.msgs_per_pub    = 100000 / TSAN_SCALE;
+        tc.pool_size       = 256;
+        tc.ring_capacity   = 64;
+        tc.max_subs        = 8;
+        run(run_stress_test(tc));
+    }
 
-    run(run_stress_test(TestConfig{
-        .num_publishers  = 8,
-        .num_subscribers = 8,
-        .msgs_per_pub    = 50000 / TSAN_SCALE,
-        .pool_size       = 128,
-        .ring_capacity   = 32,
-        .max_subs        = 16,
-    }));
+    {
+        TestConfig tc;
+        tc.num_publishers  = 8;
+        tc.num_subscribers = 8;
+        tc.msgs_per_pub    = 50000 / TSAN_SCALE;
+        tc.pool_size       = 128;
+        tc.ring_capacity   = 32;
+        tc.max_subs        = 16;
+        run(run_stress_test(tc));
+    }
 
-    run(run_stress_test(TestConfig{
-        .num_publishers  = 1,
-        .num_subscribers = 1,
-        .msgs_per_pub    = 500000 / TSAN_SCALE,
-        .pool_size       = 64,
-        .ring_capacity   = 16,
-        .max_subs        = 2,
-    }));
+    {
+        TestConfig tc;
+        tc.num_publishers  = 1;
+        tc.num_subscribers = 1;
+        tc.msgs_per_pub    = 500000 / TSAN_SCALE;
+        tc.pool_size       = 64;
+        tc.ring_capacity   = 16;
+        tc.max_subs        = 2;
+        run(run_stress_test(tc));
+    }
 
     // High contention: many pubs, small pool, heavy overflow
-    run(run_stress_test(TestConfig{
-        .num_publishers  = 16,
-        .num_subscribers = 16,
-        .msgs_per_pub    = 20000 / TSAN_SCALE,
-        .pool_size       = 32,
-        .ring_capacity   = 8,
-        .max_subs        = 16,
-    }));
+    {
+        TestConfig tc;
+        tc.num_publishers  = 16;
+        tc.num_subscribers = 16;
+        tc.msgs_per_pub    = 20000 / TSAN_SCALE;
+        tc.pool_size       = 32;
+        tc.ring_capacity   = 8;
+        tc.max_subs        = 16;
+        run(run_stress_test(tc));
+    }
 
     // Zero-copy receive tests -- exercises SampleView pin CAS,
     // refcount increment/decrement, and destructor release path
-    run(run_stress_test(TestConfig{
-        .num_publishers  = 2,
-        .num_subscribers = 4,
-        .msgs_per_pub    = 100000 / TSAN_SCALE,
-        .pool_size       = 256,
-        .ring_capacity   = 64,
-        .max_subs        = 8,
-        .use_zerocopy    = true,
-    }));
+    {
+        TestConfig tc;
+        tc.num_publishers  = 2;
+        tc.num_subscribers = 4;
+        tc.msgs_per_pub    = 100000 / TSAN_SCALE;
+        tc.pool_size       = 256;
+        tc.ring_capacity   = 64;
+        tc.max_subs        = 8;
+        tc.use_zerocopy    = true;
+        run(run_stress_test(tc));
+    }
 
-    run(run_stress_test(TestConfig{
-        .num_publishers  = 8,
-        .num_subscribers = 8,
-        .msgs_per_pub    = 50000 / TSAN_SCALE,
-        .pool_size       = 128,
-        .ring_capacity   = 32,
-        .max_subs        = 16,
-        .use_zerocopy    = true,
-    }));
+    {
+        TestConfig tc;
+        tc.num_publishers  = 8;
+        tc.num_subscribers = 8;
+        tc.msgs_per_pub    = 50000 / TSAN_SCALE;
+        tc.pool_size       = 128;
+        tc.ring_capacity   = 32;
+        tc.max_subs        = 16;
+        tc.use_zerocopy    = true;
+        run(run_stress_test(tc));
+    }
 
     // High contention zero-copy
-    run(run_stress_test(TestConfig{
-        .num_publishers  = 16,
-        .num_subscribers = 16,
-        .msgs_per_pub    = 20000 / TSAN_SCALE,
-        .pool_size       = 32,
-        .ring_capacity   = 8,
-        .max_subs        = 16,
-        .use_zerocopy    = true,
-    }));
+    {
+        TestConfig tc;
+        tc.num_publishers  = 16;
+        tc.num_subscribers = 16;
+        tc.msgs_per_pub    = 20000 / TSAN_SCALE;
+        tc.pool_size       = 32;
+        tc.ring_capacity   = 8;
+        tc.max_subs        = 16;
+        tc.use_zerocopy    = true;
+        run(run_stress_test(tc));
+    }
 
     std::printf("=== Summary: %d passed, %d failed ===\n", pass, fail);
     if (fail > 0)

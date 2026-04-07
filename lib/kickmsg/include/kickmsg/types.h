@@ -11,7 +11,7 @@ namespace kickmsg
     using namespace std::chrono;
 
     constexpr uint64_t    MAGIC           = 0x4B49434B4D534721ULL; // "KICKMSG!"
-    constexpr uint32_t    VERSION         = 1;
+    constexpr uint32_t    VERSION         = 2;
     constexpr uint32_t    INVALID_SLOT    = UINT32_MAX;
     constexpr uint64_t    LOCKED_SEQUENCE = UINT64_MAX;
     constexpr std::size_t CACHE_LINE      = 64;
@@ -81,6 +81,7 @@ namespace kickmsg
     struct SubRingHeader
     {
         alignas(CACHE_LINE) std::atomic<uint32_t> active;
+        alignas(CACHE_LINE) std::atomic<uint32_t> in_flight;
         alignas(CACHE_LINE) std::atomic<uint64_t> write_pos;
     };
 

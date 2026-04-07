@@ -48,7 +48,7 @@ TEST_F(NodeTest, AdvertiseAndSubscribe)
     auto sub = sub_node.subscribe("data");
 
     uint32_t val = 42;
-    ASSERT_TRUE(pub.send(&val, sizeof(val)));
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
 
     auto sample = sub.try_receive();
     ASSERT_TRUE(sample.has_value());
@@ -78,7 +78,7 @@ TEST_F(NodeTest, JoinBroadcastTwoNodes)
     auto [pub_b, sub_b] = node_b.join_broadcast("events", cfg);
 
     std::string msg_a = "hello from A";
-    ASSERT_TRUE(pub_a.send(msg_a.data(), msg_a.size()));
+    ASSERT_GE(pub_a.send(msg_a.data(), msg_a.size()), 0);
 
     auto recv_b = sub_b.try_receive();
     ASSERT_TRUE(recv_b.has_value());
@@ -89,7 +89,7 @@ TEST_F(NodeTest, JoinBroadcastTwoNodes)
     EXPECT_EQ(std::string(static_cast<char const*>(recv_a->data()), recv_a->len()), msg_a);
 
     std::string msg_b = "reply from B";
-    ASSERT_TRUE(pub_b.send(msg_b.data(), msg_b.size()));
+    ASSERT_GE(pub_b.send(msg_b.data(), msg_b.size()), 0);
 
     auto recv_a2 = sub_a.try_receive();
     ASSERT_TRUE(recv_a2.has_value());
@@ -109,7 +109,7 @@ TEST_F(NodeTest, MailboxPattern)
     auto reply_pub = node_b.open_mailbox("nodeA", "inbox");
 
     std::string reply = "version 1.0";
-    ASSERT_TRUE(reply_pub.send(reply.data(), reply.size()));
+    ASSERT_GE(reply_pub.send(reply.data(), reply.size()), 0);
 
     auto msg = inbox.try_receive();
     ASSERT_TRUE(msg.has_value());
@@ -133,8 +133,8 @@ TEST_F(NodeTest, MailboxMultipleWriters)
 
     std::string m1 = "from w1";
     std::string m2 = "from w2";
-    ASSERT_TRUE(pub1.send(m1.data(), m1.size()));
-    ASSERT_TRUE(pub2.send(m2.data(), m2.size()));
+    ASSERT_GE(pub1.send(m1.data(), m1.size()), 0);
+    ASSERT_GE(pub2.send(m2.data(), m2.size()), 0);
 
     auto r1 = inbox.try_receive();
     ASSERT_TRUE(r1.has_value());

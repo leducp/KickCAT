@@ -68,8 +68,14 @@ namespace kickmsg
         for (uint32_t i = 0; i < header_->max_subs; ++i)
         {
             auto* ring = sub_ring_at(base_, header_, i);
+
+            // Announce presence before checking active, so the subscriber's
+            // destructor can wait for us to finish via in_flight == 0.
+            ring->in_flight.fetch_add(1, std::memory_order_acquire);
+
             if (ring->active.load(std::memory_order_acquire) == 0)
             {
+                ring->in_flight.fetch_sub(1, std::memory_order_release);
                 continue;
             }
 
@@ -127,6 +133,8 @@ namespace kickmsg
             }
             if (not locked)
             {
+                ++dropped_;
+                ring->in_flight.fetch_sub(1, std::memory_order_release);
                 continue;
             }
 
@@ -139,6 +147,7 @@ namespace kickmsg
             // at this position will see all preceding stores.
             e.sequence.store(pos + 1, std::memory_order_release);
 
+            ring->in_flight.fetch_sub(1, std::memory_order_release);
             futex_wake_all(ring->write_pos);
             ++delivered;
         }
@@ -159,16 +168,22 @@ namespace kickmsg
         return delivered;
     }
 
-    bool Publisher::send(void const* data, std::size_t len)
+    int32_t Publisher::send(void const* data, std::size_t len)
     {
+        if (len > header_->slot_data_size)
+        {
+            return -EMSGSIZE;
+        }
+
         auto* ptr = allocate(len);
         if (ptr == nullptr)
         {
-            return false;
+            return -EAGAIN;
         }
+
         std::memcpy(ptr, data, len);
         publish();
-        return true;
+        return static_cast<int32_t>(len);
     }
 
     uint32_t Publisher::wait_and_capture_slot(Entry& e, uint64_t expected_seq,

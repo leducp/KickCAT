@@ -17,6 +17,14 @@ namespace kickmsg
         Subscriber sub;
     };
 
+    /// High-level messaging node: manages shared-memory regions and provides
+    /// Publisher/Subscriber handles for topic-centric communication.
+    ///
+    /// Lifetime: the Node owns the underlying shared-memory mappings. All
+    /// Publisher, Subscriber, and BroadcastHandle objects returned by this
+    /// Node hold raw pointers into the mapped memory. They MUST NOT outlive
+    /// the Node that created them — destroying the Node unmaps the memory
+    /// and silently invalidates all outstanding handles.
     class Node
     {
     public:

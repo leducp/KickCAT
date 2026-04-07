@@ -34,6 +34,7 @@ namespace kickmsg
             , commit_timeout_{other.commit_timeout_}
             , pending_slot_{other.pending_slot_}
             , pending_len_{other.pending_len_}
+            , dropped_{other.dropped_}
         {
             other.pending_slot_ = INVALID_SLOT;
         }
@@ -48,6 +49,7 @@ namespace kickmsg
                 commit_timeout_ = other.commit_timeout_;
                 pending_slot_   = other.pending_slot_;
                 pending_len_    = other.pending_len_;
+                dropped_        = other.dropped_;
                 other.pending_slot_ = INVALID_SLOT;
             }
             return *this;
@@ -55,7 +57,13 @@ namespace kickmsg
 
         void* allocate(std::size_t len);
         std::size_t publish();
-        bool send(void const* data, std::size_t len);
+
+        /// Allocate, copy, and publish in one call.
+        /// Returns bytes written on success, -EMSGSIZE if too large, -EAGAIN if pool exhausted.
+        int32_t send(void const* data, std::size_t len);
+
+        /// Number of per-ring delivery drops (CAS lock contention or pool exhaustion).
+        uint64_t dropped() const { return dropped_; }
 
     private:
         static uint32_t wait_and_capture_slot(Entry& e, uint64_t expected_seq,
@@ -68,6 +76,7 @@ namespace kickmsg
         microseconds commit_timeout_;
         uint32_t     pending_slot_;
         uint32_t     pending_len_;
+        uint64_t     dropped_{0};
     };
 
 } // namespace kickmsg

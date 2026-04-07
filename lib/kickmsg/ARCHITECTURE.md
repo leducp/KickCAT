@@ -184,7 +184,7 @@ contains a sequence number, slot index, and payload length -- all atomic.
 ```
 Ring[0]
 ┌──────────────────────────────────────────────────────────┐
-│  active: 1          write_pos: AtomicU64 = 42            │
+│  active: 1   in_flight: 0   write_pos: AtomicU64 = 42   │
 │                                                          │
 │  entries[0..7]:                                          │
 │  ┌─────┬───────────┬──────────┬─────────────┐            │
@@ -203,6 +203,14 @@ Ring[0]
 ```
 
 - **Capacity** must be a power of 2 (index masking: `pos & (cap - 1)`).
+- **active** (atomic uint32): 1 if a subscriber owns this ring, 0 otherwise.
+  Publishers check this before delivering.
+- **in_flight** (atomic uint32): number of publishers currently mid-commit
+  on this ring. Publishers increment before checking `active` and decrement
+  after committing (or abandoning). The subscriber destructor spins until
+  `in_flight == 0` to ensure `write_pos` is final before draining.
+- **write_pos** (atomic uint64): monotonically increasing position counter.
+  Publishers CAS-increment it to claim a ring slot.
 - **Sequence number** is monotonically increasing (`pos + 1`), used as a
   seqlock for data consistency validation and as a commit barrier between
   publishers (see Publish Flow below).
@@ -552,25 +560,35 @@ B       Publisher crashes after            Slot refcount inflated;
         (crash leak)
 ```
 
-**Class A is fully closed.** The subscriber destructor walks its ring's
-live window before deactivating:
+**Class A is fully closed** via the `in_flight` quiescence protocol
+and full-window drain:
 
 ```
 ~Subscriber():
-    1. active = 0                          (stop new publishes to this ring)
-    2. wp = ring.write_pos
-    3. clamp read_pos to [wp - capacity, wp)  (older entries already evicted)
-    4. for each entry in [read_pos, wp):
-         if sequence == expected:
+    1. active = 0 (release)             — stop new publishers from entering
+    2. spin until in_flight == 0        — wait for mid-commit publishers to finish
+    3. wp = ring.write_pos              — now guaranteed final
+    4. oldest = max(0, wp - capacity)
+    5. for each entry in [oldest, wp):  — entire live window, consumed AND unconsumed
+         if sequence == pos + 1:        — committed and not evicted
            slot.refcount--
            if refcount == 0: treiber_push(slot)
          else:
-           skip (uncommitted, falls into Class B)
+           skip (evicted, uncommitted, or locked — falls into Class B)
 ```
 
-Entries mid-commit by a concurrent publisher (sequence not yet stored)
-are skipped -- at most 1 per concurrent publisher. Their refcount
-inflation falls into Class B.
+The key invariant: `in_flight` is incremented by publishers BEFORE
+checking `active`, so once `in_flight == 0` after `active = 0`, no
+publisher can be mid-commit. `write_pos` is truly final.
+
+The drain walks `[oldest, wp)` — not just `[read_pos, wp)` — because
+`try_receive()` pins and unpins the slot (net-zero refcount change),
+leaving the ring's original reference (rc=1) on consumed entries.
+Those entries in `[oldest, read_pos)` must also be released.
+
+For `try_receive_view()`, a live `SampleView` holds an extra pin
+(rc=2: ring ref + view pin). The drain releases the ring ref (rc→1);
+`~SampleView()` releases the pin (rc→0) and pushes to free.
 
 ### Leak budget
 

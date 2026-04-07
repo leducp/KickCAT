@@ -40,7 +40,7 @@ TEST_F(PublisherTest, SendReceiveSingleMessage)
     kickmsg::Publisher  pub(region);
 
     uint64_t payload = 0xDEADBEEFCAFEBABEULL;
-    ASSERT_TRUE(pub.send(&payload, sizeof(payload)));
+    ASSERT_GE(pub.send(&payload, sizeof(payload)), 0);
 
     auto sample = sub.try_receive();
     ASSERT_TRUE(sample.has_value());
@@ -95,7 +95,7 @@ TEST_F(PublisherTest, MultipleMessages)
     constexpr int N = 5;
     for (int i = 0; i < N; ++i)
     {
-        ASSERT_TRUE(pub.send(&i, sizeof(i)));
+        ASSERT_GE(pub.send(&i, sizeof(i)), 0);
     }
 
     for (int i = 0; i < N; ++i)
@@ -119,7 +119,7 @@ TEST_F(PublisherTest, MultipleSubscribersEachReceive)
     kickmsg::Publisher   pub(region);
 
     uint32_t val = 7;
-    ASSERT_TRUE(pub.send(&val, sizeof(val)));
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
 
     auto s1 = sub1.try_receive();
     auto s2 = sub2.try_receive();

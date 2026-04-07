@@ -70,6 +70,7 @@ namespace kickmsg
         {
             auto* ring = sub_ring_at(region.base(), h, i);
             ring->active.store(0, std::memory_order_relaxed);
+            ring->in_flight.store(0, std::memory_order_relaxed);
             ring->write_pos.store(0, std::memory_order_relaxed);
         }
 

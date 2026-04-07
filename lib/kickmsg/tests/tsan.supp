@@ -1,6 +1,5 @@
-# Seqlock-protected slot data: publisher writes payload, subscriber reads
-# via memcpy with sequence-number validation (double-check before/after).
-# TSan cannot reason about seqlock correctness.
-race:kickmsg::Publisher::send
-race:kickmsg::Subscriber::try_receive
-race:kickmsg::Subscriber::try_receive_view
+# No suppressions needed.
+# The seqlock data races were fixed by the refcount pin in try_receive()
+# and the two-phase commit (LOCKED_SEQUENCE) in publish().
+# This file is kept empty so the suppression infrastructure remains
+# available if needed in the future.

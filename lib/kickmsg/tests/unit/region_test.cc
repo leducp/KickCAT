@@ -221,7 +221,7 @@ TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
     for (int i = 0; i < 4; ++i)
     {
         uint32_t val = static_cast<uint32_t>(i);
-        ASSERT_TRUE(pub.send(&val, sizeof(val)));
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
     }
 
     auto reclaimed = region.reclaim_orphaned_slots();

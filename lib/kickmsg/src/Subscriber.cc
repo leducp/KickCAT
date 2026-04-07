@@ -1,5 +1,7 @@
 #include "kickmsg/Subscriber.h"
 
+#include "kickcat/OS/Time.h"
+
 namespace kickmsg
 {
     Subscriber::Subscriber(SharedRegion& region)
@@ -36,6 +38,16 @@ namespace kickmsg
         {
             auto* ring = sub_ring_at(base_, header_, ring_idx_);
             ring->active.store(0, std::memory_order_release);
+
+            // Wait for all publishers that slipped through the active=1 check.
+            // They increment in_flight before reading active, so once in_flight==0
+            // no publisher is mid-commit on this ring and write_pos is final.
+            // Worst case: a publisher stuck in wait_and_capture_slot for commit_timeout.
+            while (ring->in_flight.load(std::memory_order_acquire) > 0)
+            {
+                kickcat::sleep(0ns);
+            }
+
             drain_unconsumed(ring);
         }
     }
@@ -59,6 +71,10 @@ namespace kickmsg
             {
                 auto* ring = sub_ring_at(base_, header_, ring_idx_);
                 ring->active.store(0, std::memory_order_release);
+                while (ring->in_flight.load(std::memory_order_acquire) > 0)
+                {
+                    kickcat::sleep(0ns);
+                }
                 drain_unconsumed(ring);
             }
 
@@ -325,40 +341,35 @@ namespace kickmsg
 
     void Subscriber::drain_unconsumed(SubRingHeader* ring)
     {
-        auto* entries = ring_entries(ring);
+        auto* entries  = ring_entries(ring);
         auto  capacity = header_->sub_ring_capacity;
 
-        // Re-read write_pos until stable: after active=0 (release), a publisher
-        // that already read active=1 may still be mid-commit. Once write_pos
-        // stops advancing, all in-flight publishers have finished.
-        uint64_t wp = 0;
-        uint64_t prev_wp = 0;
-        do
-        {
-            prev_wp = wp;
-            wp = ring->write_pos.load(std::memory_order_acquire);
-        }
-        while (wp != prev_wp);
+        // write_pos is final: the in_flight spin in the destructor guarantees
+        // no publisher is mid-commit on this ring.
+        auto wp = ring->write_pos.load(std::memory_order_acquire);
 
-        if (wp <= read_pos_)
+        if (wp == 0)
         {
             return;
         }
 
-        if (wp - read_pos_ > capacity)
-        {
-            read_pos_ = wp - capacity;
-        }
+        // The live window is [oldest, wp).
+        uint64_t oldest = (wp > capacity) ? (wp - capacity) : 0;
 
-        while (read_pos_ < wp)
+        // Release this ring's reference for ALL committed entries in the live window:
+        // - [oldest, read_pos_): consumed by try_receive (pin/unpin is net-zero,
+        //   so the ring's original rc=1 reference still needs releasing).
+        //   For try_receive_view, rc=2 (ring ref + SampleView pin); we release
+        //   the ring ref here, ~SampleView releases the pin later.
+        // - [read_pos_, wp): unconsumed entries, also need their ring ref released.
+        // Evicted entries have seq != pos+1, so the check safely skips them.
+        for (uint64_t pos = oldest; pos < wp; ++pos)
         {
-            auto  idx = read_pos_ & header_->sub_ring_mask;
-            auto& e   = entries[idx];
+            auto& e   = entries[pos & header_->sub_ring_mask];
+            auto  seq = e.sequence.load(std::memory_order_acquire);
 
-            auto seq = e.sequence.load(std::memory_order_acquire);
-            if (seq != read_pos_ + 1)
+            if (seq != pos + 1)
             {
-                ++read_pos_;
                 continue;
             }
 
@@ -373,7 +384,6 @@ namespace kickmsg
                     treiber_push(header_->free_top, slot, slot_idx);
                 }
             }
-            ++read_pos_;
         }
     }
 } // namespace kickmsg

@@ -51,7 +51,7 @@ TEST_F(SubscriberTest, ZeroCopyReceive)
     kickmsg::Publisher  pub(region);
 
     uint64_t payload = 0x1234567890ABCDEFULL;
-    ASSERT_TRUE(pub.send(&payload, sizeof(payload)));
+    ASSERT_GE(pub.send(&payload, sizeof(payload)), 0);
 
     auto view = sub.try_receive_view();
     ASSERT_TRUE(view.has_value());
@@ -71,7 +71,7 @@ TEST_F(SubscriberTest, SampleViewMoveSemantics)
     kickmsg::Publisher  pub(region);
 
     uint32_t val = 99;
-    ASSERT_TRUE(pub.send(&val, sizeof(val)));
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
 
     auto view1 = sub.try_receive_view();
     ASSERT_TRUE(view1.has_value());
@@ -150,7 +150,7 @@ TEST_F(SubscriberTest, DrainReleasesSlots)
         for (int i = 0; i < 5; ++i)
         {
             uint32_t val = static_cast<uint32_t>(i);
-            ASSERT_TRUE(pub.send(&val, sizeof(val)));
+            ASSERT_GE(pub.send(&val, sizeof(val)), 0);
         }
 
         EXPECT_EQ(count_free(), free_before - 5);
