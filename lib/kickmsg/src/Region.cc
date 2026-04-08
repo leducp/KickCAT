@@ -1,15 +1,15 @@
 #include "kickmsg/Region.h"
+#include "kickcat/OS/Time.h"
 
-#include <thread>
 #include <unistd.h>
 
 namespace kickmsg
 {
-    SharedRegion SharedRegion::create(char const* name, ChannelType type,
+    SharedRegion SharedRegion::create(char const* name, channel::Type type,
                                      ChannelConfig const& cfg,
                                      char const* creator_name)
     {
-        if (type != ChannelType::PubSub and type != ChannelType::Broadcast)
+        if (type != channel::PubSub and type != channel::Broadcast)
         {
             throw std::runtime_error("Unsupported channel type");
         }
@@ -18,16 +18,16 @@ namespace kickmsg
             throw std::runtime_error("sub_ring_capacity must be a power of 2");
         }
 
-        auto creator_len = static_cast<uint16_t>(std::strlen(creator_name));
-        auto header_size = align_up(sizeof(Header) + creator_len, CACHE_LINE);
+        uint16_t    creator_len     = static_cast<uint16_t>(std::strlen(creator_name));
+        std::size_t header_size     = align_up(sizeof(Header) + creator_len, CACHE_LINE);
 
-        auto ring_stride = align_up(
+        std::size_t ring_stride     = align_up(
             sizeof(SubRingHeader) + cfg.sub_ring_capacity * sizeof(Entry), CACHE_LINE);
-        auto slot_stride = align_up(sizeof(SlotHeader) + cfg.max_payload_size, CACHE_LINE);
+        std::size_t slot_stride     = align_up(sizeof(SlotHeader) + cfg.max_payload_size, CACHE_LINE);
 
-        auto sub_rings_offset = header_size;
-        auto pool_offset      = sub_rings_offset + cfg.max_subscribers * ring_stride;
-        auto total_size       = pool_offset + cfg.pool_size * slot_stride;
+        std::size_t sub_rings_offset = header_size;
+        std::size_t pool_offset      = sub_rings_offset + cfg.max_subscribers * ring_stride;
+        std::size_t total_size       = pool_offset + cfg.pool_size * slot_stride;
 
         SharedRegion region;
         region.name_ = name;
@@ -51,34 +51,30 @@ namespace kickmsg
         h->commit_timeout_us = static_cast<uint64_t>(cfg.commit_timeout.count());
         h->config_hash       = compute_config_hash(type, cfg);
         h->creator_pid       = static_cast<uint64_t>(getpid());
-        h->created_at_ns     = static_cast<uint64_t>(
-            duration_cast<nanoseconds>(
-                system_clock::now().time_since_epoch()).count());
+        h->created_at_ns     = static_cast<uint64_t>(kickcat::since_epoch().count());
         h->creator_name_len  = creator_len;
         std::memcpy(header_creator_name(h), creator_name, creator_len);
 
-        h->free_top.store(tagged_pack(0, INVALID_SLOT), std::memory_order_relaxed);
+        h->free_top = tagged_pack(0, INVALID_SLOT);
 
         for (uint32_t i = 0; i < cfg.pool_size; ++i)
         {
             auto* slot = slot_at(region.base(), h, i);
-            slot->refcount.store(0, std::memory_order_relaxed);
+            slot->refcount = 0;
             treiber_push(h->free_top, slot, i);
         }
 
         for (uint32_t i = 0; i < cfg.max_subscribers; ++i)
         {
             auto* ring = sub_ring_at(region.base(), h, i);
-            ring->state.store(RingState::Free, std::memory_order_relaxed);
-            ring->in_flight.store(0, std::memory_order_relaxed);
-            ring->write_pos.store(0, std::memory_order_relaxed);
+            ring->state    = ring::Free;
+            ring->in_flight = 0;
+            ring->write_pos = 0;
         }
 
-        // Write magic LAST — create_or_open() polls magic as the "init complete"
-        // sentinel. The release fence ensures all preceding stores are visible
-        // before magic becomes MAGIC.
-        std::atomic_thread_fence(std::memory_order_release);
-        h->magic = MAGIC;
+        // Write magic LAST with release: create_or_open() polls magic with
+        // acquire, so all preceding init stores are visible once magic == MAGIC.
+        h->magic.store(MAGIC, std::memory_order_release);
         return region;
     }
 
@@ -89,7 +85,7 @@ namespace kickmsg
         region.shm_.open(name);
 
         auto* h = region.header();
-        if (h->magic != MAGIC)
+        if (h->magic.load(std::memory_order_acquire) != MAGIC)
         {
             throw std::runtime_error("Invalid shared memory (bad magic)");
         }
@@ -101,18 +97,18 @@ namespace kickmsg
         return region;
     }
 
-    SharedRegion SharedRegion::create_or_open(char const* name, ChannelType type,
+    SharedRegion SharedRegion::create_or_open(char const* name, channel::Type type,
                                               ChannelConfig const& cfg,
                                               char const* creator_name)
     {
-        auto creator_len = static_cast<uint16_t>(std::strlen(creator_name));
-        auto header_size = align_up(sizeof(Header) + creator_len, CACHE_LINE);
-        auto ring_stride = align_up(
+        uint16_t    creator_len     = static_cast<uint16_t>(std::strlen(creator_name));
+        std::size_t header_size     = align_up(sizeof(Header) + creator_len, CACHE_LINE);
+        std::size_t ring_stride     = align_up(
             sizeof(SubRingHeader) + cfg.sub_ring_capacity * sizeof(Entry), CACHE_LINE);
-        auto slot_stride = align_up(sizeof(SlotHeader) + cfg.max_payload_size, CACHE_LINE);
-        auto sub_rings_offset = header_size;
-        auto pool_offset      = sub_rings_offset + cfg.max_subscribers * ring_stride;
-        auto total_size       = pool_offset + cfg.pool_size * slot_stride;
+        std::size_t slot_stride     = align_up(sizeof(SlotHeader) + cfg.max_payload_size, CACHE_LINE);
+        std::size_t sub_rings_offset = header_size;
+        std::size_t pool_offset      = sub_rings_offset + cfg.max_subscribers * ring_stride;
+        std::size_t total_size       = pool_offset + cfg.pool_size * slot_stride;
 
         SharedMemory probe;
         if (probe.try_create(name, total_size))
@@ -121,7 +117,7 @@ namespace kickmsg
             return create(name, type, cfg, creator_name);
         }
 
-        auto expected_hash = compute_config_hash(type, cfg);
+        uint64_t expected_hash = compute_config_hash(type, cfg);
 
         for (int i = 0; i < 200; ++i)
         {
@@ -131,7 +127,7 @@ namespace kickmsg
                 shm.open(name);
 
                 auto* h = static_cast<Header*>(shm.address());
-                if (h->magic == MAGIC and h->version == VERSION)
+                if (h->magic.load(std::memory_order_acquire) == MAGIC and h->version == VERSION)
                 {
                     if (h->config_hash != expected_hash)
                     {
@@ -153,7 +149,7 @@ namespace kickmsg
             catch (...)
             {
             }
-            std::this_thread::sleep_for(milliseconds{10});
+            kickcat::sleep(10ms);
         }
 
         throw std::runtime_error(
@@ -176,20 +172,28 @@ namespace kickmsg
 
         for (uint64_t i = 0; i < h->max_subs; ++i)
         {
-            auto* ring    = sub_ring_at(b, h, static_cast<uint32_t>(i));
-            auto* entries = ring_entries(ring);
-            auto  wp      = ring->write_pos.load(std::memory_order_acquire);
-            auto  cap     = h->sub_ring_capacity;
+            auto*    ring    = sub_ring_at(b, h, static_cast<uint32_t>(i));
+            auto*    entries = ring_entries(ring);
+            uint64_t wp      = ring->write_pos.load(std::memory_order_acquire);
+            uint64_t cap     = h->sub_ring_capacity;
 
-            uint64_t start = (wp > cap) ? (wp - cap) : 0;
+            uint64_t start = 0;
+            if (wp > cap)
+            {
+                start = wp - cap;
+            }
             for (uint64_t pos = start; pos < wp; ++pos)
             {
-                auto& e   = entries[pos & h->sub_ring_mask];
-                auto  seq = e.sequence.load(std::memory_order_acquire);
+                auto&    e   = entries[pos & h->sub_ring_mask];
+                uint64_t seq = e.sequence.load(std::memory_order_acquire);
 
                 if (seq == LOCKED_SEQUENCE)
                 {
-                    uint64_t prev_seq = (pos >= cap) ? (pos - cap + 1) : 0;
+                    uint64_t prev_seq = 0;
+                    if (pos >= cap)
+                    {
+                        prev_seq = pos - cap + 1;
+                    }
                     e.sequence.store(prev_seq, std::memory_order_release);
                     ++repaired;
                 }
@@ -209,21 +213,25 @@ namespace kickmsg
 
         for (uint64_t i = 0; i < h->max_subs; ++i)
         {
-            auto* ring    = sub_ring_at(b, h, static_cast<uint32_t>(i));
-            auto* entries = ring_entries(ring);
-            auto  wp      = ring->write_pos.load(std::memory_order_acquire);
-            auto  cap     = h->sub_ring_capacity;
+            auto*    ring    = sub_ring_at(b, h, static_cast<uint32_t>(i));
+            auto*    entries = ring_entries(ring);
+            uint64_t wp      = ring->write_pos.load(std::memory_order_acquire);
+            uint64_t cap     = h->sub_ring_capacity;
 
-            uint64_t start = (wp > cap) ? (wp - cap) : 0;
+            uint64_t start = 0;
+            if (wp > cap)
+            {
+                start = wp - cap;
+            }
             for (uint64_t pos = start; pos < wp; ++pos)
             {
-                auto& e   = entries[pos & h->sub_ring_mask];
-                auto  seq = e.sequence.load(std::memory_order_acquire);
+                auto&    e   = entries[pos & h->sub_ring_mask];
+                uint64_t seq = e.sequence.load(std::memory_order_acquire);
 
                 // Skip uncommitted and locked entries.
                 if (seq >= pos + 1 and seq != LOCKED_SEQUENCE)
                 {
-                    auto idx = e.slot_idx.load(std::memory_order_relaxed);
+                    uint32_t idx = e.slot_idx;
                     if (idx < h->pool_size)
                     {
                         referenced[idx] = true;
@@ -241,8 +249,8 @@ namespace kickmsg
                 continue;
             }
 
-            auto* slot = slot_at(b, h, static_cast<uint32_t>(idx));
-            auto  rc   = slot->refcount.load(std::memory_order_acquire);
+            auto*    slot = slot_at(b, h, static_cast<uint32_t>(idx));
+            uint32_t rc   = slot->refcount.load(std::memory_order_acquire);
             if (rc > 0)
             {
                 slot->refcount.store(0, std::memory_order_release);
@@ -253,4 +261,4 @@ namespace kickmsg
 
         return reclaimed;
     }
-} // namespace kickmsg
+}

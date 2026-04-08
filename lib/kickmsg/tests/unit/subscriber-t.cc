@@ -1,14 +1,17 @@
 #include <gtest/gtest.h>
 
+#include "kickcat/OS/Time.h"
 #include "kickmsg/Publisher.h"
 #include "kickmsg/Subscriber.h"
 
 #include <cstring>
 #include <thread>
 
+using namespace kickcat;
+
 class SubscriberTest : public ::testing::Test
 {
-protected:
+public:
     static constexpr char const* SHM_NAME = "/kickmsg_test_subscriber";
 
     void SetUp() override
@@ -35,7 +38,7 @@ protected:
 TEST_F(SubscriberTest, ReceiveEmptyReturnsNullopt)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
     kickmsg::Subscriber sub(region);
 
     EXPECT_FALSE(sub.try_receive().has_value());
@@ -45,7 +48,7 @@ TEST_F(SubscriberTest, ReceiveEmptyReturnsNullopt)
 TEST_F(SubscriberTest, ZeroCopyReceive)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -65,7 +68,7 @@ TEST_F(SubscriberTest, ZeroCopyReceive)
 TEST_F(SubscriberTest, SampleViewMoveSemantics)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -96,7 +99,7 @@ TEST_F(SubscriberTest, OverwritingRingReportsLoss)
     cfg.pool_size         = 8;
     cfg.max_payload_size  = 8;
 
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -125,19 +128,19 @@ TEST_F(SubscriberTest, DrainReleasesSlots)
     cfg.max_payload_size  = 64;
 
     auto region = kickmsg::SharedRegion::create(
-                      SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+                      SHM_NAME, kickmsg::channel::PubSub, cfg);
     kickmsg::Publisher pub(region);
 
     auto count_free = [&]()
     {
         uint32_t count = 0;
-        auto* hdr = region.header();
-        auto  top = hdr->free_top.load(std::memory_order_acquire);
-        auto  idx = kickmsg::tagged_idx(top);
+        auto*    hdr = region.header();
+        uint64_t top = hdr->free_top.load(std::memory_order_acquire);
+        uint32_t idx = kickmsg::tagged_idx(top);
         while (idx != kickmsg::INVALID_SLOT)
         {
             auto* slot = kickmsg::slot_at(region.base(), hdr, idx);
-            idx = slot->next_free.load(std::memory_order_relaxed);
+            idx = slot->next_free;
             ++count;
         }
         return count;
@@ -145,7 +148,7 @@ TEST_F(SubscriberTest, DrainReleasesSlots)
 
     {
         kickmsg::Subscriber sub(region);
-        auto free_before = count_free();
+        uint32_t free_before = count_free();
 
         for (int i = 0; i < 5; ++i)
         {
@@ -162,28 +165,28 @@ TEST_F(SubscriberTest, DrainReleasesSlots)
 TEST_F(SubscriberTest, BlockingReceiveTimesOut)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
     kickmsg::Subscriber sub(region);
 
-    auto start  = std::chrono::steady_clock::now();
-    auto sample = sub.receive(std::chrono::milliseconds{50});
-    auto elapsed = std::chrono::steady_clock::now() - start;
+    nanoseconds start  = kickcat::since_epoch();
+    auto        sample = sub.receive(milliseconds{50});
+    nanoseconds elapsed = kickcat::since_epoch() - start;
 
     EXPECT_FALSE(sample.has_value());
-    EXPECT_GE(elapsed, std::chrono::milliseconds{40});
+    EXPECT_GE(elapsed, milliseconds{40});
 }
 
 TEST_F(SubscriberTest, BlockingReceiveWakesOnPublish)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
 
     std::thread sender([&]()
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        kickcat::sleep(20ms);
         uint32_t val = 123;
         pub.send(&val, sizeof(val));
     });
@@ -211,7 +214,7 @@ TEST_F(SubscriberTest, DrainDoesNotDoubleDecrementOnChurn)
     cfg.max_payload_size  = 8;
 
     auto region = kickmsg::SharedRegion::create(
-        SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "drain_test");
+        SHM_NAME, kickmsg::channel::PubSub, cfg, "drain_test");
 
     kickmsg::Publisher pub(region);
 
@@ -246,7 +249,7 @@ TEST_F(SubscriberTest, DrainDoesNotDoubleDecrementOnChurn)
     for (uint32_t i = 0; i < cfg.pool_size; ++i)
     {
         auto* slot = kickmsg::slot_at(base, h, i);
-        auto rc = slot->refcount.load(std::memory_order_relaxed);
+        uint32_t rc = slot->refcount;
         EXPECT_EQ(rc, 0u) << "slot " << i << " has refcount " << rc;
     }
 }
@@ -263,7 +266,7 @@ TEST_F(SubscriberTest, ConcurrentChurnRefcountIntegrity)
     cfg.max_payload_size  = 8;
 
     auto region = kickmsg::SharedRegion::create(
-        SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "churn_test");
+        SHM_NAME, kickmsg::channel::PubSub, cfg, "churn_test");
 
     std::atomic<bool> done{false};
 
@@ -303,7 +306,7 @@ TEST_F(SubscriberTest, ConcurrentChurnRefcountIntegrity)
     for (uint32_t i = 0; i < cfg.pool_size; ++i)
     {
         auto* slot = kickmsg::slot_at(base, h, i);
-        auto rc = slot->refcount.load(std::memory_order_relaxed);
+        uint32_t rc = slot->refcount;
         EXPECT_EQ(rc, 0u) << "slot " << i << " has refcount " << rc
                           << " (round completed, all should be 0)";
     }

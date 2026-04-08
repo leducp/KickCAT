@@ -17,8 +17,8 @@ namespace kickmsg
         for (uint32_t i = 0; i < header_->max_subs; ++i)
         {
             auto* ring = sub_ring_at(base_, header_, i);
-            auto  expected = RingState::Free;
-            if (ring->state.compare_exchange_strong(expected, RingState::Live,
+            ring::State expected = ring::Free;
+            if (ring->state.compare_exchange_strong(expected, ring::Live,
                     std::memory_order_seq_cst))
             {
                 ring_idx_  = i;
@@ -40,7 +40,7 @@ namespace kickmsg
         {
             auto* ring = sub_ring_at(base_, header_, ring_idx_);
             // Transition Live → Draining: no new publisher can be admitted.
-            ring->state.store(RingState::Draining, std::memory_order_seq_cst);
+            ring->state.store(ring::Draining, std::memory_order_seq_cst);
 
             // Wait for all admitted publishers to finish.
             while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
@@ -51,7 +51,7 @@ namespace kickmsg
             drain_unconsumed(ring);
 
             // Transition Draining → Free: ring available for a new subscriber.
-            ring->state.store(RingState::Free, std::memory_order_seq_cst);
+            ring->state.store(ring::Free, std::memory_order_seq_cst);
         }
     }
 
@@ -74,13 +74,13 @@ namespace kickmsg
             if (ring_idx_ != UINT32_MAX)
             {
                 auto* ring = sub_ring_at(base_, header_, ring_idx_);
-                ring->state.store(RingState::Draining, std::memory_order_seq_cst);
+                ring->state.store(ring::Draining, std::memory_order_seq_cst);
                 while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
                 {
                     kickcat::sleep(0ns);
                 }
                 drain_unconsumed(ring);
-                ring->state.store(RingState::Free, std::memory_order_seq_cst);
+                ring->state.store(ring::Free, std::memory_order_seq_cst);
             }
 
             base_      = other.base_;
@@ -102,26 +102,26 @@ namespace kickmsg
 
         for (int retries = 0; retries < 64; ++retries)
         {
-            auto wp = ring->write_pos.load(std::memory_order_acquire);
+            uint64_t wp = ring->write_pos.load(std::memory_order_acquire);
             if (wp <= read_pos_)
             {
                 return std::nullopt;
             }
 
-            auto capacity = header_->sub_ring_capacity;
+            uint64_t capacity = header_->sub_ring_capacity;
             if (wp - read_pos_ > capacity)
             {
                 lost_ += (wp - read_pos_) - capacity;
                 read_pos_ = wp - capacity;
             }
 
-            auto  idx     = read_pos_ & header_->sub_ring_mask;
+            uint64_t idx  = read_pos_ & header_->sub_ring_mask;
             auto* entries = ring_entries(ring);
             auto& e       = entries[idx];
 
             // Acquire: ensures we see the slot_idx/payload_len written
             // by the publisher before the sequence commit.
-            auto seq1 = e.sequence.load(std::memory_order_acquire);
+            uint64_t seq1 = e.sequence.load(std::memory_order_acquire);
             if (seq1 != read_pos_ + 1)
             {
                 if (seq1 == LOCKED_SEQUENCE or seq1 < read_pos_ + 1)
@@ -136,8 +136,8 @@ namespace kickmsg
                 continue;
             }
 
-            auto slot_idx    = e.slot_idx.load(std::memory_order_relaxed);
-            auto payload_len = e.payload_len.load(std::memory_order_relaxed);
+            uint32_t slot_idx    = e.slot_idx.load(std::memory_order_relaxed);
+            uint32_t payload_len = e.payload_len.load(std::memory_order_relaxed);
 
             if (slot_idx >= header_->pool_size or payload_len > header_->slot_data_size)
             {
@@ -152,57 +152,60 @@ namespace kickmsg
             // another publisher overwrite the data mid-copy.
             auto* slot = slot_at(base_, header_, slot_idx);
             uint32_t rc = slot->refcount.load(std::memory_order_acquire);
+            bool pinned = false;
             while (rc > 0)
             {
                 if (slot->refcount.compare_exchange_weak(rc, rc + 1,
                         std::memory_order_acq_rel, std::memory_order_acquire))
                 {
-                    goto pinned;
+                    pinned = true;
+                    break;
                 }
             }
-            // refcount == 0: slot already freed, count as lost.
-            ++lost_;
-            ++read_pos_;
-            continue;
 
-        pinned:
+            if (not pinned)
             {
-                // Seqlock validation: re-read the sequence after pinning. If it
-                // changed, the entry was overwritten between our first read and
-                // the pin, so the slot_idx we pinned may be stale.
-                auto seq2 = e.sequence.load(std::memory_order_acquire);
-                if (seq2 != seq1)
-                {
-                    auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
-                    if (prev == 1)
-                    {
-                        treiber_push(header_->free_top, slot, slot_idx);
-                    }
-                    ++lost_;
-                    ++read_pos_;
-                    continue;
-                }
+                // refcount == 0: slot already freed, count as lost.
+                ++lost_;
+                ++read_pos_;
+                continue;
+            }
 
-                std::memcpy(recv_buf_.data(), slot_data(slot), payload_len);
-
-                // Unpin: we have our copy, release the slot reference.
-                auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+            // Seqlock validation: re-read the sequence after pinning. If it
+            // changed, the entry was overwritten between our first read and
+            // the pin, so the slot_idx we pinned may be stale.
+            uint64_t seq2 = e.sequence.load(std::memory_order_acquire);
+            if (seq2 != seq1)
+            {
+                uint32_t prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
                 if (prev == 1)
                 {
                     treiber_push(header_->free_top, slot, slot_idx);
                 }
-
+                ++lost_;
                 ++read_pos_;
-                return SampleRef{recv_buf_.data(), payload_len};
+                continue;
             }
+
+            std::memcpy(recv_buf_.data(), slot_data(slot), payload_len);
+
+            // Unpin: we have our copy, release the slot reference.
+            uint32_t prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+            if (prev == 1)
+            {
+                treiber_push(header_->free_top, slot, slot_idx);
+            }
+
+            ++read_pos_;
+            return SampleRef{recv_buf_.data(), payload_len};
         }
         return std::nullopt;
     }
 
     std::optional<Subscriber::SampleRef> Subscriber::receive(nanoseconds timeout)
     {
-        auto* ring     = sub_ring_at(base_, header_, ring_idx_);
-        auto  deadline = steady_clock::now() + timeout;
+        auto*       ring  = sub_ring_at(base_, header_, ring_idx_);
+        nanoseconds start = kickcat::since_epoch();
 
         while (true)
         {
@@ -212,16 +215,17 @@ namespace kickmsg
                 return sample;
             }
 
-            if (steady_clock::now() >= deadline)
+            nanoseconds elapsed = kickcat::elapsed_time(start);
+            if (elapsed >= timeout)
             {
                 return std::nullopt;
             }
 
-            auto cur = ring->write_pos.load(std::memory_order_relaxed);
+            uint64_t cur = ring->write_pos.load(std::memory_order_relaxed);
             if (cur <= read_pos_)
             {
-                auto remaining = deadline - steady_clock::now();
-                if (remaining <= nanoseconds::zero())
+                nanoseconds remaining = timeout - elapsed;
+                if (remaining <= 0ns)
                 {
                     return std::nullopt;
                 }
@@ -236,24 +240,24 @@ namespace kickmsg
 
         for (int retries = 0; retries < 64; ++retries)
         {
-            auto wp = ring->write_pos.load(std::memory_order_acquire);
+            uint64_t wp = ring->write_pos.load(std::memory_order_acquire);
             if (wp <= read_pos_)
             {
                 return std::nullopt;
             }
 
-            auto capacity = header_->sub_ring_capacity;
+            uint64_t capacity = header_->sub_ring_capacity;
             if (wp - read_pos_ > capacity)
             {
                 lost_ += (wp - read_pos_) - capacity;
                 read_pos_ = wp - capacity;
             }
 
-            auto  idx     = read_pos_ & header_->sub_ring_mask;
+            uint64_t idx  = read_pos_ & header_->sub_ring_mask;
             auto* entries = ring_entries(ring);
             auto& e       = entries[idx];
 
-            auto seq1 = e.sequence.load(std::memory_order_acquire);
+            uint64_t seq1 = e.sequence.load(std::memory_order_acquire);
             if (seq1 != read_pos_ + 1)
             {
                 if (seq1 == LOCKED_SEQUENCE or seq1 < read_pos_ + 1)
@@ -265,8 +269,8 @@ namespace kickmsg
                 continue;
             }
 
-            auto slot_idx    = e.slot_idx.load(std::memory_order_relaxed);
-            auto payload_len = e.payload_len.load(std::memory_order_relaxed);
+            uint32_t slot_idx    = e.slot_idx.load(std::memory_order_relaxed);
+            uint32_t payload_len = e.payload_len.load(std::memory_order_relaxed);
 
             if (slot_idx >= header_->pool_size or payload_len > header_->slot_data_size)
             {
@@ -278,46 +282,49 @@ namespace kickmsg
             // Pin the slot so it survives until ~SampleView().
             auto* slot = slot_at(base_, header_, slot_idx);
             uint32_t rc = slot->refcount.load(std::memory_order_acquire);
+            bool pinned = false;
             while (rc > 0)
             {
                 if (slot->refcount.compare_exchange_weak(rc, rc + 1,
                         std::memory_order_acq_rel, std::memory_order_acquire))
                 {
-                    goto pinned;
+                    pinned = true;
+                    break;
                 }
             }
-            ++lost_;
-            ++read_pos_;
-            continue;
 
-        pinned:
+            if (not pinned)
             {
-                // Seqlock validation after pinning.
-                auto seq2 = e.sequence.load(std::memory_order_acquire);
-                if (seq2 != seq1)
-                {
-                    auto prev = slot->refcount.fetch_sub(1,
-                                    std::memory_order_acq_rel);
-                    if (prev == 1)
-                    {
-                        treiber_push(header_->free_top, slot, slot_idx);
-                    }
-                    ++lost_;
-                    ++read_pos_;
-                    continue;
-                }
-
+                ++lost_;
                 ++read_pos_;
-                return SampleView{base_, header_, slot_idx, payload_len};
+                continue;
             }
+
+            // Seqlock validation after pinning.
+            uint64_t seq2 = e.sequence.load(std::memory_order_acquire);
+            if (seq2 != seq1)
+            {
+                uint32_t prev = slot->refcount.fetch_sub(1,
+                                    std::memory_order_acq_rel);
+                if (prev == 1)
+                {
+                    treiber_push(header_->free_top, slot, slot_idx);
+                }
+                ++lost_;
+                ++read_pos_;
+                continue;
+            }
+
+            ++read_pos_;
+            return SampleView{base_, header_, slot_idx, payload_len};
         }
         return std::nullopt;
     }
 
     std::optional<Subscriber::SampleView> Subscriber::receive_view(nanoseconds timeout)
     {
-        auto* ring     = sub_ring_at(base_, header_, ring_idx_);
-        auto  deadline = steady_clock::now() + timeout;
+        auto*       ring  = sub_ring_at(base_, header_, ring_idx_);
+        nanoseconds start = kickcat::since_epoch();
 
         while (true)
         {
@@ -327,16 +334,17 @@ namespace kickmsg
                 return sample;
             }
 
-            if (steady_clock::now() >= deadline)
+            nanoseconds elapsed = kickcat::elapsed_time(start);
+            if (elapsed >= timeout)
             {
                 return std::nullopt;
             }
 
-            auto cur = ring->write_pos.load(std::memory_order_relaxed);
+            uint64_t cur = ring->write_pos.load(std::memory_order_relaxed);
             if (cur <= read_pos_)
             {
-                auto remaining = deadline - steady_clock::now();
-                if (remaining <= nanoseconds::zero())
+                nanoseconds remaining = timeout - elapsed;
+                if (remaining <= 0ns)
                 {
                     return std::nullopt;
                 }
@@ -347,12 +355,12 @@ namespace kickmsg
 
     void Subscriber::drain_unconsumed(SubRingHeader* ring)
     {
-        auto* entries  = ring_entries(ring);
-        auto  capacity = header_->sub_ring_capacity;
+        auto*    entries  = ring_entries(ring);
+        uint64_t capacity = header_->sub_ring_capacity;
 
         // write_pos is final: the in_flight spin in the destructor guarantees
         // no publisher is mid-commit on this ring.
-        auto wp = ring->write_pos.load(std::memory_order_acquire);
+        uint64_t wp = ring->write_pos.load(std::memory_order_acquire);
 
         if (wp == 0)
         {
@@ -362,7 +370,11 @@ namespace kickmsg
         // Only release entries this subscriber is responsible for:
         // [max(oldest, start_pos_), wp). Entries before start_pos_ belong
         // to a previous subscriber on this ring slot and were already released.
-        uint64_t oldest = (wp > capacity) ? (wp - capacity) : 0;
+        uint64_t oldest = 0;
+        if (wp > capacity)
+        {
+            oldest = wp - capacity;
+        }
         if (oldest < start_pos_)
         {
             oldest = start_pos_;
@@ -377,20 +389,20 @@ namespace kickmsg
         // Evicted entries have seq != pos+1, so the check safely skips them.
         for (uint64_t pos = oldest; pos < wp; ++pos)
         {
-            auto& e   = entries[pos & header_->sub_ring_mask];
-            auto  seq = e.sequence.load(std::memory_order_acquire);
+            auto&    e   = entries[pos & header_->sub_ring_mask];
+            uint64_t seq = e.sequence.load(std::memory_order_acquire);
 
             if (seq != pos + 1)
             {
                 continue;
             }
 
-            auto slot_idx = e.slot_idx.load(std::memory_order_relaxed);
+            uint32_t slot_idx = e.slot_idx.load(std::memory_order_relaxed);
             if (slot_idx < header_->pool_size)
             {
-                auto* slot = slot_at(base_, header_, slot_idx);
-                auto  prev = slot->refcount.fetch_sub(1,
-                                 std::memory_order_acq_rel);
+                auto*    slot = slot_at(base_, header_, slot_idx);
+                uint32_t prev = slot->refcount.fetch_sub(1,
+                                    std::memory_order_acq_rel);
                 if (prev == 1)
                 {
                     treiber_push(header_->free_top, slot, slot_idx);

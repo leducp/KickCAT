@@ -14,7 +14,7 @@ namespace kickmsg
     class Publisher
     {
     public:
-        explicit Publisher(SharedRegion& region)
+        Publisher(SharedRegion& region)
             : base_{region.base()}
             , header_{region.header()}
             , commit_timeout_{microseconds{header_->commit_timeout_us}}
@@ -78,7 +78,6 @@ namespace kickmsg
         uint32_t     pending_len_;
         uint64_t     dropped_{0};
     };
+}
 
-} // namespace kickmsg
-
-#endif // KICKMSG_PUBLISHER_H
+#endif

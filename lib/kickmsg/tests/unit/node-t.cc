@@ -1,9 +1,9 @@
+#include <cstring>
+#include <string>
+
 #include <gtest/gtest.h>
 
 #include "kickmsg/Node.h"
-
-#include <cstring>
-#include <string>
 
 class NodeTest : public ::testing::Test
 {

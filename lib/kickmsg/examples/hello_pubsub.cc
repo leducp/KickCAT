@@ -30,7 +30,7 @@ int main()
 
     // Create the shared region
     auto region = kickmsg::SharedRegion::create(
-        SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "hello_example");
+        SHM_NAME, kickmsg::channel::PubSub, cfg, "hello_example");
 
     // Attach a subscriber, then a publisher
     kickmsg::Subscriber sub(region);

@@ -31,10 +31,8 @@ namespace kickmsg
 
             ~SampleRef()
             {
-#ifndef NDEBUG
                 data_ = nullptr;
                 len_  = 0;
-#endif
             }
 
             SampleRef(SampleRef const&) = delete;
@@ -44,10 +42,8 @@ namespace kickmsg
                 : data_{other.data_}
                 , len_{other.len_}
             {
-#ifndef NDEBUG
                 other.data_ = nullptr;
                 other.len_  = 0;
-#endif
             }
 
             SampleRef& operator=(SampleRef&& other) noexcept
@@ -56,10 +52,8 @@ namespace kickmsg
                 {
                     data_ = other.data_;
                     len_  = other.len_;
-#ifndef NDEBUG
                     other.data_ = nullptr;
                     other.len_  = 0;
-#endif
                 }
                 return *this;
             }
@@ -153,7 +147,7 @@ namespace kickmsg
             uint32_t len_;
         };
 
-        explicit Subscriber(SharedRegion& region);
+        Subscriber(SharedRegion& region);
         ~Subscriber();
 
         Subscriber(Subscriber const&) = delete;
@@ -180,7 +174,6 @@ namespace kickmsg
         uint64_t             lost_;
         std::vector<uint8_t> recv_buf_;
     };
+}
 
-} // namespace kickmsg
-
-#endif // KICKMSG_SUBSCRIBER_H
+#endif

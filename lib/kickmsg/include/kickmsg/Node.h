@@ -27,7 +27,7 @@ namespace kickmsg
     class Node
     {
     public:
-        explicit Node(std::string name, std::string prefix = "kickmsg");
+        Node(std::string const& name, std::string const& prefix = "kickmsg");
 
         // --- PubSub (topic-centric, 1-to-N by convention) ---
         Publisher  advertise(char const* topic, ChannelConfig const& cfg = {});
@@ -52,7 +52,6 @@ namespace kickmsg
         std::string prefix_;
         std::vector<SharedRegion> regions_;
     };
+}
 
-} // namespace kickmsg
-
-#endif // KICKMSG_NODE_H
+#endif

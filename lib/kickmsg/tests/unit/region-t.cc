@@ -9,7 +9,7 @@
 
 class RegionTest : public ::testing::Test
 {
-protected:
+public:
     static constexpr char const* SHM_NAME = "/kickmsg_test_region";
 
     void SetUp() override
@@ -36,12 +36,12 @@ protected:
 TEST_F(RegionTest, CreateAndValidateHeader)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "test");
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg, "test");
     auto* hdr   = region.header();
 
     EXPECT_EQ(hdr->magic, kickmsg::MAGIC);
     EXPECT_EQ(hdr->version, kickmsg::VERSION);
-    EXPECT_EQ(hdr->channel_type, kickmsg::ChannelType::PubSub);
+    EXPECT_EQ(hdr->channel_type, kickmsg::channel::PubSub);
     EXPECT_EQ(hdr->max_subs, cfg.max_subscribers);
     EXPECT_EQ(hdr->sub_ring_capacity, cfg.sub_ring_capacity);
     EXPECT_EQ(hdr->sub_ring_mask, cfg.sub_ring_capacity - 1);
@@ -56,7 +56,7 @@ TEST_F(RegionTest, CreateAndValidateHeader)
 TEST_F(RegionTest, OpenExistingRegion)
 {
     auto cfg = default_cfg();
-    auto r1  = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "orig");
+    auto r1  = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg, "orig");
     auto r2  = kickmsg::SharedRegion::open(SHM_NAME);
 
     EXPECT_EQ(r2.header()->magic, kickmsg::MAGIC);
@@ -72,19 +72,19 @@ TEST_F(RegionTest, CreateOrOpenFirstCreates)
 {
     auto cfg = default_cfg();
     auto r   = kickmsg::SharedRegion::create_or_open(
-                   SHM_NAME, kickmsg::ChannelType::Broadcast, cfg, "creator");
+                   SHM_NAME, kickmsg::channel::Broadcast, cfg, "creator");
 
     EXPECT_EQ(r.header()->magic, kickmsg::MAGIC);
-    EXPECT_EQ(r.header()->channel_type, kickmsg::ChannelType::Broadcast);
+    EXPECT_EQ(r.header()->channel_type, kickmsg::channel::Broadcast);
 }
 
 TEST_F(RegionTest, CreateOrOpenSecondOpens)
 {
     auto cfg = default_cfg();
     auto r1  = kickmsg::SharedRegion::create_or_open(
-                   SHM_NAME, kickmsg::ChannelType::Broadcast, cfg, "first");
+                   SHM_NAME, kickmsg::channel::Broadcast, cfg, "first");
     auto r2  = kickmsg::SharedRegion::create_or_open(
-                   SHM_NAME, kickmsg::ChannelType::Broadcast, cfg, "second");
+                   SHM_NAME, kickmsg::channel::Broadcast, cfg, "second");
 
     EXPECT_EQ(r2.header()->magic, kickmsg::MAGIC);
     EXPECT_EQ(r2.header()->pool_size, cfg.pool_size);
@@ -93,13 +93,13 @@ TEST_F(RegionTest, CreateOrOpenSecondOpens)
 TEST_F(RegionTest, CreateOrOpenConfigMismatchThrows)
 {
     auto cfg = default_cfg();
-    kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "node");
+    kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg, "node");
 
     auto bad_cfg = cfg;
     bad_cfg.max_payload_size = cfg.max_payload_size * 2;
     EXPECT_THROW(
         kickmsg::SharedRegion::create_or_open(
-            SHM_NAME, kickmsg::ChannelType::PubSub, bad_cfg, "other"),
+            SHM_NAME, kickmsg::channel::PubSub, bad_cfg, "other"),
         std::runtime_error);
 }
 
@@ -107,7 +107,7 @@ TEST_F(RegionTest, HeaderStoresCreatorMetadata)
 {
     auto cfg    = default_cfg();
     auto region = kickmsg::SharedRegion::create(
-                      SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "my_node");
+                      SHM_NAME, kickmsg::channel::PubSub, cfg, "my_node");
     auto* hdr   = region.header();
 
     EXPECT_EQ(hdr->creator_pid, static_cast<uint64_t>(getpid()));
@@ -120,21 +120,21 @@ TEST_F(RegionTest, NonPowerOfTwoRingThrows)
     auto cfg = default_cfg();
     cfg.sub_ring_capacity = 7;
     EXPECT_THROW(
-        kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg),
+        kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg),
         std::runtime_error);
 }
 
 TEST_F(RegionTest, TreiberPopAllThenPushBack)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
     auto* base  = region.base();
     auto* hdr   = region.header();
 
     std::vector<uint32_t> popped;
     for (uint32_t i = 0; i < cfg.pool_size; ++i)
     {
-        auto idx = kickmsg::treiber_pop(hdr->free_top, base, hdr);
+        uint32_t idx = kickmsg::treiber_pop(hdr->free_top, base, hdr);
         ASSERT_NE(idx, kickmsg::INVALID_SLOT) << "Pop failed at iteration " << i;
         popped.push_back(idx);
     }
@@ -148,11 +148,11 @@ TEST_F(RegionTest, TreiberPopAllThenPushBack)
     }
 
     uint32_t count = 0;
-    auto top = kickmsg::tagged_idx(hdr->free_top.load(std::memory_order_acquire));
+    uint32_t top = kickmsg::tagged_idx(hdr->free_top.load(std::memory_order_acquire));
     while (top != kickmsg::INVALID_SLOT)
     {
         auto* slot = kickmsg::slot_at(base, hdr, top);
-        top = slot->next_free.load(std::memory_order_relaxed);
+        top = slot->next_free;
         ++count;
     }
     EXPECT_EQ(count, static_cast<uint32_t>(cfg.pool_size));
@@ -167,18 +167,18 @@ TEST_F(RegionTest, CollectGarbageReclaimsOrphanedSlots)
     cfg.max_payload_size  = 64;
 
     auto region = kickmsg::SharedRegion::create(
-                      SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+                      SHM_NAME, kickmsg::channel::PubSub, cfg);
     auto* hdr = region.header();
 
     auto count_free = [&]()
     {
         uint32_t count = 0;
-        auto  top = hdr->free_top.load(std::memory_order_acquire);
-        auto  idx = kickmsg::tagged_idx(top);
+        uint64_t top = hdr->free_top.load(std::memory_order_acquire);
+        uint32_t idx = kickmsg::tagged_idx(top);
         while (idx != kickmsg::INVALID_SLOT)
         {
             auto* slot = kickmsg::slot_at(region.base(), hdr, idx);
-            idx = slot->next_free.load(std::memory_order_relaxed);
+            idx = slot->next_free;
             ++count;
         }
         return count;
@@ -188,7 +188,7 @@ TEST_F(RegionTest, CollectGarbageReclaimsOrphanedSlots)
 
     for (int i = 0; i < 3; ++i)
     {
-        auto idx = kickmsg::treiber_pop(hdr->free_top, region.base(), hdr);
+        uint32_t idx = kickmsg::treiber_pop(hdr->free_top, region.base(), hdr);
         ASSERT_NE(idx, kickmsg::INVALID_SLOT);
         auto* slot = kickmsg::slot_at(region.base(), hdr, idx);
         slot->refcount.store(static_cast<uint32_t>(cfg.max_subscribers),
@@ -197,7 +197,7 @@ TEST_F(RegionTest, CollectGarbageReclaimsOrphanedSlots)
 
     EXPECT_EQ(count_free(), 13u);
 
-    auto reclaimed = region.reclaim_orphaned_slots();
+    std::size_t reclaimed = region.reclaim_orphaned_slots();
     EXPECT_EQ(reclaimed, 3u);
     EXPECT_EQ(count_free(), 16u);
 
@@ -212,8 +212,7 @@ TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
     cfg.pool_size         = 16;
     cfg.max_payload_size  = 64;
 
-    auto region = kickmsg::SharedRegion::create(
-                      SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -224,7 +223,7 @@ TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
         ASSERT_GE(pub.send(&val, sizeof(val)), 0);
     }
 
-    auto reclaimed = region.reclaim_orphaned_slots();
+    std::size_t reclaimed = region.reclaim_orphaned_slots();
     EXPECT_EQ(reclaimed, 0u);
 
     for (int i = 0; i < 4; ++i)

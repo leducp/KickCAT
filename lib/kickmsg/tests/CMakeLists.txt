@@ -1,9 +1,9 @@
 add_executable(kickmsg_unit
-    unit/types_test.cc
-    unit/region_test.cc
-    unit/publisher_test.cc
-    unit/subscriber_test.cc
-    unit/node_test.cc
+    unit/types-t.cc
+    unit/region-t.cc
+    unit/publisher-t.cc
+    unit/subscriber-t.cc
+    unit/node-t.cc
 )
 target_link_libraries(kickmsg_unit PRIVATE kickmsg kickcat GTest::gtest_main)
 set_kickcat_properties(kickmsg_unit)

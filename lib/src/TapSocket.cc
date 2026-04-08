@@ -36,8 +36,8 @@ namespace kickcat
         if (init_)
         {
             // Server creates both regions and takes side A (publish a2b, subscribe b2a)
-            region_out_ = kickmsg::SharedRegion::create(name_a2b.c_str(), kickmsg::ChannelType::PubSub, cfg, "kickcat");
-            region_in_  = kickmsg::SharedRegion::create(name_b2a.c_str(), kickmsg::ChannelType::PubSub, cfg, "kickcat");
+            region_out_ = kickmsg::SharedRegion::create(name_a2b.c_str(), kickmsg::channel::PubSub, cfg, "kickcat");
+            region_in_  = kickmsg::SharedRegion::create(name_b2a.c_str(), kickmsg::channel::PubSub, cfg, "kickcat");
         }
         else
         {

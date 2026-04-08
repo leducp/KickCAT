@@ -38,7 +38,7 @@ namespace kickmsg
 
     // FNV-1a hash of config fields, used to detect parameter mismatches
     // when opening an existing region.
-    uint64_t compute_config_hash(ChannelType type, ChannelConfig const& cfg)
+    uint64_t compute_config_hash(channel::Type type, ChannelConfig const& cfg)
     {
         constexpr uint64_t FNV_OFFSET = 14695981039346656037ULL;
         constexpr uint64_t FNV_PRIME  = 1099511628211ULL;
@@ -55,11 +55,11 @@ namespace kickmsg
         };
 
         uint64_t h = FNV_OFFSET;
-        h = mix(h, static_cast<uint64_t>(type));
-        h = mix(h, static_cast<uint64_t>(cfg.max_subscribers));
-        h = mix(h, static_cast<uint64_t>(cfg.sub_ring_capacity));
-        h = mix(h, static_cast<uint64_t>(cfg.pool_size));
-        h = mix(h, static_cast<uint64_t>(cfg.max_payload_size));
+        h = mix(h, static_cast<uint64_t>(type)); // enum class requires cast
+        h = mix(h, cfg.max_subscribers);
+        h = mix(h, cfg.sub_ring_capacity);
+        h = mix(h, cfg.pool_size);
+        h = mix(h, cfg.max_payload_size);
         return h;
     }
 

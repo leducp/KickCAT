@@ -29,7 +29,7 @@ namespace kickmsg
         // Release any previously allocated but unpublished slot.
         release_pending();
 
-        auto slot_idx = treiber_pop(header_->free_top, base_, header_);
+        uint32_t slot_idx = treiber_pop(header_->free_top, base_, header_);
         if (slot_idx == INVALID_SLOT)
         {
             return nullptr;
@@ -49,13 +49,13 @@ namespace kickmsg
             return 0;
         }
 
-        auto slot_idx = pending_slot_;
-        auto len      = pending_len_;
+        uint32_t slot_idx = pending_slot_;
+        uint32_t len      = pending_len_;
         pending_slot_ = INVALID_SLOT;
         pending_len_  = 0;
 
-        auto* slot     = slot_at(base_, header_, slot_idx);
-        auto  capacity = header_->sub_ring_capacity;
+        auto*    slot     = slot_at(base_, header_, slot_idx);
+        uint64_t capacity = header_->sub_ring_capacity;
 
         // Pre-set refcount to max_subs before publishing to any ring,
         // so a fast eviction on ring[k] cannot free the slot before
@@ -76,11 +76,11 @@ namespace kickmsg
             // to both publisher and subscriber on all architectures.
             ring->in_flight.fetch_add(1, std::memory_order_seq_cst);
 
-            if (ring->state.load(std::memory_order_seq_cst) != RingState::Live)
+            if (ring->state.load(std::memory_order_seq_cst) != ring::Live)
             {
                 // Release this ring's reference BEFORE in_flight--, so drain
                 // can't start until the refcount adjustment is complete.
-                auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+                uint32_t prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
                 if (prev == 1)
                 {
                     treiber_push(header_->free_top, slot, slot_idx);
@@ -98,7 +98,7 @@ namespace kickmsg
             while (not ring->write_pos.compare_exchange_weak(pos, pos + 1,
                        std::memory_order_acq_rel, std::memory_order_acquire));
 
-            auto  idx     = pos & header_->sub_ring_mask;
+            uint64_t idx  = pos & header_->sub_ring_mask;
             auto* entries = ring_entries(ring);
             auto& e       = entries[idx];
 
@@ -144,7 +144,7 @@ namespace kickmsg
             if (not locked)
             {
                 ++dropped_;
-                auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+                uint32_t prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
                 if (prev == 1)
                 {
                     treiber_push(header_->free_top, slot, slot_idx);
@@ -195,23 +195,22 @@ namespace kickmsg
                                               microseconds timeout)
     {
         constexpr int CHECK_INTERVAL = 1024;
-        auto deadline = steady_clock::now() + timeout;
+        nanoseconds start = kickcat::since_epoch();
 
         int i = 0;
         while (true)
         {
-            auto seq = e.sequence.load(std::memory_order_acquire);
+            uint64_t seq = e.sequence.load(std::memory_order_acquire);
             if (seq >= expected_seq and seq != LOCKED_SEQUENCE)
             {
-                // Acquire: pairs with drain_unconsumed's release store of INVALID_SLOT
-                // after releasing the ring's reference. Without acquire, a publisher
-                // on AArch64/RISC-V could read a stale slot_idx and double-decrement.
+                // Acquire: pairs with drain_unconsumed's release store of
+                // INVALID_SLOT after releasing the ring's reference.
                 return e.slot_idx.load(std::memory_order_acquire);
             }
             ++i;
             if ((i & (CHECK_INTERVAL - 1)) == 0)
             {
-                if (steady_clock::now() >= deadline)
+                if (kickcat::elapsed_time(start) >= timeout)
                 {
                     return INVALID_SLOT;
                 }
@@ -221,11 +220,11 @@ namespace kickmsg
 
     void Publisher::release_slot(uint32_t idx)
     {
-        auto* s    = slot_at(base_, header_, idx);
-        auto  prev = s->refcount.fetch_sub(1, std::memory_order_acq_rel);
+        auto*    s    = slot_at(base_, header_, idx);
+        uint32_t prev = s->refcount.fetch_sub(1, std::memory_order_acq_rel);
         if (prev == 1)
         {
             treiber_push(header_->free_top, s, idx);
         }
     }
-} // namespace kickmsg
+}

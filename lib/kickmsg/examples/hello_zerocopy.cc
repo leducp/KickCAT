@@ -30,7 +30,7 @@ int main()
     cfg.max_payload_size  = 1024;
 
     auto region = kickmsg::SharedRegion::create(
-        SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "zerocopy_example");
+        SHM_NAME, kickmsg::channel::PubSub, cfg, "zerocopy_example");
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);

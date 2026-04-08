@@ -18,11 +18,14 @@ namespace kickmsg
 
     constexpr uint64_t DEFAULT_COMMIT_TIMEOUT_US = 100'000; // 100 ms
 
-    enum class ChannelType : uint32_t
+    namespace channel
     {
-        PubSub    = 1,
-        Broadcast = 2,
-    };
+        enum Type : uint32_t
+        {
+            PubSub    = 1,
+            Broadcast = 2,
+        };
+    }
 
     struct ChannelConfig
     {
@@ -45,9 +48,9 @@ namespace kickmsg
     /// Layout version changes require a VERSION bump.
     struct Header
     {
-        uint64_t    magic;              ///< MAGIC sentinel — written last during init, polled by create_or_open
+        std::atomic<uint64_t> magic;    ///< MAGIC sentinel — written last (release) during init, polled (acquire) by create_or_open
         uint32_t    version;            ///< Layout version — rejects mismatched builds
-        ChannelType channel_type;       ///< PubSub or Broadcast
+        channel::Type channel_type;     ///< PubSub or Broadcast
 
         uint64_t    total_size;         ///< Total shared-memory region size in bytes
 
@@ -76,7 +79,7 @@ namespace kickmsg
 
     /// Ring entry: one per position in a subscriber ring.
     /// Packed to guarantee binary layout across compilers.
-    struct __attribute__((packed)) Entry
+    struct Entry
     {
         std::atomic<uint64_t> sequence;     ///< Commit barrier (pos + 1) and seqlock for data consistency
         std::atomic<uint32_t> slot_idx;     ///< Index into the slot pool (INVALID_SLOT if released by drain)
@@ -84,13 +87,16 @@ namespace kickmsg
     };
 
     /// Ring state machine for subscriber lifecycle.
-    /// FREE → LIVE (subscriber joins) → DRAINING (subscriber leaving) → FREE
-    enum class RingState : uint32_t
+    /// Free → Live (subscriber joins) → Draining (subscriber leaving) → Free
+    namespace ring
     {
-        Free     = 0,  ///< No subscriber — available for claim
-        Live     = 1,  ///< Subscriber owns ring, publishers may deliver
-        Draining = 2,  ///< Subscriber tearing down — no new delivery, drain in progress
-    };
+        enum State : uint32_t
+        {
+            Free     = 0,  ///< No subscriber — available for claim
+            Live     = 1,  ///< Subscriber owns ring, publishers may deliver
+            Draining = 2,  ///< Subscriber tearing down — no new delivery, drain in progress
+        };
+    }
 
     /// Per-subscriber ring header in shared memory.
     /// Fields are cache-line aligned to avoid false sharing between
@@ -98,14 +104,14 @@ namespace kickmsg
     /// subscriber (writes state, reads write_pos).
     struct SubRingHeader
     {
-        alignas(CACHE_LINE) std::atomic<RingState> state;    ///< Ring lifecycle state
+        alignas(CACHE_LINE) std::atomic<ring::State> state;   ///< Ring lifecycle state
         alignas(CACHE_LINE) std::atomic<uint32_t> in_flight; ///< Publishers currently admitted to this ring
         alignas(CACHE_LINE) std::atomic<uint64_t> write_pos; ///< Monotonically increasing position counter
     };
 
     /// Slot header: prepended to each payload buffer in the pool.
     /// Packed to guarantee binary layout across compilers.
-    struct __attribute__((packed)) SlotHeader
+    struct SlotHeader
     {
         std::atomic<uint32_t> refcount;  ///< Number of ring references + SampleView pins
         std::atomic<uint32_t> next_free; ///< Next slot index in the Treiber free-stack chain
@@ -143,12 +149,12 @@ namespace kickmsg
 
     SubRingHeader* sub_ring_at(void* base, Header const* h, uint32_t idx);
     Entry*         ring_entries(SubRingHeader* ring);
-    SlotHeader*      slot_at(void* base, Header const* h, uint32_t idx);
-    SlotHeader*      slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx);
+    SlotHeader*    slot_at(void* base, Header const* h, uint32_t idx);
+    SlotHeader*    slot_at(void* pool_base, std::size_t slot_stride, uint32_t idx);
     uint8_t*       slot_data(SlotHeader* slot);
     char*          header_creator_name(Header* h);
 
-    uint64_t compute_config_hash(ChannelType type, ChannelConfig const& cfg);
+    uint64_t compute_config_hash(channel::Type type, ChannelConfig const& cfg);
 
     void     treiber_push(std::atomic<uint64_t>& top, SlotHeader* slot, uint32_t slot_idx);
     void     treiber_push(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride, uint32_t slot_idx);

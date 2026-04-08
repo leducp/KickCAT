@@ -51,7 +51,7 @@ rings. No ring ever has two readers.
   index to each  │        │           │
   active ring    │        ▼           ▼
                  ├──►┌─Ring[0]──────┐ ┌─Ring[1]──────┐ ┌─Ring[2]──────┐
-                 │   │ write_pos: 42│ │ write_pos: 42│ │ (active=0)   │
+                 │   │ write_pos: 42│ │ write_pos: 42│ │ (state=Free) │
                  │   │ MPSC via CAS │ │ MPSC via CAS │ │  unused      │
                  │   └──────┬───────┘ └──────┬───────┘ └──────────────┘
                  │          │                │
@@ -66,8 +66,9 @@ rings. No ring ever has two readers.
 ```
 
 **Full cycle**: a publisher (1) pops a free slot from the Treiber stack,
-(2) writes its payload, (3) pre-sets the refcount to the number of active
-subscribers, then (4) pushes the slot index into each active ring via CAS.
+(2) writes its payload, (3) pre-sets the refcount to `max_subs` (the
+maximum number of subscriber rings), then (4) pushes the slot index into
+each Live ring via CAS, releasing the reference inline for non-Live rings.
 On the other end, each subscriber reads entries from its own ring and
 decrements the slot's refcount. When the ring wraps, the publisher evicts
 the oldest entry and decrements its slot's refcount too. In both cases,
@@ -126,7 +127,7 @@ The region header is self-describing and forward-compatible:
 Header (at offset 0)
 ┌───────────────────────────────────────────────────────────┐
 │  magic              0x4B49434B4D534721 ("KICKMSG!")       │
-│  version            2                                     │
+│  version            3                                     │
 │  channel_type       PubSub | Broadcast                    │
 │  total_size         total mmap size in bytes               │
 │  sub_rings_offset   byte offset to first subscriber ring  │
@@ -184,7 +185,7 @@ contains a sequence number, slot index, and payload length -- all atomic.
 ```
 Ring[0]
 ┌──────────────────────────────────────────────────────────┐
-│  active: 1   in_flight: 0   write_pos: AtomicU64 = 42   │
+│  state: Live   in_flight: 0   write_pos: AtomicU64 = 42 │
 │                                                          │
 │  entries[0..7]:                                          │
 │  ┌─────┬───────────┬──────────┬─────────────┐            │
@@ -203,10 +204,13 @@ Ring[0]
 ```
 
 - **Capacity** must be a power of 2 (index masking: `pos & (cap - 1)`).
-- **active** (atomic uint32): 1 if a subscriber owns this ring, 0 otherwise.
-  Publishers check this before delivering.
-- **in_flight** (atomic uint32): number of publishers currently mid-commit
-  on this ring. Publishers increment before checking `active` and decrement
+- **state** (atomic RingState): lifecycle state of the ring.
+  `Free(0)` -- no subscriber, available for claim.
+  `Live(1)` -- subscriber owns ring, publishers may deliver.
+  `Draining(2)` -- subscriber tearing down, no new delivery.
+  Publishers check `state == Live` before delivering.
+- **in_flight** (atomic uint32): number of publishers currently admitted
+  to this ring. Publishers increment before checking `state` and decrement
   after committing (or abandoning). The subscriber destructor spins until
   `in_flight == 0` to ensure `write_pos` is final before draining.
 - **write_pos** (atomic uint64): monotonically increasing position counter.
@@ -234,19 +238,22 @@ Publisher
 2. memcpy payload -> Slot[3].data  Write payload into the slot.
    |
    v
-3. Slot[3].refcount = N            Pre-set to number of active subscribers.
+3. Slot[3].refcount = max_subs     Pre-set to max subscriber count.
    |                               Done BEFORE publishing to any ring, so
    |                               the slot cannot be freed prematurely.
    v
 4. For each Ring[i]:
    |
-   |-- in_flight.fetch_add(1)      Announce presence BEFORE checking active.
-   |                                The subscriber destructor spins until
-   |                                in_flight == 0 to ensure write_pos is
-   |                                final before draining.
+   |-- in_flight.fetch_add(1, seq_cst)  Dekker double-check admission:
+   |                                    announce presence BEFORE reading
+   |                                    state, so a concurrent Draining
+   |                                    transition is never missed.
    |
-   |-- if active == 0:             Ring has no subscriber.
-   |     in_flight.fetch_sub(1)    Release and skip to next ring.
+   |-- if state != Live:               Ring is Free or Draining.
+   |     slot.refcount--               Release this ring's reference
+   |     (if refcount -> 0:            inline (before in_flight--), so
+   |       treiber_push)               drain cannot start prematurely.
+   |     in_flight.fetch_sub(1, seq_cst)
    |     continue
    |
    |-- CAS write_pos: 42 -> 43    Claim position 42 (MPSC-safe).
@@ -302,10 +309,9 @@ Publisher
    |                                can now observe in_flight == 0.
    |
    '-- futex_wake_all(write_pos)   Wake any sleeping subscribers.
-   |
-   v
-5. Adjust refcount for inactive   fetch_sub(inactive_count).
-   rings.                         If refcount -> 0: treiber_push.
+
+   No batched excess subtraction — each skipped ring released its
+   reference inline above, under the in_flight umbrella.
 ```
 
 ### Why a two-phase commit?
@@ -325,8 +331,9 @@ brief delay.
 
 If we incremented refcount one ring at a time, a fast eviction on
 Ring[1] could drop the slot's refcount to 0 and free it before we've
-even published to Ring[2]. Pre-setting to `max_active_subs` ensures
-the slot stays alive for the entire publish loop.
+even published to Ring[2]. Pre-setting to `max_subs` ensures
+the slot stays alive for the entire publish loop. Skipped rings
+(non-Live) release their reference inline inside the loop.
 
 ### What does "evict" mean for refcount?
 
@@ -448,11 +455,13 @@ A slot goes through the following states:
     ▼
   WRITING (publisher owns it, refcount = 0)
     │
-    │  publish(): refcount = active_subs, push index to rings
+    │  publish(): refcount = max_subs, push index to Live rings
     ▼
   PUBLISHED (referenced by N ring entries and/or SampleViews)
     │
     │  Sources of refcount decrement (one per ring):
+    │  - Non-Live ring skip         (publisher releases inline when
+    │                                state != Live during admission)
     │  - Ring overflow eviction     (publisher evicts oldest entry)
     │  - drain_unconsumed()         (subscriber destructor releases
     │                                the ring's reference for all
@@ -492,14 +501,13 @@ After treiber_pop, before          Pool slot leaked (popped but
                                    set). Bounded: 1 slot per crash.
 
 After refcount pre-set, during     Refcount was set to max_subs but
-  the ring-push loop (delivered    only k out of N active rings
-  to k of N active rings)         received the slot index. Step 5
-                                   (excess adjustment) never runs.
-                                   The k rings that received the slot
-                                   will eventually decrement refcount
-                                   (via eviction or consumption), but
-                                   refcount settles at (max_subs - k)
-                                   and never reaches 0. The slot is
+  the ring-push loop (delivered    only k out of N rings were visited
+  to k of N rings)                 before the crash. Rings visited
+                                   before the crash released their
+                                   reference (inline for non-Live, or
+                                   via eviction/consumption for Live).
+                                   Remaining (max_subs - k) references
+                                   are never released. The slot is
                                    permanently leaked.
 
 After CAS on write_pos, before     Entry is uncommitted (sequence
@@ -571,9 +579,9 @@ There are two distinct classes of slot leaks:
 ```
 Class   Cause                              Stuck state
 ───────────────────────────────────────────────────────────────────────
-A       Subscriber destructs while         Ring inactive, entries
-        entries remain unconsumed.         committed, refcount never
-        (deactivation race)                decremented by this ring.
+A       Subscriber destructs while         Ring in Draining/Free state,
+        entries remain unconsumed.         entries committed, refcount
+        (deactivation race)                never decremented by this ring.
 
 B       Publisher crashes after            Slot refcount inflated;
         treiber_pop or after write_pos     ring entry uncommitted or
@@ -586,21 +594,24 @@ and full-window drain:
 
 ```
 ~Subscriber():
-    1. active = 0 (release)             — stop new publishers from entering
-    2. spin until in_flight == 0        — wait for mid-commit publishers to finish
-    3. wp = ring.write_pos              — now guaranteed final
-    4. oldest = max(0, wp - capacity)
-    5. for each entry in [oldest, wp):  — entire live window, consumed AND unconsumed
-         if sequence == pos + 1:        — committed and not evicted
-           slot.refcount--
-           if refcount == 0: treiber_push(slot)
-         else:
-           skip (evicted, uncommitted, or locked — falls into Class B)
+    1. state = Draining (seq_cst)       — publishers see non-Live, skip this ring
+    2. spin until in_flight == 0        — wait for all admitted publishers to finish
+    3. drain_unconsumed(ring):
+         wp = ring.write_pos            — now guaranteed final
+         oldest = max(0, wp - capacity)
+         for each entry in [max(oldest, start_pos), wp):
+           if sequence == pos + 1:      — committed and not evicted
+             slot.refcount--
+             if refcount == 0: treiber_push(slot)
+             entry.slot_idx = INVALID_SLOT (seq_cst)
+           else:
+             skip (evicted, uncommitted, or locked — falls into Class B)
+    4. state = Free (seq_cst)           — ring available for a new subscriber
 ```
 
 The key invariant: `in_flight` is incremented by publishers BEFORE
-checking `active`, so once `in_flight == 0` after `active = 0`, no
-publisher can be mid-commit. `write_pos` is truly final.
+reading `state`, so once `in_flight == 0` after `state = Draining`, no
+publisher can be admitted. `write_pos` is truly final.
 
 The drain walks `[max(oldest, start_pos), wp)` — not just
 `[read_pos, wp)` — because `try_receive()` pins and unpins the slot
@@ -624,7 +635,7 @@ Only Class B can leak slots. Each publisher crash leaks at most
 **2 pool slots**:
 
 - The slot the crashed publisher allocated (refcount stuck > 0 because
-  step 5 never adjusted for inactive/undelivered rings)
+  the remaining rings were never visited for inline release)
 - The slot referenced by the abandoned ring entry (if one existed
   at the wrapped position and its `slot_idx` could not be trusted)
 
@@ -758,7 +769,11 @@ free_top (Treiber)      64-bit tagged pointer: 32-bit generation counter
 write_pos (rings)       Monotonically increasing 64-bit counter. Only goes
                         up, never revisits a value.
 
-active (subscriber)     One-shot transition (0 → 1). No cycle possible.
+state (subscriber)      One-way state machine: Free → Live → Draining → Free.
+                        Publishers only deliver to Live rings. The
+                        Dekker admission (in_flight++ then state check)
+                        ensures no publisher misses a Live → Draining
+                        transition.
 
 refcount (pinning)      CAS from rc to rc+1 only when rc > 0. Even if
                         intermediate transitions bring it back to the same

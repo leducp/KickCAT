@@ -3,9 +3,9 @@
 namespace kickmsg
 {
 
-    Node::Node(std::string name, std::string prefix)
-        : name_{std::move(name)}
-        , prefix_{std::move(prefix)}
+    Node::Node(std::string const& name, std::string const& prefix)
+        : name_{name}
+        , prefix_{prefix}
     {
     }
 
@@ -13,7 +13,7 @@ namespace kickmsg
     {
         auto shm_name = make_topic_name(topic);
         regions_.emplace_back(
-            SharedRegion::create(shm_name.c_str(), ChannelType::PubSub, cfg, name_.c_str()));
+            SharedRegion::create(shm_name.c_str(), channel::PubSub, cfg, name_.c_str()));
         return Publisher(regions_.back());
     }
 
@@ -29,7 +29,7 @@ namespace kickmsg
         auto shm_name = make_broadcast_name(channel);
         regions_.emplace_back(
             SharedRegion::create_or_open(
-                shm_name.c_str(), ChannelType::Broadcast, cfg, name_.c_str()));
+                shm_name.c_str(), channel::Broadcast, cfg, name_.c_str()));
         auto& region = regions_.back();
         return BroadcastHandle{Publisher{region}, Subscriber{region}};
     }
@@ -40,7 +40,7 @@ namespace kickmsg
         mbx_cfg.max_subscribers = 1;
         auto shm_name = make_mailbox_name(name_.c_str(), tag);
         regions_.emplace_back(
-            SharedRegion::create(shm_name.c_str(), ChannelType::PubSub, mbx_cfg, name_.c_str()));
+            SharedRegion::create(shm_name.c_str(), channel::PubSub, mbx_cfg, name_.c_str()));
         return Subscriber(regions_.back());
     }
 
@@ -65,5 +65,4 @@ namespace kickmsg
     {
         return "/" + prefix_ + "_" + owner + "_mbx_" + tag;
     }
-
-} // namespace kickmsg
+}

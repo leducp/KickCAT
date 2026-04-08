@@ -7,7 +7,7 @@
 
 class PublisherTest : public ::testing::Test
 {
-protected:
+public:
     static constexpr char const* SHM_NAME = "/kickmsg_test_publisher";
 
     void SetUp() override
@@ -34,7 +34,7 @@ protected:
 TEST_F(PublisherTest, SendReceiveSingleMessage)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -54,7 +54,7 @@ TEST_F(PublisherTest, SendReceiveSingleMessage)
 TEST_F(PublisherTest, AllocatePublishSeparately)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -64,7 +64,7 @@ TEST_F(PublisherTest, AllocatePublishSeparately)
 
     uint32_t val = 42;
     std::memcpy(ptr, &val, sizeof(val));
-    auto delivered = pub.publish();
+    std::size_t delivered = pub.publish();
     EXPECT_EQ(delivered, 1u);
 
     auto sample = sub.try_receive();
@@ -78,7 +78,7 @@ TEST_F(PublisherTest, AllocatePublishSeparately)
 TEST_F(PublisherTest, AllocateTooLargeReturnsNull)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
     kickmsg::Publisher pub(region);
 
     EXPECT_EQ(pub.allocate(cfg.max_payload_size + 1), nullptr);
@@ -87,7 +87,7 @@ TEST_F(PublisherTest, AllocateTooLargeReturnsNull)
 TEST_F(PublisherTest, SendReturnsEmsgsize)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
     kickmsg::Publisher pub(region);
 
     uint8_t buf[128]{};
@@ -102,7 +102,7 @@ TEST_F(PublisherTest, SendReturnsEagainOnPoolExhaustion)
     cfg.pool_size         = 2;
     cfg.max_payload_size  = 8;
 
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
 
@@ -117,7 +117,7 @@ TEST_F(PublisherTest, SendReturnsEagainOnPoolExhaustion)
 TEST_F(PublisherTest, DroppedCounterZeroInNormalUse)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -133,7 +133,7 @@ TEST_F(PublisherTest, DroppedCounterZeroInNormalUse)
 TEST_F(PublisherTest, MultipleMessages)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub(region);
     kickmsg::Publisher  pub(region);
@@ -158,7 +158,7 @@ TEST_F(PublisherTest, MultipleMessages)
 TEST_F(PublisherTest, MultipleSubscribersEachReceive)
 {
     auto cfg    = default_cfg();
-    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::ChannelType::PubSub, cfg);
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
 
     kickmsg::Subscriber sub1(region);
     kickmsg::Subscriber sub2(region);
