@@ -45,20 +45,28 @@ namespace kickmsg
             // Wait for all admitted publishers to finish.
             // Bounded: if a publisher crashed after in_flight++ but before in_flight--,
             // the counter is permanently inflated. Use commit_timeout as the bound.
+            bool quiesced = true;
             microseconds deadline{header_->commit_timeout_us};
             nanoseconds start = kickcat::since_epoch();
             while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
             {
                 if (kickcat::elapsed_time(start) >= deadline)
                 {
-                    // Publisher likely crashed. Force in_flight to 0 and proceed.
-                    ring->in_flight = 0;
+                    // Publisher likely crashed. Do NOT force in_flight to 0:
+                    // a slow-but-alive publisher may still be mid-commit.
+                    // Skip drain to avoid racing with it. Leaked slot refs
+                    // are recoverable by GC (reclaim_orphaned_slots).
+                    quiesced = false;
+                    ++drain_timeouts_;
                     break;
                 }
                 kickcat::sleep(0ns);
             }
 
-            drain_unconsumed(ring);
+            if (quiesced)
+            {
+                drain_unconsumed(ring);
+            }
 
             // Transition Draining → Free: ring available for a new subscriber.
             ring->state.store(ring::Free, std::memory_order_seq_cst);
@@ -72,6 +80,7 @@ namespace kickmsg
         , start_pos_{other.start_pos_}
         , read_pos_{other.read_pos_}
         , lost_{other.lost_}
+        , drain_timeouts_{other.drain_timeouts_}
         , recv_buf_{std::move(other.recv_buf_)}
     {
         other.ring_idx_ = UINT32_MAX;
@@ -85,28 +94,34 @@ namespace kickmsg
             {
                 auto* ring = sub_ring_at(base_, header_, ring_idx_);
                 ring->state.store(ring::Draining, std::memory_order_seq_cst);
+                bool quiesced = true;
                 microseconds deadline{header_->commit_timeout_us};
                 nanoseconds start = kickcat::since_epoch();
                 while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
                 {
                     if (kickcat::elapsed_time(start) >= deadline)
                     {
-                        ring->in_flight = 0;
+                        quiesced = false;
+                        ++drain_timeouts_;
                         break;
                     }
                     kickcat::sleep(0ns);
                 }
-                drain_unconsumed(ring);
+                if (quiesced)
+                {
+                    drain_unconsumed(ring);
+                }
                 ring->state.store(ring::Free, std::memory_order_seq_cst);
             }
 
-            base_      = other.base_;
-            header_    = other.header_;
-            ring_idx_  = other.ring_idx_;
-            start_pos_ = other.start_pos_;
-            read_pos_  = other.read_pos_;
-            lost_      = other.lost_;
-            recv_buf_ = std::move(other.recv_buf_);
+            base_           = other.base_;
+            header_         = other.header_;
+            ring_idx_       = other.ring_idx_;
+            start_pos_      = other.start_pos_;
+            read_pos_       = other.read_pos_;
+            lost_           = other.lost_;
+            drain_timeouts_ = other.drain_timeouts_;
+            recv_buf_       = std::move(other.recv_buf_);
 
             other.ring_idx_ = UINT32_MAX;
         }

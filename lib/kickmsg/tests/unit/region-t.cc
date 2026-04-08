@@ -204,6 +204,109 @@ TEST_F(RegionTest, CollectGarbageReclaimsOrphanedSlots)
     EXPECT_EQ(region.reclaim_orphaned_slots(), 0u);
 }
 
+TEST_F(RegionTest, RepairLockedEntryUnblocksPublishing)
+{
+    // Verify that after repair_locked_entries(), the repaired ring position
+    // can be published over again when the ring wraps.
+
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 4;    // capacity = 4, so pos=4 wraps to idx=0
+    cfg.pool_size         = 16;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    kickmsg::Subscriber sub(region);
+    kickmsg::Publisher  pub(region);
+
+    // Publish 1 message at pos=0, creating a committed entry with seq=1
+    uint32_t val = 100;
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+
+    // Consume it so the subscriber is caught up
+    auto sample = sub.try_receive();
+    ASSERT_TRUE(sample.has_value());
+
+    // Simulate a crash at pos=1: manually lock the entry
+    auto* ring    = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    auto* entries = kickmsg::ring_entries(ring);
+
+    // Advance write_pos to simulate that a publisher claimed pos=1
+    ring->write_pos.store(2, std::memory_order_release);
+    auto& e1 = entries[1]; // pos=1 → idx=1
+    e1.sequence.store(kickmsg::LOCKED_SEQUENCE, std::memory_order_release);
+
+    // Repair should fix the locked entry
+    std::size_t repaired = region.repair_locked_entries();
+    EXPECT_EQ(repaired, 1u);
+
+    // The repaired entry should have seq = pos + 1 = 2
+    uint64_t seq = e1.sequence.load(std::memory_order_acquire);
+    EXPECT_EQ(seq, 2u);
+
+    // The repaired entry should have INVALID_SLOT
+    uint32_t slot_idx = e1.slot_idx.load(std::memory_order_acquire);
+    EXPECT_EQ(slot_idx, kickmsg::INVALID_SLOT);
+
+    // Now publish enough to wrap around: pos 2, 3, 4, 5
+    // pos=4 wraps to idx=0 and expects prev_seq=1 (pos 0's committed seq) — OK
+    // pos=5 wraps to idx=1 and expects prev_seq=2 (the repaired seq) — this
+    // would fail with the old code that stored prev_seq instead of pos+1
+    for (int i = 0; i < 4; ++i)
+    {
+        val = static_cast<uint32_t>(200 + i);
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0)
+            << "Publishing failed at iteration " << i
+            << " — repaired entry likely blocked the ring";
+    }
+
+    // Subscriber should receive the new messages (some may be lost due to wrapping)
+    int received = 0;
+    while (auto s = sub.try_receive())
+    {
+        ++received;
+    }
+    EXPECT_GT(received, 0);
+}
+
+TEST_F(RegionTest, RepairLockedEntryAtPositionZero)
+{
+    // Edge case: crash at pos=0 where prev_seq was 0.
+    // Old code stored prev_seq=0, new code stores pos+1=1.
+
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    kickmsg::Subscriber sub(region);
+
+    // Simulate crash at pos=0: lock the entry, advance write_pos
+    auto* ring    = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    auto* entries = kickmsg::ring_entries(ring);
+    ring->write_pos.store(1, std::memory_order_release);
+    entries[0].sequence.store(kickmsg::LOCKED_SEQUENCE, std::memory_order_release);
+
+    std::size_t repaired = region.repair_locked_entries();
+    EXPECT_EQ(repaired, 1u);
+    EXPECT_EQ(entries[0].sequence.load(std::memory_order_acquire), 1u);
+    EXPECT_EQ(entries[0].slot_idx.load(std::memory_order_acquire), kickmsg::INVALID_SLOT);
+
+    // Publishing should work: pos=1,2,3 use fresh indices, pos=4 wraps to idx=0
+    // and expects prev_seq=1 — matches the repaired value
+    kickmsg::Publisher pub(region);
+    for (int i = 0; i < 5; ++i)
+    {
+        uint32_t val = static_cast<uint32_t>(i);
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0)
+            << "Publishing failed at iteration " << i;
+    }
+}
+
 TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
 {
     kickmsg::channel::Config cfg;

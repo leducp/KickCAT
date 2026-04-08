@@ -596,8 +596,10 @@ and full-window drain:
 ```
 ~Subscriber():
     1. state = Draining (seq_cst)       — publishers see non-Live, skip this ring
-    2. spin until in_flight == 0        — wait for all admitted publishers to finish
-    3. drain_unconsumed(ring):
+    2. spin until in_flight == 0        — bounded by commit_timeout
+       a) success: quiescence achieved
+       b) timeout: publisher likely crashed — skip drain (see below)
+    3. if quiesced: drain_unconsumed(ring):
          wp = ring.write_pos            — now guaranteed final
          oldest = max(0, wp - capacity)
          for each entry in [max(oldest, start_pos), wp):
@@ -613,6 +615,16 @@ and full-window drain:
 The key invariant: `in_flight` is incremented by publishers BEFORE
 reading `state`, so once `in_flight == 0` after `state = Draining`, no
 publisher can be admitted. `write_pos` is truly final.
+
+**Timeout path**: if `in_flight` does not reach 0 within
+`commit_timeout`, the destructor does **not** force `in_flight` to 0
+and does **not** run `drain_unconsumed()`. Forcing in_flight would
+break the quiescence invariant: a slow-but-alive publisher could still
+be mid-commit, and drain would race with it, causing double-decrements.
+Instead, the destructor skips drain and transitions directly to `Free`.
+Leaked slot references are recoverable by the GC paths
+(`repair_locked_entries` + `reclaim_orphaned_slots`). A diagnostic
+counter `drain_timeouts()` is incremented for observability.
 
 The drain walks `[max(oldest, start_pos), wp)` — not just
 `[read_pos, wp)` — because `try_receive()` pins and unpins the slot
@@ -670,25 +682,33 @@ Recovery is split into two methods with different safety profiles:
 **`repair_locked_entries()`** — safe under live traffic.
 
 Scans all ring entries. If `sequence == LOCKED_SEQUENCE` (publisher crashed
-mid-commit), rolls back to the expected previous sequence, unblocking future
-publishers. The worst case under live traffic is a benign double-store if a
-slow (but alive) publisher commits at the same time.
+mid-commit), commits the entry with `slot_idx = INVALID_SLOT` and the
+correct final sequence (`pos + 1`). This unblocks future publishers
+wrapping to this position: they CAS `(pos + 1) → LOCKED`, which now
+succeeds. Subscribers and evictions skip `INVALID_SLOT` entries. The
+worst case under live traffic is a benign double-store if a slow (but
+alive) publisher commits at the same time.
 
 ```
 repair_locked_entries(region):
     for each ring i in [0, max_subs):
         for pos in [oldest_live, write_pos):
             if entries[pos].sequence == LOCKED_SEQUENCE:
-                entries[pos].sequence = expected_prev_seq(pos)
+                entries[pos].slot_idx = INVALID_SLOT
+                entries[pos].payload_len = 0
+                entries[pos].sequence = pos + 1    // committed sequence
 ```
 
-**`reclaim_orphaned_slots()`** — requires publisher quiescence.
+**`reclaim_orphaned_slots()`** — requires full quiescence.
 
 Scans all ring entries to build a set of referenced slot indices, then
 reclaims any slot with refcount > 0 that is not in the referenced set.
-NOT safe under live traffic: a publisher between refcount pre-set and
-ring push has rc > 0 but no ring entry yet. Reclaiming it would cause
-silent data corruption.
+NOT safe under live traffic. Requires:
+- All publishers quiesced (a publisher between refcount pre-set and
+  ring push has rc > 0 but no ring entry yet).
+- No outstanding `SampleView` objects (a view holds a refcount pin
+  without a ring entry reference; reclaiming it would free memory
+  still being read).
 
 ```
 reclaim_orphaned_slots(region):
@@ -743,14 +763,13 @@ std::size_t repaired = region.repair_locked_entries();
 std::size_t reclaimed = region.reclaim_orphaned_slots();
 ```
 
-`repair_locked_entries()` scans all ring entries and rolls back any
-stuck at `LOCKED_SEQUENCE`. Safe to call at any time.
+`repair_locked_entries()` scans all ring entries and commits any stuck
+at `LOCKED_SEQUENCE` with `INVALID_SLOT`. Safe to call at any time.
 
 `reclaim_orphaned_slots()` walks all rings to build a referenced-slot
 set, then frees any unreferenced slot with refcount > 0. NOT safe
-under live traffic — a publisher between refcount pre-set and ring
-push would have its slot reclaimed, causing data corruption. Call
-only when all publishers are quiesced.
+under live traffic — requires all publishers quiesced and no
+outstanding `SampleView` objects.
 
 
 ## ABA Safety

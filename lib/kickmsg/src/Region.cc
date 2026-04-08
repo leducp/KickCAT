@@ -189,12 +189,17 @@ namespace kickmsg
 
                 if (seq == LOCKED_SEQUENCE)
                 {
-                    uint64_t prev_seq = 0;
-                    if (pos >= cap)
-                    {
-                        prev_seq = pos - cap + 1;
-                    }
-                    e.sequence.store(prev_seq, std::memory_order_release);
+                    // The crashed publisher may have written garbage into
+                    // slot_idx/payload_len. Mark the entry as having no
+                    // valid slot so subscribers skip it and future evictions
+                    // don't release a stale index.
+                    e.slot_idx.store(INVALID_SLOT, std::memory_order_relaxed);
+                    e.payload_len.store(0, std::memory_order_relaxed);
+
+                    // Commit with the sequence future publishers expect:
+                    // pos + 1 (not prev_seq). A publisher wrapping to this
+                    // position will CAS(pos + 1 → LOCKED), which now succeeds.
+                    e.sequence.store(pos + 1, std::memory_order_release);
                     ++repaired;
                 }
             }

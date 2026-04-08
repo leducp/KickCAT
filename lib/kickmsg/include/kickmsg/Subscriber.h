@@ -163,6 +163,7 @@ namespace kickmsg
         std::optional<SampleView> receive_view(nanoseconds timeout);
 
         uint64_t lost() const { return lost_; }
+        uint64_t drain_timeouts() const { return drain_timeouts_; }
 
     private:
         void drain_unconsumed(SubRingHeader* ring);
@@ -173,6 +174,7 @@ namespace kickmsg
         uint64_t             start_pos_;
         uint64_t             read_pos_;
         uint64_t             lost_;
+        uint64_t             drain_timeouts_{0};
         std::vector<uint8_t> recv_buf_;
     };
 }

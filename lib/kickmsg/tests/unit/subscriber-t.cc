@@ -254,6 +254,177 @@ TEST_F(SubscriberTest, DrainDoesNotDoubleDecrementOnChurn)
     }
 }
 
+TEST_F(SubscriberTest, DrainTimeoutsStartsAtZero)
+{
+    auto cfg    = default_cfg();
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+    kickmsg::Subscriber sub(region);
+
+    EXPECT_EQ(sub.drain_timeouts(), 0u);
+}
+
+TEST_F(SubscriberTest, StuckPublisherCausesDrainTimeout)
+{
+    // Simulate a crashed publisher by manually inflating in_flight.
+    // The subscriber destructor should timeout and skip drain.
+
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+    cfg.commit_timeout    = std::chrono::microseconds{1000}; // 1ms — fast timeout
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    kickmsg::Publisher pub(region);
+
+    {
+        kickmsg::Subscriber sub(region);
+
+        // Publish a few messages so there is something to drain
+        for (int i = 0; i < 3; ++i)
+        {
+            uint32_t val = static_cast<uint32_t>(i);
+            ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+        }
+
+        EXPECT_EQ(sub.drain_timeouts(), 0u);
+
+        // Simulate a stuck publisher: inflate in_flight on ring 0
+        auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+        ring->in_flight.fetch_add(1, std::memory_order_seq_cst);
+
+        // sub destructs here — should timeout waiting for in_flight,
+        // skip drain, and increment drain_timeouts
+    }
+
+    // The ring should be Free again despite the timeout
+    auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    EXPECT_EQ(ring->state.load(std::memory_order_seq_cst), kickmsg::ring::Free);
+
+    // Fix the stuck in_flight so the ring is clean for the next subscriber
+    ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
+}
+
+TEST_F(SubscriberTest, RejoinAfterDrainTimeout)
+{
+    // After a timeout path (drain skipped), a new subscriber should
+    // be able to join and operate normally.
+
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+    cfg.commit_timeout    = std::chrono::microseconds{1000};
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    kickmsg::Publisher pub(region);
+
+    // Round 1: subscriber with simulated stuck publisher
+    {
+        kickmsg::Subscriber sub(region);
+        uint32_t val = 1;
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+
+        auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+        ring->in_flight.fetch_add(1, std::memory_order_seq_cst);
+        // sub destructs — timeout, drain skipped
+    }
+
+    // Fix the fake stuck publisher
+    auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
+
+    // Round 2: new subscriber joins and receives normally
+    {
+        kickmsg::Subscriber sub(region);
+        uint32_t val = 42;
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+
+        auto sample = sub.try_receive();
+        ASSERT_TRUE(sample.has_value());
+
+        uint32_t got = 0;
+        std::memcpy(&got, sample->data(), sizeof(got));
+        EXPECT_EQ(got, 42u);
+    }
+}
+
+TEST_F(SubscriberTest, SlowPublisherNoCorruption)
+{
+    // A publisher that is slow (not crashed) holds in_flight during
+    // subscriber teardown. The subscriber should timeout and skip drain.
+    // The slow publisher finishes normally — no corruption, no crash.
+
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 8;
+    cfg.pool_size         = 16;
+    cfg.max_payload_size  = 8;
+    cfg.commit_timeout    = std::chrono::microseconds{1000}; // 1ms
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    std::atomic<bool> pub_start{false};
+    std::atomic<bool> pub_done{false};
+
+    // Publisher thread: will be mid-commit when subscriber destructs
+    std::thread slow_pub([&]()
+    {
+        kickmsg::Publisher pub(region);
+
+        // Wait for signal to start publishing
+        while (not pub_start.load(std::memory_order_acquire))
+        {
+            kickcat::sleep(0ns);
+        }
+
+        // Publish several messages slowly (each takes > commit_timeout)
+        for (int i = 0; i < 5; ++i)
+        {
+            uint32_t val = static_cast<uint32_t>(i);
+            pub.send(&val, sizeof(val));
+            kickcat::sleep(5ms); // 5ms >> 1ms timeout
+        }
+
+        pub_done.store(true, std::memory_order_release);
+    });
+
+    {
+        kickmsg::Subscriber sub(region);
+
+        // Let the publisher start and publish at least one message
+        pub_start.store(true, std::memory_order_release);
+        kickcat::sleep(2ms);
+
+        // Read what we can
+        while (auto sample = sub.try_receive())
+        {
+            // consume
+        }
+
+        // sub destructs here while publisher is likely mid-commit
+    }
+
+    // Wait for publisher to finish
+    while (not pub_done.load(std::memory_order_acquire))
+    {
+        kickcat::sleep(1ms);
+    }
+
+    slow_pub.join();
+
+    // New subscriber can join and the channel still works
+    {
+        kickmsg::Subscriber sub(region);
+        // Just verify construction succeeds and ring is usable
+        EXPECT_FALSE(sub.try_receive().has_value());
+    }
+}
+
 TEST_F(SubscriberTest, ConcurrentChurnRefcountIntegrity)
 {
     // Publisher runs continuously while a subscriber churns on ring 0.

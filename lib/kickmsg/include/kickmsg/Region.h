@@ -45,8 +45,7 @@ namespace kickmsg
         channel::Type channel_type() const { return header()->channel_type; }
 
         /// Repair ring entries stuck at LOCKED_SEQUENCE (publisher crashed mid-commit).
-        /// Rolls the sequence back to the expected previous value, unblocking future
-        /// publishers at that position.
+        /// Commits the entry with INVALID_SLOT so future publishers can wrap past it.
         ///
         /// Safe to call under live traffic: the worst outcome is a benign double-store
         /// if a slow (but alive) publisher commits at the same time.
@@ -55,11 +54,14 @@ namespace kickmsg
 
         /// Reclaim orphaned slots (refcount > 0 but not referenced by any ring entry).
         /// These are caused by publisher crashes between allocate and publish, or by
-        /// the drain_unconsumed race on subscriber shutdown.
+        /// skipped drain on subscriber teardown timeout.
         ///
-        /// NOT safe under live traffic: a publisher between refcount pre-set and ring
-        /// push has rc > 0 with no ring entry yet. Reclaiming it causes silent data
-        /// corruption. Call only when all publishers are quiesced.
+        /// NOT safe under live traffic. Call only when:
+        ///  - all publishers are quiesced (a publisher between refcount pre-set
+        ///    and ring push has rc > 0 with no ring entry yet), AND
+        ///  - no outstanding SampleView exists (a view holds a refcount pin on
+        ///    its slot without any ring entry reference; reclaiming it would free
+        ///    memory still being read).
         /// Returns the number of slots reclaimed.
         std::size_t reclaim_orphaned_slots();
 
