@@ -197,3 +197,114 @@ TEST_F(SubscriberTest, BlockingReceiveWakesOnPublish)
 
     sender.join();
 }
+
+TEST_F(SubscriberTest, DrainDoesNotDoubleDecrementOnChurn)
+{
+    // Minimal reproducer: create subscriber, publish, destroy subscriber,
+    // create new subscriber on same ring, publish more, destroy.
+    // Verify all refcounts reach zero — no double-decrement.
+
+    kickmsg::ChannelConfig cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(
+        SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "drain_test");
+
+    kickmsg::Publisher pub(region);
+
+    // Round 1: subscriber joins, publisher publishes, subscriber destructs
+    {
+        kickmsg::Subscriber sub(region);
+        uint32_t val = 1;
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+        // sub destructs here — drain releases refcounts
+    }
+
+    // Round 2: new subscriber on same ring, more publishes, destructs
+    {
+        kickmsg::Subscriber sub(region);
+        uint32_t val = 2;
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+        // sub destructs here — drain must not double-decrement round 1's entries
+    }
+
+    // Round 3: one more cycle
+    {
+        kickmsg::Subscriber sub(region);
+        uint32_t val = 3;
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+    }
+
+    // All slots should have refcount 0
+    auto* base = region.base();
+    auto* h    = region.header();
+    for (uint32_t i = 0; i < cfg.pool_size; ++i)
+    {
+        auto* slot = kickmsg::slot_at(base, h, i);
+        auto rc = slot->refcount.load(std::memory_order_relaxed);
+        EXPECT_EQ(rc, 0u) << "slot " << i << " has refcount " << rc;
+    }
+}
+
+TEST_F(SubscriberTest, ConcurrentChurnRefcountIntegrity)
+{
+    // Publisher runs continuously while a subscriber churns on ring 0.
+    // After everything stops, all refcounts must be zero.
+
+    kickmsg::ChannelConfig cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 8;
+    cfg.pool_size         = 16;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(
+        SHM_NAME, kickmsg::ChannelType::PubSub, cfg, "churn_test");
+
+    std::atomic<bool> done{false};
+
+    std::thread pub_thread([&]()
+    {
+        kickmsg::Publisher pub(region);
+        uint32_t val = 0;
+        while (not done)
+        {
+            if (pub.send(&val, sizeof(val)) >= 0)
+            {
+                ++val;
+            }
+            else
+            {
+                std::this_thread::yield();
+            }
+        }
+    });
+
+    // Churn: create/destroy subscriber 10 times
+    for (int round = 0; round < 10; ++round)
+    {
+        kickmsg::Subscriber sub(region);
+        for (int j = 0; j < 5; ++j)
+        {
+            sub.try_receive();
+        }
+    }
+
+    done = true;
+    pub_thread.join();
+
+    // Verify all refcounts are zero
+    auto* base = region.base();
+    auto* h    = region.header();
+    for (uint32_t i = 0; i < cfg.pool_size; ++i)
+    {
+        auto* slot = kickmsg::slot_at(base, h, i);
+        auto rc = slot->refcount.load(std::memory_order_relaxed);
+        EXPECT_EQ(rc, 0u) << "slot " << i << " has refcount " << rc
+                          << " (round completed, all should be 0)";
+    }
+}

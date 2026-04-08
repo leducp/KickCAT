@@ -10,7 +10,6 @@
 
 namespace kickmsg
 {
-
     struct BroadcastHandle
     {
         Publisher  pub;
