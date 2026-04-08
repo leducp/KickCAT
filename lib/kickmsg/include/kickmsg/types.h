@@ -11,7 +11,7 @@ namespace kickmsg
     using namespace std::chrono;
 
     constexpr uint64_t    MAGIC           = 0x4B49434B4D534721ULL; // "KICKMSG!"
-    constexpr uint32_t    VERSION         = 2;
+    constexpr uint32_t    VERSION         = 3;
     constexpr uint32_t    INVALID_SLOT    = UINT32_MAX;
     constexpr uint64_t    LOCKED_SEQUENCE = UINT64_MAX;
     constexpr std::size_t CACHE_LINE      = 64;
@@ -83,14 +83,23 @@ namespace kickmsg
         std::atomic<uint32_t> payload_len;  ///< Actual payload bytes written to the slot
     };
 
+    /// Ring state machine for subscriber lifecycle.
+    /// FREE → LIVE (subscriber joins) → DRAINING (subscriber leaving) → FREE
+    enum class RingState : uint32_t
+    {
+        Free     = 0,  ///< No subscriber — available for claim
+        Live     = 1,  ///< Subscriber owns ring, publishers may deliver
+        Draining = 2,  ///< Subscriber tearing down — no new delivery, drain in progress
+    };
+
     /// Per-subscriber ring header in shared memory.
     /// Fields are cache-line aligned to avoid false sharing between
-    /// publisher (writes write_pos, reads active/in_flight) and
-    /// subscriber (writes active, reads write_pos).
+    /// publisher (writes write_pos, reads state/in_flight) and
+    /// subscriber (writes state, reads write_pos).
     struct SubRingHeader
     {
-        alignas(CACHE_LINE) std::atomic<uint32_t> active;    ///< 1 if a subscriber owns this ring, 0 otherwise
-        alignas(CACHE_LINE) std::atomic<uint32_t> in_flight; ///< Publishers mid-commit on this ring (for safe drain)
+        alignas(CACHE_LINE) std::atomic<RingState> state;    ///< Ring lifecycle state
+        alignas(CACHE_LINE) std::atomic<uint32_t> in_flight; ///< Publishers currently admitted to this ring
         alignas(CACHE_LINE) std::atomic<uint64_t> write_pos; ///< Monotonically increasing position counter
     };
 

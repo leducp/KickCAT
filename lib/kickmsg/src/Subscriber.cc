@@ -16,10 +16,10 @@ namespace kickmsg
 
         for (uint32_t i = 0; i < header_->max_subs; ++i)
         {
-            auto*    ring     = sub_ring_at(base_, header_, i);
-            uint32_t expected = 0;
-            if (ring->active.compare_exchange_strong(expected, 1,
-                    std::memory_order_acq_rel))
+            auto* ring = sub_ring_at(base_, header_, i);
+            auto  expected = RingState::Free;
+            if (ring->state.compare_exchange_strong(expected, RingState::Live,
+                    std::memory_order_seq_cst))
             {
                 ring_idx_  = i;
                 start_pos_ = ring->write_pos.load(std::memory_order_acquire);
@@ -39,18 +39,19 @@ namespace kickmsg
         if (ring_idx_ != UINT32_MAX)
         {
             auto* ring = sub_ring_at(base_, header_, ring_idx_);
-            ring->active.store(0, std::memory_order_release);
+            // Transition Live → Draining: no new publisher can be admitted.
+            ring->state.store(RingState::Draining, std::memory_order_seq_cst);
 
-            // Wait for all publishers that slipped through the active=1 check.
-            // They increment in_flight before reading active, so once in_flight==0
-            // no publisher is mid-commit on this ring and write_pos is final.
-            // Worst case: a publisher stuck in wait_and_capture_slot for commit_timeout.
-            while (ring->in_flight.load(std::memory_order_acquire) > 0)
+            // Wait for all admitted publishers to finish.
+            while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
             {
                 kickcat::sleep(0ns);
             }
 
             drain_unconsumed(ring);
+
+            // Transition Draining → Free: ring available for a new subscriber.
+            ring->state.store(RingState::Free, std::memory_order_seq_cst);
         }
     }
 
@@ -73,12 +74,13 @@ namespace kickmsg
             if (ring_idx_ != UINT32_MAX)
             {
                 auto* ring = sub_ring_at(base_, header_, ring_idx_);
-                ring->active.store(0, std::memory_order_release);
-                while (ring->in_flight.load(std::memory_order_acquire) > 0)
+                ring->state.store(RingState::Draining, std::memory_order_seq_cst);
+                while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
                 {
                     kickcat::sleep(0ns);
                 }
                 drain_unconsumed(ring);
+                ring->state.store(RingState::Free, std::memory_order_seq_cst);
             }
 
             base_      = other.base_;

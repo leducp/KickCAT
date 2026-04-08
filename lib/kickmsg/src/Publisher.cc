@@ -69,13 +69,23 @@ namespace kickmsg
         {
             auto* ring = sub_ring_at(base_, header_, i);
 
-            // Announce presence before checking active, so the subscriber's
-            // destructor can wait for us to finish via in_flight == 0.
-            ring->in_flight.fetch_add(1, std::memory_order_release);
+            // Dekker double-check admission: increment in_flight first, then
+            // verify the ring is Live. If the subscriber flipped to Draining
+            // between our check and the increment, the re-read catches it.
+            // seq_cst on all operations ensures a single total order visible
+            // to both publisher and subscriber on all architectures.
+            ring->in_flight.fetch_add(1, std::memory_order_seq_cst);
 
-            if (ring->active.load(std::memory_order_acquire) == 0)
+            if (ring->state.load(std::memory_order_seq_cst) != RingState::Live)
             {
-                ring->in_flight.fetch_sub(1, std::memory_order_release);
+                // Release this ring's reference BEFORE in_flight--, so drain
+                // can't start until the refcount adjustment is complete.
+                auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+                if (prev == 1)
+                {
+                    treiber_push(header_->free_top, slot, slot_idx);
+                }
+                ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
                 continue;
             }
 
@@ -134,7 +144,12 @@ namespace kickmsg
             if (not locked)
             {
                 ++dropped_;
-                ring->in_flight.fetch_sub(1, std::memory_order_release);
+                auto prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
+                if (prev == 1)
+                {
+                    treiber_push(header_->free_top, slot, slot_idx);
+                }
+                ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
                 continue;
             }
 
@@ -147,23 +162,13 @@ namespace kickmsg
             // at this position will see all preceding stores.
             e.sequence.store(pos + 1, std::memory_order_release);
 
-            ring->in_flight.fetch_sub(1, std::memory_order_release);
+            ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
             futex_wake_all(ring->write_pos);
             ++delivered;
         }
 
-        // Subtract references for rings we skipped (inactive or lock failed).
-        auto excess = static_cast<uint32_t>(header_->max_subs)
-                    - static_cast<uint32_t>(delivered);
-        if (excess > 0)
-        {
-            auto prev = slot->refcount.fetch_sub(excess,
-                            std::memory_order_acq_rel);
-            if (prev == excess)
-            {
-                treiber_push(header_->free_top, slot, slot_idx);
-            }
-        }
+        // No batched excess subtraction — each skipped ring released its
+        // reference inline above, under the in_flight umbrella.
 
         return delivered;
     }

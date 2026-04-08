@@ -293,9 +293,9 @@ bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::ChannelConfig
     for (uint32_t i = 0; i < cfg.max_subscribers; ++i)
     {
         auto* ring = kickmsg::sub_ring_at(base, hdr, i);
-        if (ring->active.load(std::memory_order_relaxed) != 0)
+        if (ring->state.load(std::memory_order_relaxed) != kickmsg::RingState::Free)
         {
-            std::fprintf(stderr, "  [FAIL] ring %u still active after test\n", i);
+            std::fprintf(stderr, "  [FAIL] ring %u not Free after test\n", i);
             return false;
         }
         if (ring->in_flight.load(std::memory_order_relaxed) != 0)
