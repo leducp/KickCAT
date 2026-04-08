@@ -17,6 +17,8 @@
 
 #include <kickmsg/Node.h>
 
+using namespace kickcat;
+
 int main()
 {
     // Clean up any leftovers from a previous run
@@ -35,7 +37,7 @@ int main()
         kickmsg::Node node_b("nodeB", "demo");
         auto [pub, sub] = node_b.join_broadcast("system", cfg);
 
-        auto msg = sub.receive(std::chrono::seconds{2});
+        auto msg = sub.receive(2s);
         if (!msg)
         {
             std::cerr << "[nodeB] Timed out waiting for broadcast\n";
@@ -56,7 +58,7 @@ int main()
     });
 
     // Give Node B time to join the broadcast channel
-    std::this_thread::sleep_for(std::chrono::milliseconds{50});
+    sleep(50ms);
 
     // --- Node A (requester) ---
     kickmsg::Node node_a("nodeA", "demo");
@@ -72,7 +74,7 @@ int main()
     std::cout << "[nodeA] Broadcast: '" << request << "'\n";
 
     // Wait for the reply on our personal mailbox
-    auto reply = inbox.receive(std::chrono::seconds{2});
+    auto reply = inbox.receive(2s);
     if (reply)
     {
         std::string answer(static_cast<char const*>(reply->data()), reply->len());

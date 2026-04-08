@@ -72,7 +72,7 @@ auto view = sub.try_receive_view();
 ### Blocking receive
 
 ```cpp
-auto sample = sub.receive(std::chrono::milliseconds{100});
+auto sample = sub.receive(100ms);
 // blocks via futex until data arrives or timeout
 ```
 
