@@ -30,6 +30,9 @@ namespace kickcat
         // eeprom never busy because the data are processed in sync with the request.
         memory_.eeprom_control &= ~0x8000;
 
+        // Disabled watchdog = OK at power-on
+        memory_.watchdog_status_process_data = 1;
+
         // Set default values in registers (TODO: a lot of them are left uninitialized)
         std::memset(memory_.sync_manager, 0, sizeof(memory_.sync_manager));
     }
@@ -586,28 +589,30 @@ namespace kickcat
 
     void EmulatedESC::checkWatchdog()
     {
-        // Warning: PDI watchdog not handled yet!
-
         nanoseconds delay = pdoWatchdog();
         if (delay == 0ns)
         {
             return; // watchdog deactivated
         }
-
-        if ((lastLogicalWrite_ + delay) >= since_epoch())
+        
+        auto now = since_epoch(); // Create the current time
+        if (now < (lastLogicalWrite_ + delay)) // If the current time is before the last valid PDO write plus the delay
         {
-            // Watchdog OK
-            memory_.watchdog_status_process_data = 1;
-            return;
-        }
-
-        if (memory_.watchdog_status_process_data == 1)
-        {
-            // Front detection (1 to 0)
-            memory_.watchdog_status_process_data = 0;
-            if (memory_.watchdog_counter_process_data < 0xFF)
+            memory_.watchdog_status_process_data = 1; // Watchdog is healthy
+        } 
+        else
+        {  // Watchdog EXPIRED
+            if (memory_.watchdog_status_process_data == 1) // Checks if the watchdog was previously OK
             {
-                memory_.watchdog_counter_process_data++;
+                memory_.watchdog_status_process_data = 0; // Watchdog expired
+                if (memory_.watchdog_counter_process_data < 0xFF)
+                {
+                    memory_.watchdog_counter_process_data++; // Counter of how many times the watchdog has expired
+                }
+                // If the watchdog expires in OP, we must tell the master and potentially drop the status ourselves
+                memory_.al_control = (memory_.al_status & 0xFFF0) | State::SAFE_OP;
+                memory_.al_status |= AL_STATUS_ERR_IND; // Set Error Bit
+                memory_.al_status_code = SYNC_MANAGER_WATCHDOG; // SM Watchdog code
             }
         }
     }
