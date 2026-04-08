@@ -43,8 +43,18 @@ namespace kickmsg
             ring->state.store(ring::Draining, std::memory_order_seq_cst);
 
             // Wait for all admitted publishers to finish.
+            // Bounded: if a publisher crashed after in_flight++ but before in_flight--,
+            // the counter is permanently inflated. Use commit_timeout as the bound.
+            microseconds deadline{header_->commit_timeout_us};
+            nanoseconds start = kickcat::since_epoch();
             while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
             {
+                if (kickcat::elapsed_time(start) >= deadline)
+                {
+                    // Publisher likely crashed. Force in_flight to 0 and proceed.
+                    ring->in_flight = 0;
+                    break;
+                }
                 kickcat::sleep(0ns);
             }
 
@@ -75,8 +85,15 @@ namespace kickmsg
             {
                 auto* ring = sub_ring_at(base_, header_, ring_idx_);
                 ring->state.store(ring::Draining, std::memory_order_seq_cst);
+                microseconds deadline{header_->commit_timeout_us};
+                nanoseconds start = kickcat::since_epoch();
                 while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
                 {
+                    if (kickcat::elapsed_time(start) >= deadline)
+                    {
+                        ring->in_flight = 0;
+                        break;
+                    }
                     kickcat::sleep(0ns);
                 }
                 drain_unconsumed(ring);

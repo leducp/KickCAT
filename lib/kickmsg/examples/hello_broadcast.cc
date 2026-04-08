@@ -25,7 +25,7 @@ int main()
     kickmsg::SharedMemory::unlink("/demo_broadcast_system");
     kickmsg::SharedMemory::unlink("/demo_nodeA_mbx_reply");
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 4;
     cfg.sub_ring_capacity = 16;
     cfg.pool_size         = 32;

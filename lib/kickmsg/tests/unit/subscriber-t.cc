@@ -24,9 +24,9 @@ public:
         kickmsg::SharedMemory::unlink(SHM_NAME);
     }
 
-    kickmsg::ChannelConfig default_cfg()
+    kickmsg::channel::Config default_cfg()
     {
-        kickmsg::ChannelConfig cfg;
+        kickmsg::channel::Config cfg;
         cfg.max_subscribers   = 4;
         cfg.sub_ring_capacity = 8;
         cfg.pool_size         = 16;
@@ -93,7 +93,7 @@ TEST_F(SubscriberTest, SampleViewMoveSemantics)
 
 TEST_F(SubscriberTest, OverwritingRingReportsLoss)
 {
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 1;
     cfg.sub_ring_capacity = 4;
     cfg.pool_size         = 8;
@@ -121,7 +121,7 @@ TEST_F(SubscriberTest, OverwritingRingReportsLoss)
 
 TEST_F(SubscriberTest, DrainReleasesSlots)
 {
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 2;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;
@@ -207,7 +207,7 @@ TEST_F(SubscriberTest, DrainDoesNotDoubleDecrementOnChurn)
     // create new subscriber on same ring, publish more, destroy.
     // Verify all refcounts reach zero — no double-decrement.
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 1;
     cfg.sub_ring_capacity = 4;
     cfg.pool_size         = 8;
@@ -259,7 +259,7 @@ TEST_F(SubscriberTest, ConcurrentChurnRefcountIntegrity)
     // Publisher runs continuously while a subscriber churns on ring 0.
     // After everything stops, all refcounts must be zero.
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 1;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;

@@ -28,7 +28,7 @@ namespace kickcat
         int32_t write(void const* frame, int32_t frame_size) override;
 
     private:
-        static kickmsg::ChannelConfig defaultConfig();
+        static kickmsg::channel::Config defaultConfig();
 
         bool init_;
         nanoseconds timeout_;

@@ -22,9 +22,9 @@ public:
         kickmsg::SharedMemory::unlink(SHM_NAME);
     }
 
-    kickmsg::ChannelConfig default_cfg()
+    kickmsg::channel::Config default_cfg()
     {
-        kickmsg::ChannelConfig cfg;
+        kickmsg::channel::Config cfg;
         cfg.max_subscribers   = 4;
         cfg.sub_ring_capacity = 8;
         cfg.pool_size         = 16;
@@ -160,7 +160,7 @@ TEST_F(RegionTest, TreiberPopAllThenPushBack)
 
 TEST_F(RegionTest, CollectGarbageReclaimsOrphanedSlots)
 {
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 2;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;
@@ -206,7 +206,7 @@ TEST_F(RegionTest, CollectGarbageReclaimsOrphanedSlots)
 
 TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
 {
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 2;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;

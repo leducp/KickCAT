@@ -248,7 +248,7 @@ SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
     return result;
 }
 
-bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::ChannelConfig const& cfg)
+bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::channel::Config const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -285,7 +285,7 @@ bool verify_pool_free(kickmsg::SharedRegion& region, kickmsg::ChannelConfig cons
     return true;
 }
 
-bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::ChannelConfig const& cfg)
+bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::channel::Config const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -308,7 +308,7 @@ bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::ChannelConfig
     return true;
 }
 
-bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::ChannelConfig const& cfg)
+bool verify_refcounts_zero(kickmsg::SharedRegion& region, kickmsg::channel::Config const& cfg)
 {
     auto* base = region.base();
     auto* hdr  = region.header();
@@ -340,7 +340,7 @@ bool run_stress_test(TestConfig const& tc)
 
     g_all_publishers_done = false;
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = tc.max_subs;
     cfg.sub_ring_capacity = tc.ring_capacity;
     cfg.pool_size         = tc.pool_size;
@@ -483,7 +483,7 @@ bool run_treiber_stress()
 {
     std::printf("--- Treiber stack stress: 8 threads x 100000 pop/push cycles ---\n");
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 1;
     cfg.sub_ring_capacity = 4;
     cfg.pool_size         = 64;
@@ -558,7 +558,7 @@ bool run_fairness_test()
     constexpr int      NUM_SUBS  = 16;
     uint32_t const     NUM_MSGS  = 100000 / TSAN_SCALE;
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = NUM_SUBS;
     cfg.sub_ring_capacity = 256;
     cfg.pool_size         = 512;
@@ -654,7 +654,7 @@ bool run_subscriber_churn()
     char const* shm_name = "/kickmsg_churn_test";
     kickmsg::SharedMemory::unlink(shm_name);
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 4;
     cfg.sub_ring_capacity = 32;
     cfg.pool_size         = 128;
@@ -763,7 +763,7 @@ bool run_gc_recovery()
     char const* shm_name = "/kickmsg_gc_test";
     kickmsg::SharedMemory::unlink(shm_name);
 
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 2;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;

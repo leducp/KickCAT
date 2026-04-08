@@ -29,11 +29,7 @@ namespace kickmsg
             {
             }
 
-            ~SampleRef()
-            {
-                data_ = nullptr;
-                len_  = 0;
-            }
+            ~SampleRef() = default;
 
             SampleRef(SampleRef const&) = delete;
             SampleRef& operator=(SampleRef const&) = delete;
@@ -110,10 +106,15 @@ namespace kickmsg
 
             void const* data() const
             {
+                if (slot_idx_ == INVALID_SLOT)
+                {
+                    return nullptr;
+                }
                 return slot_data(slot_at(base_, header_, slot_idx_));
             }
 
             std::size_t len() const { return len_; }
+            bool valid()     const { return slot_idx_ != INVALID_SLOT; }
 
         private:
             friend class Subscriber;

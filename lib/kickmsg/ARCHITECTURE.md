@@ -126,7 +126,7 @@ The region header is self-describing and forward-compatible:
 ```
 Header (at offset 0)
 ┌───────────────────────────────────────────────────────────┐
-│  magic              0x4B49434B4D534721 ("KICKMSG!")       │
+│  magic (atomic)     0x4B49434B4D534721 ("KICKMSG!")       │
 │  version            3                                     │
 │  channel_type       PubSub | Broadcast                    │
 │  total_size         total mmap size in bytes               │
@@ -150,9 +150,10 @@ Header (at offset 0)
 ```
 
 Offsets (rather than fixed struct sizes) allow extending the header
-without breaking existing readers. The `magic` field is used by
-`create_or_open()` to spin-wait until the creator has finished
-initialization.
+without breaking existing readers. The `magic` field is an
+`atomic<uint64_t>` written last with `release` during init and polled
+with `acquire` by `create_or_open()` to spin-wait until the creator
+has finished initialization.
 
 
 ## Treiber Free Stack
@@ -708,8 +709,12 @@ reclaim_orphaned_slots(region):
 ```
 Crash scenario                       GC effect
 ──────────────────────────────────────────────────────────────────────
-After treiber_pop, before publish    Slot has refcount 0 or stale
-                                     value, not in any ring → reclaimed.
+After treiber_pop, before publish    Slot has refcount 0, not in any
+                                     ring, not in free stack. GC cannot
+                                     distinguish it from a legitimately
+                                     free slot → NOT reclaimed (Class B
+                                     unrecoverable leak, bounded to 1
+                                     slot per crash, see below).
 
 After refcount pre-set, delivered    Slot is in k rings but refcount
   to k of N rings                    is max_subs. The k ring references

@@ -22,7 +22,7 @@ int main()
     kickmsg::SharedMemory::unlink(SHM_NAME);
 
     // Configure the channel
-    kickmsg::ChannelConfig cfg;
+    kickmsg::channel::Config cfg;
     cfg.max_subscribers   = 2;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;

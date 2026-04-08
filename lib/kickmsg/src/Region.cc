@@ -6,7 +6,7 @@
 namespace kickmsg
 {
     SharedRegion SharedRegion::create(char const* name, channel::Type type,
-                                     ChannelConfig const& cfg,
+                                     channel::Config const& cfg,
                                      char const* creator_name)
     {
         if (type != channel::PubSub and type != channel::Broadcast)
@@ -98,7 +98,7 @@ namespace kickmsg
     }
 
     SharedRegion SharedRegion::create_or_open(char const* name, channel::Type type,
-                                              ChannelConfig const& cfg,
+                                              channel::Config const& cfg,
                                               char const* creator_name)
     {
         uint16_t    creator_len     = static_cast<uint16_t>(std::strlen(creator_name));

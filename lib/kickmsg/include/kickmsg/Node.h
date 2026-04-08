@@ -30,14 +30,14 @@ namespace kickmsg
         Node(std::string const& name, std::string const& prefix = "kickmsg");
 
         // --- PubSub (topic-centric, 1-to-N by convention) ---
-        Publisher  advertise(char const* topic, ChannelConfig const& cfg = {});
+        Publisher  advertise(char const* topic, channel::Config const& cfg = {});
         Subscriber subscribe(char const* topic);
 
         // --- Broadcast (N-to-N shared channel) ---
-        BroadcastHandle join_broadcast(char const* channel, ChannelConfig const& cfg = {});
+        BroadcastHandle join_broadcast(char const* channel, channel::Config const& cfg = {});
 
         // --- Mailbox (N-to-1, max_subscribers=1) ---
-        Subscriber create_mailbox(char const* tag, ChannelConfig const& cfg = {});
+        Subscriber create_mailbox(char const* tag, channel::Config const& cfg = {});
         Publisher  open_mailbox(char const* owner_node, char const* tag);
 
         std::string const& name()   const { return name_; }

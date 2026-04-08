@@ -16,7 +16,7 @@ namespace kickmsg
     constexpr uint64_t    LOCKED_SEQUENCE = UINT64_MAX;
     constexpr std::size_t CACHE_LINE      = 64;
 
-    constexpr uint64_t DEFAULT_COMMIT_TIMEOUT_US = 100'000; // 100 ms
+    constexpr microseconds DEFAULT_COMMIT_TIMEOUT = 100ms;
 
     namespace channel
     {
@@ -25,9 +25,8 @@ namespace kickmsg
             PubSub    = 1,
             Broadcast = 2,
         };
-    }
 
-    struct ChannelConfig
+        struct Config
     {
         std::size_t max_subscribers   = 16;
         std::size_t sub_ring_capacity = 64;
@@ -39,10 +38,17 @@ namespace kickmsg
         // higher risk of falsely evicting a slow-but-alive publisher under
         // heavy scheduling pressure.  Longer = safer under load but adds
         // latency when a real crash occurs.
-        microseconds commit_timeout{DEFAULT_COMMIT_TIMEOUT_US};
-    };
+        microseconds commit_timeout{DEFAULT_COMMIT_TIMEOUT};
+        };
+    }
 
     // ---- Shared-memory layout structures ----
+    //
+    // Convention: atomic fields accessed without explicit memory_order
+    // (e.g. slot->refcount = 0) are in contexts where ordering is irrelevant
+    // (quiesced GC, post-join verification, single-threaded init).
+    // Explicit memory_order at all synchronization points makes them
+    // visually distinct from incidental reads.
 
     /// Shared-memory region header. Written once by the creator, read by all.
     /// Layout version changes require a VERSION bump.
@@ -154,7 +160,7 @@ namespace kickmsg
     uint8_t*       slot_data(SlotHeader* slot);
     char*          header_creator_name(Header* h);
 
-    uint64_t compute_config_hash(channel::Type type, ChannelConfig const& cfg);
+    uint64_t compute_config_hash(channel::Type type, channel::Config const& cfg);
 
     void     treiber_push(std::atomic<uint64_t>& top, SlotHeader* slot, uint32_t slot_idx);
     void     treiber_push(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride, uint32_t slot_idx);

@@ -17,9 +17,9 @@ namespace kickcat
         close();
     }
 
-    kickmsg::ChannelConfig TapSocket::defaultConfig()
+    kickmsg::channel::Config TapSocket::defaultConfig()
     {
-        kickmsg::ChannelConfig cfg;
+        kickmsg::channel::Config cfg;
         cfg.max_subscribers   = 1;
         cfg.sub_ring_capacity = 64;
         cfg.pool_size         = 128;
