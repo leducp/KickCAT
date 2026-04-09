@@ -123,6 +123,9 @@ namespace kickmsg
             // If the ring has wrapped, the entry we are about to overwrite
             // may still reference a live slot. Wait for the previous writer
             // to commit, then release that slot's reference for this ring.
+            // wait_and_capture_slot returns INVALID_SLOT if the entry was
+            // already overwritten by a newer generation (double-release guard)
+            // or if the wait timed out (publisher crash).
             if (pos >= capacity)
             {
                 uint64_t expected_seq = pos - capacity + 1;
@@ -159,11 +162,6 @@ namespace kickmsg
                 }
                 // Another publisher holds the lock; it will release quickly.
             }
-            // If lock fails after wait_and_capture_slot timeout, the entry
-            // is poisoned (LOCKED_SEQUENCE from crashed publisher, or stale
-            // value). This ring position is dead until repair_locked_entries()
-            // is called. No self-recovery: commit_timeout is a heuristic,
-            // not proof of death.
             if (not locked)
             {
                 ++dropped_;
@@ -239,11 +237,19 @@ namespace kickmsg
         while (true)
         {
             uint64_t seq = e.sequence.load(std::memory_order_acquire);
-            if (seq >= expected_seq and seq != LOCKED_SEQUENCE)
+            if (seq == expected_seq)
             {
-                // Acquire: pairs with drain_unconsumed's release store of
-                // INVALID_SLOT after releasing the ring's reference.
+                // Exact match: the entry was committed at our expected
+                // position. Its slot_idx is the one we need to release.
                 return e.slot_idx.load(std::memory_order_acquire);
+            }
+            if (seq > expected_seq and seq != LOCKED_SEQUENCE)
+            {
+                // Newer generation: the entry was already overwritten by
+                // a publisher that wrapped past us. That publisher already
+                // released the old slot as part of its own eviction.
+                // Returning INVALID_SLOT avoids a double-release.
+                return INVALID_SLOT;
             }
             ++i;
             if ((i & (CHECK_INTERVAL - 1)) == 0)

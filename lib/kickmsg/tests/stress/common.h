@@ -121,6 +121,7 @@ inline void validate_payload(Payload const& msg, int num_pubs, uint64_t ring_pos
 
     auto& prev_seq = last_seq[msg.pub_id];
     auto& prev_pos = last_pos[msg.pub_id];
+
     if (prev_seq != UINT32_MAX and msg.seq <= prev_seq)
     {
         auto delta = static_cast<int32_t>(prev_seq) - static_cast<int32_t>(msg.seq);

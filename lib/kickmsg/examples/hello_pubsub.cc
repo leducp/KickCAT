@@ -49,7 +49,7 @@ int main()
     for (uint32_t i = 0; i < 5; ++i)
     {
         auto sample = sub.try_receive();
-        if (!sample)
+        if (not sample)
         {
             std::cerr << "Missing message " << i << "\n";
             continue;
