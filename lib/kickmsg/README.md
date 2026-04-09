@@ -28,14 +28,14 @@ KickMsg provides MPMC publish/subscribe over shared memory with zero-copy receiv
 #include <kickmsg/Subscriber.h>
 
 // Create a channel
-kickmsg::ChannelConfig cfg;
+kickmsg::channel::Config cfg;
 cfg.max_subscribers   = 4;
 cfg.sub_ring_capacity = 64;
 cfg.pool_size         = 256;
 cfg.max_payload_size  = 4096;
 
 auto region = kickmsg::SharedRegion::create(
-    "/my_topic", kickmsg::ChannelType::PubSub, cfg);
+    "/my_topic", kickmsg::channel::PubSub, cfg);
 
 // Subscribe, then publish
 kickmsg::Subscriber sub(region);
@@ -45,7 +45,7 @@ uint32_t value = 42;
 pub.send(&value, sizeof(value));
 
 auto sample = sub.try_receive();
-// sample->data(), sample->len()
+// sample->data(), sample->len(), sample->ring_pos()
 ```
 
 ### Node API (topic-centric)
@@ -76,32 +76,43 @@ auto sample = sub.receive(100ms);
 // blocks via futex until data arrives or timeout
 ```
 
+### Health diagnostics and crash recovery
+
+```cpp
+// Periodic health check (read-only, safe under live traffic)
+auto report = region.diagnose();
+// report.locked_entries, report.retired_rings,
+// report.draining_rings, report.live_rings
+
+// Repair poisoned entries (safe under live traffic)
+region.repair_locked_entries();
+
+// Reset retired rings (after confirming crashed publisher is gone)
+region.reset_retired_rings();
+
+// Reclaim leaked slots (requires full quiescence)
+region.reclaim_orphaned_slots();
+```
+
 ## Building
 
-### Standalone
+KickMsg is built as part of the KickCAT project.
 
 ```bash
-# Install dependencies (GTest for tests)
-uv venv .venv && source .venv/bin/activate
-uv pip install conan
-conan install . --output-folder=build --build=missing
-
-# Build
-cmake -S . -B build \
-    -DCMAKE_PREFIX_PATH=build \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DKICKMSG_BUILD_TESTS=ON \
-    -DKICKMSG_BUILD_EXAMPLES=ON
-cmake --build build
+# From the KickCAT root:
+./scripts/configure.sh build --with=unit_tests
+./scripts/setup_build.sh build
+cd build && make -j
 
 # Run tests
-./build/tests/kickmsg_unit
-./build/tests/kickmsg_stress_test
+./kickmsg_unit
+./kickmsg_stress_test
 
-# Run examples
-./build/examples/hello_pubsub
-./build/examples/hello_zerocopy
-./build/examples/hello_broadcast
+# Run examples (if BUILD_MASTER_EXAMPLES is ON)
+./lib/kickmsg/examples/hello_pubsub
+./lib/kickmsg/examples/hello_zerocopy
+./lib/kickmsg/examples/hello_broadcast
+./lib/kickmsg/examples/hello_diagnose
 ```
 
 ### As a subdirectory
@@ -111,13 +122,13 @@ add_subdirectory(kickmsg)
 target_link_libraries(my_app PRIVATE kickmsg)
 ```
 
-## CMake Options
+### Relevant CMake options (set in KickCAT's top-level CMakeLists.txt)
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `KICKMSG_BUILD_TESTS` | `OFF` | Build unit and stress tests |
-| `KICKMSG_BUILD_EXAMPLES` | `OFF` | Build example programs |
-| `KICKMSG_ENABLE_TSAN` | `OFF` | Build TSan stress test variant |
+| `BUILD_UNIT_TESTS` | `OFF` | Build unit and stress tests |
+| `BUILD_MASTER_EXAMPLES` | `OFF` | Build example programs |
+| `ENABLE_TSAN` | `OFF` | Enable ThreadSanitizer |
 
 ## Platform Support
 

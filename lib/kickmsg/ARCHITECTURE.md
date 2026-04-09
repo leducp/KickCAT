@@ -586,7 +586,7 @@ On timeout (returns `INVALID_SLOT`), the publisher:
 2. Overwrites the entry with its own data via the two-phase commit
 3. The ring resumes normal operation
 
-The timeout is configurable per channel via `ChannelConfig::commit_timeout`
+The timeout is configurable per channel via `channel::Config::commit_timeout`
 (default: 100 ms). The tradeoff:
 
 - **Shorter timeout** → faster recovery after a crash, but higher risk
@@ -975,7 +975,7 @@ Blocking subscribers to wait for new data could be done with a
 All patterns are conventions on top of the same MPMC pool + rings engine.
 The backbone does not enforce these constraints; they are established by
 the `Node` API which controls how shared-memory regions are named and
-how `ChannelConfig` defaults are set.
+how `channel::Config` defaults are set.
 
 ```
 PubSub (1-to-N)         Broadcast (N-to-N)         Mailbox (N-to-1)

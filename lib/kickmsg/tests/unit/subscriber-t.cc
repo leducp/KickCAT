@@ -279,10 +279,18 @@ TEST_F(SubscriberTest, StuckPublisherCausesDrainTimeout)
 
     kickmsg::Publisher pub(region);
 
+    // We need two rings: sub1 on ring 0 (will be stuck), sub2 on ring 1.
+    // Move-assign sub2 = std::move(sub1) triggers release_ring() on sub2's
+    // old ring (ring 1, clean) then transfers sub1's state. But sub1's ring
+    // is stuck, so when sub2 destructs, it timeouts on ring 0 and we can
+    // observe drain_timeouts() before destruction.
+
+    // Use a simpler approach: create sub, inflate in_flight, move-construct
+    // a new subscriber from it (transferring drain_timeouts), then the new
+    // one destructs — we observe via the ring state.
     {
         kickmsg::Subscriber sub(region);
 
-        // Publish a few messages so there is something to drain
         for (int i = 0; i < 3; ++i)
         {
             uint32_t val = static_cast<uint32_t>(i);
@@ -296,8 +304,7 @@ TEST_F(SubscriberTest, StuckPublisherCausesDrainTimeout)
         ring->state_flight.fetch_add(kickmsg::ring::IN_FLIGHT_ONE,
                                      std::memory_order_acq_rel);
 
-        // sub destructs here — should timeout waiting for in_flight,
-        // skip drain, and increment drain_timeouts
+        // sub destructs here — timeout, drain skipped
     }
 
     // The ring should be Free with stale in_flight preserved
@@ -306,9 +313,53 @@ TEST_F(SubscriberTest, StuckPublisherCausesDrainTimeout)
     EXPECT_EQ(kickmsg::ring::get_state(packed), kickmsg::ring::Free);
     EXPECT_GT(kickmsg::ring::get_in_flight(packed), 0u);
 
-    // Simulate operator recovery: clear the stale in_flight
+    // Simulate operator recovery
     ring->state_flight.store(kickmsg::ring::make_packed(kickmsg::ring::Free),
                              std::memory_order_release);
+}
+
+TEST_F(SubscriberTest, DrainTimeoutsCounterIncrementsOnTimeout)
+{
+    // Verify drain_timeouts() by using move-assignment: the old ring
+    // is released (triggering the timeout), and the counter is observable
+    // on the surviving object.
+
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 2;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+    cfg.commit_timeout    = std::chrono::microseconds{1000};
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    kickmsg::Publisher pub(region);
+
+    // sub takes ring 0
+    kickmsg::Subscriber sub(region);
+    uint32_t val = 1;
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+
+    EXPECT_EQ(sub.drain_timeouts(), 0u);
+
+    // Inflate in_flight on ring 0 to simulate crash
+    auto* ring0 = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    ring0->state_flight.fetch_add(kickmsg::ring::IN_FLIGHT_ONE,
+                                  std::memory_order_acq_rel);
+
+    // Move-assign from a fresh subscriber (ring 1).
+    // This triggers release_ring() on the OLD ring (ring 0, stuck).
+    // The timeout fires, drain_timeouts_ increments, and the counter
+    // is preserved because the object survives the move.
+    kickmsg::Subscriber fresh(region);  // takes ring 1
+    sub = std::move(fresh);
+
+    // sub is alive and now owns ring 1. drain_timeouts should be 1
+    // from the timed-out release of ring 0.
+    EXPECT_EQ(sub.drain_timeouts(), 1u);
+
+    // Recovery
+    region.reset_retired_rings();
 }
 
 TEST_F(SubscriberTest, RejoinAfterDrainTimeout)

@@ -17,6 +17,18 @@ namespace kickmsg
         {
             throw std::runtime_error("sub_ring_capacity must be a power of 2");
         }
+        if (cfg.pool_size == 0)
+        {
+            throw std::runtime_error("pool_size must be > 0");
+        }
+        if (cfg.max_subscribers == 0)
+        {
+            throw std::runtime_error("max_subscribers must be > 0");
+        }
+        if (cfg.max_payload_size == 0)
+        {
+            throw std::runtime_error("max_payload_size must be > 0");
+        }
 
         uint16_t    creator_len     = static_cast<uint16_t>(std::strlen(creator_name));
         std::size_t header_size     = align_up(sizeof(Header) + creator_len, CACHE_LINE);
