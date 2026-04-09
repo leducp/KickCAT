@@ -23,9 +23,10 @@ namespace kickmsg
         class SampleRef
         {
         public:
-            SampleRef(void const* data, std::size_t len)
+            SampleRef(void const* data, std::size_t len, uint64_t ring_pos)
                 : data_{data}
                 , len_{len}
+                , ring_pos_{ring_pos}
             {
             }
 
@@ -37,6 +38,7 @@ namespace kickmsg
             SampleRef(SampleRef&& other) noexcept
                 : data_{other.data_}
                 , len_{other.len_}
+                , ring_pos_{other.ring_pos_}
             {
                 other.data_ = nullptr;
                 other.len_  = 0;
@@ -46,20 +48,23 @@ namespace kickmsg
             {
                 if (this != &other)
                 {
-                    data_ = other.data_;
-                    len_  = other.len_;
+                    data_     = other.data_;
+                    len_      = other.len_;
+                    ring_pos_ = other.ring_pos_;
                     other.data_ = nullptr;
                     other.len_  = 0;
                 }
                 return *this;
             }
 
-            void const* data() const { return data_; }
-            std::size_t len()  const { return len_; }
+            void const* data()     const { return data_; }
+            std::size_t len()      const { return len_; }
+            uint64_t    ring_pos() const { return ring_pos_; }
 
         private:
             void const* data_;
             std::size_t len_;
+            uint64_t    ring_pos_;
         };
 
         // Zero-copy sample: data points directly into shared memory.
@@ -73,6 +78,7 @@ namespace kickmsg
                 , header_{nullptr}
                 , slot_idx_{INVALID_SLOT}
                 , len_{0}
+                , ring_pos_{0}
             {
             }
 
@@ -86,6 +92,7 @@ namespace kickmsg
                 , header_{other.header_}
                 , slot_idx_{other.slot_idx_}
                 , len_{other.len_}
+                , ring_pos_{other.ring_pos_}
             {
                 other.slot_idx_ = INVALID_SLOT;
             }
@@ -96,9 +103,10 @@ namespace kickmsg
                 {
                     release();
                     base_     = other.base_;
-                    header_      = other.header_;
+                    header_   = other.header_;
                     slot_idx_ = other.slot_idx_;
                     len_      = other.len_;
+                    ring_pos_ = other.ring_pos_;
                     other.slot_idx_ = INVALID_SLOT;
                 }
                 return *this;
@@ -113,17 +121,19 @@ namespace kickmsg
                 return slot_data(slot_at(base_, header_, slot_idx_));
             }
 
-            std::size_t len() const { return len_; }
-            bool valid()     const { return slot_idx_ != INVALID_SLOT; }
+            std::size_t len()      const { return len_; }
+            uint64_t    ring_pos() const { return ring_pos_; }
+            bool valid()           const { return slot_idx_ != INVALID_SLOT; }
 
         private:
             friend class Subscriber;
 
-            SampleView(void* base, Header* hdr, uint32_t slot_idx, uint32_t len)
+            SampleView(void* base, Header* hdr, uint32_t slot_idx, uint32_t len, uint64_t ring_pos)
                 : base_{base}
                 , header_{hdr}
                 , slot_idx_{slot_idx}
                 , len_{len}
+                , ring_pos_{ring_pos}
             {
             }
 
@@ -146,6 +156,7 @@ namespace kickmsg
             Header*  header_;
             uint32_t slot_idx_;
             uint32_t len_;
+            uint64_t ring_pos_;
         };
 
         Subscriber(SharedRegion& region);
@@ -166,6 +177,7 @@ namespace kickmsg
         uint64_t drain_timeouts() const { return drain_timeouts_; }
 
     private:
+        void release_ring();
         void drain_unconsumed(SubRingHeader* ring);
 
         void*                base_;

@@ -102,17 +102,30 @@ namespace kickmsg
             Live     = 1,  ///< Subscriber owns ring, publishers may deliver
             Draining = 2,  ///< Subscriber tearing down — no new delivery, drain in progress
         };
+
+        /// Packed [in_flight:30 | state:2] in a single uint32_t.
+        /// Single-variable atomics eliminate cross-variable ordering concerns:
+        /// publisher CAS atomically checks state and increments in_flight,
+        /// so acquire/release is sufficient (no Dekker protocol, no seq_cst).
+        constexpr uint32_t STATE_MASK    = 0x3u;
+        constexpr uint32_t IN_FLIGHT_ONE = 0x4u;
+
+        constexpr State    get_state(uint32_t packed)     { return static_cast<State>(packed & STATE_MASK); }
+        constexpr uint32_t get_in_flight(uint32_t packed) { return packed >> 2; }
+        constexpr uint32_t make_packed(State s, uint32_t in_flight = 0) { return (in_flight << 2) | s; }
     }
 
     /// Per-subscriber ring header in shared memory.
-    /// Fields are cache-line aligned to avoid false sharing between
-    /// publisher (writes write_pos, reads state/in_flight) and
-    /// subscriber (writes state, reads write_pos).
+    /// state_flight packs ring state and in_flight publisher count into one
+    /// atomic, enabling single-CAS admission without cross-variable fences.
+    /// write_pos and has_waiter share a cache line: the publisher writes
+    /// write_pos then reads has_waiter, the subscriber reads write_pos then
+    /// writes has_waiter — both access the same line, one cache miss each.
     struct SubRingHeader
     {
-        alignas(CACHE_LINE) std::atomic<ring::State> state;   ///< Ring lifecycle state
-        alignas(CACHE_LINE) std::atomic<uint32_t> in_flight; ///< Publishers currently admitted to this ring
-        alignas(CACHE_LINE) std::atomic<uint64_t> write_pos; ///< Monotonically increasing position counter
+        alignas(CACHE_LINE) std::atomic<uint32_t> state_flight; ///< Packed [in_flight:30 | state:2]
+        alignas(CACHE_LINE) std::atomic<uint64_t> write_pos;    ///< Monotonically increasing position counter
+        std::atomic<uint32_t> has_waiter;                       ///< Set by subscriber before futex_wait
     };
 
     /// Slot header: prepended to each payload buffer in the pool.

@@ -64,39 +64,57 @@ namespace kickmsg
                              std::memory_order_release);
 
         std::size_t delivered = 0;
+        uint32_t    excess    = 0;
 
         for (uint32_t i = 0; i < header_->max_subs; ++i)
         {
             auto* ring = sub_ring_at(base_, header_, i);
 
-            // Dekker double-check admission: increment in_flight first, then
-            // verify the ring is Live. If the subscriber flipped to Draining
-            // between our check and the increment, the re-read catches it.
-            // seq_cst on all operations ensures a single total order visible
-            // to both publisher and subscriber on all architectures.
-            ring->in_flight.fetch_add(1, std::memory_order_seq_cst);
-
-            if (ring->state.load(std::memory_order_seq_cst) != ring::Live)
+            // Relaxed pre-check: skip obviously non-Live rings without
+            // any RMW atomic. Stale reads are safe:
+            //  - Sees Free, actually Live: miss one delivery (acceptable).
+            //  - Sees Live, actually Draining: CAS catches it below.
+            uint32_t snapshot = ring->state_flight.load(std::memory_order_relaxed);
+            if (ring::get_state(snapshot) != ring::Live)
             {
-                // Release this ring's reference BEFORE in_flight--, so drain
-                // can't start until the refcount adjustment is complete.
-                uint32_t prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
-                if (prev == 1)
-                {
-                    treiber_push(header_->free_top, slot, slot_idx);
-                }
-                ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
+                ++excess;
                 continue;
             }
 
-            // Claim a position in this ring via CAS (MPSC serialization).
-            uint64_t pos;
-            do
+            // CAS admission: atomically verify state==Live and increment
+            // in_flight. All ordering is on a single variable, so
+            // acquire/release is sufficient (no seq_cst needed).
+            uint32_t old = snapshot;
+            bool admitted = false;
+            while (true)
             {
-                pos = ring->write_pos.load(std::memory_order_acquire);
+                if (ring::get_state(old) != ring::Live)
+                {
+                    ++excess;
+                    break;
+                }
+                if (ring->state_flight.compare_exchange_weak(old,
+                        old + ring::IN_FLIGHT_ONE,
+                        std::memory_order_acq_rel,
+                        std::memory_order_acquire))
+                {
+                    admitted = true;
+                    break;
+                }
+                // CAS failed — old was updated. Re-check state.
             }
-            while (not ring->write_pos.compare_exchange_weak(pos, pos + 1,
-                       std::memory_order_acq_rel, std::memory_order_acquire));
+
+            if (not admitted)
+            {
+                continue;
+            }
+
+            // Admitted: in_flight incremented, state is Live.
+
+            // Claim a position in this ring. fetch_add is unconditional:
+            // no CAS retry loop, O(1) under contention, and compiles to
+            // a single LDADDAL on AArch64 with LSE atomics.
+            uint64_t pos = ring->write_pos.fetch_add(1, std::memory_order_acq_rel);
 
             uint64_t idx  = pos & header_->sub_ring_mask;
             auto* entries = ring_entries(ring);
@@ -141,15 +159,17 @@ namespace kickmsg
                 }
                 // Another publisher holds the lock; it will release quickly.
             }
+            // If lock fails after wait_and_capture_slot timeout, the entry
+            // is poisoned (LOCKED_SEQUENCE from crashed publisher, or stale
+            // value). This ring position is dead until repair_locked_entries()
+            // is called. No self-recovery: commit_timeout is a heuristic,
+            // not proof of death.
             if (not locked)
             {
                 ++dropped_;
-                uint32_t prev = slot->refcount.fetch_sub(1, std::memory_order_acq_rel);
-                if (prev == 1)
-                {
-                    treiber_push(header_->free_top, slot, slot_idx);
-                }
-                ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
+                ++excess;
+                ring->state_flight.fetch_sub(ring::IN_FLIGHT_ONE,
+                                             std::memory_order_release);
                 continue;
             }
 
@@ -162,13 +182,31 @@ namespace kickmsg
             // at this position will see all preceding stores.
             e.sequence.store(pos + 1, std::memory_order_release);
 
-            ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
-            futex_wake_all(ring->write_pos);
+            // Release admission.
+            ring->state_flight.fetch_sub(ring::IN_FLIGHT_ONE,
+                                         std::memory_order_release);
+
+            // Conditional wake: skip the syscall when no subscriber is blocking.
+            if (ring->has_waiter.load(std::memory_order_relaxed))
+            {
+                futex_wake_all(ring->write_pos);
+            }
             ++delivered;
         }
 
-        // No batched excess subtraction — each skipped ring released its
-        // reference inline above, under the in_flight umbrella.
+        // Batch release excess refs for all non-delivered rings.
+        // Safe because: Free rings have no drain to race with, and
+        // Draining rings where CAS failed never admitted us (in_flight
+        // was never incremented), so their drain doesn't depend on us.
+        if (excess > 0)
+        {
+            uint32_t prev = slot->refcount.fetch_sub(excess,
+                                std::memory_order_acq_rel);
+            if (prev == excess)
+            {
+                treiber_push(header_->free_top, slot, slot_idx);
+            }
+        }
 
         return delivered;
     }

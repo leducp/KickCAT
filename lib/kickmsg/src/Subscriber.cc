@@ -17,9 +17,15 @@ namespace kickmsg
         for (uint32_t i = 0; i < header_->max_subs; ++i)
         {
             auto* ring = sub_ring_at(base_, header_, i);
-            ring::State expected = ring::Free;
-            if (ring->state.compare_exchange_strong(expected, ring::Live,
-                    std::memory_order_seq_cst))
+            // Requires Free | in_flight=0. A ring stuck at Free | in_flight>0
+            // (from a crashed publisher) stays retired until the operator
+            // calls reset_retired_rings(). We do NOT force-reset stale
+            // in_flight: the packed layout means a late fetch_sub from a
+            // slow publisher would underflow into the state bits.
+            uint32_t expected = ring::make_packed(ring::Free);
+            if (ring->state_flight.compare_exchange_strong(expected,
+                    ring::make_packed(ring::Live),
+                    std::memory_order_acq_rel))
             {
                 ring_idx_  = i;
                 start_pos_ = ring->write_pos.load(std::memory_order_acquire);
@@ -34,43 +40,75 @@ namespace kickmsg
         }
     }
 
-    Subscriber::~Subscriber()
+    void Subscriber::release_ring()
     {
-        if (ring_idx_ != UINT32_MAX)
+        if (ring_idx_ == UINT32_MAX)
         {
-            auto* ring = sub_ring_at(base_, header_, ring_idx_);
-            // Transition Live → Draining: no new publisher can be admitted.
-            ring->state.store(ring::Draining, std::memory_order_seq_cst);
+            return;
+        }
 
-            // Wait for all admitted publishers to finish.
-            // Bounded: if a publisher crashed after in_flight++ but before in_flight--,
-            // the counter is permanently inflated. Use commit_timeout as the bound.
-            bool quiesced = true;
-            microseconds deadline{header_->commit_timeout_us};
-            nanoseconds start = kickcat::since_epoch();
-            while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
+        auto* ring = sub_ring_at(base_, header_, ring_idx_);
+
+        // Transition Live → Draining, preserving in_flight count.
+        uint32_t old = ring->state_flight.load(std::memory_order_acquire);
+        while (true)
+        {
+            uint32_t desired = (old & ~ring::STATE_MASK) | ring::Draining;
+            if (ring->state_flight.compare_exchange_weak(old, desired,
+                    std::memory_order_acq_rel, std::memory_order_acquire))
             {
-                if (kickcat::elapsed_time(start) >= deadline)
+                break;
+            }
+        }
+
+        // Wait for all admitted publishers to finish.
+        bool quiesced = true;
+        microseconds deadline{header_->commit_timeout_us};
+        nanoseconds start = kickcat::since_epoch();
+        while (ring::get_in_flight(
+                   ring->state_flight.load(std::memory_order_acquire)) > 0)
+        {
+            if (kickcat::elapsed_time(start) >= deadline)
+            {
+                // Publisher likely crashed. Do NOT force in_flight to 0:
+                // a slow-but-alive publisher may still be mid-commit.
+                // Skip drain to avoid racing with it. Leaked slot refs
+                // are recoverable by GC (reclaim_orphaned_slots).
+                quiesced = false;
+                ++drain_timeouts_;
+                break;
+            }
+            kickcat::sleep(0ns);
+        }
+
+        if (quiesced)
+        {
+            drain_unconsumed(ring);
+            // in_flight == 0 — safe to store directly.
+            ring->state_flight.store(ring::make_packed(ring::Free),
+                                     std::memory_order_release);
+        }
+        else
+        {
+            // Timeout: only change state bits, preserve in_flight
+            // for the slow/crashed publisher.
+            old = ring->state_flight.load(std::memory_order_acquire);
+            while (true)
+            {
+                uint32_t desired = (old & ~ring::STATE_MASK) | ring::Free;
+                if (ring->state_flight.compare_exchange_weak(old, desired,
+                        std::memory_order_release,
+                        std::memory_order_acquire))
                 {
-                    // Publisher likely crashed. Do NOT force in_flight to 0:
-                    // a slow-but-alive publisher may still be mid-commit.
-                    // Skip drain to avoid racing with it. Leaked slot refs
-                    // are recoverable by GC (reclaim_orphaned_slots).
-                    quiesced = false;
-                    ++drain_timeouts_;
                     break;
                 }
-                kickcat::sleep(0ns);
             }
-
-            if (quiesced)
-            {
-                drain_unconsumed(ring);
-            }
-
-            // Transition Draining → Free: ring available for a new subscriber.
-            ring->state.store(ring::Free, std::memory_order_seq_cst);
         }
+    }
+
+    Subscriber::~Subscriber()
+    {
+        release_ring();
     }
 
     Subscriber::Subscriber(Subscriber&& other) noexcept
@@ -90,29 +128,7 @@ namespace kickmsg
     {
         if (this != &other)
         {
-            if (ring_idx_ != UINT32_MAX)
-            {
-                auto* ring = sub_ring_at(base_, header_, ring_idx_);
-                ring->state.store(ring::Draining, std::memory_order_seq_cst);
-                bool quiesced = true;
-                microseconds deadline{header_->commit_timeout_us};
-                nanoseconds start = kickcat::since_epoch();
-                while (ring->in_flight.load(std::memory_order_seq_cst) > 0)
-                {
-                    if (kickcat::elapsed_time(start) >= deadline)
-                    {
-                        quiesced = false;
-                        ++drain_timeouts_;
-                        break;
-                    }
-                    kickcat::sleep(0ns);
-                }
-                if (quiesced)
-                {
-                    drain_unconsumed(ring);
-                }
-                ring->state.store(ring::Free, std::memory_order_seq_cst);
-            }
+            release_ring();
 
             base_           = other.base_;
             header_         = other.header_;
@@ -229,7 +245,7 @@ namespace kickmsg
             }
 
             ++read_pos_;
-            return SampleRef{recv_buf_.data(), payload_len};
+            return SampleRef{recv_buf_.data(), payload_len, read_pos_ - 1};
         }
         return std::nullopt;
     }
@@ -261,7 +277,9 @@ namespace kickmsg
                 {
                     return std::nullopt;
                 }
+                ring->has_waiter.store(1, std::memory_order_relaxed);
                 futex_wait(ring->write_pos, cur, remaining);
+                ring->has_waiter.store(0, std::memory_order_relaxed);
             }
         }
     }
@@ -348,7 +366,7 @@ namespace kickmsg
             }
 
             ++read_pos_;
-            return SampleView{base_, header_, slot_idx, payload_len};
+            return SampleView{base_, header_, slot_idx, payload_len, read_pos_ - 1};
         }
         return std::nullopt;
     }
@@ -380,7 +398,9 @@ namespace kickmsg
                 {
                     return std::nullopt;
                 }
+                ring->has_waiter.store(1, std::memory_order_relaxed);
                 futex_wait(ring->write_pos, cur, remaining);
+                ring->has_waiter.store(0, std::memory_order_relaxed);
             }
         }
     }
@@ -441,7 +461,7 @@ namespace kickmsg
                 }
                 // Mark entry as released so a future publisher wrapping to this
                 // position won't double-decrement via release_slot.
-                // seq_cst: the release/acquire chain through active and in_flight
+                // seq_cst: the release/acquire chain through state_flight
                 // does not formally guarantee the publisher sees this store.
                 // seq_cst establishes a total order visible to all threads.
                 // Cost: one full barrier per drained entry, only during destruction.

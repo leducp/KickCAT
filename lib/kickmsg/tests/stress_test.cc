@@ -87,12 +87,15 @@ struct MsgTrace
 {
     uint32_t pub_id;
     uint32_t seq;
+    uint64_t ring_pos;
 };
 
 static constexpr std::size_t TRACE_SIZE = 16;
 
-void validate_payload(Payload const& msg, int num_pubs,
-                      std::vector<uint32_t>& last_seq, SubResult& result,
+void validate_payload(Payload const& msg, int num_pubs, uint64_t ring_pos,
+                      std::vector<uint32_t>& last_seq,
+                      std::vector<uint64_t>& last_pos,
+                      SubResult& result,
                       MsgTrace* trace, std::size_t& trace_pos)
 {
     if (msg.magic != Payload::MAGIC)
@@ -112,15 +115,20 @@ void validate_payload(Payload const& msg, int num_pubs,
     }
 
     // Record in trace ring
-    trace[trace_pos % TRACE_SIZE] = {msg.pub_id, msg.seq};
+    trace[trace_pos % TRACE_SIZE] = {msg.pub_id, msg.seq, ring_pos};
     ++trace_pos;
 
-    auto& prev = last_seq[msg.pub_id];
-    if (prev != UINT32_MAX and msg.seq <= prev)
+    auto& prev_seq = last_seq[msg.pub_id];
+    auto& prev_pos = last_pos[msg.pub_id];
+    if (prev_seq != UINT32_MAX and msg.seq <= prev_seq)
     {
-        auto delta = static_cast<int32_t>(prev) - static_cast<int32_t>(msg.seq);
-        std::fprintf(stderr, "  [REORDER] sub%d: pub %u seq %u after prev %u (delta=%d, lost=%" PRIu64 ", recv=%" PRIu64 ")\n",
-                     result.sub_id, msg.pub_id, msg.seq, prev, delta, result.lost, result.received);
+        auto delta = static_cast<int32_t>(prev_seq) - static_cast<int32_t>(msg.seq);
+        std::fprintf(stderr, "  [REORDER] sub%d: pub %u seq %u @pos %" PRIu64
+                     " after prev seq %u @pos %" PRIu64
+                     " (delta=%d, lost=%" PRIu64 ", recv=%" PRIu64 ")\n",
+                     result.sub_id, msg.pub_id, msg.seq, ring_pos,
+                     prev_seq, prev_pos,
+                     delta, result.lost, result.received);
 
         // Dump recent messages for context
         if (result.reordered == 0)
@@ -139,15 +147,16 @@ void validate_payload(Payload const& msg, int num_pubs,
                 {
                     marker = " <--";
                 }
-                std::fprintf(stderr, "    [%zu] pub %u seq %u%s\n",
-                             i, t.pub_id, t.seq, marker);
+                std::fprintf(stderr, "    [%zu] pub %u seq %u @pos %" PRIu64 "%s\n",
+                             i, t.pub_id, t.seq, t.ring_pos, marker);
             }
         }
 
         ++result.reordered;
         return;
     }
-    prev = msg.seq;
+    prev_seq = msg.seq;
+    prev_pos = ring_pos;
 
     ++result.received;
 }
@@ -161,6 +170,7 @@ SubResult subscriber_thread_copy(kickmsg::SharedRegion& region, int sub_id,
     result.sub_id = sub_id;
 
     std::vector<uint32_t> last_seq(static_cast<std::size_t>(num_pubs), UINT32_MAX);
+    std::vector<uint64_t> last_pos(static_cast<std::size_t>(num_pubs), UINT64_MAX);
     MsgTrace trace[TRACE_SIZE]{};
     std::size_t trace_pos = 0;
 
@@ -193,7 +203,8 @@ SubResult subscriber_thread_copy(kickmsg::SharedRegion& region, int sub_id,
 
         Payload msg;
         std::memcpy(&msg, sample->data(), sizeof(msg));
-        validate_payload(msg, num_pubs, last_seq, result, trace, trace_pos);
+        validate_payload(msg, num_pubs, sample->ring_pos(),
+                         last_seq, last_pos, result, trace, trace_pos);
     }
 
     result.lost = sub.lost();
@@ -209,6 +220,7 @@ SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
     result.sub_id = sub_id;
 
     std::vector<uint32_t> last_seq(static_cast<std::size_t>(num_pubs), UINT32_MAX);
+    std::vector<uint64_t> last_pos(static_cast<std::size_t>(num_pubs), UINT64_MAX);
     MsgTrace trace[TRACE_SIZE]{};
     std::size_t trace_pos = 0;
 
@@ -241,7 +253,8 @@ SubResult subscriber_thread_zerocopy(kickmsg::SharedRegion& region, int sub_id,
 
         Payload msg;
         std::memcpy(&msg, view->data(), sizeof(msg));
-        validate_payload(msg, num_pubs, last_seq, result, trace, trace_pos);
+        validate_payload(msg, num_pubs, view->ring_pos(),
+                         last_seq, last_pos, result, trace, trace_pos);
     }
 
     result.lost = sub.lost();
@@ -293,15 +306,16 @@ bool verify_rings_inactive(kickmsg::SharedRegion& region, kickmsg::channel::Conf
     for (uint32_t i = 0; i < cfg.max_subscribers; ++i)
     {
         auto* ring = kickmsg::sub_ring_at(base, hdr, i);
-        if (ring->state != kickmsg::ring::Free)
+        uint32_t packed = ring->state_flight.load(std::memory_order_acquire);
+        if (kickmsg::ring::get_state(packed) != kickmsg::ring::Free)
         {
             std::fprintf(stderr, "  [FAIL] ring %u not Free after test\n", i);
             return false;
         }
-        if (ring->in_flight != 0)
+        if (kickmsg::ring::get_in_flight(packed) != 0)
         {
             std::fprintf(stderr, "  [FAIL] ring %u has in_flight=%u after test\n",
-                         i, static_cast<uint32_t>(ring->in_flight));
+                         i, kickmsg::ring::get_in_flight(packed));
             return false;
         }
     }

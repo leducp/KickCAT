@@ -67,9 +67,9 @@ namespace kickmsg
         for (uint32_t i = 0; i < cfg.max_subscribers; ++i)
         {
             auto* ring = sub_ring_at(region.base(), h, i);
-            ring->state    = ring::Free;
-            ring->in_flight = 0;
-            ring->write_pos = 0;
+            ring->state_flight = ring::make_packed(ring::Free);
+            ring->write_pos    = 0;
+            ring->has_waiter   = 0;
         }
 
         // Write magic LAST with release: create_or_open() polls magic with
@@ -164,6 +164,54 @@ namespace kickmsg
         }
     }
 
+    SharedRegion::HealthReport SharedRegion::diagnose()
+    {
+        auto* b = base();
+        auto* h = header();
+        HealthReport report{};
+
+        for (uint64_t i = 0; i < h->max_subs; ++i)
+        {
+            auto* ring    = sub_ring_at(b, h, static_cast<uint32_t>(i));
+            auto* entries = ring_entries(ring);
+            uint64_t wp   = ring->write_pos.load(std::memory_order_acquire);
+            uint64_t cap  = h->sub_ring_capacity;
+
+            uint64_t start = 0;
+            if (wp > cap)
+            {
+                start = wp - cap;
+            }
+            for (uint64_t pos = start; pos < wp; ++pos)
+            {
+                auto& e = entries[pos & h->sub_ring_mask];
+                if (e.sequence.load(std::memory_order_acquire) == LOCKED_SEQUENCE)
+                {
+                    ++report.locked_entries;
+                }
+            }
+
+            uint32_t    packed    = ring->state_flight.load(std::memory_order_acquire);
+            ring::State state     = ring::get_state(packed);
+            uint32_t    in_flight = ring::get_in_flight(packed);
+
+            if (state == ring::Live)
+            {
+                ++report.live_rings;
+            }
+            else if (state == ring::Free and in_flight > 0)
+            {
+                ++report.retired_rings;
+            }
+            else if (state == ring::Draining and in_flight > 0)
+            {
+                ++report.draining_rings;
+            }
+        }
+
+        return report;
+    }
+
     std::size_t SharedRegion::repair_locked_entries()
     {
         auto* b   = base();
@@ -206,6 +254,29 @@ namespace kickmsg
         }
 
         return repaired;
+    }
+
+    std::size_t SharedRegion::reset_retired_rings()
+    {
+        auto* b = base();
+        auto* h = header();
+        std::size_t reset = 0;
+
+        for (uint64_t i = 0; i < h->max_subs; ++i)
+        {
+            auto*    ring   = sub_ring_at(b, h, static_cast<uint32_t>(i));
+            uint32_t packed = ring->state_flight.load(std::memory_order_acquire);
+
+            if (ring::get_state(packed) == ring::Free
+                and ring::get_in_flight(packed) > 0)
+            {
+                ring->state_flight.store(ring::make_packed(ring::Free),
+                                         std::memory_order_release);
+                ++reset;
+            }
+        }
+
+        return reset;
     }
 
     std::size_t SharedRegion::reclaim_orphaned_slots()

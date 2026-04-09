@@ -293,18 +293,22 @@ TEST_F(SubscriberTest, StuckPublisherCausesDrainTimeout)
 
         // Simulate a stuck publisher: inflate in_flight on ring 0
         auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
-        ring->in_flight.fetch_add(1, std::memory_order_seq_cst);
+        ring->state_flight.fetch_add(kickmsg::ring::IN_FLIGHT_ONE,
+                                     std::memory_order_acq_rel);
 
         // sub destructs here — should timeout waiting for in_flight,
         // skip drain, and increment drain_timeouts
     }
 
-    // The ring should be Free again despite the timeout
+    // The ring should be Free with stale in_flight preserved
     auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
-    EXPECT_EQ(ring->state.load(std::memory_order_seq_cst), kickmsg::ring::Free);
+    uint32_t packed = ring->state_flight.load(std::memory_order_acquire);
+    EXPECT_EQ(kickmsg::ring::get_state(packed), kickmsg::ring::Free);
+    EXPECT_GT(kickmsg::ring::get_in_flight(packed), 0u);
 
-    // Fix the stuck in_flight so the ring is clean for the next subscriber
-    ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
+    // Simulate operator recovery: clear the stale in_flight
+    ring->state_flight.store(kickmsg::ring::make_packed(kickmsg::ring::Free),
+                             std::memory_order_release);
 }
 
 TEST_F(SubscriberTest, RejoinAfterDrainTimeout)
@@ -330,13 +334,15 @@ TEST_F(SubscriberTest, RejoinAfterDrainTimeout)
         ASSERT_GE(pub.send(&val, sizeof(val)), 0);
 
         auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
-        ring->in_flight.fetch_add(1, std::memory_order_seq_cst);
-        // sub destructs — timeout, drain skipped
+        ring->state_flight.fetch_add(kickmsg::ring::IN_FLIGHT_ONE,
+                                     std::memory_order_acq_rel);
+        // sub destructs — timeout, drain skipped, stale in_flight preserved
     }
 
-    // Fix the fake stuck publisher
-    auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
-    ring->in_flight.fetch_sub(1, std::memory_order_seq_cst);
+    // Operator recovery: reset_retired_rings() clears stale in_flight
+    // on retired rings so a new subscriber can claim them.
+    std::size_t reset = region.reset_retired_rings();
+    EXPECT_GE(reset, 1u);
 
     // Round 2: new subscriber joins and receives normally
     {

@@ -205,22 +205,50 @@ Ring[0]
 ```
 
 - **Capacity** must be a power of 2 (index masking: `pos & (cap - 1)`).
-- **state** (atomic RingState): lifecycle state of the ring.
-  `Free(0)` -- no subscriber, available for claim.
-  `Live(1)` -- subscriber owns ring, publishers may deliver.
-  `Draining(2)` -- subscriber tearing down, no new delivery.
-  Publishers check `state == Live` before delivering.
-- **in_flight** (atomic uint32): number of publishers currently admitted
-  to this ring. Publishers increment before checking `state` and decrement
-  after committing (or abandoning). The subscriber destructor spins until
-  `in_flight == 0` to ensure `write_pos` is final before draining.
+- **state_flight** (atomic uint32): packed `[in_flight:30 | state:2]`.
+  State bits: `Free(0)`, `Live(1)`, `Draining(2)`.
+  In_flight bits: number of publishers currently admitted to this ring.
+  Packing into a single variable eliminates cross-variable ordering
+  concerns: the publisher's CAS atomically checks state and increments
+  in_flight, so acquire/release is sufficient (no seq_cst needed).
 - **write_pos** (atomic uint64): monotonically increasing position counter.
-  Publishers CAS-increment it to claim a ring slot.
+  Publishers claim positions via `fetch_add` (unconditional, O(1)).
+- **has_waiter** (atomic uint32): set by the subscriber before blocking
+  on `futex_wait`, cleared after. Publishers skip the `futex_wake_all`
+  syscall when no subscriber is sleeping.
 - **Sequence number** is monotonically increasing (`pos + 1`), used as a
   seqlock for data consistency validation and as a commit barrier between
   publishers (see Publish Flow below).
 - Stale entries (sequence < subscriber's expected) are detected and
   reported as lost messages.
+
+### Subscriber join and visibility window
+
+A subscriber joins by CAS-ing a Free ring to Live. The CAS expects
+exactly `Free | in_flight=0` (packed value 0). A ring stuck at
+`Free | in_flight>0` (from a crashed publisher whose subscriber
+teardown timed out) stays retired until the operator calls
+`reset_retired_rings()` to recover it.
+
+Direct acceptance of non-zero in_flight would be unsafe: the packed
+`state_flight` layout means a late `fetch_sub(IN_FLIGHT_ONE)` from
+a slow publisher would underflow into the state bits, corrupting
+the ring for the new subscriber. Force-resetting in_flight to 0
+would also be unsafe: `commit_timeout` is a heuristic, not proof
+of death. A slow-but-alive publisher could still execute its
+pending `fetch_sub`, causing the same underflow.
+
+**After a publisher crash, the operator must call
+`repair_locked_entries()` for poisoned ring entries and
+`reset_retired_rings()` for stuck ring headers.** These are
+explicit recovery steps, not silent self-repair — crashes should
+be visible to the operator.
+
+A newly joined subscriber may miss a small number of in-flight
+publishes during the visibility window right after attachment:
+publishers using a relaxed pre-check may still see the ring as
+non-Live (stale read). Steady-state delivery begins once all
+publishers observe the ring as Live.
 
 
 ## Publish Flow
@@ -245,21 +273,23 @@ Publisher
    v
 4. For each Ring[i]:
    |
-   |-- in_flight.fetch_add(1, seq_cst)  Dekker double-check admission:
-   |                                    announce presence BEFORE reading
-   |                                    state, so a concurrent Draining
-   |                                    transition is never missed.
+   |-- Relaxed pre-check:           Skip obviously non-Live rings with a
+   |     state_flight (relaxed)     single relaxed load (no RMW atomic).
+   |     if state != Live:          A stale read may miss a just-joined
+   |       excess++, continue       subscriber (acceptable — lossy).
+   |                                The CAS below catches false positives.
    |
-   |-- if state != Live:               Ring is Free or Draining.
-   |     slot.refcount--               Release this ring's reference
-   |     (if refcount -> 0:            inline (before in_flight--), so
-   |       treiber_push)               drain cannot start prematurely.
-   |     in_flight.fetch_sub(1, seq_cst)
-   |     continue
+   |-- CAS admission on             Atomically verify state==Live and
+   |   state_flight (acq_rel):      increment in_flight in one CAS.
+   |     old + IN_FLIGHT_ONE        All ordering is on a single variable,
+   |                                so acquire/release is sufficient
+   |     if state changed to        (no seq_cst, no Dekker protocol).
+   |     non-Live during CAS:       CAS fails, excess++, continue.
+   |       excess++, continue
    |
-   |-- CAS write_pos: 42 -> 43    Claim position 42 (MPSC-safe).
-   |   Multiple publishers may     Losers retry with updated value.
-   |   race here; CAS serializes.
+   |-- fetch_add(write_pos, 1)     Claim position 42. Unconditional:
+   |                                O(1) under contention, compiles to
+   |                                a single LDADDAL on AArch64 (LSE).
    |
    |-- If ring full (wrap):
    |     wait_and_capture_slot()   Spin-wait (check clock every 1024
@@ -272,11 +302,11 @@ Publisher
    |     |                         just -1 for this ring's reference).
    |     |                         If refcount reaches 0 -> treiber_push.
    |     '-- Timeout (crash):      Previous writer crashed. Skip
-   |           skip release         release_slot() because slot_idx may
+   |                                release_slot() because slot_idx may
    |                                be garbage. The pool slot referenced
-   |                                by the abandoned entry is leaked.
-   |                                The ring entry itself is overwritten
-   |                                and stays operational.
+   |                                by the abandoned entry is leaked
+   |                                (recoverable by GC). The ring position
+   |                                is poisoned until repair_locked_entries().
    |
    |-- Two-phase commit:
    |   |
@@ -293,8 +323,8 @@ Publisher
    |   |                             (just two relaxed stores + one
    |   |                             release store).
    |   |   If expected is neither    Entry was committed by another
-   |   |     prev_seq nor LOCKED     publisher. in_flight.fetch_sub(1),
-   |   |                             give up on this ring.
+   |   |     prev_seq nor LOCKED     publisher. excess++, give up
+   |   |                             on this ring.
    |   |
    |   | Write entry fields (relaxed, safe because we hold the lock):
    |   |   entry.slot_idx    = 3
@@ -306,13 +336,18 @@ Publisher
    |                                 at this position will see all
    |                                 preceding stores.
    |
-   |-- in_flight.fetch_sub(1)      Release ring — subscriber destructor
-   |                                can now observe in_flight == 0.
+   |-- state_flight.fetch_sub       Release admission — subscriber
+   |     (IN_FLIGHT_ONE, release)   destructor can now observe
+   |                                in_flight == 0.
    |
-   '-- futex_wake_all(write_pos)   Wake any sleeping subscribers.
+   '-- if has_waiter:               Conditional wake: skip the syscall
+         futex_wake_all(write_pos)  when no subscriber is blocking.
 
-   No batched excess subtraction — each skipped ring released its
-   reference inline above, under the in_flight umbrella.
+5. Batch excess: fetch_sub(excess) on slot refcount.
+   One atomic RMW for all non-delivered rings, instead of N
+   individual decrements. Safe because Free rings have no drain
+   to race with, and Draining rings where CAS failed never
+   admitted us (in_flight was never incremented).
 ```
 
 ### Why a two-phase commit?
@@ -756,20 +791,61 @@ After write_pos CAS, before          Entry is overwritten after
 ### API
 
 ```cpp
+// Lightweight health check — read-only, safe under live traffic.
+// Call periodically from a supervisor to detect crash damage.
+// Note: a single nonzero reading may be a transient state (e.g.,
+// Draining ring with publishers finishing). Call twice with a gap
+// > commit_timeout; persistent counts indicate a real crash.
+auto report = region.diagnose();
+// report.locked_entries:  entries stuck at LOCKED_SEQUENCE
+// report.retired_rings:   Free rings with stale in_flight > 0
+// report.draining_rings:  Draining rings with in_flight > 0 (usually transient)
+// report.live_rings:      active subscriber rings
+
 // Safe under live traffic — repairs poisoned ring entries.
+// Can be called freely on a health-check timer.
 std::size_t repaired = region.repair_locked_entries();
 
-// Requires publisher quiescence — reclaims orphaned slots.
+// Resets retired rings (Free | in_flight>0) so new subscribers can
+// claim them. Only safe after confirming the crashed publisher is gone.
+// Deliberate post-crash action, not a routine maintenance call.
+std::size_t reset = region.reset_retired_rings();
+
+// Requires full quiescence — reclaims orphaned slots.
 std::size_t reclaimed = region.reclaim_orphaned_slots();
 ```
 
-`repair_locked_entries()` scans all ring entries and commits any stuck
-at `LOCKED_SEQUENCE` with `INVALID_SLOT`. Safe to call at any time.
+**`diagnose()`** — read-only scan, safe under live traffic. Returns
+counts of locked entries and stuck rings. The supervisor calls this
+periodically; persistent nonzero counts signal recovery is needed.
 
-`reclaim_orphaned_slots()` walks all rings to build a referenced-slot
-set, then frees any unreferenced slot with refcount > 0. NOT safe
-under live traffic — requires all publishers quiesced and no
-outstanding `SampleView` objects.
+**`repair_locked_entries()`** — commits locked entries with
+`INVALID_SLOT`. Safe under live traffic (benign double-store if a
+slow publisher commits at the same time). Can run on a timer.
+
+**`reset_retired_rings()`** — resets stuck rings (`Free | in_flight>0`
+→ `Free | in_flight=0`). Only safe after confirming the crashed
+publisher is gone. Unlike `repair_locked_entries()`, this is a
+deliberate post-crash action.
+
+**`reclaim_orphaned_slots()`** — walks all rings to build a
+referenced-slot set, then frees any unreferenced slot with
+refcount > 0. NOT safe under live traffic — requires all publishers
+quiesced and no outstanding `SampleView` objects.
+
+### Recommended recovery sequence
+
+```
+1. diagnose() → persistent nonzero counts (check twice, gap > commit_timeout)
+2. repair_locked_entries()          — safe under live traffic
+3. reset_retired_rings()            — after confirming crashed publisher is gone
+4. (optional) pause all publishers
+5. reclaim_orphaned_slots()         — requires quiescence
+6. resume publishers
+```
+
+Steps 4–6 are only needed if the pool is exhausted from leaked slots.
+In most cases, steps 2–3 restore the channel to full operation.
 
 
 ## ABA Safety

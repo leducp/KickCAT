@@ -307,6 +307,137 @@ TEST_F(RegionTest, RepairLockedEntryAtPositionZero)
     }
 }
 
+TEST_F(RegionTest, DiagnoseHealthyReturnsZeros)
+{
+    auto cfg    = default_cfg();
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    kickmsg::Subscriber sub(region);
+    kickmsg::Publisher  pub(region);
+
+    for (int i = 0; i < 5; ++i)
+    {
+        uint32_t val = static_cast<uint32_t>(i);
+        ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+    }
+
+    auto report = region.diagnose();
+    EXPECT_EQ(report.locked_entries, 0u);
+    EXPECT_EQ(report.retired_rings, 0u);
+}
+
+TEST_F(RegionTest, DiagnoseDetectsLockedEntries)
+{
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 1;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    kickmsg::Subscriber sub(region);
+    kickmsg::Publisher  pub(region);
+
+    // Publish one normal message
+    uint32_t val = 1;
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+
+    // Simulate a crashed publisher at pos=1: lock the entry
+    auto* ring    = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    auto* entries = kickmsg::ring_entries(ring);
+    ring->write_pos.store(2, std::memory_order_release);
+    entries[1].sequence.store(kickmsg::LOCKED_SEQUENCE, std::memory_order_release);
+
+    auto report = region.diagnose();
+    EXPECT_EQ(report.locked_entries, 1u);
+    EXPECT_EQ(report.retired_rings, 0u);
+
+    // Repair and verify clean
+    region.repair_locked_entries();
+    report = region.diagnose();
+    EXPECT_EQ(report.locked_entries, 0u);
+}
+
+TEST_F(RegionTest, DiagnoseDetectsStuckRings)
+{
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 2;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    // Simulate a stuck ring: Free with stale in_flight
+    auto* ring = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    ring->state_flight.store(
+        kickmsg::ring::make_packed(kickmsg::ring::Free, 1),
+        std::memory_order_release);
+
+    auto report = region.diagnose();
+    EXPECT_EQ(report.locked_entries, 0u);
+    EXPECT_EQ(report.retired_rings, 1u);
+
+    // Reset retired rings and verify clean
+    std::size_t reset = region.reset_retired_rings();
+    EXPECT_EQ(reset, 1u);
+    report = region.diagnose();
+    EXPECT_EQ(report.retired_rings, 0u);
+
+    // Subscriber can now join the recovered ring
+    kickmsg::Subscriber sub(region);
+    kickmsg::Publisher  pub(region);
+
+    uint32_t val = 42;
+    ASSERT_GE(pub.send(&val, sizeof(val)), 0);
+    auto sample = sub.try_receive();
+    ASSERT_TRUE(sample.has_value());
+
+    uint32_t got = 0;
+    std::memcpy(&got, sample->data(), sizeof(got));
+    EXPECT_EQ(got, 42u);
+}
+
+TEST_F(RegionTest, ResetRetiredRingsLeavesDrainingUntouched)
+{
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 2;
+    cfg.sub_ring_capacity = 4;
+    cfg.pool_size         = 8;
+    cfg.max_payload_size  = 8;
+
+    auto region = kickmsg::SharedRegion::create(SHM_NAME, kickmsg::channel::PubSub, cfg);
+
+    // Ring 0: retired (Free | in_flight=1) — should be reset
+    auto* ring0 = kickmsg::sub_ring_at(region.base(), region.header(), 0);
+    ring0->state_flight.store(
+        kickmsg::ring::make_packed(kickmsg::ring::Free, 1),
+        std::memory_order_release);
+
+    // Ring 1: draining (Draining | in_flight=1) — must NOT be touched
+    auto* ring1 = kickmsg::sub_ring_at(region.base(), region.header(), 1);
+    ring1->state_flight.store(
+        kickmsg::ring::make_packed(kickmsg::ring::Draining, 1),
+        std::memory_order_release);
+
+    auto report = region.diagnose();
+    EXPECT_EQ(report.retired_rings, 1u);
+    EXPECT_EQ(report.draining_rings, 1u);
+
+    std::size_t reset = region.reset_retired_rings();
+    EXPECT_EQ(reset, 1u);  // only the retired ring
+
+    // Ring 0 was reset
+    uint32_t packed0 = ring0->state_flight.load(std::memory_order_acquire);
+    EXPECT_EQ(packed0, kickmsg::ring::make_packed(kickmsg::ring::Free));
+
+    // Ring 1 is still Draining with in_flight preserved
+    uint32_t packed1 = ring1->state_flight.load(std::memory_order_acquire);
+    EXPECT_EQ(kickmsg::ring::get_state(packed1), kickmsg::ring::Draining);
+    EXPECT_EQ(kickmsg::ring::get_in_flight(packed1), 1u);
+}
+
 TEST_F(RegionTest, CollectGarbageDoesNotReclaimLiveSlots)
 {
     kickmsg::channel::Config cfg;
