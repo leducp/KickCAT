@@ -28,3 +28,10 @@ set_kickcat_properties(kickmsg_stress_test)
 set_target_properties(kickmsg_stress_test
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(kickmsg_crash_test crash_test.cc)
+target_link_libraries(kickmsg_crash_test PRIVATE kickmsg kickcat)
+set_kickcat_properties(kickmsg_crash_test)
+set_target_properties(kickmsg_crash_test
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
