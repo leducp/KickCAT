@@ -17,6 +17,7 @@ option(ENABLE_ESI_PARSER       "Enable ESI XML parser" ON)
 option(ENABLE_AF_XDP           "Enable AF_XDP socket for improved performance (requires libxdp, libbpf, clang)" OFF)
 option(ENABLE_CODE_COVERAGE    "Enable code coverage (requires gcovr)" OFF)
 option(ENABLE_TSAN             "Enable ThreadSanitizer" OFF)
+option(BUILD_BENCHMARKS        "Build benchmarks (requires Google Benchmark)" OFF)
 
 if (ENABLE_TSAN)
   add_compile_options(-fsanitize=thread -g)

@@ -26,3 +26,8 @@ endif()
 if(BUILD_MASTER_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+if(BUILD_BENCHMARKS)
+    find_package(benchmark REQUIRED)
+    add_subdirectory(benchmarks)
+endif()

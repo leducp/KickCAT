@@ -1,8 +1,6 @@
 #ifndef KICKMSG_PUBLISHER_H
 #define KICKMSG_PUBLISHER_H
 
-#include <cstring>
-
 #include "types.h"
 #include "Region.h"
 #include "kickcat/OS/Futex.h"

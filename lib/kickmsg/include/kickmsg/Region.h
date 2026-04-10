@@ -1,8 +1,6 @@
 #ifndef KICKMSG_REGION_H
 #define KICKMSG_REGION_H
 
-#include <cstring>
-#include <stdexcept>
 #include <string>
 #include <vector>
 

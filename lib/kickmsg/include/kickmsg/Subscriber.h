@@ -1,9 +1,7 @@
 #ifndef KICKMSG_SUBSCRIBER_H
 #define KICKMSG_SUBSCRIBER_H
 
-#include <cstring>
 #include <optional>
-#include <stdexcept>
 #include <vector>
 
 #include "types.h"

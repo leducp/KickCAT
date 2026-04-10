@@ -81,7 +81,11 @@ bool run_subscriber_churn()
 
     bool ok = not error;
 
-    // After all threads joined, every slot should be back in the pool
+    // After all threads joined, every slot should be back in the pool.
+    // This validates two critical invariants:
+    //   1. start_pos_ is captured BEFORE CAS to Live (no missed entries)
+    //   2. drain_unconsumed releases all entries in [start_pos_, wp)
+    // A refcount leak here indicates a gap in the drain window.
     std::size_t repaired = region.repair_locked_entries();
     std::size_t reclaimed = region.reclaim_orphaned_slots();
     if (repaired > 0)

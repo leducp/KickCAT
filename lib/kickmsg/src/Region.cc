@@ -1,7 +1,9 @@
+#include <cstring>
+#include <stdexcept>
+#include <unistd.h>
+
 #include "kickmsg/Region.h"
 #include "kickcat/OS/Time.h"
-
-#include <unistd.h>
 
 namespace kickmsg
 {

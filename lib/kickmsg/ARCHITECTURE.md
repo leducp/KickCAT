@@ -244,6 +244,14 @@ pending `fetch_sub`, causing the same underflow.
 explicit recovery steps, not silent self-repair — crashes should
 be visible to the operator.
 
+**Ordering invariant**: the subscriber captures `write_pos` BEFORE
+the CAS to Live, not after. Once the ring is Live, publishers can
+immediately `fetch_add(write_pos)`, racing with the subscriber's
+read. Capturing first guarantees `start_pos_ <= any position a
+publisher can claim after seeing Live`. Without this ordering, the
+subscriber's `drain_unconsumed` window `[start_pos_, wp)` can miss
+entries committed between the CAS and the read — a refcount leak.
+
 A newly joined subscriber may miss a small number of in-flight
 publishes during the visibility window right after attachment:
 publishers using a relaxed pre-check may still see the ring as
@@ -294,16 +302,12 @@ Publisher
    |-- If ring full (wrap):
    |     wait_and_capture_slot()   Spin-wait (check clock every 1024
    |     |                         iterations) up to commit_timeout
-   |     |                         (default 100ms). Skips entries in
-   |     |                         LOCKED_SEQUENCE state (another
-   |     |                         publisher is mid-commit).
-   |     |-- Committed:            Entry is valid. Read its slot_idx
-   |     |     release_slot()      and decrement refcount (not set to 0,
-   |     |                         just -1 for this ring's reference).
-   |     |                         If refcount reaches 0 -> treiber_push.
-   |     '-- Timeout (crash):      Previous writer crashed. Skip
-   |                                release_slot() because slot_idx may
-   |                                be garbage. The pool slot referenced
+   |     |                         (default 100ms).
+   |     |-- Committed:            Capture slot_idx (old_slot).
+   |     |                         Release is DEFERRED until after lock
+   |     |                         CAS succeeds (see below).
+   |     '-- Timeout (crash):      Previous writer crashed. old_slot =
+   |                                INVALID_SLOT. The pool slot referenced
    |                                by the abandoned entry is leaked
    |                                (recoverable by GC). The ring position
    |                                is poisoned until repair_locked_entries().
@@ -325,6 +329,25 @@ Publisher
    |   |   If expected is neither    Entry was committed by another
    |   |     prev_seq nor LOCKED     publisher. excess++, give up
    |   |                             on this ring.
+   |   |
+   |   | Lock failure:              Do NOT release old_slot — between
+   |   |   excess++, continue       capture and now, the entry may have
+   |   |                             been overwritten. old_slot could
+   |   |                             belong to a newer generation. The
+   |   |                             unreleased ref is a bounded leak
+   |   |                             (1 per drop), recoverable by GC.
+   |   |
+   |   | Lock success — deferred release:
+   |   |   Re-read e.slot_idx       After locking, we own the entry.
+   |   |   If slot_idx != INVALID:  Release old_slot (this ring's
+   |   |     release_slot(old_slot) reference to the previous occupant).
+   |   |   If slot_idx == INVALID:  drain_unconsumed already released
+   |   |     skip release            this ring's reference. Releasing
+   |   |                             again would double-decrement.
+   |   |   Why deferred? TOCTOU: between wait_and_capture_slot reading
+   |   |   slot_idx and the lock CAS, another publisher (or drain) can
+   |   |   modify the entry. Releasing before lock risks corrupting a
+   |   |   live slot's refcount. After lock, no concurrent modification.
    |   |
    |   | Write entry fields (relaxed, safe because we hold the lock):
    |   |   entry.slot_idx    = 3

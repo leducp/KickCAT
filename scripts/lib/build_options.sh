@@ -4,6 +4,7 @@
 
 declare -A OPT_DEFAULTS=(
     [unit_tests]=OFF
+    [benchmarks]=OFF
     [master_examples]=ON
     [slave_examples]=ON
     [esi_parser]=ON
@@ -16,6 +17,7 @@ declare -A OPT_DEFAULTS=(
 
 declare -A OPT_DESCRIPTIONS=(
     [unit_tests]="Build unit tests"
+    [benchmarks]="Build benchmarks (requires Google Benchmark)"
     [master_examples]="Build master examples"
     [slave_examples]="Build slave examples"
     [esi_parser]="Enable ESI XML parser"
@@ -28,6 +30,7 @@ declare -A OPT_DESCRIPTIONS=(
 
 declare -A OPT_CMAKE_FLAGS=(
     [unit_tests]="BUILD_UNIT_TESTS"
+    [benchmarks]="BUILD_BENCHMARKS"
     [master_examples]="BUILD_MASTER_EXAMPLES"
     [slave_examples]="BUILD_SLAVE_EXAMPLES"
     [esi_parser]="ENABLE_ESI_PARSER"
@@ -41,6 +44,7 @@ declare -A OPT_CMAKE_FLAGS=(
 # Only options that gate a Conan dependency
 declare -A OPT_CONAN_FLAGS=(
     [unit_tests]="unit_tests"
+    [benchmarks]="benchmarks"
     [master_examples]="master_examples"
     [esi_parser]="esi_parser"
     [simulation]="simulation"

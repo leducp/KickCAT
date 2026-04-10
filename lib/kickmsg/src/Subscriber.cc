@@ -1,5 +1,7 @@
-#include "kickmsg/Subscriber.h"
+#include <cstring>
+#include <stdexcept>
 
+#include "kickmsg/Subscriber.h"
 #include "kickcat/OS/Time.h"
 
 namespace kickmsg
@@ -471,4 +473,4 @@ namespace kickmsg
         }
 
     }
-} // namespace kickmsg
+}

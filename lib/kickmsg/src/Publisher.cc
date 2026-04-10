@@ -1,5 +1,7 @@
 #include "kickmsg/Publisher.h"
 
+#include <cstring>
+
 namespace kickmsg
 {
     Publisher::~Publisher()

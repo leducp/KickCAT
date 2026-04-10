@@ -11,6 +11,7 @@ class KickCATDev(ConanFile):
 
     options = {
         "unit_tests":       [True, False],
+        "benchmarks":       [True, False],
         "esi_parser":       [True, False],
         "simulation":       [True, False],
         "tools":            [True, False],
@@ -18,6 +19,7 @@ class KickCATDev(ConanFile):
     }
     default_options = {
         "unit_tests":       False,
+        "benchmarks":       False,
         "esi_parser":       True,
         "simulation":       True,
         "tools":            True,
@@ -38,6 +40,9 @@ class KickCATDev(ConanFile):
 
         if self.options.tools or self.options.master_examples or self.options.simulation:
             self.requires("argparse/3.2")
+
+        if self.options.benchmarks:
+            self.requires("benchmark/1.9.1")
 
         if self.settings.os == "Windows":
             self.requires("npcap/1.70")

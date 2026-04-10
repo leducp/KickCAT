@@ -2,7 +2,6 @@
 
 namespace kickmsg
 {
-
     Node::Node(std::string const& name, std::string const& prefix)
         : name_{name}
         , prefix_{prefix}

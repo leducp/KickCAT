@@ -10,6 +10,12 @@ namespace kickmsg
 {
     using namespace std::chrono;
 
+    static_assert(std::atomic<uint64_t>::is_always_lock_free,
+        "KickMsg requires lock-free 64-bit atomics. "
+        "32-bit platforms (RV32, MIPS32) are not supported.");
+    static_assert(std::atomic<uint32_t>::is_always_lock_free,
+        "KickMsg requires lock-free 32-bit atomics.");
+
     constexpr uint64_t    MAGIC           = 0x4B49434B4D534721ULL; // "KICKMSG!"
     constexpr uint32_t    VERSION         = 3;
     constexpr uint32_t    INVALID_SLOT    = UINT32_MAX;
@@ -27,18 +33,18 @@ namespace kickmsg
         };
 
         struct Config
-    {
-        std::size_t max_subscribers   = 16;
-        std::size_t sub_ring_capacity = 64;
-        std::size_t pool_size         = 256;
-        std::size_t max_payload_size  = 4096;
+        {
+            std::size_t max_subscribers   = 16;
+            std::size_t sub_ring_capacity = 64;
+            std::size_t pool_size         = 256;
+            std::size_t max_payload_size  = 4096;
 
-        // Maximum time a publisher waits for a previous writer to commit
-        // before assuming it crashed.  Shorter = faster crash recovery but
-        // higher risk of falsely evicting a slow-but-alive publisher under
-        // heavy scheduling pressure.  Longer = safer under load but adds
-        // latency when a real crash occurs.
-        microseconds commit_timeout{DEFAULT_COMMIT_TIMEOUT};
+            // Maximum time a publisher waits for a previous writer to commit
+            // before assuming it crashed.  Shorter = faster crash recovery but
+            // higher risk of falsely evicting a slow-but-alive publisher under
+            // heavy scheduling pressure.  Longer = safer under load but adds
+            // latency when a real crash occurs.
+            microseconds commit_timeout{DEFAULT_COMMIT_TIMEOUT};
         };
     }
 
@@ -136,13 +142,6 @@ namespace kickmsg
         std::atomic<uint32_t> next_free; ///< Next slot index in the Treiber free-stack chain
     };
 
-    static_assert(std::atomic<uint64_t>::is_always_lock_free,
-        "KickMsg requires lock-free 64-bit atomics. "
-        "32-bit platforms (RV32, MIPS32) are not supported.");
-    static_assert(std::atomic<uint32_t>::is_always_lock_free,
-        "KickMsg requires lock-free 32-bit atomics.");
-
-
     // ---- constexpr helpers (stay in header) ----
 
     constexpr std::size_t align_up(std::size_t val, std::size_t alignment)
@@ -180,6 +179,6 @@ namespace kickmsg
     uint32_t treiber_pop(std::atomic<uint64_t>& top, void* base, Header const* h);
     uint32_t treiber_pop(std::atomic<uint64_t>& top, void* pool_base, std::size_t slot_stride);
 
-} // namespace kickmsg
+}
 
-#endif // KICKMSG_TYPES_H
+#endif
