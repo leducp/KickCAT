@@ -1,67 +1,63 @@
 /// @file hello_pubsub.cc
-/// @brief Minimal KickMsg publish/subscribe example.
+/// @brief KickMsg publish/subscribe via the Node API.
 ///
-/// Demonstrates basic shared-memory pub/sub with copy-based receive:
-///   1. Create a shared region
-///   2. Publish messages from a Publisher
-///   3. Receive copies with a Subscriber (SampleRef)
+/// Two nodes communicate over a named topic:
+///   - "sensor" advertises "temperature" and publishes readings
+///   - "display" subscribes to "temperature" and prints them
 ///
-/// Single-process for simplicity; in production, publisher and subscriber
-/// typically live in separate processes sharing the same named region.
+/// Single-process for simplicity; in production, each node lives in
+/// its own process sharing the same prefix.
 
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <thread>
 
-#include <kickmsg/Publisher.h>
-#include <kickmsg/Subscriber.h>
+#include <kickmsg/Node.h>
+
+using namespace kickcat;
+
+struct TemperatureReading
+{
+    uint32_t sensor_id;
+    float    celsius;
+};
 
 int main()
 {
-    char const* SHM_NAME = "/kickmsg_hello_pubsub";
-    kickmsg::SharedMemory::unlink(SHM_NAME);
+    // Clean up leftovers
+    kickmsg::SharedMemory::unlink("/demo_temperature");
 
-    // Configure the channel
-    kickmsg::channel::Config cfg;
-    cfg.max_subscribers   = 2;
-    cfg.sub_ring_capacity = 8;
-    cfg.pool_size         = 16;
-    cfg.max_payload_size  = 128;
+    // Sensor node: advertises "temperature"
+    kickmsg::Node sensor("sensor", "demo");
+    auto pub = sensor.advertise("temperature");
 
-    // Create the shared region
-    auto region = kickmsg::SharedRegion::create(
-        SHM_NAME, kickmsg::channel::PubSub, cfg, "hello_example");
+    // Display node: subscribes to "temperature"
+    kickmsg::Node display("display", "demo");
+    auto sub = display.subscribe("temperature");
 
-    // Attach a subscriber, then a publisher
-    kickmsg::Subscriber sub(region);
-    kickmsg::Publisher  pub(region);
+    // Publish a few readings
+    TemperatureReading readings[] = {
+        {1, 22.5f}, {2, 19.8f}, {1, 23.1f}, {3, 31.4f}, {2, 20.0f}
+    };
 
-    // Send a few messages
-    for (uint32_t i = 0; i < 5; ++i)
+    for (auto const& r : readings)
     {
-        if (pub.send(&i, sizeof(i)) < 0)
+        if (pub.send(&r, sizeof(r)) < 0)
         {
-            std::cerr << "Failed to send message " << i << "\n";
+            std::cerr << "Failed to send reading from sensor " << r.sensor_id << "\n";
         }
     }
 
-    // Receive them (copy-based: data is copied into subscriber's buffer)
-    for (uint32_t i = 0; i < 5; ++i)
+    // Receive and display
+    while (auto sample = sub.try_receive())
     {
-        auto sample = sub.try_receive();
-        if (not sample)
-        {
-            std::cerr << "Missing message " << i << "\n";
-            continue;
-        }
-
-        uint32_t value = 0;
-        std::memcpy(&value, sample->data(), sizeof(value));
-        std::cout << "Received: " << value << "\n";
+        TemperatureReading r;
+        std::memcpy(&r, sample->data(), sizeof(r));
+        std::cout << "Sensor " << r.sensor_id << ": " << r.celsius << " C\n";
     }
 
-    // Clean up
-    region.unlink();
+    kickmsg::SharedMemory::unlink("/demo_temperature");
     std::cout << "Done.\n";
     return 0;
 }

@@ -1,76 +1,78 @@
 /// @file hello_zerocopy.cc
-/// @brief KickMsg zero-copy receive example.
+/// @brief KickMsg zero-copy receive via the Node API.
 ///
-/// Demonstrates the SampleView API for zero-copy message consumption:
-///   - SampleView holds a direct pointer into shared memory
-///   - A refcount pin keeps the slot alive while the view exists
-///   - The slot is released automatically when SampleView is destroyed
-///
-/// Zero-copy is ideal for large payloads (camera frames, point clouds)
-/// where memcpy overhead matters. For small, high-frequency data,
-/// prefer try_receive() which copies into a local buffer.
+/// Demonstrates SampleView: a zero-copy handle that points directly into
+/// shared memory. The slot stays pinned (refcount > 0) while the view
+/// is alive, preventing reuse. Ideal for large payloads (camera frames,
+/// point clouds) where memcpy overhead matters.
 
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <string_view>
 
-#include <kickmsg/Publisher.h>
-#include <kickmsg/Subscriber.h>
+#include <kickmsg/Node.h>
+
+using namespace kickcat;
+
+struct ImageHeader
+{
+    uint32_t width;
+    uint32_t height;
+    uint32_t channels;
+    uint32_t frame_id;
+    // In a real application, pixel data follows this header.
+};
 
 int main()
 {
-    char const* SHM_NAME = "/kickmsg_hello_zerocopy";
-    kickmsg::SharedMemory::unlink(SHM_NAME);
+    kickmsg::SharedMemory::unlink("/demo_camera");
 
     kickmsg::channel::Config cfg;
-    cfg.max_subscribers   = 2;
+    cfg.max_subscribers   = 4;
     cfg.sub_ring_capacity = 8;
     cfg.pool_size         = 16;
-    cfg.max_payload_size  = 1024;
+    cfg.max_payload_size  = sizeof(ImageHeader) + 1024; // header + small payload
 
-    auto region = kickmsg::SharedRegion::create(
-        SHM_NAME, kickmsg::channel::PubSub, cfg, "zerocopy_example");
+    // Camera node publishes frames
+    kickmsg::Node camera("camera", "demo");
+    auto pub = camera.advertise("frames", cfg);
 
-    kickmsg::Subscriber sub(region);
-    kickmsg::Publisher  pub(region);
+    // Viewer node subscribes with zero-copy
+    kickmsg::Node viewer("viewer", "demo");
+    auto sub = viewer.subscribe("frames");
 
-    // Publish a large-ish payload
-    char const* message = "Hello from shared memory! No copies on the receive path.";
-    if (pub.send(message, std::strlen(message)) < 0)
+    // Publish a few "frames"
+    for (uint32_t i = 0; i < 3; ++i)
     {
-        std::cerr << "Failed to send message\n";
+        void* ptr = pub.allocate(sizeof(ImageHeader));
+        if (ptr == nullptr)
+        {
+            std::cerr << "Pool exhausted at frame " << i << "\n";
+            continue;
+        }
+
+        ImageHeader hdr{640, 480, 3, i};
+        std::memcpy(ptr, &hdr, sizeof(hdr));
+        pub.publish();
+
+        std::cout << "Published frame " << i << " (640x480x3)\n";
     }
 
     // Zero-copy receive: view points directly into shared memory
-    auto view = sub.try_receive_view();
-    if (view)
+    while (auto view = sub.try_receive_view())
     {
-        std::cout << "Zero-copy receive (" << view->len() << " bytes): "
-                  << std::string_view(static_cast<char const*>(view->data()), view->len())
-                  << "\n";
+        auto const* hdr = static_cast<ImageHeader const*>(view->data());
+        std::cout << "Received frame " << hdr->frame_id
+                  << " (" << hdr->width << "x" << hdr->height
+                  << "x" << hdr->channels << ")"
+                  << " — zero-copy, " << view->len() << " bytes pinned\n";
 
-        // The shared-memory slot stays pinned while 'view' is alive.
-        // You can safely read view->data() until 'view' goes out of scope.
+        // The slot remains pinned while 'view' is alive.
+        // No memcpy needed — read directly from shared memory.
     }
-    // view is destroyed here -> refcount drops, slot returns to the free pool
+    // All views destroyed here -> slots return to free pool
 
-    // Verify the slot was released: we can send another message reusing it
-    uint32_t seq = 42;
-    if (pub.send(&seq, sizeof(seq)) < 0)
-    {
-        std::cerr << "Failed to send seq\n";
-    }
-
-    auto view2 = sub.try_receive_view();
-    if (view2)
-    {
-        uint32_t got = 0;
-        std::memcpy(&got, view2->data(), sizeof(got));
-        std::cout << "Second message (after slot reuse): " << got << "\n";
-    }
-
-    region.unlink();
+    kickmsg::SharedMemory::unlink("/demo_camera");
     std::cout << "Done.\n";
     return 0;
 }

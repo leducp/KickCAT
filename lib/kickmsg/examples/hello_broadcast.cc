@@ -1,96 +1,102 @@
 /// @file hello_broadcast.cc
-/// @brief KickMsg broadcast + mailbox (request/reply) example.
+/// @brief KickMsg N-to-N broadcast with multiple nodes.
 ///
-/// Demonstrates the Node high-level API:
-///   - join_broadcast(): N-to-N channel where any node can publish and subscribe
-///   - create_mailbox():  personal MPSC inbox for receiving replies
-///   - open_mailbox():    send a message to another node's mailbox
-///
-/// Scenario (single process, two threads for simplicity):
-///   Node A broadcasts "version?" on the "system" channel.
-///   Node B receives it, then replies to Node A's mailbox.
-///   Node A reads the reply from its inbox.
+/// Four nodes join a "chat" broadcast channel. Each node can both
+/// publish and receive. Demonstrates:
+///   - join_broadcast(): returns both a Publisher and Subscriber
+///   - Multiple concurrent participants on the same channel
+///   - Each node sees messages from all other nodes (not its own)
 
 #include <cstring>
 #include <iostream>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include <kickmsg/Node.h>
 
 using namespace kickcat;
 
+struct ChatMessage
+{
+    char sender[16];
+    char text[112];
+};
+
+static void chat_node(char const* name, char const* message,
+                      std::atomic<int>& ready, int total_nodes)
+{
+    kickmsg::channel::Config cfg;
+    cfg.max_subscribers   = 8;
+    cfg.sub_ring_capacity = 32;
+    cfg.pool_size         = 64;
+    cfg.max_payload_size  = sizeof(ChatMessage);
+
+    kickmsg::Node node(name, "demo");
+    auto [pub, sub] = node.join_broadcast("chat", cfg);
+
+    // Signal ready and wait for all nodes
+    ready.fetch_add(1, std::memory_order_release);
+    while (ready.load(std::memory_order_acquire) < total_nodes)
+    {
+        kickcat::sleep(1ms);
+    }
+
+    // Send our message
+    ChatMessage msg{};
+    std::strncpy(msg.sender, name, sizeof(msg.sender) - 1);
+    std::strncpy(msg.text, message, sizeof(msg.text) - 1);
+    pub.send(&msg, sizeof(msg));
+
+    // Give others time to publish
+    kickcat::sleep(10ms);
+
+    // Receive messages from others
+    while (auto sample = sub.try_receive())
+    {
+        ChatMessage received;
+        std::memcpy(&received, sample->data(), sizeof(received));
+
+        // Skip our own messages
+        if (std::strcmp(received.sender, name) == 0)
+        {
+            continue;
+        }
+
+        std::cout << "[" << name << " sees] " << received.sender
+                  << ": " << received.text << "\n";
+    }
+}
+
 int main()
 {
-    // Clean up any leftovers from a previous run
-    kickmsg::SharedMemory::unlink("/demo_broadcast_system");
-    kickmsg::SharedMemory::unlink("/demo_nodeA_mbx_reply");
+    kickmsg::SharedMemory::unlink("/demo_broadcast_chat");
 
+    // Pre-create the channel so all nodes can join without racing create_or_open
     kickmsg::channel::Config cfg;
-    cfg.max_subscribers   = 4;
-    cfg.sub_ring_capacity = 16;
-    cfg.pool_size         = 32;
-    cfg.max_payload_size  = 256;
+    cfg.max_subscribers   = 8;
+    cfg.sub_ring_capacity = 32;
+    cfg.pool_size         = 64;
+    cfg.max_payload_size  = sizeof(ChatMessage);
 
-    // --- Node B (responder) runs in a background thread ---
-    std::thread responder([&cfg]()
+    auto setup_region = kickmsg::SharedRegion::create(
+        "/demo_broadcast_chat", kickmsg::channel::Broadcast, cfg, "setup");
+
+    std::atomic<int> ready{0};
+    constexpr int NUM_NODES = 4;
+
+    std::vector<std::thread> threads;
+    threads.emplace_back(chat_node, "alice",   "Hello everyone!", std::ref(ready), NUM_NODES);
+    threads.emplace_back(chat_node, "bob",     "Hey alice!",      std::ref(ready), NUM_NODES);
+    threads.emplace_back(chat_node, "charlie", "Good morning!",   std::ref(ready), NUM_NODES);
+    threads.emplace_back(chat_node, "dave",    "Hi all :)",       std::ref(ready), NUM_NODES);
+
+    for (auto& t : threads)
     {
-        kickmsg::Node node_b("nodeB", "demo");
-        auto [pub, sub] = node_b.join_broadcast("system", cfg);
-
-        auto msg = sub.receive(2s);
-        if (!msg)
-        {
-            std::cerr << "[nodeB] Timed out waiting for broadcast\n";
-            return;
-        }
-
-        std::string request(static_cast<char const*>(msg->data()), msg->len());
-        std::cout << "[nodeB] Received broadcast: '" << request << "'\n";
-
-        // Reply to nodeA's mailbox
-        auto reply_pub = node_b.open_mailbox("nodeA", "reply");
-        std::string reply = "nodeB v1.2.3";
-        if (reply_pub.send(reply.data(), reply.size()) < 0)
-        {
-            std::cerr << "[nodeB] Failed to send reply\n";
-        }
-        std::cout << "[nodeB] Sent reply to nodeA's mailbox\n";
-    });
-
-    // Give Node B time to join the broadcast channel
-    sleep(50ms);
-
-    // --- Node A (requester) ---
-    kickmsg::Node node_a("nodeA", "demo");
-    auto [pub, sub] = node_a.join_broadcast("system", cfg);
-    auto inbox = node_a.create_mailbox("reply", cfg);
-
-    // Broadcast a request
-    std::string request = "version?";
-    if (pub.send(request.data(), request.size()) < 0)
-    {
-        std::cerr << "[nodeA] Failed to broadcast request\n";
-    }
-    std::cout << "[nodeA] Broadcast: '" << request << "'\n";
-
-    // Wait for the reply on our personal mailbox
-    auto reply = inbox.receive(2s);
-    if (reply)
-    {
-        std::string answer(static_cast<char const*>(reply->data()), reply->len());
-        std::cout << "[nodeA] Got reply: '" << answer << "'\n";
-    }
-    else
-    {
-        std::cerr << "[nodeA] Timed out waiting for reply\n";
+        t.join();
     }
 
-    responder.join();
-
-    // Clean up shared memory
-    kickmsg::SharedMemory::unlink("/demo_broadcast_system");
-    kickmsg::SharedMemory::unlink("/demo_nodeA_mbx_reply");
-
+    kickmsg::SharedMemory::unlink("/demo_broadcast_chat");
     std::cout << "Done.\n";
     return 0;
 }
