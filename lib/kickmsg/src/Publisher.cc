@@ -121,19 +121,20 @@ namespace kickmsg
             auto& e       = entries[idx];
 
             // If the ring has wrapped, the entry we are about to overwrite
-            // may still reference a live slot. Wait for the previous writer
-            // to commit, then release that slot's reference for this ring.
-            // wait_and_capture_slot returns INVALID_SLOT if the entry was
-            // already overwritten by a newer generation (double-release guard)
-            // or if the wait timed out (publisher crash).
+            // may still reference a live slot. Capture its slot_idx for
+            // release AFTER we successfully lock the entry.
+            //
+            // We defer the release because of a TOCTOU race: between
+            // wait_and_capture_slot reading the slot_idx and our lock CAS,
+            // another publisher can overwrite the entry (evict + commit).
+            // If our CAS then fails, releasing the captured slot_idx would
+            // corrupt a live entry's refcount. Deferring until after lock
+            // success guarantees we own the entry.
+            uint32_t old_slot = INVALID_SLOT;
             if (pos >= capacity)
             {
                 uint64_t expected_seq = pos - capacity + 1;
-                uint32_t old_slot = wait_and_capture_slot(e, expected_seq, commit_timeout_);
-                if (old_slot != INVALID_SLOT)
-                {
-                    release_slot(old_slot);
-                }
+                old_slot = wait_and_capture_slot(e, expected_seq, commit_timeout_);
             }
 
             // Two-phase commit: CAS sequence to LOCKED_SEQUENCE to exclusively
@@ -164,11 +165,31 @@ namespace kickmsg
             }
             if (not locked)
             {
+                // Lock failed: do NOT release old_slot — the entry may have
+                // been overwritten, so old_slot could belong to a newer
+                // generation we don't own. The unreleased slot is a bounded
+                // leak (1 per dropped message), recoverable by GC.
                 ++dropped_;
                 ++excess;
                 ring->state_flight.fetch_sub(ring::IN_FLIGHT_ONE,
                                              std::memory_order_release);
                 continue;
+            }
+
+            // Lock succeeded: we exclusively own this entry. Now safe to
+            // release the previous occupant's slot reference for this ring.
+            // Re-read slot_idx from the locked entry to get the definitive
+            // value — our lock guarantees no concurrent modification.
+            if (pos >= capacity and old_slot != INVALID_SLOT)
+            {
+                uint32_t confirmed_slot = e.slot_idx.load(std::memory_order_relaxed);
+                if (confirmed_slot == old_slot and confirmed_slot != INVALID_SLOT)
+                {
+                    release_slot(confirmed_slot);
+                }
+                // If confirmed_slot != old_slot, the entry was overwritten
+                // between wait_and_capture and our lock. The overwriter
+                // already released the old occupant. Skip to avoid double-release.
             }
 
             // We exclusively own this entry. No other publisher can CAS from
@@ -237,19 +258,9 @@ namespace kickmsg
         while (true)
         {
             uint64_t seq = e.sequence.load(std::memory_order_acquire);
-            if (seq == expected_seq)
+            if (seq >= expected_seq and seq != LOCKED_SEQUENCE)
             {
-                // Exact match: the entry was committed at our expected
-                // position. Its slot_idx is the one we need to release.
                 return e.slot_idx.load(std::memory_order_acquire);
-            }
-            if (seq > expected_seq and seq != LOCKED_SEQUENCE)
-            {
-                // Newer generation: the entry was already overwritten by
-                // a publisher that wrapped past us. That publisher already
-                // released the old slot as part of its own eviction.
-                // Returning INVALID_SLOT avoids a double-release.
-                return INVALID_SLOT;
             }
             ++i;
             if ((i & (CHECK_INTERVAL - 1)) == 0)
