@@ -23,12 +23,17 @@ namespace kickmsg
             // in_flight: the packed layout means a late fetch_sub from a
             // slow publisher would underflow into the state bits.
             uint32_t expected = ring::make_packed(ring::Free);
+            // Capture write_pos BEFORE setting Live. Once Live, publishers
+            // can immediately commit via fetch_add, racing with our read.
+            // Reading first ensures start_pos_ <= any position a publisher
+            // can claim after seeing Live.
+            uint64_t wp = ring->write_pos.load(std::memory_order_acquire);
             if (ring->state_flight.compare_exchange_strong(expected,
                     ring::make_packed(ring::Live),
                     std::memory_order_acq_rel))
             {
                 ring_idx_  = i;
-                start_pos_ = ring->write_pos.load(std::memory_order_acquire);
+                start_pos_ = wp;
                 read_pos_  = start_pos_;
                 break;
             }
@@ -461,14 +466,9 @@ namespace kickmsg
                 {
                     treiber_push(header_->free_top, slot, slot_idx);
                 }
-                // Mark entry as released so a future publisher wrapping to this
-                // position won't double-decrement via release_slot.
-                // seq_cst: the release/acquire chain through state_flight
-                // does not formally guarantee the publisher sees this store.
-                // seq_cst establishes a total order visible to all threads.
-                // Cost: one full barrier per drained entry, only during destruction.
                 e.slot_idx.store(INVALID_SLOT, std::memory_order_seq_cst);
             }
         }
+
     }
 } // namespace kickmsg

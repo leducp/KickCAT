@@ -165,10 +165,6 @@ namespace kickmsg
             }
             if (not locked)
             {
-                // Lock failed: do NOT release old_slot — the entry may have
-                // been overwritten, so old_slot could belong to a newer
-                // generation we don't own. The unreleased slot is a bounded
-                // leak (1 per dropped message), recoverable by GC.
                 ++dropped_;
                 ++excess;
                 ring->state_flight.fetch_sub(ring::IN_FLIGHT_ONE,
@@ -176,20 +172,16 @@ namespace kickmsg
                 continue;
             }
 
-            // Lock succeeded: we exclusively own this entry. Now safe to
-            // release the previous occupant's slot reference for this ring.
-            // Re-read slot_idx from the locked entry to get the definitive
-            // value — our lock guarantees no concurrent modification.
-            if (pos >= capacity and old_slot != INVALID_SLOT)
+            // Lock succeeded: we exclusively own this entry. Release the
+            // previous occupant's slot reference for this ring, unless
+            // drain_unconsumed already released it (marked by INVALID_SLOT).
+            if (old_slot != INVALID_SLOT)
             {
-                uint32_t confirmed_slot = e.slot_idx.load(std::memory_order_relaxed);
-                if (confirmed_slot == old_slot and confirmed_slot != INVALID_SLOT)
+                uint32_t current_slot = e.slot_idx.load(std::memory_order_acquire);
+                if (current_slot != INVALID_SLOT)
                 {
-                    release_slot(confirmed_slot);
+                    release_slot(old_slot);
                 }
-                // If confirmed_slot != old_slot, the entry was overwritten
-                // between wait_and_capture and our lock. The overwriter
-                // already released the old occupant. Skip to avoid double-release.
             }
 
             // We exclusively own this entry. No other publisher can CAS from
