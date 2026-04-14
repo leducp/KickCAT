@@ -62,7 +62,7 @@ before-all = [
 ]
 repair-wheel-command = [
   "auditwheel repair --zip-compression-level=9 -w {dest_dir} {wheel}",
-  "pipx run abi3audit --strict --report {wheel}",
+  "pipx run abi3audit --strict --report {dest_dir}/*.whl",
 ]
 
 [tool.ruff]
