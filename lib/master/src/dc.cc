@@ -539,8 +539,8 @@ namespace kickcat
             nanoseconds drift = nanoseconds(sync.time_diff_raw & 0x7FFFFFFF);
             if (drift > threshold)
             {
-                dc_info("DC slave %d NOT synchronized: drift = %ld ns (threshold = %ld ns)\n",
-                        sync.slave->address, drift.count(), threshold.count());
+                dc_warning("DC slave %d NOT synchronized: drift = %ld ns (threshold = %ld ns)\n",
+                           sync.slave->address, drift.count(), threshold.count());
                 synchronized = false;
             }
             else if (log_all)
