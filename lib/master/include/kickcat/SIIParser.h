@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "kickcat/protocol.h"
@@ -45,6 +46,13 @@ namespace kickcat::eeprom
         std::vector<RawCategory>         unknownCategories;
 
         void parse(uint8_t const* data, std::size_t size);
+
+        /// \brief Resolve a 1-based SII string index (ETG.2010). Empty for index 0 or out-of-range.
+        std::string_view getString(uint8_t index) const
+        {
+            if ((index == 0) or (index > strings.size())) { return {}; }
+            return strings[index - 1];
+        }
 
         template<typename T>
         void parse(std::vector<T> const& data)

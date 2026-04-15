@@ -15,6 +15,14 @@ namespace kickcat
     {
         void parseSII(uint8_t const* data, std::size_t size);
 
+        /// \brief Human-readable slave name. Returns the SII general-category device name when present,
+        ///        otherwise a fallback derived from the fixed station address (e.g. "Slave @0x1001").
+        std::string name() const;
+
+        /// \brief Slave order/type code from the SII general category (ESI Device:Type / OrderIdx).
+        ///        Returns an empty string if the SII has no order string.
+        std::string type() const;
+
         ErrorCounters const& errorCounters() const;
         int computeErrorCounters() const;
 
