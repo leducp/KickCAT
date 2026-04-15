@@ -323,6 +323,8 @@ TEST(EsiParser, load_basic_with_bit_types_and_no_info)
         ASSERT_EQ(e2->type, CoE::DataType::BOOLEAN);
         ASSERT_EQ(e2->bitlen, 1);
         ASSERT_EQ(e2->bitoff, 32);
+        ASSERT_EQ(e2->data_bit_offset, 0);
+        ASSERT_NE(e2->data, nullptr);
 
         // SubIndex 3: BIT6 (Padding)
         auto [obj3, e3] = findObject(dictionary, 0x6000, 3);
@@ -330,13 +332,17 @@ TEST(EsiParser, load_basic_with_bit_types_and_no_info)
         ASSERT_EQ(e3->type, CoE::DataType::BIT6);
         ASSERT_EQ(e3->bitlen, 6);
         ASSERT_EQ(e3->bitoff, 33);
+        ASSERT_EQ(e3->data_bit_offset, 0);
+        ASSERT_NE(e3->data, nullptr);
 
-        // SubIndex 4: BOOL (StatusBit)
+        // SubIndex 4: BOOL (StatusBit). Fixture declares DefaultData for only
+        // 4 SubItems, matched positionally to entries[0..3]; SI 4 stays null.
         auto [obj4, e4] = findObject(dictionary, 0x6000, 4);
         ASSERT_NE(e4, nullptr);
         ASSERT_EQ(e4->type, CoE::DataType::BOOLEAN);
         ASSERT_EQ(e4->bitlen, 1);
         ASSERT_EQ(e4->bitoff, 39);
+        ASSERT_EQ(e4->data_bit_offset, 0);
     }
 
     // 0x7010 - RECORD with BIT6 SubItem (outputs)

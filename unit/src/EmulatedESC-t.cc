@@ -284,6 +284,209 @@ TEST(EmulatedESC, ecat_PDOs)
     ASSERT_EQ(read_test, payload);
 }
 
+TEST(EmulatedESC, ecat_PDOs_bit_aligned_single_bit)
+{
+    // Physical bit 3 of byte 0x300A → logical bit 5 of byte 0x2003
+    // (mailbox-status-check pattern).
+    EmulatedESC esc;
+
+    uint8_t current = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &current, 1);
+
+    uint8_t next = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &next, 1);
+
+    FMMU fmmu;
+    memset(&fmmu, 0, sizeof(FMMU));
+    fmmu.type               = 1;
+    fmmu.logical_address    = 0x2003;
+    fmmu.length             = 1;
+    fmmu.logical_start_bit  = 5;
+    fmmu.logical_stop_bit   = 5;
+    fmmu.physical_address   = 0x300A;
+    fmmu.physical_start_bit = 3;
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(FMMU));
+
+    // PRE_OP → SAFE_OP triggers configurePDOs.
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+    uint64_t scratch = 0;
+    uint16_t wkc = 0;
+    esc.processDatagram(&header, &scratch, &wkc);
+
+    uint8_t phys = (1 << 3);
+    esc.write(0x300A, &phys, 1);
+
+    uint8_t frame = 0xAA;
+    header.command = Command::LRD;
+    header.address = 0x2003;
+    header.len = 1;
+    wkc = 0;
+    esc.processDatagram(&header, &frame, &wkc);
+    ASSERT_EQ(wkc, 1);
+    EXPECT_EQ(frame & (1 << 5), (1 << 5));
+    EXPECT_EQ(frame & ~uint8_t(1 << 5), 0xAA & ~uint8_t(1 << 5));
+
+    phys = 0;
+    esc.write(0x300A, &phys, 1);
+    frame = 0xFF;
+    wkc = 0;
+    esc.processDatagram(&header, &frame, &wkc);
+    ASSERT_EQ(wkc, 1);
+    EXPECT_EQ(frame & (1 << 5), 0);
+    EXPECT_EQ(frame | (1 << 5), 0xFF);
+}
+
+TEST(EmulatedESC, ecat_PDOs_bit_aligned_write)
+{
+    // LWR of logical bit 2 → physical bit 6; other 7 physical bits must survive.
+    EmulatedESC esc;
+
+    uint8_t current = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &current, 1);
+
+    uint8_t next = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &next, 1);
+
+    FMMU fmmu;
+    memset(&fmmu, 0, sizeof(FMMU));
+    fmmu.type               = 2;
+    fmmu.logical_address    = 0x2000;
+    fmmu.length             = 1;
+    fmmu.logical_start_bit  = 2;
+    fmmu.logical_stop_bit   = 2;
+    fmmu.physical_address   = 0x3000;
+    fmmu.physical_start_bit = 6;
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(FMMU));
+
+    // Second (byte-aligned read) FMMU lets PDI pre-fill / read back byte 0x3000.
+    memset(&fmmu, 0, sizeof(FMMU));
+    fmmu.type               = 1;
+    fmmu.logical_address    = 0x2100;
+    fmmu.length             = 1;
+    fmmu.logical_start_bit  = 0;
+    fmmu.logical_stop_bit   = 7;
+    fmmu.physical_address   = 0x3000;
+    fmmu.physical_start_bit = 0;
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x10, &fmmu, sizeof(FMMU));
+
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+    uint64_t scratch = 0;
+    uint16_t wkc = 0;
+    esc.processDatagram(&header, &scratch, &wkc);
+
+    uint8_t phys = 0xA5;
+    ASSERT_EQ(esc.write(0x3000, &phys, 1), 1);
+
+    uint8_t frame = (1 << 2);
+    header.command = Command::LWR;
+    header.address = 0x2000;
+    header.len = 1;
+    wkc = 0;
+    esc.processDatagram(&header, &frame, &wkc);
+    ASSERT_EQ(wkc, 1);
+
+    esc.read(0x3000, &phys, 1);
+    EXPECT_EQ(phys & (1 << 6), (1 << 6));
+    EXPECT_EQ(phys & ~uint8_t(1 << 6), 0xA5 & ~uint8_t(1 << 6));
+
+    frame = 0;
+    wkc = 0;
+    esc.processDatagram(&header, &frame, &wkc);
+    ASSERT_EQ(wkc, 1);
+
+    esc.read(0x3000, &phys, 1);
+    EXPECT_EQ(phys & (1 << 6), 0);
+    EXPECT_EQ(phys | uint8_t(1 << 6), 0xA5 | uint8_t(1 << 6));
+}
+
+TEST(EmulatedESC, ecat_PDOs_bit_aligned_cross_byte)
+{
+    // 4-bit mapping wrapping both sides:
+    //   logical  0x2000 bits 6,7 + 0x2001 bits 0,1
+    //   physical 0x3000 bits 5,6,7 + 0x3001 bit 0
+    EmulatedESC esc;
+
+    uint8_t current = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &current, 1);
+
+    uint8_t next = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &next, 1);
+
+    FMMU fmmu;
+    memset(&fmmu, 0, sizeof(FMMU));
+    fmmu.type               = 1;
+    fmmu.logical_address    = 0x2000;
+    fmmu.length             = 2;
+    fmmu.logical_start_bit  = 6;
+    fmmu.logical_stop_bit   = 1;
+    fmmu.physical_address   = 0x3000;
+    fmmu.physical_start_bit = 5;
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(FMMU));
+
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+    uint64_t scratch = 0;
+    uint16_t wkc = 0;
+    esc.processDatagram(&header, &scratch, &wkc);
+
+    uint8_t phys[2] = { uint8_t(0xE0), uint8_t(0x01) };
+    esc.write(0x3000, phys, 2);
+
+    uint8_t frame[2] = { 0x00, 0x00 };
+    header.command = Command::LRD;
+    header.address = 0x2000;
+    header.len = 2;
+    wkc = 0;
+    esc.processDatagram(&header, frame, &wkc);
+    ASSERT_EQ(wkc, 1);
+    EXPECT_EQ(frame[0] & 0xC0, 0xC0);
+    EXPECT_EQ(frame[0] & 0x3F, 0x00);
+    EXPECT_EQ(frame[1] & 0x03, 0x03);
+    EXPECT_EQ(frame[1] & 0xFC, 0x00);
+}
+
+TEST(EmulatedESC, ecat_PDOs_malformed_fmmu_does_not_hang)
+{
+    // Regression: stop < start in a single-byte FMMU used to wrap total_bits
+    // to ~4B and stall processBitAlignedPDO.
+    EmulatedESC esc;
+
+    uint8_t current = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &current, 1);
+
+    uint8_t next = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &next, 1);
+
+    FMMU fmmu;
+    memset(&fmmu, 0, sizeof(FMMU));
+    fmmu.type               = 1;
+    fmmu.logical_address    = 0x2000;
+    fmmu.length             = 1;
+    fmmu.logical_start_bit  = 6;
+    fmmu.logical_stop_bit   = 0;
+    fmmu.physical_address   = 0x3000;
+    fmmu.physical_start_bit = 0;
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(FMMU));
+
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+    uint64_t scratch = 0;
+    uint16_t wkc = 0;
+    esc.processDatagram(&header, &scratch, &wkc);
+
+    uint8_t frame = 0xAA;
+    header.command = Command::LRD;
+    header.address = 0x2000;
+    header.len = 1;
+    wkc = 0;
+    esc.processDatagram(&header, &frame, &wkc);
+    EXPECT_EQ(wkc, 0);
+    EXPECT_EQ(frame, 0xAA);
+}
+
 TEST(EmulatedESC, watchdog)
 {
     EmulatedESC esc;

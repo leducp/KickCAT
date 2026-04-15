@@ -136,7 +136,8 @@ namespace kickcat::mailbox::response
 
         beforeHooks(CoE::Access::READ, entry);
 
-        uint32_t size = entry->bitlen / 8;
+        // ETG1000.5: sub-byte types travel as 1 octet with unused high bits = 0.
+        uint32_t size = (entry->bitlen + 7) / 8;
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData);
 
         sdo_->size_indicator = 1;   // always 1 on upload response
@@ -154,7 +155,16 @@ namespace kickcat::mailbox::response
             header_->len += size;
         }
 
-        std::memcpy(payload_, entry->data, size);
+        if ((entry->bitlen % 8 == 0) and (entry->data_bit_offset == 0))
+        {
+            std::memcpy(payload_, entry->data, size);
+        }
+        else
+        {
+            std::memset(payload_, 0, size);
+            CoE::readEntryBits(entry, payload_, 0);
+        }
+
         coe_->service = CoE::Service::SDO_RESPONSE;
         sdo_->command = CoE::SDO::response::UPLOAD;
         reply(std::move(data_));
@@ -169,9 +179,43 @@ namespace kickcat::mailbox::response
         sdo_->size_indicator = 1;   // always 1 on upload response
         sdo_->transfer_type = 0;    // complete access -> not expedited
 
-        uint32_t size = 0;
-        uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
-        uint16_t skip_offset = object->entries.at(sdo_->subindex).bitoff / 8;
+        // SI 0 may have no default data if the ESI omits <DefaultData>.
+        if (object->entries.at(0).data == nullptr)
+        {
+            abort(CoE::SDO::abort::NO_DATA_AVAILABLE);
+            return ProcessingResult::FINALIZE;
+        }
+
+        uint32_t number_of_entries = *static_cast<uint8_t const*>(object->entries.at(0).data);
+        if (number_of_entries >= object->entries.size())
+        {
+            number_of_entries = static_cast<uint32_t>(object->entries.size() - 1);
+        }
+
+        uint32_t skip_bit_offset = object->entries.at(sdo_->subindex).bitoff;
+        uint32_t end_bit_offset  = 0;
+
+        // No entries past sdo_->subindex: reply empty, skip the pre-zero underflow.
+        if (number_of_entries < sdo_->subindex)
+        {
+            std::memcpy(payload_, &end_bit_offset, 4);
+            header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData);
+            coe_->service = CoE::Service::SDO_RESPONSE;
+            sdo_->command = CoE::SDO::response::UPLOAD;
+            reply(std::move(data_));
+            return ProcessingResult::FINALIZE;
+        }
+
+        // ETG1000.6: padding bits must be 0.
+        {
+            auto const& last = object->entries.at(number_of_entries);
+            uint32_t last_end = uint32_t(last.bitoff) + last.bitlen;
+            if (last_end > skip_bit_offset)
+            {
+                uint32_t total_bits = last_end - skip_bit_offset;
+                std::memset(payload_ + 4, 0, (total_bits + 7) / 8);
+            }
+        }
 
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {
@@ -190,14 +234,14 @@ namespace kickcat::mailbox::response
 
             beforeHooks(CoE::Access::READ, entry);
 
-            uint16_t entry_size = entry->bitlen / 8;
-            uint16_t entry_off  = entry->bitoff / 8 - skip_offset;
-            std::memcpy(payload_ + 4 + entry_off, entry->data, entry_size);
-            size = entry_size + entry_off; // only record the last position + last entry size
+            uint32_t wire_bit_offset = entry->bitoff - skip_bit_offset;
+            CoE::readEntryBits(entry, payload_ + 4, wire_bit_offset);
+            end_bit_offset = wire_bit_offset + entry->bitlen;
 
             afterHooks(CoE::Access::READ, entry);
         }
 
+        uint32_t size = (end_bit_offset + 7) / 8;
         std::memcpy(payload_, &size, 4);
 
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData) + size;
@@ -228,13 +272,20 @@ namespace kickcat::mailbox::response
             payload_ += 4;
         }
 
-        if (size != (entry->bitlen / 8))
+        if (size != static_cast<uint32_t>((entry->bitlen + 7) / 8))
         {
             abort(CoE::SDO::abort::DATA_TYPE_LENGTH_MISMATCH);
             return ProcessingResult::FINALIZE;
         }
 
-        std::memcpy(entry->data, payload_, size);
+        if ((entry->bitlen % 8 == 0) and (entry->data_bit_offset == 0))
+        {
+            std::memcpy(entry->data, payload_, size);
+        }
+        else
+        {
+            CoE::writeEntryBits(entry, payload_, 0);
+        }
 
         coe_->service = CoE::Service::SDO_RESPONSE;
         sdo_->command = CoE::SDO::response::DOWNLOAD;
@@ -250,23 +301,26 @@ namespace kickcat::mailbox::response
         uint32_t msg_size;
         std::memcpy(&msg_size, payload_, 4);
 
-        uint8_t* start_offset   = payload_ + 4;
-        uint8_t* current_offset = start_offset;
-        uint16_t skip_offset = object->entries.at(sdo_->subindex).bitoff / 8;
+        uint8_t const* start_offset = payload_ + 4;
+
+        uint32_t skip_bit_offset = object->entries.at(sdo_->subindex).bitoff;
 
         if (sdo_->subindex == 0)
         {
             auto* entry = &object->entries.at(0);
+            if (entry->data == nullptr)
+            {
+                abort(CoE::SDO::abort::NO_DATA_AVAILABLE);
+                return ProcessingResult::FINALIZE;
+            }
+
             beforeHooks(CoE::Access::WRITE, entry);
-
-            std::memcpy(entry->data, payload_ + 4, 1);
-            current_offset += 1;
-
+            std::memcpy(entry->data, start_offset, 1);
             afterHooks(CoE::Access::WRITE, entry);
         }
 
         uint16_t subindex = 1;
-        while ((current_offset - start_offset) < msg_size)
+        while (true)
         {
             if (subindex >= object->entries.size())
             {
@@ -275,6 +329,18 @@ namespace kickcat::mailbox::response
             }
 
             auto* entry = &object->entries.at(subindex);
+            // Guard unsigned subtraction; mirrors uploadComplete.
+            if (entry->bitoff < skip_bit_offset)
+            {
+                break;
+            }
+            uint32_t wire_bit_offset = entry->bitoff - skip_bit_offset;
+            uint32_t entry_end_bit   = wire_bit_offset + entry->bitlen;
+            if (((entry_end_bit + 7) / 8) > msg_size)
+            {
+                break;
+            }
+
             if (not isDownloadAuthorized(entry))
             {
                 abort(CoE::SDO::abort::WRITE_READ_ONLY_ACCESS);
@@ -283,12 +349,7 @@ namespace kickcat::mailbox::response
 
             beforeHooks(CoE::Access::WRITE, entry);
 
-            uint32_t entry_size = entry->bitlen / 8;
-            uint32_t entry_off  = entry->bitoff / 8;
-            current_offset = start_offset + entry_off - skip_offset;
-
-            std::memcpy(entry->data, current_offset, entry_size);
-            current_offset += entry_size;
+            CoE::writeEntryBits(entry, start_offset, wire_bit_offset);
             subindex++;
 
             afterHooks(CoE::Access::WRITE, entry);

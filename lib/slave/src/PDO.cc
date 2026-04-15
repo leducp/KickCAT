@@ -134,7 +134,7 @@ namespace kickcat
         return pdo_indices;
     }
 
-    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset, uint32_t max_size)
+    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint32_t& bit_offset, uint32_t max_size)
     {
         auto [obj0, entry0] = CoE::findObject(dict, pdo_idx, 0);
         if (not entry0)
@@ -164,6 +164,13 @@ namespace kickcat
                 return false;
             }
 
+            // ETG1000.6 PDO mapping: Index=0 is a padding gap, not an OD entry.
+            if (index == 0)
+            {
+                bit_offset += bits;
+                continue;
+            }
+
             auto [od_obj, od_entry] = CoE::findObject(dict, index, sub);
             if (not od_entry)
             {
@@ -173,15 +180,18 @@ namespace kickcat
             // Aliasing logic
             void* old_data = od_entry->data;
             bool old_is_mapped = od_entry->is_mapped;
+            uint8_t old_data_bit_offset = od_entry->data_bit_offset;
 
             uint8_t* new_ptr = static_cast<uint8_t*>(buffer) + (bit_offset / 8);
 
-            od_entry->data = new_ptr;
-            od_entry->is_mapped = true; // data has been remapped/aliased
+            od_entry->data            = new_ptr;
+            od_entry->data_bit_offset = static_cast<uint8_t>(bit_offset % 8);
+            od_entry->is_mapped       = true; // data has been remapped/aliased
 
             if (old_data)
             {
-                std::memcpy(new_ptr, old_data, bits / 8);
+                CoE::copyBits(static_cast<uint8_t const*>(old_data), old_data_bit_offset,
+                              new_ptr, od_entry->data_bit_offset, bits);
 
                 if (not old_is_mapped) // if the old data was not mapped, we allocated it, so free it
                 {
@@ -198,7 +208,7 @@ namespace kickcat
     StatusCode PDO::configureMapping(CoE::Dictionary& dict)
     {
         {
-            uint16_t bit_offset = 0;
+            uint32_t bit_offset = 0;
             std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C13);
 
             for (auto pdo : pdo_indices)
@@ -211,7 +221,7 @@ namespace kickcat
         }
 
         {
-            uint16_t bit_offset = 0;
+            uint32_t bit_offset = 0;
             std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C12);
 
             for (auto pdo : pdo_indices)

@@ -30,7 +30,7 @@ namespace kickcat
 
         std::vector<uint16_t> parseAssignment(CoE::Dictionary& dict, uint16_t assign_idx);
 
-        bool parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset, uint32_t max_size);
+        bool parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint32_t& bit_offset, uint32_t max_size);
 
         AbstractESC* esc_;
         void* input_                = {nullptr};
