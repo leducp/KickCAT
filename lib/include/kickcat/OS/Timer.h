@@ -42,12 +42,23 @@ namespace kickcat
         /// Wait until the next timer tick (blocking call)
         std::error_code wait_next_tick();
 
+        /// \brief  Adjust the timer phase to track an external time reference (e.g. EtherCAT DC).
+        /// \details Call this every cycle before wait_next_tick() with bus.dcMasterOffset().
+        ///          A positive offset means the master is ahead of the reference: the timer slows down.
+        ///          Uses a first-order IIR filter to smooth the correction.
+        ///          Pass 0ns when no reference is available (no-op when filtered offset is zero).
+        void apply_offset(nanoseconds raw_offset);
+
     protected:
     private:
+        static constexpr int64_t OFFSET_FILTER_DEPTH      = 256;
+        static constexpr int64_t OFFSET_CORRECTION_DIVISOR = 16;
+
         std::string name_;
         nanoseconds period_;
         nanoseconds next_deadline_{};
         nanoseconds last_wakeup_{};
+        nanoseconds filtered_offset_{0ns};
 
         Mutex mutex_{};
         ConditionVariable stop_{};

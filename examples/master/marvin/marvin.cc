@@ -301,6 +301,7 @@ int main(int argc, char *argv[])
             bus.isDCSynchronized(1000ns);
         }
 
+        timer.apply_offset(bus.dcMasterOffset());
         timer.wait_next_tick();
     }
 

@@ -472,20 +472,37 @@ namespace kickcat
 
     void Bus::sendDriftCompensation(std::function<void(DatagramState const&)> const& error)
     {
-        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+        // FRMW reads the reference clock's system time and writes it to all subordinate clocks.
+        // The reference clock free-runs on its own quartz (offset was set during enableDC).
+        // Using only FRMW (no FPWR) avoids injecting master clock jitter and NTP corrections
+        // into the network - the slave PLLs track the stable ESC oscillator instead.
+        auto process = [this](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
         {
             if (wkc == 0)
             {
                 dc_error("Invalid working counter:  %" PRIu16 "\n", wkc);
                 return DatagramState::INVALID_WKC;
             }
+
+            uint64_t raw_network_time = 0;
+            std::memcpy(&raw_network_time, data, sizeof(raw_network_time));
+            dc_network_time_ = nanoseconds(raw_network_time);
+            dc_master_time_  = since_epoch();
+
             return DatagramState::OK;
         };
 
-        nanoseconds now = since_ecat_epoch();
-        uint64_t raw_now = now.count();
-        link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
-        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr,  sizeof(uint64_t), process, error);
+        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr, sizeof(uint64_t), process, error);
+    }
+
+
+    nanoseconds Bus::dcMasterOffset() const
+    {
+        if (dc_slave_ == nullptr or dc_master_time_ == 0ns)
+        {
+            return 0ns;
+        }
+        return dc_master_time_ - to_unix_epoch(dc_network_time_);
     }
 
 

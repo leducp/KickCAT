@@ -55,6 +55,12 @@ namespace kickcat
         period_ = period;
     }
 
+    void Timer::apply_offset(nanoseconds raw_offset)
+    {
+        filtered_offset_ = (filtered_offset_ * (OFFSET_FILTER_DEPTH - 1) + raw_offset) / OFFSET_FILTER_DEPTH;
+        next_deadline_ -= filtered_offset_ / OFFSET_CORRECTION_DIVISOR;
+    }
+
     std::error_code Timer::wait_next_tick()
     {
         {
