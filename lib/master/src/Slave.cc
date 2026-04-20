@@ -59,10 +59,7 @@ namespace kickcat
 
     int Slave::countOpenPorts() const
     {
-        return  dl_status.PL_port0 +
-                dl_status.PL_port1 +
-                dl_status.PL_port2 +
-                dl_status.PL_port3;
+        return dl_status.COM_port0 + dl_status.COM_port1 + dl_status.COM_port2 + dl_status.COM_port3;
     }
 
     bool Slave::isDCSupport() const
