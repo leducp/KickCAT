@@ -472,10 +472,10 @@ namespace kickcat
 
     void Bus::sendDriftCompensation(std::function<void(DatagramState const&)> const& error)
     {
-        // FRMW reads the reference clock's system time and writes it to all subordinate clocks.
-        // The reference clock free-runs on its own quartz (offset was set during enableDC).
-        // Using only FRMW (no FPWR) avoids injecting master clock jitter and NTP corrections
-        // into the network - the slave PLLs track the stable ESC oscillator instead.
+        // FPWR writes the master time to the reference clock's system time, then FRMW reads
+        // the reference clock's system time and writes it to all subordinate clocks.
+        // Per ETG1000.4 6.8.3: writes to 0x0910 feed the ESC's PLL. Some ESCs drop out of DC
+        // state (AL_STATUS_CODE 0x0032 PLL Error) if this write is omitted.
         auto process = [this](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
         {
             if (wkc == 0)
@@ -492,7 +492,10 @@ namespace kickcat
             return DatagramState::OK;
         };
 
-        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr, sizeof(uint64_t), process, error);
+        nanoseconds now = since_ecat_epoch();
+        uint64_t raw_now = now.count();
+        link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
+        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr,  sizeof(uint64_t), process, error);
     }
 
 
