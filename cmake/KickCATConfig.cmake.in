@@ -1,0 +1,24 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+set(KICKCAT_ENABLE_ESI_PARSER @ENABLE_ESI_PARSER@)
+set(KICKCAT_ENABLE_AF_XDP      @ENABLE_AF_XDP@)
+
+if(KICKCAT_ENABLE_ESI_PARSER)
+    find_dependency(tinyxml2 CONFIG)
+endif()
+
+if(KICKCAT_ENABLE_AF_XDP AND UNIX AND NOT APPLE)
+    find_dependency(PkgConfig)
+    pkg_check_modules(LIBXDP REQUIRED libxdp)
+    pkg_check_modules(LIBBPF REQUIRED libbpf)
+endif()
+
+if(WIN32)
+    find_dependency(npcap CONFIG)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/KickCATTargets.cmake")
+
+check_required_components(KickCAT)

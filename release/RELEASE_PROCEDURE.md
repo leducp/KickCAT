@@ -6,8 +6,26 @@ This document outlines the mandatory steps to be followed when releasing a new v
 
 Before an official release, a Release Candidate must be created to trigger the full CI pipeline and provide artifacts for hardware testing.
 
-> **Note:** Versioning is tag-driven. The `pyproject.toml` placeholder (`0.0.0`) is replaced
-> automatically during wheel build via `tools/setup/version.sh`. No manual version edit is needed.
+> **Note:** Versioning is tag-driven. `tools/setup/version.sh` substitutes the `0.0.0`
+> placeholder in both `pyproject.toml` and `CMakeLists.txt` during the build. No manual
+> version edit is needed.
+>
+> **Accepted tag scheme:** `vX.Y.Z` or `vX.Y.Z-rcN` (strictly 3-part numeric, optional
+> rc suffix). Anything else falls back to `0.0.0`.
+>
+> The script writes two distinct forms: `pyproject.toml` keeps the raw tag, and
+> `CMakeLists.txt` gets a sanitized form that CMake's `project(VERSION …)` accepts.
+> The `.pc` `Version:` field is filled from `@PROJECT_VERSION@`, so it mirrors the
+> CMake form, not the raw tag.
+>
+> | tag           | `pyproject.toml` `version` | CMake `project(VERSION …)` | `.pc` `Version:` |
+> |---------------|----------------------------|----------------------------|------------------|
+> | `v1.2.0`      | `v1.2.0`                   | `1.2.0`                    | `1.2.0`          |
+> | `v1.2.0-rc3`  | `v1.2.0-rc3`               | `1.2.0.3` *(rc → tweak slot)* | `1.2.0.3`     |
+> | anything else | `0.0.0`                    | `0.0.0`                    | `0.0.0`          |
+>
+> RC tags are intentionally not PEP 440 compliant — PyPI will refuse them, which is
+> correct: only the final `vX.Y.Z` tag is meant to produce a public wheel.
 
 1. Push a tag with the `-rc` suffix:
    ```bash

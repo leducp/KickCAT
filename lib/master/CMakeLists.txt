@@ -12,4 +12,4 @@ target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Slave.cc
 )
 
-target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
+kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/include)

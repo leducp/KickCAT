@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(KickCAT)
+project(KickCAT VERSION 0.0.0 LANGUAGES C CXX)
 
 
 # Custom CMake modules
@@ -7,6 +7,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_BINARY_DIR})
 include(Config)
 include(debug)
+
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  set(KICKCAT_INSTALL_DEFAULT ON)
+else()
+  set(KICKCAT_INSTALL_DEFAULT OFF)
+endif()
 
 option(BUILD_MASTER_EXAMPLES   "Build master examples" ON)
 option(BUILD_SLAVE_EXAMPLES    "Build slave examples" ON)
@@ -17,6 +23,9 @@ option(ENABLE_ESI_PARSER       "Enable ESI XML parser" ON)
 option(ENABLE_AF_XDP           "Enable AF_XDP socket for improved performance (requires libxdp, libbpf, clang)" OFF)
 option(ENABLE_CODE_COVERAGE    "Enable code coverage (requires gcovr)" OFF)
 option(BUILD_EEPROM_EDITOR     "Build EEPROM editor GUI (requires imgui, glfw)" OFF)
+option(KICKCAT_INSTALL         "Install KickCAT targets, headers, CMake config and pkg-config files" ${KICKCAT_INSTALL_DEFAULT})
+
+include(Install)
 
 if (NUTTX)
   set(BUILD_MASTER_EXAMPLES OFF CACHE BOOL "" FORCE)

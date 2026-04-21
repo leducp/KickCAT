@@ -15,7 +15,7 @@ target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/slave/Slave.cc
 )
 
-target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
+kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (NUTTX)
   target_sources(kickcat PRIVATE
@@ -28,13 +28,13 @@ if (NUTTX)
     )
   endif()
 
-  target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/driver/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/driver/include/kickcat)
+  kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/driver/include)
 endif()
 
 if (RPI)
   target_sources(kickcat PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/driver/src/rpi/SPI.cc
   )
-  target_include_directories(kickcat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/driver/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/driver/include/kickcat)
+  kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/driver/include)
   target_link_libraries(kickcat bcm2835)
 endif()
