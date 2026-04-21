@@ -1,7 +1,9 @@
 set(_KICKCAT_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "")
 
+# GNUInstallDirs must stay outside the gate: the INSTALL_INTERFACE genex in
+# kickcat_publish_includes reads CMAKE_INSTALL_INCLUDEDIR unconditionally.
+include(GNUInstallDirs)
 if(KICKCAT_INSTALL)
-  include(GNUInstallDirs)
   include(CMakePackageConfigHelpers)
 endif()
 
@@ -59,10 +61,18 @@ function(kickcat_install_package os_libraries)
     DESTINATION ${cmake_config_dir}
   )
 
+  # Relocatable .pc via ${pcfiledir} so DESTDIR-staged installs resolve paths.
   if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
-    set(PC_LIBDIR     "${CMAKE_INSTALL_LIBDIR}")
+    set(PC_PREFIX "${CMAKE_INSTALL_PREFIX}")
+    set(PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
   else()
-    set(PC_LIBDIR     "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
+    file(RELATIVE_PATH _pc_to_prefix
+      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+      "${CMAKE_INSTALL_PREFIX}")
+    # file(RELATIVE_PATH) appends a trailing slash here; strip to avoid //lib.
+    string(REGEX REPLACE "/$" "" _pc_to_prefix "${_pc_to_prefix}")
+    set(PC_PREFIX "\${pcfiledir}/${_pc_to_prefix}")
+    set(PC_LIBDIR "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
   endif()
   if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
     set(PC_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}")

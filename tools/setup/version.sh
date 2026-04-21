@@ -4,11 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Accepted tag scheme: vX.Y.Z or vX.Y.Z-rcN. Anything else -> 0.0.0.
-# pyproject.toml / pkg-config get the raw tag (PyPI will reject -rc forms,
-# which is fine: those builds aren't release artifacts anyway).
-# CMake's project(VERSION) needs strict X[.Y[.Z[.T]]], so the rc number
-# rides in the tweak slot: vX.Y.Z-rcN -> X.Y.Z.N.
+# Tag scheme: vX.Y.Z or vX.Y.Z-rcN. Off-scheme -> 0.0.0 in both files.
+# CMake needs strict X[.Y[.Z[.T]]], so rc rides the tweak slot: X.Y.Z.N.
 VERSION="0.0.0"
 CMAKE_VERSION="0.0.0"
 
@@ -27,9 +24,8 @@ if git -C "$ROOT_DIR" rev-parse --git-dir > /dev/null 2>&1; then
     fi
 fi
 
-# Anchor to the actual version lines so re-runs (e.g. checkout of a different
-# tag on an already-substituted tree) overwrite the prior value instead of
-# no-op'ing because the '0.0.0' literal is gone.
+# Anchor to the actual version lines (not the '0.0.0' literal) so re-runs on
+# an already-substituted tree overwrite instead of no-op'ing.
 sed -i -E "s/^version = \".+\"$/version = \"${VERSION}\"/" \
     "$ROOT_DIR/pyproject.toml"
 sed -i -E "s/^project\(KickCAT VERSION [^ )]+/project(KickCAT VERSION ${CMAKE_VERSION}/" \

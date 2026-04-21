@@ -9,7 +9,7 @@ if(KICKCAT_ENABLE_ESI_PARSER)
     find_dependency(tinyxml2 CONFIG)
 endif()
 
-if(KICKCAT_ENABLE_AF_XDP AND UNIX AND NOT APPLE)
+if(KICKCAT_ENABLE_AF_XDP AND LINUX)
     find_dependency(PkgConfig)
     pkg_check_modules(LIBXDP REQUIRED libxdp)
     pkg_check_modules(LIBBPF REQUIRED libbpf)
