@@ -1,12 +1,9 @@
 #ifndef KICKCAT_OS_TIMER_H
 #define KICKCAT_OS_TIMER_H
 
-#include <string_view>
 #include <system_error>
 
 #include "kickcat/OS/Time.h"
-#include "kickcat/OS/ConditionVariable.h"
-#include "kickcat/OS/Mutex.h"
 
 namespace kickcat
 {
@@ -17,19 +14,17 @@ namespace kickcat
         Timer(Timer const &) = delete;
         void operator=(Timer const &) = delete;
 
-        /// \param  name     Name of the timer (logging)
         /// \param  period   Interval between two timer firing
         Timer(nanoseconds period);
         ~Timer() = default;
 
-        /// Start the timer.
-        void start(nanoseconds sync_point = since_epoch());
+        /// \brief  Initialize (or restart) the timer.
+        /// \details Aligns the next deadline to sync_point + N*period so that it lies in the future.
+        ///          Resets the drift compensation state. Safe to call multiple times.
+        void init(nanoseconds sync_point = since_epoch());
 
-        ///  Stop the timer.
-        void stop();
-
-        ///  Get timer status
-        bool is_stopped() const;
+        /// \deprecated Use init() instead.
+        void start(nanoseconds sync_point = since_epoch()) { init(sync_point); }
 
         ///  Change the timer values to the new provided values and reset it.
         ///  This does not take effect before the timer is restarted.
@@ -42,16 +37,23 @@ namespace kickcat
         /// Wait until the next timer tick (blocking call)
         std::error_code wait_next_tick();
 
-    protected:
+        /// \brief  Phase-lock the timer to an external time reference (e.g. EtherCAT DC).
+        /// \details Pass the master-vs-reference offset every cycle before wait_next_tick().
+        ///          Do not call when no drift compensation is desired.
+        void apply_offset(nanoseconds raw_offset);
+
+        /// \return filtered per-cycle drift estimate applied by apply_offset(). 0ns if apply_offset()
+        ///         has never been called; typically a few tens of ns at steady state.
+        nanoseconds filtered_drift() const { return filtered_drift_; }
+
     private:
-        std::string name_;
+        static constexpr int64_t DRIFT_FILTER_DEPTH = 256;
+
         nanoseconds period_;
         nanoseconds next_deadline_{};
         nanoseconds last_wakeup_{};
-
-        Mutex mutex_{};
-        ConditionVariable stop_{};
-        bool is_stopped_{true};
+        nanoseconds last_raw_offset_{0ns};
+        nanoseconds filtered_drift_{0ns};
     };
 }
 

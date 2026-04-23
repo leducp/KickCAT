@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
     };
 
     Timer timer{1ms};
-    timer.start(sync_point);
+    timer.init(sync_point);
 
     for (int i = 0; i < 10; ++i)
     {
@@ -301,6 +301,7 @@ int main(int argc, char *argv[])
             bus.isDCSynchronized(1000ns);
         }
 
+        timer.apply_offset(bus.dcMasterOffset());
         timer.wait_next_tick();
     }
 
