@@ -22,6 +22,8 @@ namespace kickcat
         uint32_t serial_number{0};
     };
 
+    /// \brief Builder for the ETG.1510 Master Object Dictionary (ETG.8200-accessible via address 0).
+    ///        populate() is one-shot per Dictionary.
     class MasterOD
     {
     public:

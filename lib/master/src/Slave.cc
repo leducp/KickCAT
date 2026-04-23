@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <iomanip>
+#include <cstdio>
 
 #include "Slave.h"
 #include "debug.h"
@@ -21,6 +21,27 @@ namespace kickcat
         mailbox_bootstrap.send_offset = sii.info.bootstrap_send_mbx_offset;
         mailbox_bootstrap.send_size   = sii.info.bootstrap_send_mbx_size;
     }
+
+    std::string Slave::name() const
+    {
+        auto s = sii.getString(sii.general.device_name_id);
+        if (not s.empty())
+        {
+            return std::string{s};
+        }
+
+        // Fallback: station-address label so operators can correlate with the wire.
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "Slave @0x%04X", address);
+        return buf;
+    }
+
+
+    std::string Slave::type() const
+    {
+        return std::string{sii.getString(sii.general.device_order_id)};
+    }
+
 
     ErrorCounters const& Slave::errorCounters() const
     {

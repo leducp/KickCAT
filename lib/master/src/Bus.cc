@@ -1328,21 +1328,30 @@ namespace kickcat
 
     std::shared_ptr<mailbox::request::GatewayMessage> Bus::addGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index)
     {
+        if (raw_message_size < static_cast<int32_t>(sizeof(mailbox::Header)))
+        {
+            bus_error("Gateway message too small (%d bytes, minimum %zu, gateway_index=%u)", raw_message_size, sizeof(mailbox::Header), gateway_index);
+            return nullptr;
+        }
+
         mailbox::Header mbx_header;
         std::memcpy(&mbx_header, raw_message, sizeof(mailbox::Header));
 
-        // Try to associate the request with a destination
+        // ETG.1510 §6: address == 0 targets the master OD.
         if (mbx_header.address == 0)
         {
-            // Master is the destination, unsupported for now (ETG 1510)
-            bus_error("Master mailbox not implemented");
-            return nullptr;
+            if (master_mailbox_ == nullptr)
+            {
+                bus_error("Master mailbox not implemented (gateway_index=%u)", gateway_index);
+                return nullptr;
+            }
+            return master_mailbox_->serveGatewayRequest(raw_message, raw_message_size, gateway_index);
         }
 
         auto it = std::find_if(slaves_.begin(), slaves_.end(), [&](Slave const& slave) { return slave.address == mbx_header.address; });
         if (it == slaves_.end())
         {
-            bus_error("No slave with address %d on the bus", mbx_header.address);
+            bus_error("No slave with address %d on the bus (gateway_index=%u)", mbx_header.address, gateway_index);
             return nullptr;
         }
 

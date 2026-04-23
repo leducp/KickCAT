@@ -149,6 +149,10 @@ namespace kickcat
         /// \return nullptr if message cannot be added (malformed, bad address, unsupported protocol, etc.), a handle on the message otherwise
         std::shared_ptr<mailbox::request::GatewayMessage> addGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
 
+        /// \brief Install a master-side response mailbox to serve ETG.1510 (address == 0) requests.
+        ///        Non-owning; pass nullptr to detach. Install before init().
+        void setMasterMailbox(mailbox::response::Mailbox* mbx) { master_mailbox_ = mbx; }
+
         void clearErrorCounters();
 
         // Helpers for broadcast commands, mainly for init purpose
@@ -240,6 +244,8 @@ namespace kickcat
         Slave* dc_slave_{nullptr};
 
         MailboxStatusFMMU mailbox_status_fmmu_{MailboxStatusFMMU::NONE};
+
+        mailbox::response::Mailbox* master_mailbox_{nullptr};
     };
 
     /**

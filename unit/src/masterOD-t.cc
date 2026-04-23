@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "kickcat/Error.h"
 #include "kickcat/MasterOD.h"
 #include "kickcat/Mailbox.h"
 #include "kickcat/Slave.h"
@@ -316,6 +317,47 @@ TEST(MasterODPopulate, creates_config_objects_from_sii)
 }
 
 
+TEST(MasterODPopulate, hole_subindex_aborts_cleanly)
+{
+    // Probe the sparse-RECORD guard: an individual SDO upload of a subindex in a gap (between
+    // :08 and :33, or above :40) must return a clean abort, not crash.
+    MasterIdentity id;
+    MasterOD od(id);
+
+    std::vector<Slave> slaves(1);
+    auto dict = od.createDictionary();
+    od.populate(dict, slaves);
+
+    mailbox::response::Mailbox mbx{MBX_SIZE};
+    mbx.enableCoE(std::move(dict));
+
+    for (uint8_t hole : {uint8_t{9}, uint8_t{32}, uint8_t{41}})
+    {
+        auto reply = mbx.processRequest(buildSDOUpload(0x8000, hole));
+        ASSERT_FALSE(reply.empty());
+        auto* coe = pointData<CoE::Header>(pointData<mailbox::Header>(reply.data()));
+        auto* sdo = pointData<CoE::ServiceData>(coe);
+        EXPECT_EQ(CoE::Service::SDO_REQUEST, coe->service);
+        EXPECT_EQ(CoE::SDO::request::ABORT,  sdo->command);
+    }
+}
+
+
+TEST(MasterODPopulate, double_populate_throws)
+{
+    // Calling populate() twice on the same dict would leave stale 0x8nnn entries and invalidate
+    // previously-captured ConfigurationData pointers. Guard against the mistake.
+    MasterIdentity id;
+    MasterOD od(id);
+
+    std::vector<Slave> slaves(1);
+    auto dict = od.createDictionary();
+    od.populate(dict, slaves);
+
+    EXPECT_THROW(od.populate(dict, slaves), kickcat::Error);
+}
+
+
 TEST(MasterODPopulate, entry_pointers_survive_dictionary_move)
 {
     MasterIdentity id;
@@ -338,4 +380,164 @@ TEST(MasterODPopulate, entry_pointers_survive_dictionary_move)
 
     ASSERT_EQ(0x11u, *static_cast<uint32_t*>(configs[0].vendor_id->data));
     ASSERT_EQ(0x22u, *static_cast<uint32_t*>(configs[1].vendor_id->data));
+}
+
+
+TEST(MasterODPopulate, number_of_entries_is_highest_supported_subindex)
+{
+    // All ETG.1510 Table 9 entries are populated, up to :40 (Diag History Object Supported).
+    // Subindex 0 reports the largest supported subindex per CiA-301 RECORD convention.
+    MasterIdentity id;
+    MasterOD od(id);
+
+    std::vector<Slave> slaves(1);
+    auto dict = od.createDictionary();
+    od.populate(dict, slaves);
+
+    mailbox::response::Mailbox mbx{MBX_SIZE};
+    mbx.enableCoE(std::move(dict));
+
+    auto reply = mbx.processRequest(buildSDOUpload(0x8000, 0));
+    ASSERT_FALSE(reply.empty());
+    auto* coe = pointData<CoE::Header>(pointData<mailbox::Header>(reply.data()));
+    auto* sdo = pointData<CoE::ServiceData>(coe);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
+    ASSERT_EQ(40u, *pointData<uint8_t>(sdo));
+}
+
+
+TEST(MasterODPopulate, optional_subindices_exist_with_defaults)
+{
+    // :02, :04, :35, :38, :40 are optional per ETG.1510 Table 9. We populate them with safe
+    // defaults so the structure is complete and later PRs can feed real values.
+    MasterIdentity id;
+    MasterOD od(id);
+
+    std::vector<Slave> slaves(1);
+    slaves[0].address = 0x1001;
+    slaves[0].sii.strings = {"AD-4242"};
+    slaves[0].sii.general.device_order_id = 1;
+    slaves[0].sii.general.port_0 = 1;   // MII
+    slaves[0].sii.general.port_1 = 2;   // EBUS
+    slaves[0].sii.general.port_2 = 0;
+    slaves[0].sii.general.port_3 = 0;
+
+    auto dict = od.createDictionary();
+    od.populate(dict, slaves);
+
+    mailbox::response::Mailbox mbx{MBX_SIZE};
+    mbx.enableCoE(std::move(dict));
+
+    // :02 Type — from SII general order string
+    auto reply_type = mbx.processRequest(buildSDOUpload(0x8000, 2));
+    ASSERT_FALSE(reply_type.empty());
+    auto* coe_type = pointData<CoE::Header>(pointData<mailbox::Header>(reply_type.data()));
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_type->service);
+    ASSERT_EQ("AD-4242", extractStringFromSDOReply(reply_type));
+
+    // :04 Device Type — default 0 until ENI / slave 0x1000 SDO upload is wired in
+    auto reply_devtype = mbx.processRequest(buildSDOUpload(0x8000, 4));
+    auto* coe_devtype  = pointData<CoE::Header>(pointData<mailbox::Header>(reply_devtype.data()));
+    auto* sdo_devtype  = pointData<CoE::ServiceData>(coe_devtype);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_devtype->service);
+    ASSERT_EQ(0u, *pointData<uint32_t>(sdo_devtype));
+
+    // :35 Link Status — obsolete per spec, populated as 0 for legacy-tool compatibility
+    auto reply_ls = mbx.processRequest(buildSDOUpload(0x8000, 35));
+    auto* coe_ls  = pointData<CoE::Header>(pointData<mailbox::Header>(reply_ls.data()));
+    auto* sdo_ls  = pointData<CoE::ServiceData>(coe_ls);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_ls->service);
+    ASSERT_EQ(0u, *pointData<uint8_t>(sdo_ls));
+
+    // :38 Port Physics — reconstituted from SII general.port_0..port_3 (4-bit nibbles)
+    auto reply_pp = mbx.processRequest(buildSDOUpload(0x8000, 38));
+    auto* coe_pp  = pointData<CoE::Header>(pointData<mailbox::Header>(reply_pp.data()));
+    auto* sdo_pp  = pointData<CoE::ServiceData>(coe_pp);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_pp->service);
+    ASSERT_EQ(uint16_t{0x0021}, *pointData<uint16_t>(sdo_pp)); // port_0=1, port_1=2 → low byte 0x21
+
+    // :40 Diag History Object Supported — default false (no slave OD probe yet)
+    auto reply_dh = mbx.processRequest(buildSDOUpload(0x8000, 40));
+    auto* coe_dh  = pointData<CoE::Header>(pointData<mailbox::Header>(reply_dh.data()));
+    auto* sdo_dh  = pointData<CoE::ServiceData>(coe_dh);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_dh->service);
+    ASSERT_EQ(0u, *pointData<uint8_t>(sdo_dh));
+}
+
+
+TEST(MasterODPopulate, mandatory_subindices_from_spec)
+{
+    // Mandatory per ETG.1510 Table 9 beyond what PR2 landed: :03 Name, :36 Link Preset,
+    // :37 Flags, :39 Mailbox Protocols Supported.
+    MasterIdentity id;
+    MasterOD od(id);
+
+    std::vector<Slave> slaves(1);
+    // Point device_name_id at the first SII string (1-based index per ETG.2010).
+    slaves[0].sii.strings = {"Acme Drive"};
+    slaves[0].sii.general.device_name_id = 1;
+    slaves[0].sii.info.mailbox_protocol = eeprom::MailboxProtocol::CoE | eeprom::MailboxProtocol::FoE;
+
+    auto dict = od.createDictionary();
+    od.populate(dict, slaves);
+
+    mailbox::response::Mailbox mbx{MBX_SIZE};
+    mbx.enableCoE(std::move(dict));
+
+    // :03 Name
+    auto reply_name = mbx.processRequest(buildSDOUpload(0x8000, 3));
+    ASSERT_FALSE(reply_name.empty());
+    auto* coe_name = pointData<CoE::Header>(pointData<mailbox::Header>(reply_name.data()));
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_name->service);
+    ASSERT_EQ("Acme Drive", extractStringFromSDOReply(reply_name));
+
+    // :36 Link Preset (default 0 until ENI is wired in)
+    auto reply_lp = mbx.processRequest(buildSDOUpload(0x8000, 36));
+    ASSERT_FALSE(reply_lp.empty());
+    auto* coe_lp = pointData<CoE::Header>(pointData<mailbox::Header>(reply_lp.data()));
+    auto* sdo_lp = pointData<CoE::ServiceData>(coe_lp);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_lp->service);
+    ASSERT_EQ(0u, *pointData<uint8_t>(sdo_lp));
+
+    // :37 Flags (default 0 until ENI is wired in)
+    auto reply_fl = mbx.processRequest(buildSDOUpload(0x8000, 37));
+    ASSERT_FALSE(reply_fl.empty());
+    auto* coe_fl = pointData<CoE::Header>(pointData<mailbox::Header>(reply_fl.data()));
+    auto* sdo_fl = pointData<CoE::ServiceData>(coe_fl);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_fl->service);
+    ASSERT_EQ(0u, *pointData<uint8_t>(sdo_fl));
+
+    // :39 Mailbox Protocols Supported (maps directly from SII mailbox_protocol bitmask)
+    auto reply_mp = mbx.processRequest(buildSDOUpload(0x8000, 39));
+    ASSERT_FALSE(reply_mp.empty());
+    auto* coe_mp = pointData<CoE::Header>(pointData<mailbox::Header>(reply_mp.data()));
+    auto* sdo_mp = pointData<CoE::ServiceData>(coe_mp);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe_mp->service);
+    ASSERT_EQ(static_cast<uint16_t>(eeprom::MailboxProtocol::CoE | eeprom::MailboxProtocol::FoE),
+              *pointData<uint16_t>(sdo_mp));
+}
+
+
+TEST(MasterODPopulate, name_falls_back_when_sii_has_no_string)
+{
+    // With no SII name string, :03 should still exist (spec marks it mandatory) with a sensible default
+    // derived from the fixed station address so operators can correlate entries with the bus.
+    MasterIdentity id;
+    MasterOD od(id);
+
+    std::vector<Slave> slaves(2);
+    slaves[0].address = 0x1001;
+    slaves[1].address = 0x100A;
+    // slaves[i].sii.general.device_name_id stays at 0 (no name)
+
+    auto dict = od.createDictionary();
+    od.populate(dict, slaves);
+
+    mailbox::response::Mailbox mbx{MBX_SIZE};
+    mbx.enableCoE(std::move(dict));
+
+    auto reply0 = mbx.processRequest(buildSDOUpload(0x8000, 3));
+    auto reply1 = mbx.processRequest(buildSDOUpload(0x8001, 3));
+    ASSERT_EQ("Slave @0x1001", extractStringFromSDOReply(reply0));
+    ASSERT_EQ("Slave @0x100A", extractStringFromSDOReply(reply1));
 }

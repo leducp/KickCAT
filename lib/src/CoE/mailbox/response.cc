@@ -175,6 +175,12 @@ namespace kickcat::mailbox::response
 
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {
+            // Sparse RECORD or sub-0 overreports: stop before reading past the dense vector.
+            if (i >= object->entries.size())
+            {
+                abort(CoE::SDO::abort::UNSUPPORTED_ACCESS);
+                return ProcessingResult::FINALIZE;
+            }
             auto* entry = &object->entries.at(i);
             if (not isUploadAuthorized(entry))
             {
@@ -264,7 +270,8 @@ namespace kickcat::mailbox::response
         {
             if (subindex >= object->entries.size())
             {
-                break;
+                abort(CoE::SDO::abort::UNSUPPORTED_ACCESS);
+                return ProcessingResult::FINALIZE;
             }
 
             auto* entry = &object->entries.at(subindex);

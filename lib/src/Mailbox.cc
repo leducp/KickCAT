@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <exception>
+#include <limits>
 
 #include "AbstractESC.h"
 #include "debug.h"
@@ -64,9 +65,14 @@ namespace kickcat::mailbox::request
 
     std::shared_ptr<GatewayMessage> Mailbox::createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index, nanoseconds timeout)
     {
+        if (raw_message_size < static_cast<int32_t>(sizeof(mailbox::Header)))
+        {
+            gateway_error("Message too small (%d bytes, gateway_index=%u)\n", raw_message_size, gateway_index);
+            return nullptr;
+        }
         if (raw_message_size > recv_size)
         {
-            gateway_error("Message size is bigger than mailbox size\n");
+            gateway_error("Message size is bigger than mailbox size (gateway_index=%u)\n", gateway_index);
             return nullptr;
         }
         auto msg = std::make_shared<GatewayMessage>(recv_size, raw_message, gateway_index, timeout);
@@ -230,6 +236,18 @@ namespace kickcat::mailbox::request
         // Switch address field with gateway index and identifier
         address_ = header_->address;
         header_->address = mailbox::GATEWAY_MESSAGE_MASK | gateway_index;
+    }
+
+
+    GatewayMessage::GatewayMessage(std::vector<uint8_t>&& reply, uint16_t gateway_index)
+        : AbstractMessage(static_cast<uint16_t>(reply.size()), 0ms)
+    {
+        // SDO response preserves header->address, so no mask-tag + process() round-trip is needed.
+        data_          = std::move(reply);
+        header_        = reinterpret_cast<mailbox::Header*>(data_.data());
+        address_       = header_->address;
+        gateway_index_ = gateway_index;
+        status_        = MessageStatus::SUCCESS;
     }
 
 
@@ -431,6 +449,33 @@ namespace kickcat::mailbox::response
         handleMessage(std::move(raw_message));
         process();
         return popReply();
+    }
+
+
+    std::shared_ptr<mailbox::request::GatewayMessage> Mailbox::serveGatewayRequest(
+        uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index)
+    {
+        if (raw_message_size < static_cast<int32_t>(sizeof(mailbox::Header)))
+        {
+            gateway_error("Request too small (%d bytes, gateway_index=%u)\n", raw_message_size, gateway_index);
+            return nullptr;
+        }
+
+        std::vector<uint8_t> request(raw_message, raw_message + raw_message_size);
+        auto reply = processRequest(std::move(request));
+
+        if (reply.size() < sizeof(mailbox::Header))
+        {
+            gateway_error("Dictionary produced no reply (gateway_index=%u)\n", gateway_index);
+            return nullptr;
+        }
+        if (reply.size() > std::numeric_limits<uint16_t>::max())
+        {
+            gateway_error("Reply too large: %zu bytes (gateway_index=%u)\n", reply.size(), gateway_index);
+            return nullptr;
+        }
+
+        return std::make_shared<mailbox::request::GatewayMessage>(std::move(reply), gateway_index);
     }
 
 

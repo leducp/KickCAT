@@ -90,6 +90,13 @@ namespace kickcat::mailbox::request
     {
     public:
         GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout);
+
+        /// \brief Build a GatewayMessage that is already completed: the reply is already in hand,
+        ///        so there is no bus round-trip. Used by synchronous dispatch paths (e.g. the master OD,
+        ///        ETG.1510). Starts in MessageStatus::SUCCESS so Gateway::processPendingRequests() picks
+        ///        it up directly. Requires reply.size() >= sizeof(mailbox::Header).
+        GatewayMessage(std::vector<uint8_t>&& reply, uint16_t gateway_index);
+
         virtual ~GatewayMessage() = default;
 
         ProcessingResult process(uint8_t const* received) override;
@@ -209,6 +216,13 @@ namespace kickcat::mailbox::response
 
         /// \brief Synchronous single-shot processing: dispatch, process, and return the reply
         std::vector<uint8_t> processRequest(std::vector<uint8_t>&& raw_message);
+
+        /// \brief Serve an ETG.8200 gateway request synchronously against this OD and return a
+        ///        completed (SUCCESS) GatewayMessage. Contrast with the slave-side
+        ///        request::Mailbox::createGatewayMessage which enqueues a pending message.
+        /// \return nullptr on malformed request, no/malformed reply, or oversized reply.
+        std::shared_ptr<mailbox::request::GatewayMessage> serveGatewayRequest(
+            uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index);
 
         // Access on the next message to send: mainly for unit test
         std::vector<uint8_t> const& readyToSend() const { return to_send_.front(); }
