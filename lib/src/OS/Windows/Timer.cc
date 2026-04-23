@@ -20,6 +20,11 @@ namespace kickcat
         {
             printf("!!! LATE !!!\n");
         }
+        while (next_deadline_ < last_wakeup_)
+        {
+            // We are late: compute a new deadline that maintain the cycle.
+            next_deadline_ += period_;
+        }
 
         return {};
     }
