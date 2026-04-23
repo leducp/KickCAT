@@ -506,30 +506,43 @@ namespace kickcat::CoE
         }
 
 
-        // Set default data value
-        // Update name if possible by using the object node
+        // ETG2000 4807: match Info/SubItem to DataType/SubItem by Name.
+        // ARRAY: DataType elements have no per-item Name, so Info/SubItem/Name
+        // is "SubIndex NNN" - fall back to parsing the trailing subindex.
         auto node_info = node->FirstChildElement("Info");
         if (node_info == nullptr)
         {
             return object;
         }
         auto object_subitem = node_info->FirstChildElement("SubItem");
-        auto entry = object.entries.begin();
-        for (auto& object_entry : object.entries)
+        while (object_subitem)
         {
-            if (object_subitem)
+            auto object_subitem_name = object_subitem->FirstChildElement("Name");
+            if (object_subitem_name)
             {
-                auto object_subitem_name = object_subitem->FirstChildElement("Name");
-                if (object_subitem_name)
+                std::string const name = object_subitem_name->GetText();
+                auto it = std::find_if(object.entries.begin(), object.entries.end(),
+                    [&name](CoE::Entry const& e){ return e.description == name; });
+                if (it == object.entries.end())
                 {
-                    object_entry.description = object_subitem_name->GetText();
+                    auto space = name.find_last_of(' ');
+                    if (space != std::string::npos)
+                    {
+                        try
+                        {
+                            uint8_t const subidx = static_cast<uint8_t>(std::stoi(name.substr(space + 1)));
+                            it = std::find_if(object.entries.begin(), object.entries.end(),
+                                [subidx](CoE::Entry const& e){ return e.subindex == subidx; });
+                        }
+                        catch (std::exception const&) {}
+                    }
                 }
-
-                loadDefaultData(object_subitem, object, *entry);
-
-                entry++;
-                object_subitem = object_subitem->NextSiblingElement();
+                if (it != object.entries.end())
+                {
+                    loadDefaultData(object_subitem, object, *it);
+                }
             }
+            object_subitem = object_subitem->NextSiblingElement("SubItem");
         }
 
         return object;

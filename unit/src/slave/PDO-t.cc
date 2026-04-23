@@ -253,8 +253,8 @@ TEST_F(PDOTest, updateOutput_read_error_does_not_crash)
 // ---- configureMapping() ----
 
 // Build a dictionary with optional TxPDO (input) and RxPDO (output) assignments.
-// TxPDO: 0x1C13 → 0x1A00 → (0x6000, sub1=uint16_t 0x1234)
-// RxPDO: 0x1C12 → 0x1600 → (0x7000, sub1=uint16_t 0x5678)
+// TxPDO: 0x1C13 -> 0x1A00 -> (0x6000, sub1=uint16_t 0x1234)
+// RxPDO: 0x1C12 -> 0x1600 -> (0x7000, sub1=uint16_t 0x5678)
 static CoE::Dictionary createMappingDict(bool with_input_assign, bool with_output_assign)
 {
     CoE::Dictionary dict;
@@ -541,7 +541,7 @@ TEST_F(PDOTest, configureMapping_bit_entries_alias_with_data_bit_offset)
 
 TEST_F(PDOTest, configureMapping_padding_entry_index_zero_is_skipped)
 {
-    // Repro sample_app_Digitalio: 4 × BOOL + 4-bit Index=0 gap rounded into one byte.
+    // 4 BOOL + 4-bit Index=0 gap rounded into one byte.
     CoE::Dictionary dict;
 
     {
@@ -595,7 +595,7 @@ TEST_F(PDOTest, configureMapping_padding_entry_index_zero_is_skipped)
 
 TEST_F(PDOTest, configureMapping_null_old_data_no_memcpy)
 {
-    // Entry with data=nullptr — parsePdoMap should skip the memcpy
+    // Entry with data=nullptr must skip the memcpy in parsePdoMap.
     CoE::Dictionary dict;
 
     CoE::Object data_obj{0x6000, CoE::ObjectCode::VAR, "Data", {}};

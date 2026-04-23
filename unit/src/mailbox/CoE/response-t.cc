@@ -1071,7 +1071,7 @@ TEST(CoE_Response_Bits, SDO_download_bool_size_mismatch_aborts)
     Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
     mbx.enableCoE(createBitObjectDictionary());
 
-    // 4-byte download for a 1-bit BOOL → DATA_TYPE_LENGTH_MISMATCH
+    // 4-byte download of a 1-bit BOOL must abort DATA_TYPE_LENGTH_MISMATCH.
     std::vector<uint8_t> raw = createTestWriteSDO(0x6000, 1, 0xCAFEBABE);
     auto response_msg = createSDOMessage(&mbx, std::move(raw));
     ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, response_msg->process());
@@ -1228,14 +1228,134 @@ TEST(CoE_Response_Bits, SDO_download_complete_null_si0_data_aborts)
     ASSERT_EQ(CoE::SDO::abort::NO_DATA_AVAILABLE, *payload);
 }
 
+TEST(CoE_Response_Bits, SDO_upload_null_entry_data_replies_zeros)
+{
+    // Repro 0x1C33 shape: ESI declares the object but some SubItems omit
+    // <DefaultData>, so EsiParser leaves their entry->data as nullptr.
+    // Individual SDO upload of such an entry used to crash; must now reply zeros.
+    MockESC esc;
+    Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
+    {
+        CoE::Dictionary dict;
+        CoE::Object obj{0x1C33, CoE::ObjectCode::RECORD, "SM input parameter", {}};
+        CoE::addEntry<uint8_t>(obj, 0, 8,  0,  CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count",          uint8_t{3});
+        CoE::addEntry<uint16_t>(obj, 1, 16, 8,  CoE::Access::READ, CoE::DataType::UNSIGNED16, "Sync Type",      uint16_t{0x0022});
+        CoE::addEntry(obj,       2, 32, 24, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Cycle Time",     nullptr);
+        CoE::addEntry<uint16_t>(obj, 3, 16, 56, CoE::Access::READ, CoE::DataType::UNSIGNED16, "Sync Modes",     uint16_t{0x8007});
+        dict.push_back(std::move(obj));
+        mbx.enableCoE(std::move(dict));
+    }
+
+    std::vector<uint8_t> raw = createTestReadSDO(0x1C33, 2);
+    auto response_msg = createSDOMessage(&mbx, std::move(raw));
+    ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, response_msg->process());
+
+    auto const& msg = mbx.readyToSend();
+    auto header  = pointData<mailbox::Header>(msg.data());
+    auto coe     = pointData<CoE::Header>(header);
+    auto sdo     = pointData<CoE::ServiceData>(coe);
+    auto payload = pointData<uint32_t>(sdo);
+
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
+    ASSERT_EQ(CoE::SDO::response::UPLOAD, sdo->command);
+    EXPECT_EQ(0u, *payload);
+}
+
+TEST(CoE_Response_Bits, SDO_upload_complete_skips_null_entries)
+{
+    // Repro 0x1C33: CA upload over an object where some middle entries have
+    // no default data. Null entries must be skipped (payload slot stays 0);
+    // entries with data must round-trip correctly.
+    MockESC esc;
+    Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
+    {
+        CoE::Dictionary dict;
+        CoE::Object obj{0x1C33, CoE::ObjectCode::RECORD, "SM input parameter", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0,  CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count",      uint8_t{3});
+        CoE::addEntry<uint16_t>(obj, 1, 16, 8,  CoE::Access::READ, CoE::DataType::UNSIGNED16, "Sync Type",  uint16_t{0x0022});
+        CoE::addEntry(obj,       2, 32, 24, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Cycle Time", nullptr);
+        CoE::addEntry<uint16_t>(obj, 3, 16, 56, CoE::Access::READ, CoE::DataType::UNSIGNED16, "Sync Modes", uint16_t{0x8007});
+        dict.push_back(std::move(obj));
+        mbx.enableCoE(std::move(dict));
+    }
+
+    std::vector<uint8_t> raw = createTestReadSDO(0x1C33, 1, true);
+    auto response_msg = createSDOMessage(&mbx, std::move(raw));
+    ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, response_msg->process());
+
+    auto const& msg = mbx.readyToSend();
+    auto header  = pointData<mailbox::Header>(msg.data());
+    auto coe     = pointData<CoE::Header>(header);
+    auto sdo     = pointData<CoE::ServiceData>(coe);
+    auto size    = pointData<uint32_t>(sdo);
+    auto payload = pointData<uint8_t>(size);
+
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
+    ASSERT_EQ(CoE::SDO::response::UPLOAD, sdo->command);
+    ASSERT_EQ(8u, *size);
+
+    uint16_t sync_type;
+    uint32_t cycle_time;
+    uint16_t sync_modes;
+    std::memcpy(&sync_type,  payload,     2);
+    std::memcpy(&cycle_time, payload + 2, 4);
+    std::memcpy(&sync_modes, payload + 6, 2);
+
+    EXPECT_EQ(sync_type,  0x0022);
+    EXPECT_EQ(cycle_time, 0u);
+    EXPECT_EQ(sync_modes, 0x8007);
+}
+
+TEST(CoE_Response_Bits, SDO_download_complete_skips_null_entries)
+{
+    // Mirror of the upload test for CA download: writes to a null-data entry
+    // in the middle of the object must be silently dropped, adjacent entries
+    // with storage must still be written correctly.
+    MockESC esc;
+    Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
+    {
+        CoE::Dictionary dict;
+        CoE::Object obj{0x1C32, CoE::ObjectCode::RECORD, "SM output parameter", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0,  CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED8,  "Count",      uint8_t{3});
+        CoE::addEntry<uint16_t>(obj, 1, 16, 8,  CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED16, "Sync Type",  uint16_t{0});
+        CoE::addEntry(obj,       2, 32, 24, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED32, "Cycle Time", nullptr);
+        CoE::addEntry<uint16_t>(obj, 3, 16, 56, CoE::Access::READ | CoE::Access::WRITE, CoE::DataType::UNSIGNED16, "Sync Modes", uint16_t{0});
+        dict.push_back(std::move(obj));
+        mbx.enableCoE(std::move(dict));
+    }
+
+    // Wire layout from SI 1: 2 bytes Sync Type + 4 bytes Cycle Time + 2 bytes Sync Modes = 8.
+    struct __attribute__((packed)) { uint16_t sync_type; uint32_t cycle_time; uint16_t sync_modes; }
+        payload{ 0x0001, 0x0000FA00, 0x8001 };
+    uint32_t size = sizeof(payload);
+    mailbox::request::SDOMessage req{TEST_MAILBOX_SIZE, 0x1C32, 1, true,
+                                     CoE::SDO::request::DOWNLOAD,
+                                     &payload, &size, 1ms};
+    std::vector<uint8_t> raw(req.data(), req.data() + TEST_MAILBOX_SIZE);
+
+    auto response_msg = createSDOMessage(&mbx, std::move(raw));
+    ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, response_msg->process());
+
+    auto const& msg = mbx.readyToSend();
+    auto coe = pointData<CoE::Header>(pointData<mailbox::Header>(msg.data()));
+    auto sdo = pointData<CoE::ServiceData>(coe);
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
+    ASSERT_EQ(CoE::SDO::response::DOWNLOAD, sdo->command);
+
+    auto const& entries = mbx.getDictionary().at(0).entries;
+    EXPECT_EQ(*static_cast<uint16_t const*>(entries.at(1).data), 0x0001);
+    EXPECT_EQ(entries.at(2).data, nullptr);
+    EXPECT_EQ(*static_cast<uint16_t const*>(entries.at(3).data), 0x8001);
+}
+
 TEST(CoE_Response_Bits, SDO_download_complete_unpacks_bits)
 {
     MockESC esc;
     Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
     mbx.enableCoE(createBitObjectDictionary());
 
-    // 5-byte payload forces Normal-Download framing (expedited is ≤4 bytes).
-    // Byte 0 = 0x0A → GPIO2=1, GPIO4=1; other bytes are padding.
+    // 5-byte payload forces Normal-Download framing (expedited is <=4 bytes).
+    // Byte 0 = 0x0A sets GPIO2=1 and GPIO4=1.
     uint8_t value[5] = {0x0A, 0x00, 0x00, 0x00, 0x00};
     uint32_t size = sizeof(value);
     mailbox::request::SDOMessage req{TEST_MAILBOX_SIZE, 0x6000, 1, true,

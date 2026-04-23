@@ -326,23 +326,25 @@ TEST(EsiParser, load_basic_with_bit_types_and_no_info)
         ASSERT_EQ(e2->data_bit_offset, 0);
         ASSERT_NE(e2->data, nullptr);
 
-        // SubIndex 3: BIT6 (Padding)
+        // SubIndex 3: BIT6 (Padding). Fixture's Info block has no "Padding"
+        // SubItem, so per ETG2000 name-matching this entry gets no default.
         auto [obj3, e3] = findObject(dictionary, 0x6000, 3);
         ASSERT_NE(e3, nullptr);
         ASSERT_EQ(e3->type, CoE::DataType::BIT6);
         ASSERT_EQ(e3->bitlen, 6);
         ASSERT_EQ(e3->bitoff, 33);
         ASSERT_EQ(e3->data_bit_offset, 0);
-        ASSERT_NE(e3->data, nullptr);
+        ASSERT_EQ(e3->data, nullptr);
 
-        // SubIndex 4: BOOL (StatusBit). Fixture declares DefaultData for only
-        // 4 SubItems, matched positionally to entries[0..3]; SI 4 stays null.
+        // SubIndex 4: BOOL (StatusBit). Fixture has "StatusBit" Info SubItem
+        // with DefaultData, matched by name to this entry.
         auto [obj4, e4] = findObject(dictionary, 0x6000, 4);
         ASSERT_NE(e4, nullptr);
         ASSERT_EQ(e4->type, CoE::DataType::BOOLEAN);
         ASSERT_EQ(e4->bitlen, 1);
         ASSERT_EQ(e4->bitoff, 39);
         ASSERT_EQ(e4->data_bit_offset, 0);
+        ASSERT_NE(e4->data, nullptr);
     }
 
     // 0x7010 - RECORD with BIT6 SubItem (outputs)
@@ -370,4 +372,74 @@ TEST(EsiParser, load_basic_with_bit_types_and_no_info)
         ASSERT_EQ(object->name, "Sync manager type");
         ASSERT_EQ(object->entries.size(), 5);
     }
+}
+
+// ETG2000 4807: Info/SubItem is matched to DataType/SubItem by Name.
+// Fixture reorders them and skips one to verify spec-conforming matching.
+TEST(EsiParser, info_subitems_matched_by_name_not_position)
+{
+    std::string xml = R"(<?xml version="1.0"?>
+<EtherCATInfo>
+  <Vendor><Id>#x1</Id><Name>Test</Name></Vendor>
+  <Descriptions>
+    <Devices>
+      <Device Physics="YY">
+        <Type ProductCode="#x1" RevisionNo="#x1">ByName</Type>
+        <Name>ByName</Name>
+        <Profile>
+          <ProfileNo>5001</ProfileNo>
+          <Dictionary>
+            <DataTypes>
+              <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+              <DataType><Name>UINT</Name><BitSize>16</BitSize></DataType>
+              <DataType>
+                <Name>DT6000</Name><BitSize>24</BitSize>
+                <SubItem><SubIdx>0</SubIdx><Name>SubIndex 000</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                <SubItem><SubIdx>1</SubIdx><Name>Alpha</Name><Type>UINT</Type><BitSize>16</BitSize><BitOffs>8</BitOffs></SubItem>
+                <SubItem><SubIdx>2</SubIdx><Name>Bravo</Name><Type>UINT</Type><BitSize>16</BitSize><BitOffs>24</BitOffs></SubItem>
+                <SubItem><SubIdx>3</SubIdx><Name>Charlie</Name><Type>UINT</Type><BitSize>16</BitSize><BitOffs>40</BitOffs></SubItem>
+              </DataType>
+            </DataTypes>
+            <Objects>
+              <Object>
+                <Index>#x6000</Index><Name>Data</Name><Type>DT6000</Type><BitSize>56</BitSize>
+                <Info>
+                  <!-- Order intentionally reshuffled; 'Bravo' is omitted. -->
+                  <SubItem><Name>Charlie</Name><Info><DefaultData>CCCC</DefaultData></Info></SubItem>
+                  <SubItem><Name>SubIndex 000</Name><Info><DefaultData>03</DefaultData></Info></SubItem>
+                  <SubItem><Name>Alpha</Name><Info><DefaultData>AAAA</DefaultData></Info></SubItem>
+                </Info>
+              </Object>
+            </Objects>
+          </Dictionary>
+        </Profile>
+        <Sm StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+      </Device>
+    </Devices>
+  </Descriptions>
+</EtherCATInfo>
+)";
+
+    CoE::EsiParser parser;
+    auto dict = parser.loadString(xml);
+
+    auto [obj0, si0] = CoE::findObject(dict, 0x6000, 0);
+    auto [obj1, si1] = CoE::findObject(dict, 0x6000, 1);
+    auto [obj2, si2] = CoE::findObject(dict, 0x6000, 2);
+    auto [obj3, si3] = CoE::findObject(dict, 0x6000, 3);
+    ASSERT_NE(si0, nullptr);
+    ASSERT_NE(si1, nullptr);
+    ASSERT_NE(si2, nullptr);
+    ASSERT_NE(si3, nullptr);
+
+    ASSERT_NE(si0->data, nullptr);
+    EXPECT_EQ(*static_cast<uint8_t*>(si0->data), 0x03);
+
+    ASSERT_NE(si1->data, nullptr);
+    EXPECT_EQ(*static_cast<uint16_t*>(si1->data), 0xAAAA);
+
+    EXPECT_EQ(si2->data, nullptr);
+
+    ASSERT_NE(si3->data, nullptr);
+    EXPECT_EQ(*static_cast<uint16_t*>(si3->data), 0xCCCC);
 }

@@ -217,7 +217,7 @@ TEST(OD, copyBits_single_bit_preserves_neighbours)
 
 TEST(OD, copyBits_cross_byte)
 {
-    // 4 bits src[bit 6..9] → dst[bit 5..8]
+    // 4 bits src[6..9] -> dst[5..8]
     uint8_t src[2] = {0xC0, 0x03};
     uint8_t dst[2] = {0x00, 0x00};
 
@@ -230,7 +230,7 @@ TEST(OD, copyBits_cross_byte)
 
 TEST(OD, copyBits_spans_three_source_bytes)
 {
-    // 16 bits src[bit 6..21] → dst[bit 0..15]; src spans 3 bytes, dst 2. LSB-first.
+    // 16 bits src[6..21] -> dst[0..15], LSB-first.
     uint8_t src[3] = {0xC0, 0xAA, 0x03};
     uint8_t dst[2] = {0xFF, 0xFF};
 

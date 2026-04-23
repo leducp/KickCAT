@@ -155,7 +155,12 @@ namespace kickcat::mailbox::response
             header_->len += size;
         }
 
-        if ((entry->bitlen % 8 == 0) and (entry->data_bit_offset == 0))
+        // Entry with no storage (ESI without <DefaultData>): reply zeros.
+        if (entry->data == nullptr)
+        {
+            std::memset(payload_, 0, size);
+        }
+        else if ((entry->bitlen % 8 == 0) and (entry->data_bit_offset == 0))
         {
             std::memcpy(payload_, entry->data, size);
         }
@@ -219,11 +224,9 @@ namespace kickcat::mailbox::response
 
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {
-            // Sparse RECORD or sub-0 overreports: stop before reading past the dense vector.
             if (i >= object->entries.size())
             {
-                abort(CoE::SDO::abort::UNSUPPORTED_ACCESS);
-                return ProcessingResult::FINALIZE;
+                break;
             }
             auto* entry = &object->entries.at(i);
             if (not isUploadAuthorized(entry))
@@ -235,7 +238,11 @@ namespace kickcat::mailbox::response
             beforeHooks(CoE::Access::READ, entry);
 
             uint32_t wire_bit_offset = entry->bitoff - skip_bit_offset;
-            CoE::readEntryBits(entry, payload_ + 4, wire_bit_offset);
+            // Entry without storage: payload was pre-zeroed, so just skip it.
+            if (entry->data != nullptr)
+            {
+                CoE::readEntryBits(entry, payload_ + 4, wire_bit_offset);
+            }
             end_bit_offset = wire_bit_offset + entry->bitlen;
 
             afterHooks(CoE::Access::READ, entry);
@@ -275,6 +282,12 @@ namespace kickcat::mailbox::response
         if (size != static_cast<uint32_t>((entry->bitlen + 7) / 8))
         {
             abort(CoE::SDO::abort::DATA_TYPE_LENGTH_MISMATCH);
+            return ProcessingResult::FINALIZE;
+        }
+
+        if (entry->data == nullptr)
+        {
+            abort(CoE::SDO::abort::NO_DATA_AVAILABLE);
             return ProcessingResult::FINALIZE;
         }
 
@@ -324,8 +337,7 @@ namespace kickcat::mailbox::response
         {
             if (subindex >= object->entries.size())
             {
-                abort(CoE::SDO::abort::UNSUPPORTED_ACCESS);
-                return ProcessingResult::FINALIZE;
+                break;
             }
 
             auto* entry = &object->entries.at(subindex);
@@ -349,7 +361,11 @@ namespace kickcat::mailbox::response
 
             beforeHooks(CoE::Access::WRITE, entry);
 
-            CoE::writeEntryBits(entry, start_offset, wire_bit_offset);
+            // Entry without storage: skip silently (nothing to write into).
+            if (entry->data != nullptr)
+            {
+                CoE::writeEntryBits(entry, start_offset, wire_bit_offset);
+            }
             subindex++;
 
             afterHooks(CoE::Access::WRITE, entry);

@@ -117,14 +117,14 @@ namespace kickcat
         std::vector<uint16_t> pdo_indices;
 
         auto [obj0, entry0] = CoE::findObject(dict, assign_idx, 0);
-        if (entry0)
+        if (entry0 and entry0->data)
         {
             uint8_t count = *static_cast<uint8_t*>(entry0->data);
 
             for (uint8_t i = 1; i <= count; ++i)
             {
                 auto [obj, entry] = CoE::findObject(dict, assign_idx, i);
-                if (entry)
+                if (entry and entry->data)
                 {
                     pdo_indices.push_back(*static_cast<uint16_t*>(entry->data));
                 }
@@ -137,7 +137,7 @@ namespace kickcat
     bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint32_t& bit_offset, uint32_t max_size)
     {
         auto [obj0, entry0] = CoE::findObject(dict, pdo_idx, 0);
-        if (not entry0)
+        if (not entry0 or entry0->data == nullptr)
         {
             return false;
         }
@@ -147,7 +147,7 @@ namespace kickcat
         for (uint8_t i = 1; i <= count; ++i)
         {
             auto [obj, entry] = CoE::findObject(dict, pdo_idx, i);
-            if (not entry)
+            if (not entry or entry->data == nullptr)
             {
                 return false;
             }

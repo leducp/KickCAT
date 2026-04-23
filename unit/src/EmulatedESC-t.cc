@@ -286,8 +286,7 @@ TEST(EmulatedESC, ecat_PDOs)
 
 TEST(EmulatedESC, ecat_PDOs_bit_aligned_single_bit)
 {
-    // Physical bit 3 of byte 0x300A → logical bit 5 of byte 0x2003
-    // (mailbox-status-check pattern).
+    // Phys bit 3 @ 0x300A maps to logical bit 5 @ 0x2003.
     EmulatedESC esc;
 
     uint8_t current = State::PRE_OP;
@@ -308,7 +307,7 @@ TEST(EmulatedESC, ecat_PDOs_bit_aligned_single_bit)
     fmmu.activate           = 1;
     esc.write(reg::FMMU + 0x00, &fmmu, sizeof(FMMU));
 
-    // PRE_OP → SAFE_OP triggers configurePDOs.
+    // PRE_OP to SAFE_OP triggers configurePDOs.
     DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
     uint64_t scratch = 0;
     uint16_t wkc = 0;
@@ -339,7 +338,7 @@ TEST(EmulatedESC, ecat_PDOs_bit_aligned_single_bit)
 
 TEST(EmulatedESC, ecat_PDOs_bit_aligned_write)
 {
-    // LWR of logical bit 2 → physical bit 6; other 7 physical bits must survive.
+    // LWR logical bit 2 -> phys bit 6; other 7 phys bits must survive.
     EmulatedESC esc;
 
     uint8_t current = State::PRE_OP;
