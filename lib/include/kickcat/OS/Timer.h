@@ -37,13 +37,14 @@ namespace kickcat
         /// Wait until the next timer tick (blocking call)
         std::error_code wait_next_tick();
 
-        /// \brief  Match the timer's firing rate to an external time reference (e.g. EtherCAT DC).
-        /// \details Call this every cycle before wait_next_tick() with bus.dcMasterOffset().
-        ///          The measured offset grows linearly at the clock drift rate: the timer
-        ///          tracks the per-cycle delta and uses it as a period correction, so the
-        ///          timer fires at the same real-time rate as the reference clock.
-        ///          Do not call this when no drift compensation is desired.
+        /// \brief  Phase-lock the timer to an external time reference (e.g. EtherCAT DC).
+        /// \details Pass the master-vs-reference offset every cycle before wait_next_tick().
+        ///          Do not call when no drift compensation is desired.
         void apply_offset(nanoseconds raw_offset);
+
+        /// \return filtered per-cycle drift estimate applied by apply_offset(). 0ns if apply_offset()
+        ///         has never been called; typically a few tens of ns at steady state.
+        nanoseconds filtered_drift() const { return filtered_drift_; }
 
     private:
         static constexpr int64_t DRIFT_FILTER_DEPTH = 256;

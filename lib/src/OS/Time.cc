@@ -23,4 +23,10 @@ namespace kickcat
     {
         return since_epoch() - start_time;
     }
+
+    nanoseconds monotonic_time()
+    {
+        auto now = time_point_cast<nanoseconds>(steady_clock::now());
+        return now.time_since_epoch();
+    }
 }

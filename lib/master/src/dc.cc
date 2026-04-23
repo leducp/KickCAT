@@ -25,6 +25,12 @@ namespace kickcat
         dc_info("DC reference slave is %d\n", dc_slave_->address);
 
         //-------- Apply propagation delay and system time offset -------//
+        // Capture the offset between CLOCK_REALTIME (used to calibrate slave time offsets
+        // via applyMasterTime) and the monotonic clock (used to write the cyclic FPWR).
+        // This lets us write a stable, NTP-immune value while keeping the calibrated slave
+        // offsets consistent with what the PLL will see.
+        dc_epoch_offset_ = since_ecat_epoch() - monotonic_time();
+
         // Trigger latch time on received registers whenever the frame pass by the port 0-3
         uint8_t dummy = 0;
         broadcastWrite(reg::DC_RECEIVED_TIME, &dummy, 1);
@@ -492,7 +498,10 @@ namespace kickcat
             return DatagramState::OK;
         };
 
-        nanoseconds now = since_ecat_epoch();
+        // Use monotonic time shifted by dc_epoch_offset_ so the value matches the ECAT-epoch
+        // domain used by applyMasterTime (keeping PLL comparisons near zero) while being
+        // immune to NTP offset adjustments that affect CLOCK_REALTIME.
+        nanoseconds now = monotonic_time() + dc_epoch_offset_;
         uint64_t raw_now = now.count();
         link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
         link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr,  sizeof(uint64_t), process, error);
@@ -571,5 +580,109 @@ namespace kickcat
         }
 
         return synchronized;
+    }
+
+
+    void Bus::logDCStatus(bool include_per_slave)
+    {
+        if (dc_slave_ == nullptr)
+        {
+            return;
+        }
+
+        struct DCSlaveStatus
+        {
+            Slave*   slave;
+            uint32_t time_diff_raw{0};
+            int16_t  speed_diff_raw{0};
+        };
+        std::vector<DCSlaveStatus> dc_status;
+
+        auto error = [](DatagramState const& state)
+        {
+            THROW_ERROR_DATAGRAM("Error while reading DC status", state);
+        };
+
+        for (auto& slave : slaves_)
+        {
+            if (not slave.isDCSupport() or &slave == dc_slave_)
+            {
+                continue;
+            }
+
+            dc_status.push_back({&slave, 0, 0});
+            auto& status = dc_status.back();
+
+            auto process_diff = [&status](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+                std::memcpy(&status.time_diff_raw, data, sizeof(status.time_diff_raw));
+                return DatagramState::OK;
+            };
+
+            auto process_speed = [&status](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                if (wkc != 1)
+                {
+                    return DatagramState::INVALID_WKC;
+                }
+                std::memcpy(&status.speed_diff_raw, data, sizeof(status.speed_diff_raw));
+                return DatagramState::OK;
+            };
+
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SYSTEM_TIME_DIFF), nullptr, sizeof(status.time_diff_raw),  process_diff,  error);
+            link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SPEED_CNT_DIFF),   nullptr, sizeof(status.speed_diff_raw), process_speed, error);
+        }
+        link_->processDatagrams();
+
+        nanoseconds max_drift = 0ns;
+        int16_t max_speed_diff_abs = 0;
+        int synchronized_count = 0;
+        for (auto const& status : dc_status)
+        {
+            // DC_SYSTEM_TIME_DIFF uses sign-magnitude encoding (bit 31 = sign, bits 30:0 = magnitude)
+            nanoseconds drift = nanoseconds(status.time_diff_raw & 0x7FFFFFFF);
+            if (drift > max_drift)
+            {
+                max_drift = drift;
+            }
+
+            int16_t speed_abs = status.speed_diff_raw;
+            if (speed_abs < 0)
+            {
+                speed_abs = static_cast<int16_t>(-speed_abs);
+            }
+            if (speed_abs > max_speed_diff_abs)
+            {
+                max_speed_diff_abs = speed_abs;
+            }
+
+            if (drift <= 1000ns)
+            {
+                ++synchronized_count;
+            }
+        }
+
+        dc_info("[DC] master_offset=%ld ns  synchronized=%d/%zu  max_drift=%ld ns  max_speed_diff=%d\n",
+                dcMasterOffset().count(),
+                synchronized_count, dc_status.size(),
+                max_drift.count(), max_speed_diff_abs);
+
+        if (include_per_slave)
+        {
+            for (auto const& status : dc_status)
+            {
+                nanoseconds drift = nanoseconds(status.time_diff_raw & 0x7FFFFFFF);
+                bool negative = (status.time_diff_raw & 0x80000000) != 0;
+                dc_info("[DC]   slave %d: time_diff=%s%ld ns  speed_diff=%d\n",
+                        status.slave->address,
+                        negative ? "-" : "",
+                        drift.count(),
+                        static_cast<int>(status.speed_diff_raw));
+            }
+        }
     }
 }

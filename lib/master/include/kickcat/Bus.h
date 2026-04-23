@@ -113,12 +113,10 @@ namespace kickcat
         void checkMailboxes( std::function<void(DatagramState const&)> const& error);
         void processMessages(std::function<void(DatagramState const&)> const& error);
 
-        /// \brief  Send drift compensation datagrams to maintain DC synchronization
-        /// \details Reads the DC reference clock's system time register (0x0910) with FRMW so that each
-        ///          slave on the segment updates its local clock offset accordingly.
-        ///          Called cyclically during process data exchange, and repeatedly (15 000 times) during
-        ///          static drift compensation at DC initialization.
-        /// \param  error  Callback invoked when a datagram error occurs
+        /// \brief  Send drift compensation datagrams to maintain DC synchronization.
+        /// \details Called cyclically during process data exchange. enableDC() also calls it
+        ///          repeatedly during static drift compensation.
+        /// \param  error  Callback invoked when a datagram error occurs.
         void sendDriftCompensation(std::function<void(DatagramState const&)> const& error);
 
         /// \brief  Check if distributed clocks are synchronized
@@ -128,11 +126,14 @@ namespace kickcat
         /// \return true if all DC slaves are synchronized within the given threshold
         bool isDCSynchronized(nanoseconds threshold = 1000ns, bool log_all = false);
 
-        /// \brief  Return the signed offset between the master OS clock and the DC network time.
-        /// \details Positive means the master clock is ahead of the network clock.
-        ///          Updated every cycle by sendDriftCompensation().
+        /// \brief  Signed offset between the master OS clock and the DC network time.
+        ///         Positive means the master clock is ahead of the network clock.
         /// \return 0ns if DC is not active or not yet measured.
         nanoseconds dcMasterOffset() const;
+
+        /// \brief  Log DC synchronization state of each DC slave.
+        /// \details Intended to be called periodically during long runs to monitor PLL health.
+        void logDCStatus(bool include_per_slave = false);
 
 
         enum Access
@@ -245,6 +246,7 @@ namespace kickcat
         Slave* dc_slave_{nullptr};
         nanoseconds dc_network_time_{0ns};  // last reference clock system time (EtherCAT epoch)
         nanoseconds dc_master_time_{0ns};   // master OS time when FRMW response was captured
+        nanoseconds dc_epoch_offset_{0ns};  // since_ecat_epoch() - monotonic_time() at enableDC
 
         MailboxStatusFMMU mailbox_status_fmmu_{MailboxStatusFMMU::NONE};
     };

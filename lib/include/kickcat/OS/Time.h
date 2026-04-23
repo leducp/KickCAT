@@ -20,6 +20,10 @@ namespace kickcat
     // return the time since since another point in time
     nanoseconds elapsed_time(nanoseconds start = since_epoch());
 
+    // return a monotonic (never going backward) time in ns.
+    // The epoch is implementation-defined; use only for duration / delta computations.
+    nanoseconds monotonic_time();
+
     // Convert an std::chrono duration to a POSIX timespec
     constexpr timespec to_timespec(nanoseconds time)
     {
