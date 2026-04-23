@@ -116,9 +116,7 @@ if (ENABLE_AF_XDP AND LINUX)
 endif()
 
 add_library(kickcat ${KICKCAT_SOURCES} ${OS_LIB_SOURCES})
-target_include_directories(kickcat
-  PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
+kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (ENABLE_AF_XDP AND LINUX)
   target_sources(kickcat PRIVATE ${BPF_HDR})
@@ -141,3 +139,5 @@ set_kickcat_properties(kickcat)
 
 add_subdirectory(master)
 add_subdirectory(slave)
+
+kickcat_install_package("${OS_LIBRARIES}")

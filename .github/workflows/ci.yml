@@ -38,7 +38,9 @@ jobs:
           - os: ubuntu-latest
             preset: bare
             configure_args: "--with=unit_tests"
+            apt_packages: "libtinyxml2-dev"
             coverage: false
+            test_install: true
           - os: windows-latest
             coverage: false
 
@@ -79,6 +81,11 @@ jobs:
           else
             ctest . --output-on-failure
           fi
+        shell: bash
+
+      - name: Install smoke test (find_package + pkg-config + KICKCAT_INSTALL=OFF)
+        if: matrix.test_install
+        run: ./scripts/test_install.sh build
         shell: bash
 
       - name: Upload Build Artifact
