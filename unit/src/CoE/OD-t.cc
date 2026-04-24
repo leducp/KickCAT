@@ -164,6 +164,108 @@ TEST(OD, entry_data_to_string)
     }
 }
 
+TEST(OD, addEntry_sub_byte_allocates_one_byte)
+{
+    Object object{0x6000, ObjectCode::VAR, "GPIOs", {}};
+
+    addEntry<uint8_t>(object, 1, 1, 0, Access::READ, DataType::BOOLEAN, "GPIO 1", uint8_t{1});
+    addEntry<uint8_t>(object, 2, 1, 1, Access::READ, DataType::BOOLEAN, "GPIO 2", uint8_t{0});
+    addEntry<uint8_t>(object, 3, 1, 2, Access::READ, DataType::BOOLEAN, "GPIO 3", uint8_t{1});
+    addEntry<uint8_t>(object, 4, 6, 3, Access::READ, DataType::BIT6,    "BIT6",   uint8_t{0x2A});
+
+    ASSERT_EQ(object.entries.size(), 4);
+    for (auto const& entry : object.entries)
+    {
+        ASSERT_NE(entry.data, nullptr);
+        ASSERT_EQ(entry.data_bit_offset, 0);
+    }
+
+    EXPECT_EQ(*static_cast<uint8_t*>(object.entries[0].data), 0x01);
+    EXPECT_EQ(*static_cast<uint8_t*>(object.entries[1].data), 0x00);
+    EXPECT_EQ(*static_cast<uint8_t*>(object.entries[2].data), 0x01);
+    EXPECT_EQ(*static_cast<uint8_t*>(object.entries[3].data), 0x2A);
+}
+
+TEST(OD, copyBits_byte_aligned_is_memcpy)
+{
+    uint8_t src[4] = {0x11, 0x22, 0x33, 0x44};
+    uint8_t dst[4] = {0xAA, 0xBB, 0xCC, 0xDD};
+
+    copyBits(src, 0, dst, 0, 32);
+
+    EXPECT_EQ(dst[0], 0x11);
+    EXPECT_EQ(dst[1], 0x22);
+    EXPECT_EQ(dst[2], 0x33);
+    EXPECT_EQ(dst[3], 0x44);
+}
+
+TEST(OD, copyBits_single_bit_preserves_neighbours)
+{
+    uint8_t src = 0x01;
+    uint8_t dst = 0xA5;
+
+    copyBits(&src, 0, &dst, 5, 1);
+    EXPECT_EQ(dst & (1 << 5), (1 << 5));
+    EXPECT_EQ(dst & ~uint8_t(1 << 5), 0xA5 & ~uint8_t(1 << 5));
+
+    src = 0x00;
+    dst = 0xFF;
+    copyBits(&src, 0, &dst, 3, 1);
+    EXPECT_EQ(dst & (1 << 3), 0);
+    EXPECT_EQ(dst | uint8_t(1 << 3), 0xFF);
+}
+
+TEST(OD, copyBits_cross_byte)
+{
+    // 4 bits src[6..9] -> dst[5..8]
+    uint8_t src[2] = {0xC0, 0x03};
+    uint8_t dst[2] = {0x00, 0x00};
+
+    copyBits(src, 6, dst, 5, 4);
+    EXPECT_EQ(dst[0] & 0xE0, 0xE0);
+    EXPECT_EQ(dst[0] & 0x1F, 0x00);
+    EXPECT_EQ(dst[1] & 0x01, 0x01);
+    EXPECT_EQ(dst[1] & 0xFE, 0x00);
+}
+
+TEST(OD, copyBits_spans_three_source_bytes)
+{
+    // 16 bits src[6..21] -> dst[0..15], LSB-first.
+    uint8_t src[3] = {0xC0, 0xAA, 0x03};
+    uint8_t dst[2] = {0xFF, 0xFF};
+
+    copyBits(src, 6, dst, 0, 16);
+
+    EXPECT_EQ(dst[0], 0xAB);
+    EXPECT_EQ(dst[1], 0x0E);
+}
+
+TEST(OD, readEntryBits_writeEntryBits_roundtrip)
+{
+    // BOOL aliased at bit 3 of a buffer byte.
+    uint8_t aliased_buffer = 0xA5;
+    Entry entry;
+    entry.bitlen           = 1;
+    entry.bitoff           = 0;
+    entry.type             = DataType::BOOLEAN;
+    entry.data             = &aliased_buffer;
+    entry.is_mapped        = true;
+    entry.data_bit_offset  = 3;
+
+    uint8_t wire = 0x00;
+    readEntryBits(&entry, &wire, 0);
+    EXPECT_EQ(wire & 0x01, (0xA5 >> 3) & 0x01);
+
+    wire = 0x01;
+    writeEntryBits(&entry, &wire, 0);
+    EXPECT_EQ(aliased_buffer & (1 << 3), (1 << 3));
+    EXPECT_EQ(aliased_buffer & ~uint8_t(1 << 3), 0xA5 & ~uint8_t(1 << 3));
+
+    // Defuse alias: Entry destructor would free our stack byte otherwise.
+    entry.data = nullptr;
+    entry.is_mapped = false;
+}
+
 TEST(OD, print_object_and_entries)
 {
     CoE::Object object

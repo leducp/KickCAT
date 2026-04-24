@@ -207,27 +207,115 @@ namespace kickcat
     }
 
 
+    bool EmulatedESC::isByteAligned(PDO const& pdo)
+    {
+        return (pdo.logical_start_bit  == 0)
+           and (pdo.logical_stop_bit   == 7)
+           and (pdo.physical_start_bit == 0);
+    }
+
+
+    uint32_t EmulatedESC::totalMappedBits(PDO const& pdo)
+    {
+        // ETG1000.4: length * 8 - logical_start_bit - (7 - logical_stop_bit).
+        // Signed: malformed FMMU clamps to 0 instead of unsigned-wrapping to ~4B.
+        int64_t bits = int64_t(pdo.size) * 8
+                     + int64_t(pdo.logical_stop_bit)
+                     - int64_t(pdo.logical_start_bit)
+                     - 7;
+        if (bits <= 0)
+        {
+            return 0;
+        }
+        return static_cast<uint32_t>(bits);
+    }
+
+
+    bool EmulatedESC::processBitAlignedPDO(DatagramHeader const* header, void* data, PDO const& pdo, bool read)
+    {
+        uint32_t total_bits = totalMappedBits(pdo);
+        uint32_t frame_start = header->address;
+        uint32_t frame_end   = header->address + header->len;
+
+        uint32_t pdo_logical_start = pdo.logical_address;
+        uint32_t pdo_logical_end   = pdo.logical_address + pdo.size;
+        if ((frame_end <= pdo_logical_start) or (frame_start >= pdo_logical_end))
+        {
+            return false;
+        }
+
+        bool touched = false;
+        for (uint32_t bit = 0; bit < total_bits; ++bit)
+        {
+            uint32_t logical_bit  = bit + pdo.logical_start_bit;
+            uint32_t physical_bit = bit + pdo.physical_start_bit;
+
+            uint32_t logical_addr  = pdo.logical_address + logical_bit / 8;
+            uint8_t  logical_bpos  = logical_bit % 8;
+            uint32_t physical_off  = physical_bit / 8;
+            uint8_t  physical_bpos = physical_bit % 8;
+
+            if ((logical_addr < frame_start) or (logical_addr >= frame_end))
+            {
+                continue;
+            }
+            touched = true;
+
+            uint8_t* frame_byte = static_cast<uint8_t*>(data) + (logical_addr - frame_start);
+            uint8_t* phys_byte  = pdo.physical_address + physical_off;
+
+            if (read)
+            {
+                uint8_t value = (*phys_byte >> physical_bpos) & 0x1;
+                *frame_byte = static_cast<uint8_t>((*frame_byte & ~(1u << logical_bpos))
+                                                 | (value << logical_bpos));
+            }
+            else
+            {
+                uint8_t value = (*frame_byte >> logical_bpos) & 0x1;
+                *phys_byte = static_cast<uint8_t>((*phys_byte & ~(1u << physical_bpos))
+                                                | (value << physical_bpos));
+            }
+        }
+        return touched;
+    }
+
+
     uint16_t EmulatedESC::processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, void* data)
     {
         int wkc = 0;
         for (auto const& pdo : pdos)
         {
-            auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
-            if (to_copy == 0)
+            if (isByteAligned(pdo))
             {
-                continue;
-            }
+                auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
+                if (to_copy == 0)
+                {
+                    continue;
+                }
 
-            if (read)
-            {
-                std::memcpy(frame, internal, to_copy);
+                if (read)
+                {
+                    std::memcpy(frame, internal, to_copy);
+                }
+                else
+                {
+                    std::memcpy(internal, frame, to_copy);
+                    lastLogicalWrite_ = since_epoch();   // update watchdog
+                }
+                ++wkc;
             }
             else
             {
-                std::memcpy(internal, frame, to_copy);
-                lastLogicalWrite_ = since_epoch();   // update watchdog
+                if (processBitAlignedPDO(header, data, pdo, read))
+                {
+                    if (not read)
+                    {
+                        lastLogicalWrite_ = since_epoch();   // update watchdog
+                    }
+                    ++wkc;
+                }
             }
-            ++wkc;
         }
         return wkc;
     }
@@ -535,8 +623,11 @@ namespace kickcat
 
             PDO pdo;
             pdo.size = fmmu.length;
-            pdo.logical_address = fmmu.logical_address;
-            pdo.physical_address = memory_.process_data_ram + (fmmu.physical_address - 0x1000);
+            pdo.logical_address    = fmmu.logical_address;
+            pdo.physical_address   = reinterpret_cast<uint8_t*>(&memory_) + fmmu.physical_address;
+            pdo.logical_start_bit  = fmmu.logical_start_bit;
+            pdo.logical_stop_bit   = fmmu.logical_stop_bit;
+            pdo.physical_start_bit = fmmu.physical_start_bit;
 
             if (fmmu.type == 1)
             {
