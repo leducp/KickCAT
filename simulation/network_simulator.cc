@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
         expanded_slave_configs = slave_configs;
     }
 
-        if (slave_configs.empty())
+	if (slave_configs.empty())
     {
         std::cerr << "No slave configuration files provided" << std::endl;
         std::cerr << program;
