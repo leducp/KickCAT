@@ -30,6 +30,13 @@ int main(int argc, char* argv[])
         .required()
         .store_into(interface);
 
+    int slave_number = 0;
+    program.add_argument("-n", "--count")
+        .help("Number of slaves to simulate")
+        .default_value(0)
+        .scan<'i', int>()
+        .store_into(slave_number);
+
     std::vector<std::string> slave_configs;
     program.add_argument("-s", "--slaves")
         .help("JSON configuration files for slaves")
@@ -54,7 +61,35 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    size_t slave_count = slave_configs.size();
+        std::vector<std::string> expanded_slave_configs;
+
+    if (slave_number > 0)
+    {
+        if (slave_configs.size() != 1)
+        {
+            std::cerr << "When using --count/-n, you must provide exactly one JSON config file with --slaves/-s" << std::endl;
+            return 1;
+        }
+
+        expanded_slave_configs.reserve(slave_number);
+        for (int i = 0; i < slave_number; ++i)
+        {
+            expanded_slave_configs.push_back(slave_configs[0]);
+        }
+    }
+    else
+    {
+        expanded_slave_configs = slave_configs;
+    }
+
+	if (slave_configs.empty())
+    {
+        std::cerr << "No slave configuration files provided" << std::endl;
+        std::cerr << program;
+        return 1;
+    }
+
+    size_t slave_count = expanded_slave_configs.size();
     std::vector<std::unique_ptr<EmulatedESC>> escs;
     std::vector<std::unique_ptr<PDO>> pdos;
     std::vector<std::unique_ptr<Slave>> slaves;
@@ -72,7 +107,7 @@ int main(int argc, char* argv[])
     constexpr uint32_t PDO_MAX_SIZE = 32;
     CoE::EsiParser parser;
 
-    for (const auto& config_path : slave_configs)
+    for (const auto& config_path : expanded_slave_configs)
     {
         fs::path p(config_path);
         fs::path config_dir = p.parent_path();
