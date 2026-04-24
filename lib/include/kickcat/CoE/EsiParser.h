@@ -14,17 +14,18 @@ namespace kickcat::CoE
         EsiParser() = default;
         ~EsiParser() = default;
 
-        CoE::Dictionary loadFile  (std::string const& file);
-        CoE::Dictionary loadString(std::string const& xml);
+        Dictionary loadFirstDictionaryFromFile  (std::string const& file);
+        std::vector<Device> loadDevicesFromFile  (std::string const& file);
+        std::vector<Device> loadString(std::string const& xml);
 
         char const* vendor() const  { return vendor_->FirstChildElement("Name")->GetText();       }
         char const* profile() const { return profile_->FirstChildElement("ProfileNo")->GetText(); }
 
     private:
+    
         template<typename T>
-        T toNumber(tinyxml2::XMLElement* node)
+        T toNumber(std::string& field)
         {
-            std::string field = node->GetText();
             if (field.rfind("#x", 0) == 0)
             {
                 field[0] = '0';
@@ -32,7 +33,15 @@ namespace kickcat::CoE
             return std::stoi(field, nullptr, 0);
         }
 
-        CoE::Dictionary parse(); // main method
+        template<typename T>
+        T toNumber(tinyxml2::XMLElement* node)
+        {
+            std::string field = node->GetText();
+            return toNumber<T>(field);
+        }
+
+        std::vector<Device> parse(); // main method
+        Dictionary loadDictionary();
         std::vector<uint8_t> loadHexBinary(tinyxml2::XMLElement* node);
         std::vector<uint8_t> loadString(tinyxml2::XMLElement* node);
 
@@ -58,6 +67,7 @@ namespace kickcat::CoE
         tinyxml2::XMLElement* desc_;
 
         // jump on profile and associated dictionnary
+        tinyxml2::XMLElement* type_;
         tinyxml2::XMLElement* profile_;
         tinyxml2::XMLElement* devices_;
         tinyxml2::XMLElement* device_;

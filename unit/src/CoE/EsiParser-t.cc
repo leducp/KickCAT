@@ -11,7 +11,7 @@ using namespace kickcat;
 TEST(EsiParser, load_error_not_an_xml)
 {
     CoE::EsiParser parser;
-    ASSERT_THROW((void) parser.loadFile(""),   std::runtime_error);
+    ASSERT_THROW((void) parser.loadFirstDictionaryFromFile(""),   std::runtime_error);
     ASSERT_THROW((void) parser.loadString(""), std::runtime_error);
 }
 
@@ -25,7 +25,7 @@ TEST(EsiParser, load_error_xml_not_an_esi)
 TEST(EsiParser, load)
 {
     CoE::EsiParser parser;
-    auto dictionary = parser.loadFile("foot.xml");
+    auto dictionary = parser.loadFirstDictionaryFromFile("foot.xml");
 
     ASSERT_EQ(dictionary.size(), 22);
     ASSERT_STREQ(parser.profile(), "0");
@@ -140,7 +140,7 @@ TEST(EsiParser, load)
 TEST(EsiParser, load_complex_with_enums_and_default_value)
 {
     CoE::EsiParser parser;
-    auto dictionary = parser.loadFile("kickcat_esi_test_complex.xml");
+    auto dictionary = parser.loadFirstDictionaryFromFile("kickcat_esi_test_complex.xml");
 
     ASSERT_STREQ(parser.profile(), "5002");
     ASSERT_STREQ(parser.vendor(),  "KickCAT");
@@ -251,7 +251,7 @@ TEST(EsiParser, load_complex_with_enums_and_default_value)
 TEST(EsiParser, load_basic_with_bit_types_and_no_info)
 {
     CoE::EsiParser parser;
-    auto dictionary = parser.loadFile("kickcat_esi_test_basic.xml");
+    auto dictionary = parser.loadFirstDictionaryFromFile("kickcat_esi_test_basic.xml");
 
     ASSERT_STREQ(parser.profile(), "5001");
     ASSERT_STREQ(parser.vendor(),  "KickCAT");

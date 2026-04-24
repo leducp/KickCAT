@@ -50,7 +50,12 @@ namespace kickcat::CoE
         {"Inputs",   4},
     };
 
-    Dictionary EsiParser::loadFile(std::string const& file)
+    Dictionary EsiParser::loadFirstDictionaryFromFile  (std::string const& file) 
+    {
+        return std::move(loadDevicesFromFile(file).front().dictionary);
+    }
+
+    std::vector<Device> EsiParser::loadDevicesFromFile(std::string const& file)
     {
         XMLError result = doc_.LoadFile(file.c_str());
         if (result != XML_SUCCESS)
@@ -61,7 +66,7 @@ namespace kickcat::CoE
         return parse();
     }
 
-    Dictionary EsiParser::loadString(std::string const& xml)
+    std::vector<Device> EsiParser::loadString(std::string const& xml)
     {
         XMLError result = doc_.Parse(xml.c_str());
         if (result != XML_SUCCESS)
@@ -72,41 +77,74 @@ namespace kickcat::CoE
         return parse();
     }
 
-    Dictionary EsiParser::parse()
+    // Helper to find and check a child element, throw if not found
+    XMLElement* firstChildElement(XMLNode* node, char const* name)
+    {
+        auto element = node->FirstChildElement(name);
+        if (element == nullptr)
+        {
+            std::string desc = "Cannot find child element <";
+            desc += node->Value();
+            desc += "> -> ";
+            desc += name;
+            throw std::invalid_argument(desc);
+        }
+        return element;
+    };
+
+    std::vector<Device> EsiParser::parse()
     {
         root_ = doc_.RootElement();
 
-        // Helper to find and check a child element, throw if not found
-        auto firstChildElement = [](XMLNode* node, char const* name) -> XMLElement*
-        {
-            auto element = node->FirstChildElement(name);
-            if (element == nullptr)
-            {
-                std::string desc = "Cannot find child element <";
-                desc += node->Value();
-                desc += "> -> ";
-                desc += name;
-                throw std::invalid_argument(desc);
-            }
-            return element;
-        };
-
         // Position handler on main entry points
         vendor_ = firstChildElement(root_, "Vendor");
+        uint32_t vendorId = toNumber<uint32_t>(firstChildElement(vendor_, "Id"));
         desc_   = firstChildElement(root_, "Descriptions");
+        devices_ = firstChildElement(desc_, "Devices");
 
-        // jump on profile and associated dictionnary
-        devices_    = firstChildElement(desc_,       "Devices");
-        device_     = firstChildElement(devices_,    "Device");
-        profile_    = firstChildElement(device_,     "Profile");
-        dictionary_ = firstChildElement(profile_,    "Dictionary");
-        dtypes_     = firstChildElement(dictionary_, "DataTypes");
-        objects_    = firstChildElement(dictionary_, "Objects");
+        // Loop through devices to find one with a Profile and Dictionary
+        device_ = devices_->FirstChildElement("Device");
 
-        // Load dictionary
+       std::vector<Device> devices;
+
+        while (device_)
+        {
+            type_ = device_->FirstChildElement("Type");
+            std::string product_code_str = type_->Attribute("ProductCode");
+            std::string revision_number_str = type_->Attribute("RevisionNo");
+            uint32_t productCode = toNumber<uint32_t>(product_code_str);
+            uint32_t revision_number = toNumber<uint32_t>(revision_number_str);
+            
+            Device new_device;
+            new_device.vendor_id = vendorId;
+            new_device.product_code = productCode;
+            new_device.revision_number = revision_number;
+            printf("Found device with vendor id 0x%08x, product code 0x%08x, revision number 0x%08x\n", new_device.vendor_id, new_device.product_code, new_device.revision_number);
+            profile_ = device_->FirstChildElement("Profile");
+            if (profile_)
+            {
+                dictionary_ = profile_->FirstChildElement("Dictionary");
+                if (dictionary_)
+                {
+                    // If we find the dictionary, set the remaining pointers and break
+                    dtypes_  = firstChildElement(dictionary_, "DataTypes");
+                    objects_ = firstChildElement(dictionary_, "Objects");
+                    new_device.dictionary = loadDictionary();
+                }
+            }
+            devices.push_back(std::move(new_device));
+            // Move to the next <Device> in the XML file (e.g., skip EL1002)
+            device_ = device_->NextSiblingElement("Device");
+        }
+
+        return devices;
+    }
+
+    Dictionary EsiParser::loadDictionary() 
+    {
         Dictionary dictionary;
 
-        // loop over dictionnary
+        // loop over dictionary
         auto node_object = objects_->FirstChildElement();
         while (node_object)
         {
@@ -520,7 +558,6 @@ namespace kickcat::CoE
                 object_subitem = object_subitem->NextSiblingElement();
             }
         }
-
         return object;
     }
 }
