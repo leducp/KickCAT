@@ -98,13 +98,6 @@ int main(int argc, char* argv[])
         expanded_slave_configs = slave_configs;
     }
 
-	if (slave_configs.empty())
-    {
-        std::cerr << "No slave configuration files provided" << std::endl;
-        std::cerr << program;
-        return 1;
-    }
-
     size_t slave_count = expanded_slave_configs.size();
     std::vector<std::unique_ptr<EmulatedESC>> escs;
     std::vector<std::unique_ptr<PDO>> pdos;
