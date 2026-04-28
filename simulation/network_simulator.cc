@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <numeric>
 
@@ -19,6 +20,21 @@ using namespace kickcat;
 using namespace kickcat::slave;
 using json = nlohmann::json;
 namespace fs = std::filesystem;
+
+CoE::Device findDeviceByVendorAndProduct(std::vector<CoE::Device>&& devices, uint32_t vendor_id, uint32_t product_code, uint32_t revision_number)
+{
+    for (CoE::Device& device : devices)
+    {
+        if (device.vendor_id == vendor_id && device.product_code == product_code && device.revision_number == revision_number)
+        {
+            printf("Found matching device in ESI file for vendor_id 0x%08x, product_code 0x%08x, revision_number 0x%08x\n", vendor_id, product_code, revision_number);
+            return std::move(device);
+        }
+    }
+    std::stringstream ss;
+    ss << "No matching device found for vendor_id 0x" << std::hex << vendor_id << " and product_code 0x" << product_code << " and revision_number 0x" << revision_number;
+    throw std::runtime_error(ss.str());
+}
 
 int main(int argc, char* argv[])
 {
@@ -82,13 +98,6 @@ int main(int argc, char* argv[])
         expanded_slave_configs = slave_configs;
     }
 
-	if (slave_configs.empty())
-    {
-        std::cerr << "No slave configuration files provided" << std::endl;
-        std::cerr << program;
-        return 1;
-    }
-
     size_t slave_count = expanded_slave_configs.size();
     std::vector<std::unique_ptr<EmulatedESC>> escs;
     std::vector<std::unique_ptr<PDO>> pdos;
@@ -147,8 +156,14 @@ int main(int argc, char* argv[])
             std::string coe_xml_path = config["coe_xml"];
             fs::path coe_xml_full_path = config_dir / coe_xml_path;
             auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
-            auto dictionary = parser.loadFile(coe_xml_full_path.string());
-            mbx->enableCoE(std::move(dictionary));
+            auto devices = parser.loadDevicesFromFile(coe_xml_full_path.string());
+
+            // search for productcode / vendor id:
+            uint32_t vendor_id = esc->getVendorId(); // from EEPROM
+            uint32_t product_code = esc->getProductCode(); // from EEPROM
+            uint32_t revision_number = esc->getRevisionNumber(); // from EEPROM
+            CoE::Device device = findDeviceByVendorAndProduct(std::move(devices), vendor_id, product_code, revision_number);
+            mbx->enableCoE(std::move(device.dictionary));
             slave->setMailbox(mbx.get());
             mailboxes.push_back(std::move(mbx));
         }

@@ -28,7 +28,7 @@ int main(int argc, char const* argv[])
     CoE::EsiParser parser;
 
     nanoseconds t1 = since_epoch();
-    CoE::Dictionary coe_dict = parser.loadFile(esi_file);
+    CoE::Dictionary coe_dict = parser.loadFirstDictionaryFromFile(esi_file);
     nanoseconds t2 = since_epoch();
 
     // dangerous lack of error checking.

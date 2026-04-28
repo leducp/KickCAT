@@ -32,6 +32,15 @@ namespace kickcat
         // Access from the PDI POV
         int32_t read (uint16_t address, void* data,       uint16_t size) override;
         int32_t write(uint16_t address, void const* data, uint16_t size) override;
+        uint32_t getVendorId() const { return vendor_id_; }
+        uint32_t getProductCode() const { return product_code_; }
+        uint32_t getRevisionNumber() const { return revision_number_; }
+
+
+    private:
+        uint32_t vendor_id_ = 0;
+        uint32_t product_code_ = 0;
+        uint32_t revision_number_ = 0;
 
     private:
         struct Memory
