@@ -410,8 +410,8 @@ namespace kickcat
     constexpr uint8_t SM_CONTROL_WATCHDOG_MASK          = 0x40;
     constexpr uint8_t SM_CONTROL_WATCHDOG_DISABLED      = 0x00;
     constexpr uint8_t SM_CONTROL_WATCHDOG_ENABLED       = 0x40;
-    constexpr uint8_t SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK = (1 << 0);
-    constexpr uint8_t SYNC_MANAGER_CONTROL_DIRECTION_MASK = (1 << 1);
+    constexpr uint8_t SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK = 0x03; // bits [1:0]
+    constexpr uint8_t SYNC_MANAGER_CONTROL_DIRECTION_MASK      = 0x0C; // bits [3:2]
 
     constexpr uint8_t SM_ACTIVATE_ENABLE        = (1 << 0);
     constexpr uint8_t SM_ACTIVATE_REPEAT_REQ    = (1 << 1);
