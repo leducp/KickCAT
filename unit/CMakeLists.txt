@@ -23,8 +23,8 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/ESMStateSafeOP-t.cc
                             src/Units-t.cc
                             src/CoE/protocol-t.cc
-                            src/CoE/EsiParser-t.cc
                             src/CoE/OD-t.cc
+                            src/ESI/Parser-t.cc
                             src/CoE/DS402StateMachine-t.cc
                             src/mailbox/request-t.cc
                             src/mailbox/response-t.cc
@@ -37,10 +37,11 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/Time.cc
 )
 
-# Use for ESI as a dataset for EsiParser
+# ESI fixtures used by Parser-t.cc
 file(COPY ${CMAKE_SOURCE_DIR}/examples/slave/nuttx/xmc4800/boards/wdc_foot/foot.xml DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_basic.xml DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_complex.xml DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_multi_device.xml DESTINATION ${CMAKE_BINARY_DIR})
 
 target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
 target_include_directories(kickcat_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

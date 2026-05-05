@@ -6,7 +6,7 @@
 #include <nlohmann/json.hpp>
 #include <numeric>
 
-#include "kickcat/CoE/EsiParser.h"
+#include "kickcat/ESI/Parser.h"
 #include "kickcat/CoE/mailbox/response.h"
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
     output_pdo.reserve(slave_count);
 
     constexpr uint32_t PDO_MAX_SIZE = 32;
-    CoE::EsiParser parser;
+    ESI::Parser parser;
 
     for (const auto& config_path : expanded_slave_configs)
     {

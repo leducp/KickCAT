@@ -1,4 +1,4 @@
-#include "kickcat/CoE/EsiParser.h"
+#include "kickcat/ESI/Parser.h"
 #include "kickcat/OS/Time.h"
 #include <argparse/argparse.hpp>
 
@@ -25,7 +25,7 @@ int main(int argc, char const* argv[])
         return 1;
     }
 
-    CoE::EsiParser parser;
+    ESI::Parser parser;
 
     nanoseconds t1 = since_epoch();
     CoE::Dictionary coe_dict = parser.loadFile(esi_file);

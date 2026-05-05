@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<EtherCATInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="EtherCATInfo.xsd" Version="1.6">
+	<Vendor>
+		<Id>#x0CAFE</Id>
+		<Name>KickCAT</Name>
+	</Vendor>
+	<Descriptions>
+		<Groups>
+			<Group>
+				<Type>KickCAT Test Devices</Type>
+				<Name>KickCAT Test Devices</Name>
+			</Group>
+		</Groups>
+		<Devices>
+			<Device Physics="YY">
+				<Type ProductCode="#x00001111" RevisionNo="#x1">kickcat_multi_dev_alpha</Type>
+				<Name>KickCAT Multi Device Alpha</Name>
+				<GroupType>KickCAT Test Devices</GroupType>
+				<Profile>
+					<ProfileNo>5101</ProfileNo>
+					<Dictionary>
+						<DataTypes>
+							<DataType>
+								<Name>UDINT</Name>
+								<BitSize>32</BitSize>
+							</DataType>
+						</DataTypes>
+						<Objects>
+							<Object>
+								<Index>#x1000</Index>
+								<Name>Device Type</Name>
+								<Type>UDINT</Type>
+								<BitSize>32</BitSize>
+								<Flags>
+									<Access>ro</Access>
+								</Flags>
+							</Object>
+						</Objects>
+					</Dictionary>
+				</Profile>
+			</Device>
+			<Device Physics="YY">
+				<Type ProductCode="#x00002222" RevisionNo="#x1">kickcat_multi_dev_beta</Type>
+				<Name>KickCAT Multi Device Beta</Name>
+				<GroupType>KickCAT Test Devices</GroupType>
+				<Profile>
+					<ProfileNo>5102</ProfileNo>
+					<Dictionary>
+						<DataTypes>
+							<DataType>
+								<Name>UDINT</Name>
+								<BitSize>32</BitSize>
+							</DataType>
+						</DataTypes>
+						<Objects>
+							<Object>
+								<Index>#x1000</Index>
+								<Name>Device Type</Name>
+								<Type>UDINT</Type>
+								<BitSize>32</BitSize>
+								<Flags>
+									<Access>ro</Access>
+								</Flags>
+							</Object>
+						</Objects>
+					</Dictionary>
+				</Profile>
+			</Device>
+			<Device Physics="YY">
+				<Type ProductCode="#x00002222" RevisionNo="#x2">kickcat_multi_dev_beta</Type>
+				<Name>KickCAT Multi Device Beta r2</Name>
+				<GroupType>KickCAT Test Devices</GroupType>
+				<Profile>
+					<ProfileNo>5103</ProfileNo>
+					<Dictionary>
+						<DataTypes>
+							<DataType>
+								<Name>UDINT</Name>
+								<BitSize>32</BitSize>
+							</DataType>
+						</DataTypes>
+						<Objects>
+							<Object>
+								<Index>#x1000</Index>
+								<Name>Device Type</Name>
+								<Type>UDINT</Type>
+								<BitSize>32</BitSize>
+								<Flags>
+									<Access>ro</Access>
+								</Flags>
+							</Object>
+						</Objects>
+					</Dictionary>
+				</Profile>
+			</Device>
+		</Devices>
+	</Descriptions>
+</EtherCATInfo>
