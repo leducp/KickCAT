@@ -33,7 +33,7 @@ class KickCATDev(ConanFile):
             self.requires("gtest/1.15.0")
 
         if self.options.esi_parser:
-            self.requires("tinyxml2/10.0.0")
+            self.requires("tinyxml2/[>=10.0.0]")
 
         if self.options.simulation:
             self.requires("nlohmann_json/3.12.0")
