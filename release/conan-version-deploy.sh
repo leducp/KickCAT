@@ -58,24 +58,18 @@ curl -L -o "$tmp" "$tar_gz_url"
 sha256sum=$(sha256sum "$tmp" | cut -d' ' -f1)
 rm "$tmp"
 
-sed \
-  -i.bak \
-  -e "1a\\
-\  \"${version}\":" \
-  -e "1a\\
-\    folder:\ all" \
-  ${recipes_kickcat}/config.yml
-rm ${recipes_kickcat}/config.yml.bak
-sed \
-  -i.bak \
-  -e "1a\\
-\  \"${version}\":" \
-  -e "1a\\
-\    url: \"${tar_gz_url}\"" \
-  -e "1a\\
-\    sha256: \"${sha256sum}\"" \
-  ${recipes_kickcat}/all/conandata.yml
-rm ${recipes_kickcat}/all/conandata.yml.bak
+cat > ${recipes_kickcat}/config.yml << EOF
+versions:
+  "${version}":
+    folder: all
+EOF
+
+cat > ${recipes_kickcat}/all/conandata.yml << EOF
+sources:
+  "${version}":
+    url: "${tar_gz_url}"
+    sha256: "${sha256sum}"
+EOF
 git add ${recipes_kickcat}/config.yml
 git add ${recipes_kickcat}/all/conandata.yml
 git add ${recipes_kickcat}/all/conanfile.py
