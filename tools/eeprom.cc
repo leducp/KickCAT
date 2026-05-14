@@ -256,7 +256,7 @@ int main(int argc, char* argv[])
         }
         printf("\n");
 
-        printf("Wait for Err led to go off on the board.\nReset device to trigger reloading of new EEPROM.\n");
+        printf("EEPROM write complete. Wait a few seconds, then reset the device to trigger reloading of the new EEPROM.\n");
     }
     return 0;
 }
