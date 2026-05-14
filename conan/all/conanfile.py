@@ -62,7 +62,7 @@ class KickCATRecipe(ConanFile):
     def requirements(self):
         self.requires("argparse/3.2")
         if self.options.with_esi_parser:
-            self.requires("tinyxml2/10.0.0")
+            self.requires("tinyxml2/11.0.0")
 
 
     def generate(self):
