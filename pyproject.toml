@@ -29,9 +29,10 @@ ENABLE_ESI_PARSER = "OFF"
 BUILD_UNIT_TESTS  = "OFF"
 ENABLE_CODE_COVERAGE = "OFF"
 BUILD_SIMULATION  = "OFF"
-BUILD_TOOLS       = "OFF"
+BUILD_TOOLS           = "OFF"
 BUILD_MASTER_EXAMPLES = "OFF"
 BUILD_SLAVE_EXAMPLES  = "OFF"
+BUILD_EEPROM_EDITOR   = "ON"
 
 [tool.cibuildwheel]
 # https://github.com/pypa/cibuildwheel/blob/main/docs/options.md
@@ -45,7 +46,7 @@ build = ["cp310-manylinux_*", "cp311-manylinux_*", "cp312-manylinux_*"]
 select = "cp3{10,11}-*"
 config-settings = { "cmake.define.CMAKE_CI_BUILD" = true, "cmake.define.CMAKE_FIND_ROOT_PATH" = "/tmp/kickcat_build_config", "cmake.define.CMAKE_TOOLCHAIN_FILE" = "/tmp/kickcat_build_config/toolchain.cmake" }
 repair-wheel-command = [
-  "auditwheel repair --zip-compression-level=9 -w {dest_dir} {wheel}"
+  "auditwheel repair --exclude libGL.so.1 --exclude libGLX.so.0 --exclude libGLdispatch.so.0 --zip-compression-level=9 -w {dest_dir} {wheel}"
 ]
 
 [tool.cibuildwheel.config-settings]
@@ -57,11 +58,13 @@ repair-wheel-command = [
 [tool.cibuildwheel.linux]
 before-all = [
   'pipx install conan',
+  'dnf install -y mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel libXcursor-devel libXinerama-devel',
+  './scripts/configure.sh /tmp/kickcat_build_config --with=eeprom_editor --non-interactive',
   './scripts/setup_build.sh /tmp/kickcat_build_config',
   './tools/setup/version.sh'
 ]
 repair-wheel-command = [
-  "auditwheel repair --zip-compression-level=9 -w {dest_dir} {wheel}",
+  "auditwheel repair --exclude libGL.so.1 --exclude libGLX.so.0 --exclude libGLdispatch.so.0 --zip-compression-level=9 -w {dest_dir} {wheel}",
   "pipx run abi3audit --strict --report {dest_dir}/*.whl",
 ]
 
