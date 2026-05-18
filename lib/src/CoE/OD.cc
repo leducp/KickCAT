@@ -266,20 +266,62 @@ namespace kickcat::CoE
                 std::free(data);
             }
 
-            subindex    = other.subindex;
-            bitlen      = other.bitlen;
-            bitoff      = other.bitoff;
-            access      = other.access;
-            type        = other.type;
-            description = std::move(other.description);
-            data        = other.data;
-            is_mapped   = other.is_mapped;
+            subindex         = other.subindex;
+            bitlen           = other.bitlen;
+            bitoff           = other.bitoff;
+            access           = other.access;
+            type             = other.type;
+            description      = std::move(other.description);
+            data             = other.data;
+            is_mapped        = other.is_mapped;
+            data_bit_offset  = other.data_bit_offset;
 
-            other.data = nullptr;
-            other.is_mapped = false;
+            other.data            = nullptr;
+            other.is_mapped       = false;
+            other.data_bit_offset = 0;
         }
 
         return *this;
+    }
+
+
+    void copyBits(uint8_t const* src, uint32_t src_bit_offset,
+                  uint8_t* dst,       uint32_t dst_bit_offset,
+                  uint32_t n_bits)
+    {
+        if (n_bits == 0)
+        {
+            return;
+        }
+
+        if ((src_bit_offset % 8 == 0) and (dst_bit_offset % 8 == 0) and (n_bits % 8 == 0))
+        {
+            std::memcpy(dst + dst_bit_offset / 8, src + src_bit_offset / 8, n_bits / 8);
+            return;
+        }
+
+        for (uint32_t i = 0; i < n_bits; ++i)
+        {
+            uint32_t s = src_bit_offset + i;
+            uint32_t d = dst_bit_offset + i;
+            uint8_t bit = static_cast<uint8_t>((src[s / 8] >> (s % 8)) & 0x1);
+            uint8_t mask = static_cast<uint8_t>(1u << (d % 8));
+            dst[d / 8] = static_cast<uint8_t>((dst[d / 8] & ~mask) | (bit << (d % 8)));
+        }
+    }
+
+
+    void readEntryBits(Entry const* entry, uint8_t* dst, uint32_t dst_bit_offset)
+    {
+        copyBits(static_cast<uint8_t const*>(entry->data), entry->data_bit_offset,
+                 dst, dst_bit_offset, entry->bitlen);
+    }
+
+
+    void writeEntryBits(Entry* entry, uint8_t const* src, uint32_t src_bit_offset)
+    {
+        copyBits(src, src_bit_offset,
+                 static_cast<uint8_t*>(entry->data), entry->data_bit_offset, entry->bitlen);
     }
 
 

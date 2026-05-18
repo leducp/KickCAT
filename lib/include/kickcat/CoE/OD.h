@@ -215,6 +215,9 @@ namespace kickcat::CoE
         void* data{nullptr};
         bool is_mapped{false};
 
+        // Bit position of the value inside `data`. Nonzero only for entries aliased into a PDO buffer.
+        uint8_t data_bit_offset{0};
+
         /// Called before access
         std::vector<std::function<void(uint16_t access, Entry*)>> before_access;
 
@@ -243,18 +246,27 @@ namespace kickcat::CoE
     {
         object.entries.emplace_back(subindex, bitlen, bitoff, access, type, description);
         auto& alloc = object.entries.back().data;
-        std::size_t size = bitlen / 8;
-        alloc = std::malloc(size);
+        std::size_t alloc_size = (bitlen + 7) / 8;
+        std::size_t copy_size  = bitlen / 8;
+        alloc = std::malloc(alloc_size);
+        std::memset(alloc, 0, alloc_size);
 
         if constexpr(std::is_same_v<const char*, T>)
         {
-            std::memcpy(alloc, data, size);
+            std::memcpy(alloc, data, copy_size);
         }
         else
         {
-            std::memcpy(alloc, &data, size);
+            if (bitlen < 8)
+            {
+                uint8_t mask = static_cast<uint8_t>((1u << bitlen) - 1);
+                *static_cast<uint8_t*>(alloc) = static_cast<uint8_t>(data) & mask;
+            }
+            else
+            {
+                std::memcpy(alloc, &data, copy_size);
+            }
         }
-
     }
 
     inline void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t bitoff,
@@ -262,6 +274,14 @@ namespace kickcat::CoE
     {
         object.entries.emplace_back(subindex, bitlen, bitoff, access, type, description);
     }
+
+    void readEntryBits (Entry const* entry, uint8_t* dst, uint32_t dst_bit_offset);
+    void writeEntryBits(Entry*       entry, uint8_t const* src, uint32_t src_bit_offset);
+
+    // LSB-first per byte. RMW: bits in dst outside [dst_bit_offset, +n_bits) are preserved.
+    void copyBits(uint8_t const* src, uint32_t src_bit_offset,
+                  uint8_t* dst,       uint32_t dst_bit_offset,
+                  uint32_t n_bits);
 
     Dictionary createOD();
     Dictionary& dictionary();

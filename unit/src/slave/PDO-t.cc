@@ -253,8 +253,8 @@ TEST_F(PDOTest, updateOutput_read_error_does_not_crash)
 // ---- configureMapping() ----
 
 // Build a dictionary with optional TxPDO (input) and RxPDO (output) assignments.
-// TxPDO: 0x1C13 → 0x1A00 → (0x6000, sub1=uint16_t 0x1234)
-// RxPDO: 0x1C12 → 0x1600 → (0x7000, sub1=uint16_t 0x5678)
+// TxPDO: 0x1C13 -> 0x1A00 -> (0x6000, sub1=uint16_t 0x1234)
+// RxPDO: 0x1C12 -> 0x1600 -> (0x7000, sub1=uint16_t 0x5678)
 static CoE::Dictionary createMappingDict(bool with_input_assign, bool with_output_assign)
 {
     CoE::Dictionary dict;
@@ -466,9 +466,136 @@ TEST_F(PDOTest, configureMapping_already_mapped_entry_is_not_freed)
     ASSERT_EQ(static_cast<void *>(input_), entry->data);
 }
 
+TEST_F(PDOTest, configureMapping_bit_entries_alias_with_data_bit_offset)
+{
+    // 4 BOOL entries packed into one PDO byte; each must get its own data_bit_offset.
+    CoE::Dictionary dict;
+
+    {
+        CoE::Object obj{0x6000, CoE::ObjectCode::RECORD, "GPIOs", {}};
+        CoE::addEntry<uint8_t>(obj, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Count", uint8_t{4});
+        CoE::addEntry<uint8_t>(obj, 1, 1, 8,  CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "GPIO1", uint8_t{0});
+        CoE::addEntry<uint8_t>(obj, 2, 1, 9,  CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "GPIO2", uint8_t{0});
+        CoE::addEntry<uint8_t>(obj, 3, 1, 10, CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "GPIO3", uint8_t{0});
+        CoE::addEntry<uint8_t>(obj, 4, 1, 11, CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "GPIO4", uint8_t{0});
+        dict.push_back(std::move(obj));
+    }
+
+    {
+        CoE::Object obj{0x1A00, CoE::ObjectCode::RECORD, "TxPDO map", {}};
+        CoE::addEntry<uint8_t>(obj, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Count", uint8_t{4});
+        CoE::addEntry<uint32_t>(obj, 1, 32, 8,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "M1",
+                                makeMappingEntry(0x6000, 1, 1));
+        CoE::addEntry<uint32_t>(obj, 2, 32, 40, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M2",
+                                makeMappingEntry(0x6000, 2, 1));
+        CoE::addEntry<uint32_t>(obj, 3, 32, 72, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M3",
+                                makeMappingEntry(0x6000, 3, 1));
+        CoE::addEntry<uint32_t>(obj, 4, 32, 104, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M4",
+                                makeMappingEntry(0x6000, 4, 1));
+        dict.push_back(std::move(obj));
+    }
+
+    {
+        CoE::Object assign{0x1C13, CoE::ObjectCode::RECORD, "TxPDO assign", {}};
+        CoE::addEntry<uint8_t>(assign, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Count", uint8_t{1});
+        CoE::addEntry<uint16_t>(assign, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
+        dict.push_back(std::move(assign));
+    }
+
+    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+
+    for (uint8_t sub = 1; sub <= 4; ++sub)
+    {
+        auto [obj, entry] = CoE::findObject(dict, 0x6000, sub);
+        ASSERT_NE(entry, nullptr) << "sub=" << int(sub);
+        ASSERT_TRUE(entry->is_mapped) << "sub=" << int(sub);
+        EXPECT_EQ(entry->data, static_cast<void*>(input_)) << "sub=" << int(sub);
+        EXPECT_EQ(entry->data_bit_offset, sub - 1) << "sub=" << int(sub);
+    }
+
+    auto [_, gpio1] = CoE::findObject(dict, 0x6000, 1);
+    auto [__, gpio3] = CoE::findObject(dict, 0x6000, 3);
+
+    uint8_t one = 0x01;
+    CoE::writeEntryBits(gpio1, &one, 0);
+    CoE::writeEntryBits(gpio3, &one, 0);
+
+    EXPECT_EQ(input_[0] & 0x0F, 0x05);
+
+    uint8_t bit = 0;
+    CoE::readEntryBits(gpio1, &bit, 0);
+    EXPECT_EQ(bit & 0x01, 1);
+    bit = 0;
+    CoE::readEntryBits(gpio3, &bit, 0);
+    EXPECT_EQ(bit & 0x01, 1);
+
+    auto [___, gpio2] = CoE::findObject(dict, 0x6000, 2);
+    bit = 0;
+    CoE::readEntryBits(gpio2, &bit, 0);
+    EXPECT_EQ(bit & 0x01, 0);
+}
+
+TEST_F(PDOTest, configureMapping_padding_entry_index_zero_is_skipped)
+{
+    // 4 BOOL + 4-bit Index=0 gap rounded into one byte.
+    CoE::Dictionary dict;
+
+    {
+        CoE::Object obj{0x6000, CoE::ObjectCode::RECORD, "Inputs", {}};
+        CoE::addEntry<uint8_t>(obj, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Count", uint8_t{4});
+        CoE::addEntry<uint8_t>(obj, 1, 1, 8,  CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "DigitalIN0", uint8_t{0});
+        CoE::addEntry<uint8_t>(obj, 2, 1, 9,  CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "DigitalIN1", uint8_t{0});
+        CoE::addEntry<uint8_t>(obj, 3, 1, 10, CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "DigitalIN2", uint8_t{0});
+        CoE::addEntry<uint8_t>(obj, 4, 1, 11, CoE::Access::READ | CoE::Access::TxPDO,
+                               CoE::DataType::BOOLEAN, "DigitalIN3", uint8_t{0});
+        dict.push_back(std::move(obj));
+    }
+
+    {
+        CoE::Object obj{0x1A00, CoE::ObjectCode::RECORD, "TxPDO map", {}};
+        CoE::addEntry<uint8_t>(obj, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Count", uint8_t{5});
+        CoE::addEntry<uint32_t>(obj, 1, 32, 8,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "M1",
+                                makeMappingEntry(0x6000, 1, 1));
+        CoE::addEntry<uint32_t>(obj, 2, 32, 40, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M2",
+                                makeMappingEntry(0x6000, 2, 1));
+        CoE::addEntry<uint32_t>(obj, 3, 32, 72, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M3",
+                                makeMappingEntry(0x6000, 3, 1));
+        CoE::addEntry<uint32_t>(obj, 4, 32, 104, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M4",
+                                makeMappingEntry(0x6000, 4, 1));
+        CoE::addEntry<uint32_t>(obj, 5, 32, 136, CoE::Access::READ, CoE::DataType::UNSIGNED32, "Padding",
+                                makeMappingEntry(0x0000, 0, 4));
+        dict.push_back(std::move(obj));
+    }
+
+    {
+        CoE::Object assign{0x1C13, CoE::ObjectCode::RECORD, "TxPDO assign", {}};
+        CoE::addEntry<uint8_t>(assign, 0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Count", uint8_t{1});
+        CoE::addEntry<uint16_t>(assign, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
+        dict.push_back(std::move(assign));
+    }
+
+    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+
+    for (uint8_t sub = 1; sub <= 4; ++sub)
+    {
+        auto [obj, entry] = CoE::findObject(dict, 0x6000, sub);
+        ASSERT_NE(entry, nullptr);
+        ASSERT_TRUE(entry->is_mapped);
+        EXPECT_EQ(entry->data, static_cast<void*>(input_)) << "sub=" << int(sub);
+        EXPECT_EQ(entry->data_bit_offset, sub - 1) << "sub=" << int(sub);
+    }
+}
+
 TEST_F(PDOTest, configureMapping_null_old_data_no_memcpy)
 {
-    // Entry with data=nullptr — parsePdoMap should skip the memcpy
+    // Entry with data=nullptr must skip the memcpy in parsePdoMap.
     CoE::Dictionary dict;
 
     CoE::Object data_obj{0x6000, CoE::ObjectCode::VAR, "Data", {}};
