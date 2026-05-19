@@ -360,42 +360,46 @@ namespace kickcat
         {
             State before  = static_cast<State>(memory_.al_status  & 0xf);
             State current = static_cast<State>(memory_.al_control & 0xf);
-            simu_info("%f  %s -> %s  \n", seconds_f(since_epoch() - start).count(), toString(before), toString(current));
+
+            memory_.al_status_code = 0;
+            memory_.al_status &= ~AL_STATUS_ERR_IND;
 
             switch (current)
             {
-                case State::BOOT: { break; }
-                case State::INIT: { break; }
-                case State::PRE_OP:
+            case State::PRE_OP:
+                if (before == State::INIT)
                 {
-                    if (before == State::INIT)
-                    {
-                        configureSMs();
+                    configureSMs();
+                }
+                memory_.al_status = State::PRE_OP;
+                break;
 
-                        seconds_f wdgPDI = pdiWatchdog();
-                        seconds_f wdgPDO = pdoWatchdog();
-                        simu_info("PDI watchdog: %04fs\n", wdgPDI.count());
-                        simu_info("PDO watchdog: %04fs\n", wdgPDO.count());
-                    }
-                    break;
-                }
-                case State::SAFE_OP:
+            case State::SAFE_OP:
+                if (before == State::PRE_OP)
                 {
-                    if (before == State::PRE_OP)
-                    {
-                        configurePDOs();
-                    }
-                    break;
+                    configurePDOs();
+                    lastLogicalWrite_ = since_epoch();
                 }
-                case State::OPERATIONAL: { break; }
-                default: {}
+                memory_.watchdog_status_process_data = 1;
+                memory_.al_status = State::SAFE_OP;
+                break;
+
+            case State::OPERATIONAL:
+                if (before == State::SAFE_OP)
+                {
+                    lastLogicalWrite_ = since_epoch();
+                    memory_.watchdog_status_process_data = 1;
+                    memory_.al_status = State::OPERATIONAL;
+                }
+                break;
+
+            case State::INIT:
+                memory_.al_status = State::INIT;
+                break;
+
+            default:
+                break;
             }
-        }
-
-        // Mirror AL_STATUS - Device Emulation
-        if(memory_.esc_configuration & 0x01)
-        {
-            memory_.al_status = memory_.al_control;
         }
 
         // Handle eeprom access
@@ -456,7 +460,10 @@ namespace kickcat
             }
         }
 
-        checkWatchdog();
+        if (memory_.al_status & State::OPERATIONAL)
+        {
+            checkWatchdog();
+        }
     }
 
 
