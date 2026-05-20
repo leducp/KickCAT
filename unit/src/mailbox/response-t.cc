@@ -37,14 +37,14 @@ public:
     {
         mbx.enableCoE(createResponseTestDictionary());
 
-        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager) * 0, _, sizeof(SyncManager)))
+        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 0, _, sizeof(SyncManager::Register)))
             .WillRepeatedly(DoAll(
-                Invoke([this](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &sm_in, sizeof(SyncManager)); }),
+                Invoke([this](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &sm_in, sizeof(SyncManager::Register)); }),
                 Return(0)));
 
-        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager) * 1, _, sizeof(SyncManager)))
+        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 1, _, sizeof(SyncManager::Register)))
             .WillRepeatedly(DoAll(
-                Invoke([this](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &sm_out, sizeof(SyncManager)); }),
+                Invoke([this](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &sm_out, sizeof(SyncManager::Register)); }),
                 Return(0)));
 
         ASSERT_EQ(0, mbx.configure());
@@ -61,12 +61,12 @@ public:
         return raw;
     }
 
-    void expectSmStatusRead(uint8_t sm_index, SyncManager const& sync)
+    void expectSmStatusRead(uint8_t sm_index, SyncManager::Register const& sync)
     {
-        EXPECT_CALL(esc, read(addressSM(sm_index), _, sizeof(SyncManager)))
+        EXPECT_CALL(esc, read(addressSM(sm_index), _, sizeof(SyncManager::Register)))
             .WillOnce(DoAll(
-                Invoke([sync](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &sync, sizeof(SyncManager)); }),
-                Return(sizeof(SyncManager))))
+                Invoke([sync](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &sync, sizeof(SyncManager::Register)); }),
+                Return(sizeof(SyncManager::Register))))
             .RetiresOnSaturation();
     }
 
@@ -80,8 +80,8 @@ public:
     }
 
     MockESC esc;
-    SyncManager sm_in {RESP_MBX_IN_ADDR,  RESP_MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
-    SyncManager sm_out{RESP_MBX_OUT_ADDR, RESP_MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
+    SyncManager::Register sm_in {RESP_MBX_IN_ADDR,  RESP_MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
+    SyncManager::Register sm_out{RESP_MBX_OUT_ADDR, RESP_MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
     Mailbox mbx{&esc, RESP_MBX_SIZE, 2};
 };
 
@@ -93,7 +93,7 @@ TEST(Mailbox_Reponse_configure, not_configured)
 
     for (uint8_t i = 0; i < reg::SM_STATS; ++i)
     {
-        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, _, sizeof(SyncManager))).WillOnce(Return(0));
+        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * i, _, sizeof(SyncManager::Register))).WillOnce(Return(0));
     }
     ASSERT_EQ(-EAGAIN, mbx.configure());
 }
@@ -106,13 +106,13 @@ TEST(Mailbox_Reponse_configure, badly_configured)
 
     for (int i = 0; i < reg::SM_STATS; ++i)
     {
-        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, _, sizeof(SyncManager)))
+        EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * i, _, sizeof(SyncManager::Register)))
             .WillOnce(Invoke([&](uint16_t, void* data, uint16_t)
             {
-                SyncManager sm{};
-                std::memset(&sm, 0, sizeof(SyncManager));
-                std::memcpy(data, &sm, sizeof(SyncManager));
-                return sizeof(SyncManager);
+                SyncManager::Register sm{};
+                std::memset(&sm, 0, sizeof(SyncManager::Register));
+                std::memcpy(data, &sm, sizeof(SyncManager::Register));
+                return sizeof(SyncManager::Register);
             }));
     }
 
@@ -122,7 +122,7 @@ TEST(Mailbox_Reponse_configure, badly_configured)
 
 TEST_F(Mailbox_Response, receive_nothing_when_sm_empty)
 {
-    SyncManager sync{};
+    SyncManager::Register sync{};
     sync.status = 0;
     expectSmStatusRead(1, sync);
 
@@ -134,7 +134,7 @@ TEST_F(Mailbox_Response, receive_new_CoE_message)
 {
     auto raw = buildRawSDORead(0x1018, 1);
 
-    SyncManager sync{};
+    SyncManager::Register sync{};
     sync.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync);
     expectMailboxDataRead(raw);
@@ -145,7 +145,7 @@ TEST_F(Mailbox_Response, receive_new_CoE_message)
 
 TEST_F(Mailbox_Response, receive_read_failure)
 {
-    SyncManager sync{};
+    SyncManager::Register sync{};
     sync.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync);
 
@@ -162,7 +162,7 @@ TEST_F(Mailbox_Response, receive_unsupported_protocol)
     auto header = pointData<mailbox::Header>(raw.data());
     header->type = mailbox::Type::VoE;
 
-    SyncManager sync{};
+    SyncManager::Register sync{};
     sync.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync);
     expectMailboxDataRead(raw);
@@ -179,7 +179,7 @@ TEST_F(Mailbox_Response, receive_unsupported_protocol)
 
 TEST_F(Mailbox_Response, receive_queue_full)
 {
-    SyncManager sync{};
+    SyncManager::Register sync{};
     sync.status = SM_STATUS_MAILBOX;
 
     auto raw1 = buildRawSDORead(0x1018, 1);
@@ -210,7 +210,7 @@ TEST_F(Mailbox_Response, process_finalize_message)
 {
     auto raw = buildRawSDORead(0x1018, 1);
 
-    SyncManager sync{};
+    SyncManager::Register sync{};
     sync.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync);
     expectMailboxDataRead(raw);
@@ -237,7 +237,7 @@ TEST_F(Mailbox_Response, process_empty_queue)
 
 TEST_F(Mailbox_Response, send_nothing_when_queue_empty)
 {
-    SyncManager sync{};
+    SyncManager::Register sync{};
     sync.status = 0;
     sync.activate = 0;
     sync.pdi_control = 0;
@@ -251,7 +251,7 @@ TEST_F(Mailbox_Response, send_message)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
-    SyncManager sync_out{};
+    SyncManager::Register sync_out{};
     sync_out.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync_out);
     expectMailboxDataRead(raw);
@@ -259,7 +259,7 @@ TEST_F(Mailbox_Response, send_message)
     mbx.receive();
     mbx.process();
 
-    SyncManager sync_in{};
+    SyncManager::Register sync_in{};
     sync_in.status = 0;
     sync_in.activate = 0;
     sync_in.pdi_control = 0;
@@ -276,7 +276,7 @@ TEST_F(Mailbox_Response, send_blocked_when_mailbox_full)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
-    SyncManager sync_out{};
+    SyncManager::Register sync_out{};
     sync_out.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync_out);
     expectMailboxDataRead(raw);
@@ -284,7 +284,7 @@ TEST_F(Mailbox_Response, send_blocked_when_mailbox_full)
     mbx.receive();
     mbx.process();
 
-    SyncManager sync_in{};
+    SyncManager::Register sync_in{};
     sync_in.status = SM_STATUS_MAILBOX;
     sync_in.activate = 0;
     sync_in.pdi_control = 0;
@@ -300,7 +300,7 @@ TEST_F(Mailbox_Response, send_repeat_procedure)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
-    SyncManager sync_out{};
+    SyncManager::Register sync_out{};
     sync_out.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync_out);
     expectMailboxDataRead(raw);
@@ -309,7 +309,7 @@ TEST_F(Mailbox_Response, send_repeat_procedure)
     mbx.process();
 
     // First send: normal
-    SyncManager sync_first{};
+    SyncManager::Register sync_first{};
     sync_first.status = 0;
     sync_first.activate = 0;
     sync_first.pdi_control = 0;
@@ -322,7 +322,7 @@ TEST_F(Mailbox_Response, send_repeat_procedure)
     mbx.send();
 
     // Second send: IRQ_READ + repeat requested
-    SyncManager sync_repeat{};
+    SyncManager::Register sync_repeat{};
     sync_repeat.status = SM_STATUS_IRQ_READ;
     sync_repeat.activate = SM_ACTIVATE_REPEAT_REQ;
     sync_repeat.pdi_control = 0;
@@ -350,7 +350,7 @@ TEST_F(Mailbox_Response, full_receive_process_send_cycle)
 {
     auto raw = buildRawSDORead(0x1018, 2);
 
-    SyncManager sync_out{};
+    SyncManager::Register sync_out{};
     sync_out.status = SM_STATUS_MAILBOX;
     expectSmStatusRead(1, sync_out);
     expectMailboxDataRead(raw);
@@ -358,7 +358,7 @@ TEST_F(Mailbox_Response, full_receive_process_send_cycle)
 
     mbx.process();
 
-    SyncManager sync_in{};
+    SyncManager::Register sync_in{};
     sync_in.status = 0;
     sync_in.activate = 0;
     sync_in.pdi_control = 0;

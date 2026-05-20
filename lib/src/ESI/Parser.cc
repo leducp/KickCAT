@@ -44,14 +44,6 @@ const std::unordered_map<std::string, CoE::DataType> Parser::BASIC_TYPES
     {"BIT8",   CoE::DataType::BIT8        },
 };
 
-const std::unordered_map<std::string, uint8_t> Parser::SM_CONF
-{
-    {"MBoxOut",  1},
-    {"MBoxIn",   2},
-    {"Outputs",  3},
-    {"Inputs",   4},
-};
-
 namespace
 {
     XMLElement* requireChild(XMLNode* node, char const* name)
@@ -160,6 +152,21 @@ namespace
         char buf[24];
         std::snprintf(buf, sizeof(buf), "Object 0x%04x", index);
         return buf;
+    }
+
+    // xs:boolean per the ESI schema: accepts "true"/"false" and "1"/"0".
+    bool readBoolAttr(XMLElement* node, char const* name)
+    {
+        if (node == nullptr)
+        {
+            return false;
+        }
+        char const* raw = node->Attribute(name);
+        if (raw == nullptr)
+        {
+            return false;
+        }
+        return std::strcmp(raw, "true") == 0 or std::strcmp(raw, "1") == 0;
     }
 }
 
@@ -336,11 +343,78 @@ Device Parser::loadDeviceImpl(DeviceFilter const& filter)
         device.profile_no = static_cast<uint16_t>(parseHexDec(profile_no_));
     }
 
-    device.dictionary = buildDictionary(device_node, profile_node);
+    parseSyncManagers(device_node, device.sync_managers);
+    parseSyncUnits   (device_node, device.sync_units);
+    parseFmmus       (device_node, device.fmmus);
+
+    device.dictionary = buildDictionary(profile_node, device.sync_managers);
     return device;
 }
 
-CoE::Dictionary Parser::buildDictionary(XMLElement* device, XMLElement* profile)
+void Parser::parseSyncManagers(XMLElement* device, std::vector<SyncManager>& out)
+{
+    for (auto* sm = device->FirstChildElement("Sm"); sm != nullptr; sm = sm->NextSiblingElement("Sm"))
+    {
+        SyncManager entry;
+
+        char const* text = sm->GetText();
+        if (text != nullptr)
+        {
+            fromString(text, entry.type);
+        }
+
+        entry.min_size      = static_cast<uint16_t>(readHexDecAttr(sm, "MinSize"     ).value_or(0));
+        entry.max_size      = static_cast<uint16_t>(readHexDecAttr(sm, "MaxSize"     ).value_or(0));
+        entry.default_size  = static_cast<uint16_t>(readHexDecAttr(sm, "DefaultSize" ).value_or(0));
+        entry.start_address = static_cast<uint16_t>(readHexDecAttr(sm, "StartAddress").value_or(0));
+        entry.control_byte  = static_cast<uint8_t> (readHexDecAttr(sm, "ControlByte" ).value_or(0));
+        entry.enable        = static_cast<uint8_t> (readHexDecAttr(sm, "Enable"      ).value_or(0));
+        entry.is_virtual    = readBoolAttr(sm, "Virtual");
+        entry.op_only       = readBoolAttr(sm, "OpOnly");
+
+        out.push_back(entry);
+    }
+}
+
+void Parser::parseSyncUnits(XMLElement* device, std::vector<SyncUnit>& out)
+{
+    for (auto* su = device->FirstChildElement("Su"); su != nullptr; su = su->NextSiblingElement("Su"))
+    {
+        SyncUnit entry;
+        entry.separate_su          = readBoolAttr(su, "SeparateSu");
+        entry.separate_frame       = readBoolAttr(su, "SeparateFrame");
+        entry.frame_repeat_support = readBoolAttr(su, "FrameRepeatSupport");
+        out.push_back(entry);
+    }
+}
+
+void Parser::parseFmmus(XMLElement* device, std::vector<Fmmu>& out)
+{
+    for (auto* fmmu = device->FirstChildElement("Fmmu"); fmmu != nullptr; fmmu = fmmu->NextSiblingElement("Fmmu"))
+    {
+        Fmmu entry;
+
+        char const* text = fmmu->GetText();
+        if (text != nullptr)
+        {
+            fromString(text, entry.type);
+        }
+
+        if (auto sm_attr = readHexDecAttr(fmmu, "Sm"))
+        {
+            entry.sm = static_cast<int>(*sm_attr);
+        }
+        if (auto su_attr = readHexDecAttr(fmmu, "Su"))
+        {
+            entry.su = static_cast<int>(*su_attr);
+        }
+        entry.op_only = readBoolAttr(fmmu, "OpOnly");
+
+        out.push_back(entry);
+    }
+}
+
+CoE::Dictionary Parser::buildDictionary(XMLElement* profile, std::vector<SyncManager> const& sms)
 {
     auto* dictionary = requireChild(profile,    "Dictionary");
     dtypes_          = requireChild(dictionary, "DataTypes");
@@ -353,37 +427,35 @@ CoE::Dictionary Parser::buildDictionary(XMLElement* device, XMLElement* profile)
         out.push_back(createObject(node_object));
     }
 
+    // Synthesize CoE object 0x1C00 (Sync Manager Communication Type) from
+    // the device's <Sm> declarations so legacy callers of loadFile/loadString
+    // still get an SM-type array in their CoE::Dictionary.
     CoE::Object sms_type;
     sms_type.index = 0x1c00;
     sms_type.code  = CoE::ObjectCode::ARRAY;
     sms_type.name  = "Sync manager type";
     sms_type.entries.push_back(CoE::Entry{0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Subindex 0"});
 
-    for (auto* sm = device->FirstChildElement("Sm"); sm != nullptr; sm = sm->NextSiblingElement("Sm"))
+    for (std::size_t i = 0; i < sms.size(); ++i)
     {
         CoE::Entry entry;
-        entry.subindex    = static_cast<uint8_t>(sms_type.entries.size());
+        entry.subindex    = static_cast<uint8_t>(i + 1);
         entry.access      = CoE::Access::READ;
         entry.bitlen      = 8;
-        entry.bitoff      = static_cast<uint16_t>(sms_type.entries.size() * 8 + 8);
-        entry.description = "Subindex " + std::to_string(sms_type.entries.size());
+        entry.bitoff      = static_cast<uint16_t>((i + 1) * 8);
+        entry.description = "Subindex " + std::to_string(i + 1);
         entry.type        = CoE::DataType::UNSIGNED8;
         entry.data        = std::malloc(1);
 
-        char const* sm_text = textOrEmpty(sm);
-        auto it = SM_CONF.find(sm_text);
-        uint8_t sm_type = 0;
-        if (it != SM_CONF.end())
-        {
-            sm_type = it->second;
-        }
-        std::memcpy(entry.data, &sm_type, 1);
+        uint8_t type = static_cast<uint8_t>(sms[i].type);
+        std::memcpy(entry.data, &type, 1);
 
         sms_type.entries.push_back(std::move(entry));
     }
+
     auto& subindex0 = sms_type.entries.at(0);
     subindex0.data = std::malloc(1);
-    uint8_t array_size = static_cast<uint8_t>(sms_type.entries.size() - 1);
+    uint8_t array_size = static_cast<uint8_t>(sms.size());
     std::memcpy(subindex0.data, &array_size, 1);
     out.push_back(std::move(sms_type));
 

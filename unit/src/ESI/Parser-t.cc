@@ -581,6 +581,134 @@ TEST(ESIParser, throws_when_subitem_type_unresolved)
     }
 }
 
+TEST(ESIParser, loadDevice_parses_sync_managers_with_attributes)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
+
+    ASSERT_EQ(device.sync_managers.size(), 4u);
+
+    auto const& mbox_out = device.sync_managers[0];
+    ASSERT_EQ(mbox_out.type,          SyncManager::MailboxOut);
+    ASSERT_EQ(mbox_out.min_size,      40);
+    ASSERT_EQ(mbox_out.max_size,      1486);
+    ASSERT_EQ(mbox_out.default_size,  128);
+    ASSERT_EQ(mbox_out.start_address, 0x1000);
+    ASSERT_EQ(mbox_out.control_byte,  0x26);
+    ASSERT_EQ(mbox_out.enable,        1);
+    ASSERT_FALSE(mbox_out.is_virtual);
+    ASSERT_FALSE(mbox_out.op_only);
+
+    auto const& mbox_in = device.sync_managers[1];
+    ASSERT_EQ(mbox_in.type,          SyncManager::MailboxIn);
+    ASSERT_EQ(mbox_in.start_address, 0x1400);
+    ASSERT_EQ(mbox_in.control_byte,  0x22);
+    ASSERT_TRUE(mbox_in.is_virtual);     // Virtual="1"
+    ASSERT_FALSE(mbox_in.op_only);
+
+    auto const& outputs = device.sync_managers[2];
+    ASSERT_EQ(outputs.type,          SyncManager::Output);
+    ASSERT_EQ(outputs.min_size,      0);  // attribute absent
+    ASSERT_EQ(outputs.default_size,  40);
+    ASSERT_EQ(outputs.start_address, 0x1800);
+    ASSERT_EQ(outputs.control_byte,  0x64);
+    ASSERT_TRUE(outputs.op_only);        // OpOnly="true"
+
+    auto const& inputs = device.sync_managers[3];
+    ASSERT_EQ(inputs.type,          SyncManager::Input);
+    ASSERT_EQ(inputs.default_size,  22);
+    ASSERT_EQ(inputs.start_address, 0x1c00);
+}
+
+TEST(ESIParser, loadDevice_parses_fmmus)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
+
+    ASSERT_EQ(device.fmmus.size(), 3u);
+
+    ASSERT_EQ(device.fmmus[0].type, fmmu::Outputs);
+    ASSERT_EQ(device.fmmus[0].sm,   2);
+    ASSERT_TRUE(device.fmmus[0].op_only);
+
+    ASSERT_EQ(device.fmmus[1].type, fmmu::Inputs);
+    ASSERT_EQ(device.fmmus[1].sm,   3);
+    ASSERT_FALSE(device.fmmus[1].op_only);
+
+    ASSERT_EQ(device.fmmus[2].type, fmmu::MBoxState);
+    ASSERT_EQ(device.fmmus[2].sm,   -1);    // absent
+    ASSERT_EQ(device.fmmus[2].su,   -1);
+}
+
+TEST(ESIParser, loadDevice_parses_sync_units)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
+
+    ASSERT_EQ(device.sync_units.size(), 1u);
+    ASSERT_TRUE (device.sync_units[0].separate_su);             // "true"
+    ASSERT_FALSE(device.sync_units[0].separate_frame);          // "0"
+    ASSERT_TRUE (device.sync_units[0].frame_repeat_support);    // "1"
+}
+
+TEST(ESIParser, sync_managers_drive_legacy_0x1C00_synthesis)
+{
+    // The synthesized 0x1C00 array must reflect the parsed SM list.
+    ESI::Parser parser;
+    auto dictionary = parser.loadFile("kickcat_esi_test_sm_fmmu.xml");
+
+    auto [object, entry] = findObject(dictionary, 0x1C00, 0);
+    ASSERT_NE(object, nullptr);
+    ASSERT_EQ(object->code, CoE::ObjectCode::ARRAY);
+    ASSERT_EQ(object->entries.size(), 5u);  // 1 size byte + 4 SMs
+
+    uint8_t size = 0;
+    std::memcpy(&size, object->entries[0].data, 1);
+    ASSERT_EQ(size, 4u);
+
+    uint8_t sm_kinds[4];
+    for (int i = 0; i < 4; ++i)
+    {
+        std::memcpy(&sm_kinds[i], object->entries[i + 1].data, 1);
+    }
+    ASSERT_EQ(sm_kinds[0], 1u);   // MBoxOut
+    ASSERT_EQ(sm_kinds[1], 2u);   // MBoxIn
+    ASSERT_EQ(sm_kinds[2], 3u);   // Outputs
+    ASSERT_EQ(sm_kinds[3], 4u);   // Inputs
+}
+
+TEST(ESIParser, throws_on_unknown_fmmu_text)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Fmmu>SomeUnknownThing</Fmmu>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("SomeUnknownThing"), std::string::npos) << msg;
+    }
+}
+
 TEST(ESIParser, CoE_alias_is_backwards_compatible)
 {
     // The CoE::EsiParser alias must still resolve to ESI::Parser.

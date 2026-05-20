@@ -50,10 +50,10 @@ public:
     uint8_t buffer_in_[256]{};
     uint8_t buffer_out_[256]{};
 
-    SyncManager mbx_in_ {MBX_IN_ADDR,  MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
-    SyncManager mbx_out_{MBX_OUT_ADDR, MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
-    SyncManager pdo_in_ {PDO_IN_ADDR,  sizeof(buffer_in_),  SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
-    SyncManager pdo_out_{PDO_OUT_ADDR, sizeof(buffer_out_), SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
+    SyncManager::Register mbx_in_ {MBX_IN_ADDR,  MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
+    SyncManager::Register mbx_out_{MBX_OUT_ADDR, MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
+    SyncManager::Register pdo_in_ {PDO_IN_ADDR,  sizeof(buffer_in_),  SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
+    SyncManager::Register pdo_out_{PDO_OUT_ADDR, sizeof(buffer_out_), SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
 
     mailbox::response::Mailbox mbx_{&esc_, MBX_SIZE};
 
@@ -82,35 +82,35 @@ public:
 
     void setupSmDefaults()
     {
-        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * 0, _, sizeof(SyncManager)))
+        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 0, _, sizeof(SyncManager::Register)))
             .WillByDefault(DoAll(
                 Invoke([this](uint16_t, void* ptr, uint16_t)
-                { std::memcpy(ptr, &mbx_in_, sizeof(SyncManager)); }),
+                { std::memcpy(ptr, &mbx_in_, sizeof(SyncManager::Register)); }),
                 Return(0)));
 
-        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * 1, _, sizeof(SyncManager)))
+        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 1, _, sizeof(SyncManager::Register)))
             .WillByDefault(DoAll(
                 Invoke([this](uint16_t, void* ptr, uint16_t)
-                { std::memcpy(ptr, &mbx_out_, sizeof(SyncManager)); }),
+                { std::memcpy(ptr, &mbx_out_, sizeof(SyncManager::Register)); }),
                 Return(0)));
 
-        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * 2, _, sizeof(SyncManager)))
+        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 2, _, sizeof(SyncManager::Register)))
             .WillByDefault(DoAll(
                 Invoke([this](uint16_t, void* ptr, uint16_t)
-                { std::memcpy(ptr, &pdo_in_, sizeof(SyncManager)); }),
+                { std::memcpy(ptr, &pdo_in_, sizeof(SyncManager::Register)); }),
                 Return(0)));
 
-        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * 3, _, sizeof(SyncManager)))
+        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 3, _, sizeof(SyncManager::Register)))
             .WillByDefault(DoAll(
                 Invoke([this](uint16_t, void* ptr, uint16_t)
-                { std::memcpy(ptr, &pdo_out_, sizeof(SyncManager)); }),
+                { std::memcpy(ptr, &pdo_out_, sizeof(SyncManager::Register)); }),
                 Return(0)));
 
-        SyncManager sm_empty{};
-        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * 4, _, sizeof(SyncManager)))
+        SyncManager::Register sm_empty{};
+        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 4, _, sizeof(SyncManager::Register)))
             .WillByDefault(DoAll(
                 Invoke([sm_empty](uint16_t, void* ptr, uint16_t)
-                { std::memcpy(ptr, &sm_empty, sizeof(SyncManager)); }),
+                { std::memcpy(ptr, &sm_empty, sizeof(SyncManager::Register)); }),
                 Return(0)));
     }
 

@@ -16,20 +16,20 @@ namespace kickcat
         uint16_t start_address;
         uint16_t length;
         uint8_t  control;
-        SyncManagerType type;
+        SyncManager::Type type;
     };
 
     constexpr SyncManagerConfig SYNC_MANAGER_PI_IN(uint8_t index, uint16_t address, uint16_t length)
-    { return {index, address, length, 0x20, SyncManagerType::Input}; }
+    { return {index, address, length, 0x20, SyncManager::Input}; }
 
     constexpr SyncManagerConfig SYNC_MANAGER_PI_OUT(uint8_t index, uint16_t address, uint16_t length)
-    { return {index, address, length, 0x64, SyncManagerType::Output}; }
+    { return {index, address, length, 0x64, SyncManager::Output}; }
 
     constexpr SyncManagerConfig SYNC_MANAGER_MBX_IN(uint8_t index, uint16_t address, uint16_t length)
-    { return {index, address, length, 0x02, SyncManagerType::MailboxIn}; }
+    { return {index, address, length, 0x02, SyncManager::MailboxIn}; }
 
     constexpr SyncManagerConfig SYNC_MANAGER_MBX_OUT(uint8_t index, uint16_t address, uint16_t length)
-    { return {index, address, length, 0x06, SyncManagerType::MailboxOut}; }
+    { return {index, address, length, 0x06, SyncManager::MailboxOut}; }
 
 
     namespace mailbox::response
@@ -59,7 +59,7 @@ namespace kickcat
         /// \return Number of bytes written or a negative errno code otherwise
         virtual int32_t write(uint16_t address, void const* data, uint16_t size) = 0;
 
-        std::tuple<uint8_t, SyncManager> findSm(uint16_t controlMode);
+        std::tuple<uint8_t, SyncManager::Register> findSm(uint16_t controlMode);
         void activateSm(SyncManagerConfig const& sm);
         void deactivateSm(SyncManagerConfig const& sm);
 

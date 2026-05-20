@@ -231,8 +231,8 @@ TEST(EmulatedESC, ecat_PDOs)
     uint8_t next = State::SAFE_OP;
     esc.write(reg::AL_CONTROL, &next, 1);
 
-    FMMU fmmu;
-    memset(&fmmu, 0, sizeof(FMMU));
+    fmmu::Register fmmu;
+    memset(&fmmu, 0, sizeof(fmmu::Register));
 
     fmmu.type  = 2;                // write access
     fmmu.logical_address    = 0x2000;
@@ -242,7 +242,7 @@ TEST(EmulatedESC, ecat_PDOs)
     fmmu.physical_address   = 0x3000;
     fmmu.physical_start_bit = 0;
     fmmu.activate           = 1;
-    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(FMMU));
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(fmmu::Register));
 
     fmmu.type  = 1;                 // read access
     fmmu.logical_address    = 0x200A;
@@ -252,7 +252,7 @@ TEST(EmulatedESC, ecat_PDOs)
     fmmu.physical_address   = 0x300A;
     fmmu.physical_start_bit = 0;
     fmmu.activate           = 1;
-    esc.write(reg::FMMU + 0x10, &fmmu, sizeof(FMMU));
+    esc.write(reg::FMMU + 0x10, &fmmu, sizeof(fmmu::Register));
 
     // run internal logic
     DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};

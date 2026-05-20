@@ -43,7 +43,12 @@ namespace kickcat::ESI
         tinyxml2::XMLElement* selectDevice(DeviceFilter const& filter);
         DeviceSummary         summarize   (tinyxml2::XMLElement* device);
 
-        CoE::Dictionary buildDictionary(tinyxml2::XMLElement* device, tinyxml2::XMLElement* profile);
+        void parseSyncManagers(tinyxml2::XMLElement* device, std::vector<SyncManager>& out);
+        void parseSyncUnits   (tinyxml2::XMLElement* device, std::vector<SyncUnit>&    out);
+        void parseFmmus       (tinyxml2::XMLElement* device, std::vector<Fmmu>&        out);
+
+        CoE::Dictionary buildDictionary(tinyxml2::XMLElement* profile,
+                                        std::vector<SyncManager> const& sms);
 
         std::vector<uint8_t> loadHexBinary(tinyxml2::XMLElement* node);
         std::vector<uint8_t> loadStringData(tinyxml2::XMLElement* node);
@@ -70,7 +75,6 @@ namespace kickcat::ESI
         std::string profile_no_;
 
         static const std::unordered_map<std::string, CoE::DataType> BASIC_TYPES;
-        static const std::unordered_map<std::string, uint8_t>       SM_CONF;
     };
 }
 

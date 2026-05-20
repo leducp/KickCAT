@@ -133,10 +133,10 @@ namespace kickcat
             uint32_t phy_port_status;
             uint8_t padding23[228];
 
-            FMMU fmmu[16];
+            fmmu::Register fmmu[16];
             uint8_t padding24[0x100];
 
-            SyncManager sync_manager[16];
+            SyncManager::Register sync_manager[16];
             uint8_t padding25[128];
 
             // DC
@@ -165,7 +165,7 @@ namespace kickcat
             uint8_t access;
             uint16_t address;
             uint16_t size;
-            SyncManager* registers;
+            SyncManager::Register* registers;
         };
         std::vector<SM> syncs_;
 

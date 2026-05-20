@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<EtherCATInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="EtherCATInfo.xsd" Version="1.6">
+	<Vendor>
+		<Id>#x0CAFE</Id>
+		<Name>KickCAT</Name>
+	</Vendor>
+	<Descriptions>
+		<Groups>
+			<Group>
+				<Type>KickCAT Test Devices</Type>
+				<Name>KickCAT Test Devices</Name>
+			</Group>
+		</Groups>
+		<Devices>
+			<Device Physics="YY">
+				<Type ProductCode="#x00005555" RevisionNo="#x1">kickcat_esi_test_sm_fmmu</Type>
+				<Name>KickCAT ESI Test Sm/Fmmu/Su</Name>
+				<GroupType>KickCAT Test Devices</GroupType>
+				<Profile>
+					<ProfileNo>5005</ProfileNo>
+					<Dictionary>
+						<DataTypes>
+							<DataType>
+								<Name>UDINT</Name>
+								<BitSize>32</BitSize>
+							</DataType>
+						</DataTypes>
+						<Objects>
+							<Object>
+								<Index>#x1000</Index>
+								<Name>Device Type</Name>
+								<Type>UDINT</Type>
+								<BitSize>32</BitSize>
+								<Flags>
+									<Access>ro</Access>
+								</Flags>
+							</Object>
+						</Objects>
+					</Dictionary>
+				</Profile>
+				<Fmmu Sm="2" OpOnly="1">Outputs</Fmmu>
+				<Fmmu Sm="3">Inputs</Fmmu>
+				<Fmmu>MBoxState</Fmmu>
+				<Su SeparateSu="true" SeparateFrame="0" FrameRepeatSupport="1"/>
+				<Sm MinSize="40" MaxSize="1486" DefaultSize="128" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+				<Sm MinSize="40" MaxSize="1486" DefaultSize="128" StartAddress="#x1400" ControlByte="#x22" Enable="1" Virtual="1">MBoxIn</Sm>
+				<Sm DefaultSize="40" StartAddress="#x1800" ControlByte="#x64" Enable="1" OpOnly="true">Outputs</Sm>
+				<Sm DefaultSize="22" StartAddress="#x1c00" ControlByte="#x20" Enable="1">Inputs</Sm>
+			</Device>
+		</Devices>
+	</Descriptions>
+</EtherCATInfo>

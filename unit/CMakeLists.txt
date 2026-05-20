@@ -42,6 +42,7 @@ file(COPY ${CMAKE_SOURCE_DIR}/examples/slave/nuttx/xmc4800/boards/wdc_foot/foot.
 file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_basic.xml DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_complex.xml DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_multi_device.xml DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_sm_fmmu.xml      DESTINATION ${CMAKE_BINARY_DIR})
 
 target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
 target_include_directories(kickcat_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
