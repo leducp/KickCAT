@@ -441,6 +441,146 @@ TEST(ESIParser, loadDevice_filter_no_match_throws)
                  std::invalid_argument);
 }
 
+TEST(ESIParser, throws_with_context_when_object_missing_name)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1000</Index>
+                                <Type>UDINT</Type>
+                                <BitSize>32</BitSize>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Name"),         std::string::npos) << msg;
+        ASSERT_NE(msg.find("Object 0x1000"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_with_context_when_object_missing_index)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object>
+                                <Name>NoIndex</Name>
+                                <Type>UDINT</Type>
+                                <BitSize>32</BitSize>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ASSERT_THROW((void) parser.loadString(xml), std::invalid_argument);
+}
+
+TEST(ESIParser, throws_on_basetype_cycle)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>DT_A</Name><BaseType>DT_B</BaseType><BitSize>32</BitSize></DataType>
+                            <DataType><Name>DT_B</Name><BaseType>DT_A</BaseType><BitSize>32</BitSize></DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1000</Index>
+                                <Name>Cycle</Name>
+                                <Type>DT_A</Type>
+                                <BitSize>32</BitSize>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("recursion"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_when_subitem_type_unresolved)
+{
+    // RECORD references DT_Missing which is not in <DataTypes>.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x2000</Index>
+                                <Name>Bad</Name>
+                                <Type>DT_Missing</Type>
+                                <BitSize>16</BitSize>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Object 0x2000"), std::string::npos) << msg;
+    }
+}
+
 TEST(ESIParser, CoE_alias_is_backwards_compatible)
 {
     // The CoE::EsiParser alias must still resolve to ESI::Parser.

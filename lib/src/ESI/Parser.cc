@@ -70,32 +70,110 @@ namespace
 
     char const* textOrEmpty(XMLElement* node)
     {
-        if (node == nullptr) { return ""; }
+        if (node == nullptr)
+        {
+            return "";
+        }
         char const* text = node->GetText();
-        if (text == nullptr) { return ""; }
+        if (text == nullptr)
+        {
+            return "";
+        }
         return text;
+    }
+
+    // Throws when a mandatory text-bearing element is missing or has empty content.
+    char const* requireText(XMLElement* elem, char const* child, std::string const& where)
+    {
+        if (elem == nullptr)
+        {
+            std::string what = "ESI: missing mandatory <";
+            what += child;
+            what += "> in ";
+            what += where;
+            throw std::invalid_argument(what);
+        }
+        char const* text = elem->GetText();
+        if (text == nullptr)
+        {
+            std::string what = "ESI: empty <";
+            what += child;
+            what += "> in ";
+            what += where;
+            throw std::invalid_argument(what);
+        }
+        return text;
+    }
+
+    // Parent + child-name overload: fetches then validates.
+    char const* requireText(XMLNode* parent, char const* child, std::string const& where)
+    {
+        return requireText(parent->FirstChildElement(child), child, where);
+    }
+
+    // Nullable read: returns nullptr if the child is missing or has no text.
+    char const* findText(XMLNode* parent, char const* child)
+    {
+        auto* elem = parent->FirstChildElement(child);
+        if (elem == nullptr)
+        {
+            return nullptr;
+        }
+        return elem->GetText();
     }
 
     int64_t parseHexDec(std::string text)
     {
+        if (text.empty())
+        {
+            throw std::invalid_argument("ESI: empty numeric value");
+        }
         if (text.rfind("#x", 0) == 0)
         {
+            if (text.size() == 2)
+            {
+                throw std::invalid_argument("ESI: '#x' with no hex digits");
+            }
             text[0] = '0';
             return std::stoll(text, nullptr, 16);
         }
         if (text.rfind("0x", 0) == 0 or text.rfind("0X", 0) == 0)
         {
+            if (text.size() == 2)
+            {
+                throw std::invalid_argument("ESI: '0x' with no hex digits");
+            }
             return std::stoll(text, nullptr, 16);
         }
         return std::stoll(text, nullptr, 10);
+    }
+
+    template<typename T>
+    T requireNumber(XMLNode* parent, char const* child, std::string const& where)
+    {
+        char const* text = requireText(parent, child, where);
+        return static_cast<T>(parseHexDec(text));
+    }
+
+    std::string objectLabel(uint16_t index)
+    {
+        char buf[24];
+        std::snprintf(buf, sizeof(buf), "Object 0x%04x", index);
+        return buf;
     }
 }
 
 std::optional<uint32_t> Parser::readHexDecAttr(XMLElement* node, char const* name)
 {
-    if (node == nullptr) { return std::nullopt; }
+    if (node == nullptr)
+    {
+        return std::nullopt;
+    }
     char const* raw = node->Attribute(name);
-    if (raw == nullptr) { return std::nullopt; }
+    if (raw == nullptr)
+    {
+        return std::nullopt;
+    }
     return static_cast<uint32_t>(parseHexDec(raw));
 }
 
@@ -173,7 +251,10 @@ XMLElement* Parser::selectDevice(DeviceFilter const& filter)
         std::size_t i = 0;
         for (auto* d = devices_->FirstChildElement("Device"); d != nullptr; d = d->NextSiblingElement("Device"))
         {
-            if (i == filter.index) { return d; }
+            if (i == filter.index)
+            {
+                return d;
+            }
             ++i;
         }
         throw std::invalid_argument("ESI: device index out of range");
@@ -185,17 +266,26 @@ XMLElement* Parser::selectDevice(DeviceFilter const& filter)
         if (filter.type)
         {
             std::string type_text = textOrEmpty(type_node);
-            if (type_text != *filter.type) { continue; }
+            if (type_text != *filter.type)
+            {
+                continue;
+            }
         }
         if (filter.product_code)
         {
             auto pc = readHexDecAttr(type_node, "ProductCode");
-            if (not pc or *pc != *filter.product_code) { continue; }
+            if (not pc or *pc != *filter.product_code)
+            {
+                continue;
+            }
         }
         if (filter.revision_no)
         {
             auto rev = readHexDecAttr(type_node, "RevisionNo");
-            if (not rev or *rev != *filter.revision_no) { continue; }
+            if (not rev or *rev != *filter.revision_no)
+            {
+                continue;
+            }
         }
         return d;
     }
@@ -282,7 +372,11 @@ CoE::Dictionary Parser::buildDictionary(XMLElement* device, XMLElement* profile)
 
         char const* sm_text = textOrEmpty(sm);
         auto it = SM_CONF.find(sm_text);
-        uint8_t sm_type = (it != SM_CONF.end()) ? it->second : uint8_t{0};
+        uint8_t sm_type = 0;
+        if (it != SM_CONF.end())
+        {
+            sm_type = it->second;
+        }
         std::memcpy(entry.data, &sm_type, 1);
 
         sms_type.entries.push_back(std::move(entry));
@@ -308,7 +402,16 @@ CoE::Dictionary Parser::loadString(std::string const& xml)
 
 std::vector<uint8_t> Parser::loadHexBinary(XMLElement* node)
 {
-    std::string field = node->GetText();
+    if (node == nullptr)
+    {
+        return {};
+    }
+    char const* raw = node->GetText();
+    if (raw == nullptr)
+    {
+        return {};
+    }
+    std::string field = raw;
     std::vector<uint8_t> data;
     data.reserve(field.size() / 2);
 
@@ -364,24 +467,17 @@ void Parser::loadDefaultData(XMLNode* node, CoE::Object& obj, CoE::Entry& entry)
         return;
     }
 
-    auto node_default_value = node_info->FirstChildElement("DefaultValue");
-    if (node_default_value != nullptr)
+    if (char const* default_value = findText(node_info, "DefaultValue"))
     {
-        std::string text = node_default_value->GetText();
-        int64_t value;
-        if (text.rfind("#x", 0) == 0)
-        {
-            text[0] = '0';
-            value = std::stoll(text, nullptr, 16);
-        }
-        else
-        {
-            value = std::stoll(text, nullptr, 10);
-        }
-
+        int64_t value = parseHexDec(default_value);
         uint32_t size = entry.bitlen / 8;
+        uint32_t copy_size = std::min<uint32_t>(size, sizeof(int64_t));
         entry.data = std::malloc(size);
-        std::memcpy(entry.data, &value, size);
+        if (copy_size < size)
+        {
+            std::memset(entry.data, 0, size);
+        }
+        std::memcpy(entry.data, &value, copy_size);
     }
 }
 
@@ -398,7 +494,12 @@ uint16_t Parser::loadAccess(XMLNode* node)
     auto node_access = node_flags->FirstChildElement("Access");
     if (node_access != nullptr)
     {
-        std::string access = node_access->GetText();
+        char const* raw = node_access->GetText();
+        std::string access;
+        if (raw != nullptr)
+        {
+            access = raw;
+        }
 
         if (access == "rw" or access == "ro")
         {
@@ -440,34 +541,45 @@ uint16_t Parser::loadAccess(XMLNode* node)
         flags |= CoE::Access::READ;
     }
 
-    auto node_pdo_mapping = node_flags->FirstChildElement("PdoMapping");
-    if (node_pdo_mapping != nullptr)
+    if (char const* mapping = findText(node_flags, "PdoMapping"))
     {
-        std::string mapping = node_pdo_mapping->GetText();
-        for (auto const& c : mapping)
+        for (char const* c = mapping; *c != '\0'; ++c)
         {
-            if (std::tolower(c) == 'r') { flags |= CoE::Access::RxPDO; }
-            if (std::tolower(c) == 't') { flags |= CoE::Access::TxPDO; }
+            if (std::tolower(*c) == 'r')
+            {
+                flags |= CoE::Access::RxPDO;
+            }
+            if (std::tolower(*c) == 't')
+            {
+                flags |= CoE::Access::TxPDO;
+            }
         }
     }
 
-    auto node_backup = node_flags->FirstChildElement("Backup");
-    if (node_backup != nullptr)
+    if (char const* t = findText(node_flags, "Backup"); t and t[0] == '1')
     {
-        if (node_backup->GetText()[0] == '1') { flags |= CoE::Access::BACKUP; }
+        flags |= CoE::Access::BACKUP;
     }
-
-    auto node_setting = node_flags->FirstChildElement("Setting");
-    if (node_setting != nullptr)
+    if (char const* t = findText(node_flags, "Setting"); t and t[0] == '1')
     {
-        if (node_setting->GetText()[0] == '1') { flags |= CoE::Access::SETTING; }
+        flags |= CoE::Access::SETTING;
     }
 
     return flags;
 }
 
-CoE::DataType Parser::resolveType(std::string const& type_name)
+CoE::DataType Parser::resolveType(std::string const& type_name, int depth)
 {
+    if (depth > MAX_TYPE_DEPTH)
+    {
+        std::string what = "ESI: <BaseType> recursion exceeds depth ";
+        what += std::to_string(MAX_TYPE_DEPTH);
+        what += " resolving '";
+        what += type_name;
+        what += "' (cycle?)";
+        throw std::invalid_argument(what);
+    }
+
     auto it = BASIC_TYPES.find(type_name);
     if (it != BASIC_TYPES.end())
     {
@@ -483,7 +595,12 @@ CoE::DataType Parser::resolveType(std::string const& type_name)
     while (dtype)
     {
         auto name_elem = dtype->FirstChildElement("Name");
-        if (name_elem and type_name == name_elem->GetText())
+        char const* name_text = nullptr;
+        if (name_elem != nullptr)
+        {
+            name_text = name_elem->GetText();
+        }
+        if (name_text != nullptr and type_name == name_text)
         {
             if (dtype->FirstChildElement("SubItem") or dtype->FirstChildElement("ArrayInfo"))
             {
@@ -493,7 +610,15 @@ CoE::DataType Parser::resolveType(std::string const& type_name)
             auto base = dtype->FirstChildElement("BaseType");
             if (base)
             {
-                return resolveType(base->GetText());
+                char const* base_text = base->GetText();
+                if (base_text == nullptr)
+                {
+                    std::string what = "ESI: empty <BaseType> for DataType '";
+                    what += type_name;
+                    what += "'";
+                    throw std::invalid_argument(what);
+                }
+                return resolveType(base_text, depth + 1);
             }
 
             break;
@@ -506,45 +631,47 @@ CoE::DataType Parser::resolveType(std::string const& type_name)
 
 std::tuple<CoE::DataType, uint16_t, uint16_t> Parser::parseType(XMLNode* node)
 {
-    auto node_type = node->FirstChildElement("Type");
-    if (not node_type)
+    char const* type_text = findText(node, "Type");
+    if (type_text == nullptr)
     {
-        node_type = node->FirstChildElement("BaseType");
+        type_text = findText(node, "BaseType");
     }
-
-    if (not node_type)
+    if (type_text == nullptr)
     {
         return {CoE::DataType::UNKNOWN, 0, 0};
     }
 
-    CoE::DataType type = resolveType(node_type->GetText());
+    CoE::DataType type = resolveType(type_text);
     if (type == CoE::DataType::UNKNOWN)
     {
         return {CoE::DataType::UNKNOWN, 0, 0};
     }
 
-    uint16_t bitlen = toNumber<uint16_t>(node->FirstChildElement("BitSize"));
+    uint16_t bitlen = requireNumber<uint16_t>(node, "BitSize", "<Type> reference");
     uint16_t bitoff = 0;
-    auto node_bitoff = node->FirstChildElement("BitOffs");
-    if (node_bitoff)
+    if (char const* bitoff_text = findText(node, "BitOffs"))
     {
-        bitoff = toNumber<uint16_t>(node_bitoff);
+        bitoff = static_cast<uint16_t>(parseHexDec(bitoff_text));
     }
 
     return {type, bitlen, bitoff};
 }
 
-
-XMLNode* Parser::findNodeType(XMLNode* node)
+XMLNode* Parser::findNodeType(XMLNode* node, std::string const& where)
 {
-    std::string raw_type = node->FirstChildElement("Type")->GetText();
+    char const* raw_type = requireText(node->FirstChildElement("Type"), "Type", where);
 
     auto dtype = dtypes_->FirstChildElement();
     while (dtype)
     {
-        if (raw_type == dtype->FirstChildElement("Name")->GetText())
+        auto name_elem = dtype->FirstChildElement("Name");
+        if (name_elem != nullptr)
         {
-            break;
+            char const* name_text = name_elem->GetText();
+            if (name_text != nullptr and std::strcmp(raw_type, name_text) == 0)
+            {
+                break;
+            }
         }
         dtype = dtype->NextSiblingElement();
     }
@@ -552,12 +679,14 @@ XMLNode* Parser::findNodeType(XMLNode* node)
     return dtype;
 }
 
-
 CoE::Object Parser::createObject(XMLNode* node)
 {
     CoE::Object object;
-    object.index = toNumber<uint16_t>(node->FirstChildElement("Index"));
-    object.name  = node->FirstChildElement("Name")->GetText();
+    object.index = requireNumber<uint16_t>(node, "Index", "Object");
+
+    std::string where = objectLabel(object.index);
+    object.name = requireText(node, "Name", where);
+
     auto [type, bitlen, bitoff] = parseType(node);
     if (CoE::isBasic(type))
     {
@@ -575,15 +704,18 @@ CoE::Object Parser::createObject(XMLNode* node)
         return object;
     }
 
-    auto node_type = findNodeType(node);
+    auto node_type = findNodeType(node, where);
+    if (node_type == nullptr)
+    {
+        throw std::invalid_argument("ESI: unresolved <Type> reference in " + where);
+    }
     auto node_subitem = node_type->FirstChildElement("SubItem");
     while (node_subitem)
     {
         CoE::Entry entry;
-        auto node_name = node_subitem->FirstChildElement("Name");
-        if (node_name)
+        if (char const* text = findText(node_subitem, "Name"))
         {
-            entry.description = node_name->GetText();
+            entry.description = text;
         }
 
         auto [subitem_type, subitem_bitlen, subitem_bitoff] = parseType(node_subitem);
@@ -594,7 +726,7 @@ CoE::Object Parser::createObject(XMLNode* node)
             entry.type     = subitem_type;
             entry.bitlen   = subitem_bitlen;
             entry.bitoff   = subitem_bitoff;
-            entry.subindex = toNumber<uint8_t>(node_subitem->FirstChildElement("SubIdx"));
+            entry.subindex = requireNumber<uint8_t>(node_subitem, "SubIdx", where + " SubItem");
             entry.access   = loadAccess(node_subitem);
 
             object.entries.push_back(std::move(entry));
@@ -603,7 +735,12 @@ CoE::Object Parser::createObject(XMLNode* node)
         {
             object.code = CoE::ObjectCode::ARRAY;
 
-            auto node_array_type = findNodeType(node_subitem);
+            std::string sub_where = where + " SubItem";
+            auto node_array_type = findNodeType(node_subitem, sub_where);
+            if (node_array_type == nullptr)
+            {
+                throw std::invalid_argument("ESI: unresolved <Type> reference in " + sub_where);
+            }
             auto [array_type, array_bitlen, array_bitoff] = parseType(node_array_type);
             entry.type   = array_type;
             entry.bitlen = array_bitlen;
@@ -611,18 +748,26 @@ CoE::Object Parser::createObject(XMLNode* node)
             entry.access = loadAccess(node_subitem);
 
             auto node_array_info = node_array_type->FirstChildElement("ArrayInfo");
-            uint8_t lbound = toNumber<uint8_t>(node_array_info->FirstChildElement("LBound"));
+            if (node_array_info == nullptr)
+            {
+                throw std::invalid_argument("ESI: missing <ArrayInfo> in " + sub_where);
+            }
+            uint8_t lbound = requireNumber<uint8_t>(node_array_info, "LBound", sub_where);
             if (lbound == 0)
             {
                 entry.subindex = 1;
-                entry.bitlen   = toNumber<uint16_t>(node_array_type->FirstChildElement("BitSize"));
+                entry.bitlen   = requireNumber<uint16_t>(node_array_type, "BitSize", sub_where);
                 object.entries.push_back(std::move(entry));
             }
             else
             {
-                uint8_t  elements       = toNumber<uint8_t>(node_array_info->FirstChildElement("Elements"));
-                uint16_t element_bitlen = static_cast<uint16_t>(toNumber<uint16_t>(node_subitem->FirstChildElement("BitSize")) / elements);
-                uint16_t element_bitoff = toNumber<uint16_t>(node_subitem->FirstChildElement("BitOffs"));
+                uint8_t  elements       = requireNumber<uint8_t> (node_array_info, "Elements", sub_where);
+                if (elements == 0)
+                {
+                    throw std::invalid_argument("ESI: <Elements> is zero in " + sub_where);
+                }
+                uint16_t element_bitlen = static_cast<uint16_t>(requireNumber<uint16_t>(node_subitem, "BitSize", sub_where) / elements);
+                uint16_t element_bitoff = requireNumber<uint16_t>(node_subitem, "BitOffs", sub_where);
 
                 for (uint8_t i = 1; i <= elements; ++i)
                 {
@@ -643,22 +788,20 @@ CoE::Object Parser::createObject(XMLNode* node)
         return object;
     }
     auto object_subitem = node_info->FirstChildElement("SubItem");
-    auto entry = object.entries.begin();
-    for (auto& object_entry : object.entries)
+    for (auto& entry : object.entries)
     {
-        if (object_subitem)
+        if (object_subitem == nullptr)
         {
-            auto object_subitem_name = object_subitem->FirstChildElement("Name");
-            if (object_subitem_name)
-            {
-                object_entry.description = object_subitem_name->GetText();
-            }
-
-            loadDefaultData(object_subitem, object, *entry);
-
-            entry++;
-            object_subitem = object_subitem->NextSiblingElement();
+            break;
         }
+
+        if (char const* text = findText(object_subitem, "Name"))
+        {
+            entry.description = text;
+        }
+        loadDefaultData(object_subitem, object, entry);
+
+        object_subitem = object_subitem->NextSiblingElement();
     }
 
     return object;

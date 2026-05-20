@@ -31,17 +31,6 @@ namespace kickcat::ESI
         Device loadDeviceString(std::string const& xml,  DeviceFilter const& filter = {});
 
     private:
-        template<typename T>
-        T toNumber(tinyxml2::XMLElement* node)
-        {
-            std::string field = node->GetText();
-            if (field.rfind("#x", 0) == 0)
-            {
-                field[0] = '0';
-            }
-            return static_cast<T>(std::stoll(field, nullptr, 0));
-        }
-
         static std::optional<uint32_t> readHexDecAttr(tinyxml2::XMLElement* node, char const* name);
 
         void openFile  (std::string const& file);
@@ -62,9 +51,11 @@ namespace kickcat::ESI
         void loadDefaultData(tinyxml2::XMLNode* node, CoE::Object& obj, CoE::Entry& entry);
         uint16_t loadAccess(tinyxml2::XMLNode* node);
 
+        static constexpr int MAX_TYPE_DEPTH = 16;
+
         std::tuple<CoE::DataType, uint16_t, uint16_t> parseType(tinyxml2::XMLNode* node);
-        CoE::DataType         resolveType (std::string const& type_name);
-        tinyxml2::XMLNode*    findNodeType(tinyxml2::XMLNode* node);
+        CoE::DataType         resolveType (std::string const& type_name, int depth = 0);
+        tinyxml2::XMLNode*    findNodeType(tinyxml2::XMLNode* node, std::string const& where);
 
         CoE::Object createObject(tinyxml2::XMLNode* node);
 
