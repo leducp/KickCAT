@@ -46,6 +46,47 @@
 				<Sm MinSize="40" MaxSize="1486" DefaultSize="128" StartAddress="#x1400" ControlByte="#x22" Enable="1" Virtual="1">MBoxIn</Sm>
 				<Sm DefaultSize="40" StartAddress="#x1800" ControlByte="#x64" Enable="1" OpOnly="true">Outputs</Sm>
 				<Sm DefaultSize="22" StartAddress="#x1c00" ControlByte="#x20" Enable="1">Inputs</Sm>
+				<Mailbox DataLinkLayer="true">
+					<AoE AdsRouter="true" GenerateOwnNetId="1">
+						<InitCmd>
+							<Transition>PS</Transition>
+							<Data>DEADBEEF</Data>
+							<Comment>AoE init</Comment>
+						</InitCmd>
+					</AoE>
+					<EoE IP="true" MAC="1" TimeStamp="0">
+						<InitCmd>
+							<Transition>IP</Transition>
+							<Transition>PS</Transition>
+							<Type>5</Type>
+							<Data>0102</Data>
+						</InitCmd>
+					</EoE>
+					<CoE SdoInfo="1" CompleteAccess="true" PdoAssign="1" PdoConfig="1" SegmentedSdo="1" EdsFile="MyDevice.eds">
+						<InitCmd CompleteAccess="1">
+							<Transition>PS</Transition>
+							<Index>#x1C12</Index>
+							<SubIndex>#x00</SubIndex>
+							<Data AdaptAutomatically="true">0001</Data>
+							<Comment>Assign RxPDO 0x1600</Comment>
+						</InitCmd>
+						<InitCmd>
+							<Transition>PS</Transition>
+							<Index>#x1C13</Index>
+							<SubIndex>#x00</SubIndex>
+							<Data>0001</Data>
+						</InitCmd>
+					</CoE>
+					<FoE/>
+					<SoE ChannelCount="2" DriveFollowsBit3Support="1">
+						<InitCmd Chn="1">
+							<Transition>PS</Transition>
+							<IDN>32</IDN>
+							<Data>00</Data>
+						</InitCmd>
+					</SoE>
+					<VoE/>
+				</Mailbox>
 			</Device>
 		</Devices>
 	</Descriptions>

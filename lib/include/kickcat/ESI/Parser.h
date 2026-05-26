@@ -46,6 +46,7 @@ namespace kickcat::ESI
         void parseSyncManagers(tinyxml2::XMLElement* device, std::vector<SyncManager>& out);
         void parseSyncUnits   (tinyxml2::XMLElement* device, std::vector<SyncUnit>&    out);
         void parseFmmus       (tinyxml2::XMLElement* device, std::vector<Fmmu>&        out);
+        void parseMailbox     (tinyxml2::XMLElement* device, Mailbox&                  out);
 
         CoE::Dictionary buildDictionary(tinyxml2::XMLElement* profile,
                                         std::vector<SyncManager> const& sms);
