@@ -5,12 +5,12 @@
 
 namespace kickcat
 {
-    std::tuple<uint8_t, SyncManager> AbstractESC::findSm(uint16_t controlMode)
+    std::tuple<uint8_t, SyncManager::Register> AbstractESC::findSm(uint16_t controlMode)
     {
         for (uint8_t i = 0; i < reg::SM_STATS; i++)
         {
-            SyncManager sync{};
-            read(reg::SYNC_MANAGER + sizeof(SyncManager) * i, &sync, sizeof(SyncManager));
+            SyncManager::Register sync{};
+            read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * i, &sync, sizeof(SyncManager::Register));
             if ((sync.control & 0x0F) == (controlMode & 0x0F))
             {
                 return std::tuple(i, sync);
@@ -22,19 +22,19 @@ namespace kickcat
 
     bool AbstractESC::isSmValid(SyncManagerConfig const& sm_ref)
     {
-        SyncManager sm_read;
+        SyncManager::Register sm_read;
         read(addressSM(sm_ref.index), &sm_read, sizeof(sm_read));
 
         bool is_valid = (sm_read.start_address == sm_ref.start_address) and (sm_read.length == sm_ref.length)
-                        and ((sm_read.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK)
-                             == (sm_ref.control & SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK))
-                        and ((sm_read.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK)
-                             == (sm_ref.control & SYNC_MANAGER_CONTROL_DIRECTION_MASK))
+                        and ((sm_read.control & SM_CONTROL_OPERATION_MODE_MASK)
+                             == (sm_ref.control & SM_CONTROL_OPERATION_MODE_MASK))
+                        and ((sm_read.control & SM_CONTROL_DIRECTION_MASK)
+                             == (sm_ref.control & SM_CONTROL_DIRECTION_MASK))
                         and (sm_read.activate & SM_ACTIVATE_ENABLE);
 
         slave_info("SM read %i: start address %x, length %u, control %x, status %x, activate %x \n", sm_ref.index, sm_read.start_address, sm_read.length, sm_read.control, sm_read.status, sm_read.activate);
         slave_info("SM config %i: start address %x, length %u, control %x \n", sm_ref.index, sm_ref.start_address, sm_ref.length, sm_ref.control);
-        
+
         return is_valid;
     }
 

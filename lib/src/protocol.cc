@@ -1,6 +1,7 @@
 #include "protocol.h"
 #include "Error.h"
 #include <sstream>
+#include <stdexcept>
 
 namespace kickcat
 {
@@ -218,16 +219,59 @@ namespace kickcat
     }
 
 
-    char const* toString(SyncManagerType const& type)
+    namespace SyncManager
     {
-        switch (type)
+        char const* toString(Type const& type)
         {
-            case SyncManagerType::Unused:     { return "Unused";                    }
-            case SyncManagerType::MailboxOut: { return "MailboxOut";                }
-            case SyncManagerType::MailboxIn:  { return "MailboxIn" ;                }
-            case SyncManagerType::Output:     { return "Output (Master to Slave)";  }
-            case SyncManagerType::Input:      { return "Input  (Slave to Master)";  }
-            default:                          { return "unknown";                   }
+            switch (type)
+            {
+                case Unused:     { return "Unused";                    }
+                case MailboxOut: { return "MailboxOut";                }
+                case MailboxIn:  { return "MailboxIn" ;                }
+                case Output:     { return "Output (Master to Slave)";  }
+                case Input:      { return "Input  (Slave to Master)";  }
+                default:         { return "unknown";                   }
+            }
+        }
+
+        void fromString(std::string_view text, Type& out)
+        {
+            if (text == "MBoxOut") { out = MailboxOut; return; }
+            if (text == "MBoxIn")  { out = MailboxIn;  return; }
+            if (text == "Outputs") { out = Output;     return; }
+            if (text == "Inputs")  { out = Input;      return; }
+
+            std::string what = "SyncManager::Type: unknown text '";
+            what.append(text);
+            what += "'";
+            throw std::invalid_argument(what);
+        }
+    }
+
+    namespace fmmu
+    {
+        char const* toString(Type const& type)
+        {
+            switch (type)
+            {
+                case Unused:    { return "Unused";    }
+                case Outputs:   { return "Outputs";   }
+                case Inputs:    { return "Inputs";    }
+                case MBoxState: { return "MBoxState"; }
+                default:        { return "unknown";   }
+            }
+        }
+
+        void fromString(std::string_view text, Type& out)
+        {
+            if (text == "Outputs")   { out = Outputs;   return; }
+            if (text == "Inputs")    { out = Inputs;    return; }
+            if (text == "MBoxState") { out = MBoxState; return; }
+
+            std::string what = "fmmu::Type: unknown text '";
+            what.append(text);
+            what += "'";
+            throw std::invalid_argument(what);
         }
     }
 

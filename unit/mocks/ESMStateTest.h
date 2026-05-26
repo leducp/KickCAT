@@ -20,10 +20,10 @@ public:
     uint8_t buffer_in_[1024];
     uint8_t buffer_out_[1024];
 
-    SyncManager mbx_in{0x00, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
-    SyncManager mbx_out{0x01, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
-    SyncManager pdo_in{0x02, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
-    SyncManager pdo_out{0x03, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+    SyncManager::Register mbx_in{0x00, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+    SyncManager::Register mbx_out{0x01, 100, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+    SyncManager::Register pdo_in{0x02, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ, 0x00, SM_ACTIVATE_ENABLE, 0x00};
+    SyncManager::Register pdo_out{0x03, 200, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0x00, SM_ACTIVATE_ENABLE, 0x00};
 
     Init init{esc_, pdo_};
     PreOP preop{esc_, pdo_};
@@ -75,11 +75,11 @@ public:
         EXPECT_EQ(context.al_status_code, statusCode);
     }
 
-    void expectSyncManagerRead(uint8_t index, SyncManager& syncManager)
+    void expectSyncManagerRead(uint8_t index, SyncManager::Register& syncManager)
     {
-        EXPECT_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * index, _, sizeof(SyncManager)))
+        EXPECT_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * index, _, sizeof(SyncManager::Register)))
             .WillRepeatedly(DoAll(
-                testing::Invoke([&](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &syncManager, sizeof(SyncManager)); }),
+                testing::Invoke([&](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &syncManager, sizeof(SyncManager::Register)); }),
                 Return(0)));
     }
 
@@ -95,10 +95,10 @@ public:
 
     void expectSyncManagerActivate(uint8_t index, bool enable = true)
     {
-        EXPECT_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * index + 7, _, sizeof(uint8_t)))
+        EXPECT_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * index + 7, _, sizeof(uint8_t)))
             .WillRepeatedly(Return(0));
 
-        EXPECT_CALL(esc_, write(reg::SYNC_MANAGER + sizeof(SyncManager) * index + 7, _, sizeof(uint8_t)))
+        EXPECT_CALL(esc_, write(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * index + 7, _, sizeof(uint8_t)))
             .WillOnce(Return(0));
 
         uint8_t pdi_control = 0;
@@ -107,7 +107,7 @@ public:
             pdi_control = 1;
         }
 
-        EXPECT_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager) * index + 7, _, 1))
+        EXPECT_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * index + 7, _, 1))
             .WillRepeatedly(DoAll(
                 testing::Invoke([=](uint16_t, void* ptr, uint16_t) { memcpy(ptr, &pdi_control, sizeof(uint8_t)); }),
                 Return(0)));

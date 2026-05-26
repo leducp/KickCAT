@@ -26,7 +26,7 @@ TEST_F(Mailbox_Request, SyncManager_configuration)
     mailbox.recv_size = 42;
     mailbox.recv_offset = 0x300;
 
-    SyncManager SM[2];
+    SyncManager::Register SM[2];
     mailbox.generateSMConfig(SM);
 
     ASSERT_EQ(42,       SM[0].length);

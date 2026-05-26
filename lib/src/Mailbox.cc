@@ -31,7 +31,7 @@ namespace kickcat::mailbox::request
     }
 
 
-    void Mailbox::generateSMConfig(SyncManager SM[2])
+    void Mailbox::generateSMConfig(SyncManager::Register SM[2])
     {
         // 0 is mailbox out, 1 is mailbox in - cf. default EtherCAT configuration if slave support a mailbox
         // NOTE: mailbox out -> master to slave - mailbox in -> slave to master
@@ -314,7 +314,7 @@ namespace kickcat::mailbox::response
 
     bool Mailbox::isConfigOk()
     {
-        if (mbx_in_.type == SyncManagerType::Unused  or mbx_out_.type == SyncManagerType::Unused)
+        if (mbx_in_.type == SyncManager::Unused  or mbx_out_.type == SyncManager::Unused)
         {
             return false;
         }
@@ -329,7 +329,7 @@ namespace kickcat::mailbox::response
 
     void Mailbox::activate(bool is_activated)
     {
-        if (mbx_in_.type != SyncManagerType::Unused and mbx_out_.type != SyncManagerType::Unused )
+        if (mbx_in_.type != SyncManager::Unused and mbx_out_.type != SyncManager::Unused )
         {
             esc_->setSmActivate({mbx_in_, mbx_out_}, is_activated);
         }
@@ -338,8 +338,8 @@ namespace kickcat::mailbox::response
 
     void Mailbox::receive()
     {
-        SyncManager sync;
-        esc_->read(addressSM(mbx_out_.index), &sync, sizeof(SyncManager));
+        SyncManager::Register sync;
+        esc_->read(addressSM(mbx_out_.index), &sync, sizeof(SyncManager::Register));
         if (not (sync.status & SM_STATUS_MAILBOX))
         {
             return;
@@ -481,8 +481,8 @@ namespace kickcat::mailbox::response
 
     void Mailbox::send()
     {
-        SyncManager sync;
-        esc_->read(addressSM(mbx_in_.index), &sync, sizeof(SyncManager));
+        SyncManager::Register sync;
+        esc_->read(addressSM(mbx_in_.index), &sync, sizeof(SyncManager::Register));
 
         // Save last fetched message for repeat procedure
         if (sync.status & SM_STATUS_IRQ_READ)

@@ -363,7 +363,7 @@ namespace kickcat
         {
             if (slave.sii.info.mailbox_protocol)
             {
-                SyncManager SM[2];
+                SyncManager::Register SM[2];
                 slave.mailbox.generateSMConfig(SM);
                 link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER), SM, process, error);
             }
@@ -412,7 +412,7 @@ namespace kickcat
                     }
 
                     Slave::PIMapping* mapping = &slave.input;
-                    if (sm[i] == SyncManagerType::Output)
+                    if (sm[i] == SyncManager::Output)
                     {
                         mapping = &slave.output;
                     }
@@ -441,7 +441,7 @@ namespace kickcat
             else
             {
                 // unsupported mailbox: use SII to get the mapping size
-                auto siiMapping = [&](Slave::PIMapping* mapping, std::vector<eeprom::PDOMapping> const& PDOs, SyncManagerType type)
+                auto siiMapping = [&](Slave::PIMapping* mapping, std::vector<eeprom::PDOMapping> const& PDOs, SyncManager::Type type)
                 {
                     mapping->sync_manager = -1;
                     mapping->size = 0;
@@ -467,8 +467,8 @@ namespace kickcat
                     }
                 };
 
-                siiMapping(&slave.output, slave.sii.RxPDO, SyncManagerType::Output);
-                siiMapping(&slave.input,  slave.sii.TxPDO, SyncManagerType::Input);
+                siiMapping(&slave.output, slave.sii.RxPDO, SyncManager::Output);
+                siiMapping(&slave.input,  slave.sii.TxPDO, SyncManager::Input);
             }
         }
     }
@@ -804,7 +804,7 @@ namespace kickcat
 
     void Bus::configureFMMUs()
     {
-        auto prepareDatagrams = [this](Slave& slave, Slave::PIMapping& mapping, SyncManagerType type)
+        auto prepareDatagrams = [this](Slave& slave, Slave::PIMapping& mapping, SyncManager::Type type)
         {
 
             if (mapping.bsize == 0)
@@ -830,15 +830,15 @@ namespace kickcat
             // Get SyncManager configuration from SII
             auto& sii_sm = slave.sii.syncManagers[mapping.sync_manager];
 
-            SyncManager sm;
-            FMMU fmmu;
-            std::memset(&sm,   0, sizeof(SyncManager));
-            std::memset(&fmmu, 0, sizeof(FMMU));
+            SyncManager::Register sm;
+            fmmu::Register fmmu;
+            std::memset(&sm,   0, sizeof(SyncManager::Register));
+            std::memset(&fmmu, 0, sizeof(fmmu::Register));
 
             uint16_t targeted_fmmu = reg::FMMU; // FMMU0 - outputs
             sm.control = 0x64;                  // 3 buffers - write acces - PDI IRQ ON - Watchdog trigger
             fmmu.type  = 2;                     // write access
-            if (type == SyncManagerType::Input)
+            if (type == SyncManager::Input)
             {
                 sm.control = 0x20;              // 3 buffers - read acces - PDI IRQ ON
                 fmmu.type  = 1;                 // read access
@@ -868,8 +868,8 @@ namespace kickcat
 
         for (auto& slave : slaves_)
         {
-            prepareDatagrams(slave, slave.input,  SyncManagerType::Input);
-            prepareDatagrams(slave, slave.output, SyncManagerType::Output);
+            prepareDatagrams(slave, slave.input,  SyncManager::Input);
+            prepareDatagrams(slave, slave.output, SyncManager::Output);
         }
 
         link_->processDatagrams();
@@ -898,8 +898,8 @@ namespace kickcat
             {
                 for (auto const& entry : entries)
                 {
-                    FMMU fmmu;
-                    std::memset(&fmmu, 0, sizeof(FMMU));
+                    fmmu::Register fmmu;
+                    std::memset(&fmmu, 0, sizeof(fmmu::Register));
                     fmmu.logical_address    = frame.address + entry.byte_offset;
                     fmmu.length             = 1;
                     fmmu.logical_start_bit  = entry.bit_position;

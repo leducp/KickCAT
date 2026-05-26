@@ -15,9 +15,9 @@ constexpr uint16_t PDO_IN_ADDR = 0x1400;
 constexpr uint16_t PDO_OUT_ADDR = 0x1600;
 constexpr uint16_t PDO_SIZE = 16;
 
-static SyncManager makeSM(uint16_t start, uint16_t length, uint8_t control)
+static SyncManager::Register makeSM(uint16_t start, uint16_t length, uint8_t control)
 {
-    SyncManager sm{};
+    SyncManager::Register sm{};
     sm.start_address = start;
     sm.length = length;
     sm.control = control;
@@ -27,7 +27,7 @@ static SyncManager makeSM(uint16_t start, uint16_t length, uint8_t control)
 
 static constexpr uint16_t smPdiAddr(uint8_t index)
 {
-    return static_cast<uint16_t>(reg::SYNC_MANAGER + index * sizeof(SyncManager) + 7);
+    return static_cast<uint16_t>(reg::SYNC_MANAGER + index * sizeof(SyncManager::Register) + 7);
 }
 
 static uint32_t makeMappingEntry(uint16_t index, uint8_t sub, uint8_t bits)
@@ -44,11 +44,11 @@ public:
     uint8_t input_[PDO_SIZE]{};
     uint8_t output_[PDO_SIZE]{};
 
-    SyncManager sm_pdo_in_ = makeSM(PDO_IN_ADDR, PDO_SIZE, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ);
-    SyncManager sm_pdo_out_ = makeSM(PDO_OUT_ADDR, PDO_SIZE, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE);
-    SyncManager sm_mbx_in_ = makeSM(0x1000, 256, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
-    SyncManager sm_mbx_out_ = makeSM(0x1200, 256, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
-    SyncManager sm_empty_{};
+    SyncManager::Register sm_pdo_in_ = makeSM(PDO_IN_ADDR, PDO_SIZE, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ);
+    SyncManager::Register sm_pdo_out_ = makeSM(PDO_OUT_ADDR, PDO_SIZE, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE);
+    SyncManager::Register sm_mbx_in_ = makeSM(0x1000, 256, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
+    SyncManager::Register sm_mbx_out_ = makeSM(0x1200, 256, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
+    SyncManager::Register sm_empty_{};
 
     void SetUp() override
     {
@@ -59,13 +59,13 @@ public:
 
     void setupSmReads()
     {
-        auto setupSm = [this](int idx, SyncManager const &sm)
+        auto setupSm = [this](int idx, SyncManager::Register const &sm)
         {
-            ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager) * idx), _, sizeof(SyncManager)))
+            ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * idx), _, sizeof(SyncManager::Register)))
                 .WillByDefault(DoAll(
                     Invoke([sm](uint16_t, void *ptr, uint16_t)
-                           { std::memcpy(ptr, &sm, sizeof(SyncManager)); }),
-                    Return(sizeof(SyncManager))));
+                           { std::memcpy(ptr, &sm, sizeof(SyncManager::Register)); }),
+                    Return(sizeof(SyncManager::Register))));
         };
 
         setupSm(0, sm_mbx_in_);
@@ -112,15 +112,15 @@ TEST_F(PDOTest, configure_success)
 TEST_F(PDOTest, configure_failure_no_buffered_sm)
 {
     // Replace all SMs with mailbox-only (control=0x02), so findSm(BUFFERED) throws
-    SyncManager mbx{};
+    SyncManager::Register mbx{};
     mbx.control = SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ;
     for (int i = 0; i < 5; ++i)
     {
-        ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager) * i), _, sizeof(SyncManager)))
+        ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * i), _, sizeof(SyncManager::Register)))
             .WillByDefault(DoAll(
                 Invoke([mbx](uint16_t, void *ptr, uint16_t)
-                       { std::memcpy(ptr, &mbx, sizeof(SyncManager)); }),
-                Return(sizeof(SyncManager))));
+                       { std::memcpy(ptr, &mbx, sizeof(SyncManager::Register)); }),
+                Return(sizeof(SyncManager::Register))));
     }
     ASSERT_EQ(-EINVAL, pdo_.configure());
 }
@@ -136,26 +136,26 @@ TEST_F(PDOTest, isConfigOk_no_error)
 TEST_F(PDOTest, isConfigOk_invalid_input_length_mismatch)
 {
     configurePdo();
-    SyncManager bad = sm_pdo_in_;
+    SyncManager::Register bad = sm_pdo_in_;
     bad.length = PDO_SIZE + 1;
-    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager) * 2), _, sizeof(SyncManager)))
+    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 2), _, sizeof(SyncManager::Register)))
         .WillByDefault(DoAll(
             Invoke([bad](uint16_t, void *ptr, uint16_t)
-                   { std::memcpy(ptr, &bad, sizeof(SyncManager)); }),
-            Return(sizeof(SyncManager))));
+                   { std::memcpy(ptr, &bad, sizeof(SyncManager::Register)); }),
+            Return(sizeof(SyncManager::Register))));
     ASSERT_EQ(StatusCode::INVALID_INPUT_CONFIGURATION, pdo_.isConfigOk());
 }
 
 TEST_F(PDOTest, isConfigOk_invalid_output_length_mismatch)
 {
     configurePdo();
-    SyncManager bad = sm_pdo_out_;
+    SyncManager::Register bad = sm_pdo_out_;
     bad.length = PDO_SIZE + 1;
-    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager) * 3), _, sizeof(SyncManager)))
+    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 3), _, sizeof(SyncManager::Register)))
         .WillByDefault(DoAll(
             Invoke([bad](uint16_t, void *ptr, uint16_t)
-                   { std::memcpy(ptr, &bad, sizeof(SyncManager)); }),
-            Return(sizeof(SyncManager))));
+                   { std::memcpy(ptr, &bad, sizeof(SyncManager::Register)); }),
+            Return(sizeof(SyncManager::Register))));
     ASSERT_EQ(StatusCode::INVALID_OUTPUT_CONFIGURATION, pdo_.isConfigOk());
 }
 
@@ -163,7 +163,7 @@ TEST_F(PDOTest, isConfigOk_invalid_output_length_mismatch)
 
 TEST_F(PDOTest, activateOutput_unused_type_no_esc_calls)
 {
-    // Before configure(), sm_output_.type == SyncManagerType::Unused
+    // Before configure(), sm_output_.type == SyncManager::Unused
     EXPECT_CALL(esc_, write(_, _, _)).Times(0);
     pdo_.activateOutput(true);
 }

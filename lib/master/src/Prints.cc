@@ -69,7 +69,7 @@ namespace kickcat
             os << "SM[" << std::dec << i << "] config\n";
             os << "     physical address: " << "0x" << std::hex << sm.start_address << "\n";
             os << "     length:           " << std::dec << sm.length << "\n";
-            os << "     type:             " << std::dec << toString(static_cast<SyncManagerType>(sm.type)) << "\n";
+            os << "     type:             " << std::dec << toString(static_cast<SyncManager::Type>(sm.type)) << "\n";
             os << "     control:          " << std::hex << (int)sm.control_register << "\n";
         }
 

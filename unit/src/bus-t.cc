@@ -494,7 +494,7 @@ TEST_F(BusTest, read_SDO_buffer_too_small)
 
 TEST_F(BusTest, detect_mapping_CoE)
 {
-    addReadEmulatedSDO<uint8_t>(CoE::SM_COM_TYPE,    { 2, SyncManagerType::Output, SyncManagerType::Input});
+    addReadEmulatedSDO<uint8_t>(CoE::SM_COM_TYPE,    { 2, SyncManager::Output, SyncManager::Input});
 
     addReadEmulatedSDO<uint16_t>(CoE::SM_CHANNEL + 0, { 2, 0x1A0A, 0x1A0B });
     addReadEmulatedSDO<uint32_t>(0x1A0A, { 2,  8, 8 });

@@ -39,7 +39,7 @@ TEST(Protocol, SyncManageType_to_string)
 {
     for (uint8_t i = 0; i < UINT8_MAX; ++i)
     {
-        char const* text = toString(static_cast<SyncManagerType>(i));
+        char const* text = toString(static_cast<SyncManager::Type>(i));
         ASSERT_EQ(4, strnlen(text, 4));
     }
 }

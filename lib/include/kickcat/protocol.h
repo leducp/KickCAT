@@ -384,34 +384,35 @@ namespace kickcat
 
     std::string toString(ErrorCounters const& counters);
 
-    struct SyncManager
+    namespace SyncManager
     {
-        uint16_t start_address;
-        uint16_t length;
-        uint8_t  control;
-        uint8_t  status;
-        uint8_t  activate;
-        uint8_t  pdi_control;
-    } __attribute__((__packed__));
+        struct Register
+        {
+            uint16_t start_address;
+            uint16_t length;
+            uint8_t  control;
+            uint8_t  status;
+            uint8_t  activate;
+            uint8_t  pdi_control;
+        } __attribute__((__packed__));
+    }
 
 
-    constexpr uint8_t SM_CONTROL_MODE_MASK              = 0x03;
-    constexpr uint8_t SM_CONTROL_MODE_BUFFERED          = 0x00;
-    constexpr uint8_t SM_CONTROL_MODE_MAILBOX           = 0x02;
-    constexpr uint8_t SM_CONTROL_DIRECTION_MASK         = 0x0C;
-    constexpr uint8_t SM_CONTROL_DIRECTION_READ         = 0x00; // ECAT read access, PDI write access
-    constexpr uint8_t SM_CONTROL_DIRECTION_WRITE        = 0x04; // ECAT write access, PDI read access
-    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_MASK    = 0x10;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_DISABLED= 0x00;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_ENABLED = 0x10;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_MASK      = 0x20;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_DISABLED  = 0x00;
-    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_ENABLED   = 0x20;
-    constexpr uint8_t SM_CONTROL_WATCHDOG_MASK          = 0x40;
-    constexpr uint8_t SM_CONTROL_WATCHDOG_DISABLED      = 0x00;
-    constexpr uint8_t SM_CONTROL_WATCHDOG_ENABLED       = 0x40;
-    constexpr uint8_t SYNC_MANAGER_CONTROL_OPERATION_MODE_MASK = 0x03; // bits [1:0]
-    constexpr uint8_t SYNC_MANAGER_CONTROL_DIRECTION_MASK      = 0x0C; // bits [3:2]
+    constexpr uint8_t SM_CONTROL_OPERATION_MODE_MASK     = 0x03; // bits [1:0]
+    constexpr uint8_t SM_CONTROL_MODE_BUFFERED           = 0x00;
+    constexpr uint8_t SM_CONTROL_MODE_MAILBOX            = 0x02;
+    constexpr uint8_t SM_CONTROL_DIRECTION_MASK          = 0x0C; // bits [3:2]
+    constexpr uint8_t SM_CONTROL_DIRECTION_READ          = 0x00; // ECAT read access, PDI write access
+    constexpr uint8_t SM_CONTROL_DIRECTION_WRITE         = 0x04; // ECAT write access, PDI read access
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_MASK     = 0x10;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_DISABLED = 0x00;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_ECAT_ENABLED  = 0x10;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_MASK       = 0x20;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_DISABLED   = 0x00;
+    constexpr uint8_t SM_CONTROL_INTERRUPT_AL_ENABLED    = 0x20;
+    constexpr uint8_t SM_CONTROL_WATCHDOG_MASK           = 0x40;
+    constexpr uint8_t SM_CONTROL_WATCHDOG_DISABLED       = 0x00;
+    constexpr uint8_t SM_CONTROL_WATCHDOG_ENABLED        = 0x40;
 
     constexpr uint8_t SM_ACTIVATE_ENABLE        = (1 << 0);
     constexpr uint8_t SM_ACTIVATE_REPEAT_REQ    = (1 << 1);
@@ -422,29 +423,47 @@ namespace kickcat
     constexpr uint8_t SM_STATUS_IRQ_READ        = (1 << 1);
     constexpr uint8_t SM_STATUS_MAILBOX         = (1 << 3);
 
-    enum SyncManagerType
+    namespace SyncManager
     {
-        Unused     = 0,
-        MailboxOut = 1,
-        MailboxIn = 2,
-        Output     = 3,
-        Input      = 4  // slave to master
-    };
-    char const* toString(SyncManagerType const& type);
-    constexpr uint16_t addressSM(uint8_t index) { return static_cast<uint16_t>(reg::SYNC_MANAGER + index * sizeof(SyncManager)); };
+        enum Type : uint8_t
+        {
+            Unused     = 0,
+            MailboxOut = 1,
+            MailboxIn  = 2,
+            Output     = 3,
+            Input      = 4   // slave to master
+        };
+        char const* toString(Type const& type);
+        void fromString(std::string_view text, Type& out);
+    }
 
-    struct FMMU
+    namespace fmmu
     {
-        uint32_t logical_address;
-        uint16_t length;
-        uint8_t  logical_start_bit;
-        uint8_t  logical_stop_bit;
-        uint16_t physical_address;
-        uint8_t  physical_start_bit;
-        uint8_t  type;
-        uint8_t  activate;
-        uint8_t  reserved[3];
-    } __attribute__((__packed__));
+        enum Type : uint8_t
+        {
+            Unused    = 0,
+            Outputs   = 1,
+            Inputs    = 2,
+            MBoxState = 3,
+        };
+        char const* toString(Type const& type);
+        void fromString(std::string_view text, Type& out);
+
+        struct Register
+        {
+            uint32_t logical_address;
+            uint16_t length;
+            uint8_t  logical_start_bit;
+            uint8_t  logical_stop_bit;
+            uint16_t physical_address;
+            uint8_t  physical_start_bit;
+            uint8_t  type;
+            uint8_t  activate;
+            uint8_t  reserved[3];
+        } __attribute__((__packed__));
+    }
+
+    constexpr uint16_t addressSM(uint8_t index) { return static_cast<uint16_t>(reg::SYNC_MANAGER + index * sizeof(SyncManager::Register)); };
 
     namespace eeprom // addresses are in words!
     {

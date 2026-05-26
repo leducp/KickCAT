@@ -121,7 +121,7 @@ namespace kickcat::mailbox::request
         bool toggle;        // for SDO segmented transfer
 
         //
-        void generateSMConfig(SyncManager SM[2]);
+        void generateSMConfig(SyncManager::Register SM[2]);
 
         // messages factory
         std::shared_ptr<AbstractMessage> createSDO(uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout = 20ms);
