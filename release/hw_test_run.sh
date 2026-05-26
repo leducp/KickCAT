@@ -16,8 +16,10 @@ source "$WORK_DIR/lib/log.sh"
 STATUS_FILE="$WORK_DIR/hw_test_status.txt"
 MONITOR_LOG="$WORK_DIR/hw_test_monitor.log"
 BENCH_LOG="$WORK_DIR/hw_test.log"
+DMESG_LOG="$WORK_DIR/hw_test_dmesg.log"
 MONITOR_PID_FILE="$WORK_DIR/hw_test.pid"
 BENCH_PID_FILE="$WORK_DIR/hw_test_bench.pid"
+DMESG_PID_FILE="$WORK_DIR/hw_test_dmesg.pid"
 
 # --- Helpers ---
 get_avg() {
@@ -82,6 +84,11 @@ if [[ "${1:-}" == "--stop" ]]; then
             fi
             rm -f "$BENCH_PID_FILE"
         fi
+        if [ -f "$DMESG_PID_FILE" ]; then
+            DMESG_PID=$(cat "$DMESG_PID_FILE")
+            kill "$DMESG_PID" 2>/dev/null || true
+            rm -f "$DMESG_PID_FILE"
+        fi
         exit 0
     fi
 
@@ -135,6 +142,11 @@ if [[ "${1:-}" == "--daemon" ]]; then
         local exit_code=$?
         trap - INT TERM EXIT
         kill "$BENCH_PID" 2>/dev/null || true
+        if [ -f "$DMESG_PID_FILE" ]; then
+            DMESG_PID=$(cat "$DMESG_PID_FILE")
+            kill "$DMESG_PID" 2>/dev/null || true
+            rm -f "$DMESG_PID_FILE"
+        fi
         rm -f "$MONITOR_PID_FILE" "$BENCH_PID_FILE"
         exit $exit_code
     }
@@ -274,7 +286,24 @@ fi
 
 step "Starting hw_test_bench"
 info "Interface: $INTERFACE, expected slaves: $SLAVES, pinned to CPU $CPU_CORE"
-chrt -f $PRIORITY taskset -c "$CPU_CORE" "$WORK_DIR/hw_test_bench" -i "$INTERFACE" -s "$SLAVES" > "$BENCH_LOG" 2>&1 &
+
+# Enable core dumps for the child (RLIMIT_CORE is also set inside the binary,
+# so this is belt-and-suspenders for builds without the in-binary handler).
+ulimit -c unlimited 2>/dev/null || true
+info "core_pattern: $(cat /proc/sys/kernel/core_pattern 2>/dev/null || echo unknown)"
+
+# Background dmesg capture: any NIC/XDP/BPF/oops will be timestamped here.
+if command -v dmesg >/dev/null 2>&1; then
+    : > "$DMESG_LOG"
+    dmesg -wT >> "$DMESG_LOG" 2>&1 &
+    DMESG_PID=$!
+    echo "$DMESG_PID" > "$DMESG_PID_FILE"
+    info "dmesg capture PID: $DMESG_PID -> $DMESG_LOG"
+fi
+
+# stdbuf -oL -eL: force line buffering at the libc level for builds that
+# predate the in-binary setvbuf(). Harmless on newer builds.
+chrt -f $PRIORITY taskset -c "$CPU_CORE" stdbuf -oL -eL "$WORK_DIR/hw_test_bench" -i "$INTERFACE" -s "$SLAVES" > "$BENCH_LOG" 2>&1 &
 BENCH_PID=$!
 echo "$BENCH_PID" > "$BENCH_PID_FILE"
 

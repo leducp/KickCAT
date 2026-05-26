@@ -5,10 +5,18 @@
 #include <vector>
 #include <numeric>
 #include <cstdio>
+#include <cstdlib>
 #include <cinttypes>
 #include <cstdarg>
+#include <cstring>
 #include <ctime>
 #include <csignal>
+#include <exception>
+#include <typeinfo>
+
+#include <execinfo.h>
+#include <unistd.h>
+#include <sys/resource.h>
 
 #include "kickcat/Link.h"
 #include "kickcat/Bus.h"
@@ -26,8 +34,109 @@ void signal_handler(int)
     running = 0;
 }
 
+namespace
+{
+    char const* signal_name(int signum)
+    {
+        if (signum == SIGSEGV) { return "SIGSEGV"; }
+        if (signum == SIGABRT) { return "SIGABRT"; }
+        if (signum == SIGBUS)  { return "SIGBUS"; }
+        if (signum == SIGFPE)  { return "SIGFPE"; }
+        if (signum == SIGILL)  { return "SIGILL"; }
+        return "UNKNOWN";
+    }
+
+    // async-signal-safe: write() + backtrace_symbols_fd() only, no malloc.
+    void crash_handler(int signum, siginfo_t* info, void* /*ucontext*/)
+    {
+        char const* name = signal_name(signum);
+        void* fault_addr = nullptr;
+        if (info != nullptr)
+        {
+            fault_addr = info->si_addr;
+        }
+
+        char header[160];
+        int n = std::snprintf(header, sizeof(header),
+            "\n--- CRASH: %s (signo=%d, addr=%p, pid=%d) ---\n",
+            name, signum, fault_addr, getpid());
+        if (n > 0)
+        {
+            ssize_t w = write(STDERR_FILENO, header, static_cast<size_t>(n));
+            (void)w;
+        }
+
+        void* frames[64];
+        int frame_count = backtrace(frames, 64);
+        backtrace_symbols_fd(frames, frame_count, STDERR_FILENO);
+
+        fsync(STDERR_FILENO);
+        fsync(STDOUT_FILENO);
+
+        // Restore default handler and re-raise so a core dump is still produced.
+        signal(signum, SIG_DFL);
+        raise(signum);
+    }
+
+    void install_crash_handlers()
+    {
+        struct rlimit rl;
+        rl.rlim_cur = RLIM_INFINITY;
+        rl.rlim_max = RLIM_INFINITY;
+        setrlimit(RLIMIT_CORE, &rl);
+
+        struct sigaction sa;
+        std::memset(&sa, 0, sizeof(sa));
+        sa.sa_flags     = SA_SIGINFO | SA_RESETHAND;
+        sa.sa_sigaction = crash_handler;
+        sigemptyset(&sa.sa_mask);
+
+        sigaction(SIGSEGV, &sa, nullptr);
+        sigaction(SIGABRT, &sa, nullptr);
+        sigaction(SIGBUS,  &sa, nullptr);
+        sigaction(SIGFPE,  &sa, nullptr);
+        sigaction(SIGILL,  &sa, nullptr);
+    }
+
+    void terminate_handler()
+    {
+        std::exception_ptr ex = std::current_exception();
+        if (ex)
+        {
+            try
+            {
+                std::rethrow_exception(ex);
+            }
+            catch (std::exception const& e)
+            {
+                fprintf(stderr, "\n--- TERMINATE: uncaught %s: %s ---\n",
+                        typeid(e).name(), e.what());
+            }
+            catch (...)
+            {
+                fprintf(stderr, "\n--- TERMINATE: uncaught unknown exception ---\n");
+            }
+        }
+        else
+        {
+            fprintf(stderr, "\n--- TERMINATE: called without active exception ---\n");
+        }
+        fflush(stderr);
+        fflush(stdout);
+        std::abort();
+    }
+}
+
 int main(int argc, char *argv[])
 {
+    // Make sure any output is flushed line-by-line even when stdout/stderr are
+    // redirected to a file: a SIGSEGV otherwise loses the last ~8 KiB of logs.
+    setvbuf(stdout, nullptr, _IOLBF, 0);
+    setvbuf(stderr, nullptr, _IOLBF, 0);
+
+    install_crash_handlers();
+    std::set_terminate(terminate_handler);
+
     argparse::ArgumentParser program("hw_test_bench");
 
     std::string nom_interface_name;
