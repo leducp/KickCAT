@@ -154,7 +154,10 @@ namespace
         return buf;
     }
 
-    // xs:boolean per the ESI schema: accepts "true"/"false" and "1"/"0".
+    // xs:boolean per the ESI schema. Returns false when the attribute is
+    // absent (schema default for the ESI attrs we read); throws when present
+    // but not one of the four canonical values, so typos like Virtual="yes"
+    // fail loudly instead of silently being treated as false.
     bool readBoolAttr(XMLElement* node, char const* name)
     {
         if (node == nullptr)
@@ -166,7 +169,77 @@ namespace
         {
             return false;
         }
-        return std::strcmp(raw, "true") == 0 or std::strcmp(raw, "1") == 0;
+        if (std::strcmp(raw, "true")  == 0 or std::strcmp(raw, "1") == 0) { return true;  }
+        if (std::strcmp(raw, "false") == 0 or std::strcmp(raw, "0") == 0) { return false; }
+
+        std::string what = "ESI: attribute '";
+        what += name;
+        what += "' is not a valid xs:boolean (got '";
+        what += raw;
+        what += "')";
+        throw std::invalid_argument(what);
+    }
+
+    // xs:int attribute: signed decimal, no #x hex prefix. nullopt when truly
+    // absent; throws when present but not a valid xs:int (e.g. Chn="abc"),
+    // so callers can use .value_or(default) for the schema-default case
+    // without silently swallowing malformed input.
+    std::optional<int32_t> readIntAttr(XMLElement* node, char const* name)
+    {
+        if (node == nullptr)
+        {
+            return std::nullopt;
+        }
+        int32_t value = 0;
+        auto result = node->QueryIntAttribute(name, &value);
+        if (result == tinyxml2::XML_NO_ATTRIBUTE)
+        {
+            return std::nullopt;
+        }
+        if (result != tinyxml2::XML_SUCCESS)
+        {
+            std::string what = "ESI: attribute '";
+            what += name;
+            what += "' is not a valid xs:int";
+            throw std::invalid_argument(what);
+        }
+        return value;
+    }
+
+    std::vector<transition::Type> parseTransitions(XMLElement* parent)
+    {
+        std::vector<transition::Type> out;
+        for (auto* t = parent->FirstChildElement("Transition"); t != nullptr; t = t->NextSiblingElement("Transition"))
+        {
+            char const* text = t->GetText();
+            if (text == nullptr)
+            {
+                throw std::invalid_argument("ESI: empty <Transition>");
+            }
+            transition::Type type;
+            fromString(text, type);
+            out.push_back(type);
+        }
+        if (out.empty())
+        {
+            throw std::invalid_argument("ESI: InitCmd has no <Transition> child (schema requires at least one)");
+        }
+        return out;
+    }
+
+    std::string commentOf(XMLElement* parent)
+    {
+        auto* c = parent->FirstChildElement("Comment");
+        if (c == nullptr)
+        {
+            return {};
+        }
+        char const* text = c->GetText();
+        if (text == nullptr)
+        {
+            return {};
+        }
+        return text;
     }
 }
 
@@ -346,9 +419,162 @@ Device Parser::loadDeviceImpl(DeviceFilter const& filter)
     parseSyncManagers(device_node, device.sync_managers);
     parseSyncUnits   (device_node, device.sync_units);
     parseFmmus       (device_node, device.fmmus);
+    parseMailbox     (device_node, device.mailbox);
 
     device.dictionary = buildDictionary(profile_node, device.sync_managers);
     return device;
+}
+
+namespace transition
+{
+    char const* toString(Type const& t)
+    {
+        switch (t)
+        {
+            case IP: { return "IP"; }
+            case PS: { return "PS"; }
+            case SO: { return "SO"; }
+            case SP: { return "SP"; }
+            case OP: { return "OP"; }
+            case OS: { return "OS"; }
+            default: { return "unknown"; }
+        }
+    }
+
+    void fromString(std::string_view text, Type& out)
+    {
+        if (text == "IP") { out = IP; return; }
+        if (text == "PS") { out = PS; return; }
+        if (text == "SO") { out = SO; return; }
+        if (text == "SP") { out = SP; return; }
+        if (text == "OP") { out = OP; return; }
+        if (text == "OS") { out = OS; return; }
+
+        std::string what = "ESI: unknown Transition '";
+        what.append(text);
+        what += "'";
+        throw std::invalid_argument(what);
+    }
+}
+
+void Parser::parseMailbox(XMLElement* device, Mailbox& out)
+{
+    // The <Device>/<Mailbox> block is distinct from <Device>/<Info>/<Mailbox>
+    // (which carries request/response timeouts). Iterate children only — never
+    // pick the one nested under <Info>.
+    auto* mbx = device->FirstChildElement("Mailbox");
+    if (mbx == nullptr)
+    {
+        return;
+    }
+
+    out.data_link_layer = readBoolAttr(mbx, "DataLinkLayer");
+    out.real_time_mode  = readBoolAttr(mbx, "RealTimeMode");
+
+    if (auto* coe = mbx->FirstChildElement("CoE"))
+    {
+        Mailbox::CoE block;
+        block.sdo_info                   = readBoolAttr(coe, "SdoInfo");
+        block.pdo_assign                 = readBoolAttr(coe, "PdoAssign");
+        block.pdo_config                 = readBoolAttr(coe, "PdoConfig");
+        block.pdo_upload                 = readBoolAttr(coe, "PdoUpload");
+        block.complete_access            = readBoolAttr(coe, "CompleteAccess");
+        block.segmented_sdo              = readBoolAttr(coe, "SegmentedSdo");
+        block.diag_history               = readBoolAttr(coe, "DiagHistory");
+        block.sdo_upload_with_max_length = readBoolAttr(coe, "SdoUploadWithMaxLength");
+        block.time_distribution          = readBoolAttr(coe, "TimeDistribution");
+        if (char const* eds = coe->Attribute("EdsFile"))
+        {
+            block.eds_file = eds;
+        }
+
+        // CoE/Object (legacy form per ETG.2000 — flagged obsolete in the XSD) is
+        // intentionally ignored; modern ESIs use <InitCmd> below.
+        for (auto* ic = coe->FirstChildElement("InitCmd"); ic != nullptr; ic = ic->NextSiblingElement("InitCmd"))
+        {
+            Mailbox::CoE::InitCmd cmd;
+            cmd.transitions = parseTransitions(ic);
+            cmd.index    = requireNumber<uint16_t>(ic, "Index",    "Mailbox/CoE/InitCmd");
+            cmd.subindex = requireNumber<uint8_t> (ic, "SubIndex", "Mailbox/CoE/InitCmd");
+            auto* data = requireChild(ic, "Data");
+            cmd.data = loadHexBinary(data);
+            cmd.adapt_automatically   = readBoolAttr(data, "AdaptAutomatically");
+            cmd.complete_access       = readBoolAttr(ic, "CompleteAccess");
+            cmd.overwritten_by_module = readBoolAttr(ic, "OverwrittenByModule");
+            cmd.comment = commentOf(ic);
+            block.init_cmds.push_back(std::move(cmd));
+        }
+        out.coe = std::move(block);
+    }
+
+    if (auto* eoe = mbx->FirstChildElement("EoE"))
+    {
+        Mailbox::EoE block;
+        block.ip         = readBoolAttr(eoe, "IP");
+        block.mac        = readBoolAttr(eoe, "MAC");
+        block.time_stamp = readBoolAttr(eoe, "TimeStamp");
+
+        for (auto* ic = eoe->FirstChildElement("InitCmd"); ic != nullptr; ic = ic->NextSiblingElement("InitCmd"))
+        {
+            Mailbox::EoE::InitCmd cmd;
+            cmd.transitions = parseTransitions(ic);
+            cmd.type = requireNumber<int32_t>(ic, "Type", "Mailbox/EoE/InitCmd");
+            cmd.data = loadHexBinary(requireChild(ic, "Data"));
+            cmd.comment = commentOf(ic);
+            block.init_cmds.push_back(std::move(cmd));
+        }
+        out.eoe = std::move(block);
+    }
+
+    if (mbx->FirstChildElement("FoE") != nullptr)
+    {
+        out.foe = Mailbox::FoE{};
+    }
+
+    if (auto* soe = mbx->FirstChildElement("SoE"))
+    {
+        Mailbox::SoE block;
+        block.channel_count      = readIntAttr(soe, "ChannelCount");
+        block.drive_follows_bit3 = readBoolAttr(soe, "DriveFollowsBit3Support");
+
+        for (auto* ic = soe->FirstChildElement("InitCmd"); ic != nullptr; ic = ic->NextSiblingElement("InitCmd"))
+        {
+            Mailbox::SoE::InitCmd cmd;
+            cmd.transitions = parseTransitions(ic);
+            cmd.idn = requireNumber<int32_t>(ic, "IDN", "Mailbox/SoE/InitCmd");
+            cmd.channel = readIntAttr(ic, "Chn").value_or(0);
+            cmd.data = loadHexBinary(requireChild(ic, "Data"));
+            cmd.comment = commentOf(ic);
+            block.init_cmds.push_back(std::move(cmd));
+        }
+        out.soe = std::move(block);
+    }
+
+    if (auto* aoe = mbx->FirstChildElement("AoE"))
+    {
+        Mailbox::AoE block;
+        block.ads_router            = readBoolAttr(aoe, "AdsRouter");
+        block.generate_own_net_id   = readBoolAttr(aoe, "GenerateOwnNetId");
+        block.initialize_own_net_id = readBoolAttr(aoe, "InitializeOwnNetId");
+
+        for (auto* ic = aoe->FirstChildElement("InitCmd"); ic != nullptr; ic = ic->NextSiblingElement("InitCmd"))
+        {
+            Mailbox::AoE::InitCmd cmd;
+            cmd.transitions = parseTransitions(ic);
+            cmd.data = loadHexBinary(requireChild(ic, "Data"));
+            cmd.comment = commentOf(ic);
+            block.init_cmds.push_back(std::move(cmd));
+        }
+        out.aoe = std::move(block);
+    }
+
+    if (mbx->FirstChildElement("VoE") != nullptr)
+    {
+        out.voe = Mailbox::VoE{};
+    }
+
+    // <Mailbox>/<VendorSpecific> is part of the schema but intentionally not
+    // surfaced on the Mailbox aggregate — open vendor content has no consumer.
 }
 
 void Parser::parseSyncManagers(XMLElement* device, std::vector<SyncManager>& out)

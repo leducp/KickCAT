@@ -677,6 +677,331 @@ TEST(ESIParser, sync_managers_drive_legacy_0x1C00_synthesis)
     ASSERT_EQ(sm_kinds[3], 4u);   // Inputs
 }
 
+TEST(ESIParser, loadDevice_parses_mailbox)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
+
+    ASSERT_TRUE (device.mailbox.data_link_layer);
+    ASSERT_FALSE(device.mailbox.real_time_mode);
+
+    ASSERT_TRUE(device.mailbox.coe.has_value());
+    auto const& coe = *device.mailbox.coe;
+    ASSERT_TRUE(coe.sdo_info);
+    ASSERT_TRUE(coe.complete_access);
+    ASSERT_TRUE(coe.pdo_assign);
+    ASSERT_TRUE(coe.pdo_config);
+    ASSERT_TRUE(coe.segmented_sdo);
+    ASSERT_FALSE(coe.diag_history);
+    ASSERT_EQ(coe.eds_file, "MyDevice.eds");
+    ASSERT_EQ(coe.init_cmds.size(), 2u);
+
+    auto const& coe_ic0 = coe.init_cmds[0];
+    ASSERT_EQ(coe_ic0.transitions.size(), 1u);
+    ASSERT_EQ(coe_ic0.transitions[0], ESI::transition::PS);
+    ASSERT_EQ(coe_ic0.index,    0x1C12);
+    ASSERT_EQ(coe_ic0.subindex, 0x00);
+    ASSERT_EQ(coe_ic0.data.size(), 2u);
+    ASSERT_EQ(coe_ic0.data[0], 0x00);
+    ASSERT_EQ(coe_ic0.data[1], 0x01);
+    ASSERT_TRUE(coe_ic0.adapt_automatically);
+    ASSERT_TRUE(coe_ic0.complete_access);
+    ASSERT_EQ(coe_ic0.comment, "Assign RxPDO 0x1600");
+
+    ASSERT_TRUE(device.mailbox.eoe.has_value());
+    auto const& eoe = *device.mailbox.eoe;
+    ASSERT_TRUE(eoe.ip);
+    ASSERT_TRUE(eoe.mac);
+    ASSERT_FALSE(eoe.time_stamp);
+    ASSERT_EQ(eoe.init_cmds.size(), 1u);
+    ASSERT_EQ(eoe.init_cmds[0].transitions.size(), 2u);
+    ASSERT_EQ(eoe.init_cmds[0].transitions[0], ESI::transition::IP);
+    ASSERT_EQ(eoe.init_cmds[0].transitions[1], ESI::transition::PS);
+    ASSERT_EQ(eoe.init_cmds[0].type, 5);
+
+    ASSERT_TRUE(device.mailbox.aoe.has_value());
+    auto const& aoe = *device.mailbox.aoe;
+    ASSERT_TRUE(aoe.ads_router);
+    ASSERT_TRUE(aoe.generate_own_net_id);
+    ASSERT_FALSE(aoe.initialize_own_net_id);
+    ASSERT_EQ(aoe.init_cmds.size(), 1u);
+    ASSERT_EQ(aoe.init_cmds[0].comment, "AoE init");
+    ASSERT_EQ(aoe.init_cmds[0].data.size(), 4u);
+
+    ASSERT_TRUE(device.mailbox.soe.has_value());
+    auto const& soe = *device.mailbox.soe;
+    ASSERT_TRUE(soe.channel_count.has_value());
+    ASSERT_EQ(*soe.channel_count, 2);
+    ASSERT_TRUE(soe.drive_follows_bit3);
+    ASSERT_EQ(soe.init_cmds.size(), 1u);
+    ASSERT_EQ(soe.init_cmds[0].idn, 32);
+    ASSERT_EQ(soe.init_cmds[0].channel, 1);
+
+    ASSERT_TRUE(device.mailbox.foe.has_value());
+    ASSERT_TRUE(device.mailbox.voe.has_value());
+}
+
+TEST(ESIParser, mailbox_absent_when_block_missing)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_multi_device.xml");
+
+    ASSERT_FALSE(device.mailbox.data_link_layer);
+    ASSERT_FALSE(device.mailbox.coe.has_value());
+    ASSERT_FALSE(device.mailbox.eoe.has_value());
+    ASSERT_FALSE(device.mailbox.foe.has_value());
+    ASSERT_FALSE(device.mailbox.soe.has_value());
+    ASSERT_FALSE(device.mailbox.aoe.has_value());
+    ASSERT_FALSE(device.mailbox.voe.has_value());
+}
+
+TEST(ESIParser, mailbox_throws_on_unknown_transition)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Mailbox>
+                    <CoE>
+                        <InitCmd>
+                            <Transition>XX</Transition>
+                            <Index>#x1000</Index>
+                            <SubIndex>#x00</SubIndex>
+                            <Data>00</Data>
+                        </InitCmd>
+                    </CoE>
+                </Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Transition"), std::string::npos) << msg;
+        ASSERT_NE(msg.find("XX"),         std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, mailbox_throws_when_coe_initcmd_missing_data)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Mailbox>
+                    <CoE>
+                        <InitCmd>
+                            <Transition>PS</Transition>
+                            <Index>#x1000</Index>
+                            <SubIndex>#x00</SubIndex>
+                        </InitCmd>
+                    </CoE>
+                </Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ASSERT_THROW((void) parser.loadString(xml), std::invalid_argument);
+}
+
+TEST(ESIParser, mailbox_throws_when_initcmd_has_no_transition)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Mailbox>
+                    <CoE>
+                        <InitCmd>
+                            <Index>#x1000</Index>
+                            <SubIndex>#x00</SubIndex>
+                            <Data>00</Data>
+                        </InitCmd>
+                    </CoE>
+                </Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Transition"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_malformed_bool_attribute)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Sm Virtual="yes" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Virtual"), std::string::npos) << msg;
+        ASSERT_NE(msg.find("yes"),     std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, accepts_canonical_bool_values_false_and_zero)
+{
+    // "false" and "0" are canonical xs:boolean values; ensure they don't throw.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Sm Virtual="false" OpOnly="0" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_EQ(device.sync_managers.size(), 1u);
+    ASSERT_FALSE(device.sync_managers[0].is_virtual);
+    ASSERT_FALSE(device.sync_managers[0].op_only);
+}
+
+TEST(ESIParser, mailbox_soe_initcmd_throws_on_malformed_chn)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Mailbox>
+                    <SoE>
+                        <InitCmd Chn="abc">
+                            <Transition>PS</Transition>
+                            <IDN>5</IDN>
+                            <Data>00</Data>
+                        </InitCmd>
+                    </SoE>
+                </Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Chn"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, mailbox_soe_initcmd_channel_defaults_to_zero)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Mailbox>
+                    <SoE>
+                        <InitCmd>
+                            <Transition>PS</Transition>
+                            <IDN>5</IDN>
+                            <Data>00</Data>
+                        </InitCmd>
+                    </SoE>
+                </Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_TRUE(device.mailbox.soe.has_value());
+    ASSERT_EQ(device.mailbox.soe->init_cmds.size(), 1u);
+    ASSERT_EQ(device.mailbox.soe->init_cmds[0].channel, 0);
+}
+
 TEST(ESIParser, throws_on_unknown_fmmu_text)
 {
     char const* xml = R"(<?xml version="1.0"?>
