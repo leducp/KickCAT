@@ -113,6 +113,46 @@ public:
     Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
 };
 
+// Behavioural gate: a well-formed OD must let the SDO server serve every accessible entry
+// through the real process() path without undefined behaviour. Combined with the debug asserts
+// in response.cc and/or ASan, this traps any served entry that has no backing storage.
+TEST_F(CoE_Response, SDO_sweep_serves_every_entry_without_ub)
+{
+    ASSERT_TRUE(CoE::validateDictionary(mbx.getDictionary()).empty());
+
+    auto const& dict = mbx.getDictionary();
+    for (auto const& object : dict)
+    {
+        for (auto const& entry : object.entries)
+        {
+            if (entry.access & CoE::Access::READ)
+            {
+                auto msg = createSDOMessage(&mbx, createTestReadSDO(object.index, entry.subindex));
+                ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, msg->process())
+                    << "upload object " << object.index << " subindex " << (int)entry.subindex;
+                (void)mbx.readyToSend();
+            }
+            if (entry.access & CoE::Access::WRITE)
+            {
+                auto msg = createSDOMessage(&mbx, createTestWriteSDO(object.index, entry.subindex, 0));
+                ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, msg->process())
+                    << "download object " << object.index << " subindex " << (int)entry.subindex;
+                (void)mbx.readyToSend();
+            }
+        }
+
+        bool const is_complex = (object.code == CoE::ObjectCode::ARRAY) or (object.code == CoE::ObjectCode::RECORD);
+        if (is_complex)
+        {
+            // Exercises uploadComplete(), which dereferences subindex 0 (the entry count).
+            auto msg = createSDOMessage(&mbx, createTestReadSDO(object.index, 1, true));
+            ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, msg->process())
+                << "complete upload object " << object.index;
+            (void)mbx.readyToSend();
+        }
+    }
+}
+
 TEST_F(CoE_Response, SDO_read_expedited_OK)
 {
     std::vector<uint8_t> raw_message = createTestReadSDO(0x1018, 2);

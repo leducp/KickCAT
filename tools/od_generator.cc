@@ -265,6 +265,21 @@ int main(int argc, char *argv[])
 
     auto dictionary = loadOD(esi_file);
 
+    auto problems = CoE::validateDictionary(dictionary);
+    if (not problems.empty())
+    {
+        std::cerr << "od_generator: object dictionary from " << esi_file
+                  << " is not safe to serve over SDO:\n";
+        for (auto const& problem : problems)
+        {
+            std::cerr << "  - " << problem << "\n";
+        }
+        std::cerr << problems.size() << " problem(s) found; refusing to generate "
+                  << OD_POPULATOR_FILE << ".\n"
+                  << "Every readable/writable object needs a value (ESI <DefaultData>/<DefaultValue>).\n";
+        return 2;
+    }
+
     std::ofstream f(std::string(OD_POPULATOR_FILE).c_str());
 
     /// Sort Dictionnary to have more readable source file

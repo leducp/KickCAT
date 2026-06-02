@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 
@@ -154,6 +155,8 @@ namespace kickcat::mailbox::response
             header_->len += size;
         }
 
+        // Invariant guaranteed by CoE::validateDictionary() at build time; never null on a valid OD.
+        assert(entry->data != nullptr && "OD entry served over SDO has null data; run CoE::validateDictionary()");
         std::memcpy(payload_, entry->data, size);
         coe_->service = CoE::Service::SDO_RESPONSE;
         sdo_->command = CoE::SDO::response::UPLOAD;
@@ -170,6 +173,7 @@ namespace kickcat::mailbox::response
         sdo_->transfer_type = 0;    // complete access -> not expedited
 
         uint32_t size = 0;
+        assert(object->entries.at(0).data != nullptr && "ARRAY/RECORD subindex 0 has null data; run CoE::validateDictionary()");
         uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
         uint16_t skip_offset = object->entries.at(sdo_->subindex).bitoff / 8;
 
@@ -192,6 +196,7 @@ namespace kickcat::mailbox::response
 
             uint16_t entry_size = entry->bitlen / 8;
             uint16_t entry_off  = entry->bitoff / 8 - skip_offset;
+            assert(entry->data != nullptr && "OD entry served over SDO has null data; run CoE::validateDictionary()");
             std::memcpy(payload_ + 4 + entry_off, entry->data, entry_size);
             size = entry_size + entry_off; // only record the last position + last entry size
 
@@ -234,6 +239,7 @@ namespace kickcat::mailbox::response
             return ProcessingResult::FINALIZE;
         }
 
+        assert(entry->data != nullptr && "OD entry written over SDO has null data; run CoE::validateDictionary()");
         std::memcpy(entry->data, payload_, size);
 
         coe_->service = CoE::Service::SDO_RESPONSE;
@@ -259,6 +265,7 @@ namespace kickcat::mailbox::response
             auto* entry = &object->entries.at(0);
             beforeHooks(CoE::Access::WRITE, entry);
 
+            assert(entry->data != nullptr && "ARRAY/RECORD subindex 0 has null data; run CoE::validateDictionary()");
             std::memcpy(entry->data, payload_ + 4, 1);
             current_offset += 1;
 
@@ -287,6 +294,7 @@ namespace kickcat::mailbox::response
             uint32_t entry_off  = entry->bitoff / 8;
             current_offset = start_offset + entry_off - skip_offset;
 
+            assert(entry->data != nullptr && "OD entry written over SDO has null data; run CoE::validateDictionary()");
             std::memcpy(entry->data, current_offset, entry_size);
             current_offset += entry_size;
             subindex++;

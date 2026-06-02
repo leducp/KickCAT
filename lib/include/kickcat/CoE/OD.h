@@ -237,6 +237,13 @@ namespace kickcat::CoE
     using Dictionary = std::vector<Object>;
     std::tuple<Object*, Entry*> findObject(Dictionary& dict, uint16_t index, uint8_t subindex);
 
+    /// \brief Static well-formedness check for a dictionary that will be served by the SDO server.
+    ///        Reports every entry that would trigger undefined behaviour when accessed over SDO:
+    ///        an SDO-accessible entry with no backing storage, or an ARRAY/RECORD whose subindex 0
+    ///        (entry count) is missing. Intended for tooling/tests/host startup - NOT for the slave
+    ///        cyclic path. An empty result means the dictionary is safe to serve.
+    std::vector<std::string> validateDictionary(Dictionary const& dict);
+
     template<typename T>
     void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t bitoff,
                   uint16_t access, DataType type, std::string const& description, T data)

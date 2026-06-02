@@ -75,6 +75,14 @@ namespace kickcat::mailbox::request
             gateway_error("Message size is bigger than mailbox size (gateway_index=%u)\n", gateway_index);
             return nullptr;
         }
+        auto const* header = pointData<mailbox::Header>(raw_message);
+        int32_t declared_size = static_cast<int32_t>(sizeof(mailbox::Header)) + header->len;
+        if (declared_size > raw_message_size)
+        {
+            gateway_error("Message header length (%u) exceeds received bytes (%d) (gateway_index=%u)\n",
+                header->len, raw_message_size, gateway_index);
+            return nullptr;
+        }
         auto msg = std::make_shared<GatewayMessage>(recv_size, raw_message, gateway_index, timeout);
         msg->setCounter(nextCounter());
         to_send.push(msg);
@@ -228,6 +236,10 @@ namespace kickcat::mailbox::request
 
         // Copy raw message in internal data field
         int32_t size = sizeof(mailbox::Header) + header->len;
+        if (size > static_cast<int32_t>(data_.size()))
+        {
+            size = static_cast<int32_t>(data_.size());
+        }
         std::memcpy(data_.data(), raw_message, size);
 
         // Store gateway index to associate the reply with the request
@@ -263,6 +275,11 @@ namespace kickcat::mailbox::request
 
         // It is the reply to this request: store the result and set back the address field
         int32_t size = header->len + sizeof(mailbox::Header);
+        if (size > static_cast<int32_t>(data_.size()))
+        {
+            // reply claims more than the mailbox can hold: reject rather than over-read 'received'
+            return ProcessingResult::NOOP;
+        }
         data_.resize(size);
         std::memcpy(data_.data(), received, size);
 
@@ -542,6 +559,11 @@ namespace kickcat::mailbox::response
 
     void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
     {
+        constexpr size_t required = sizeof(mailbox::Header) + sizeof(mailbox::Error::ServiceData);
+        if (raw_message.size() < required)
+        {
+            raw_message.resize(required, 0);
+        }
         auto* header = pointData<mailbox::Header>(raw_message.data());
         auto* err    = pointData<mailbox::Error::ServiceData>(header);
 

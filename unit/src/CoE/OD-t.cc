@@ -191,3 +191,70 @@ TEST(OD, print_object_and_entries)
     std::string str = toString(object);
     ASSERT_LT(1100, str.size());
 }
+
+TEST(OD, validate_dictionary_accepts_well_formed)
+{
+    Dictionary dict;
+    {
+        CoE::Object object{0x1018, CoE::ObjectCode::RECORD, "Identity Object", {}};
+        CoE::addEntry<uint8_t> (object, 0, 8,  0, Access::READ, DataType::UNSIGNED8,  "Subindex 000", 0x4);
+        CoE::addEntry<uint32_t>(object, 1, 32, 8, Access::READ, DataType::UNSIGNED32, "Vendor ID",    0x6a5);
+        dict.push_back(std::move(object));
+    }
+
+    auto problems = validateDictionary(dict);
+    ASSERT_TRUE(problems.empty()) << problems.front();
+}
+
+TEST(OD, validate_dictionary_flags_readable_entry_with_null_data)
+{
+    Dictionary dict;
+    {
+        CoE::Object object{0x6000, CoE::ObjectCode::VAR, "Readable VAR without storage", {}};
+        // nullptr overload: a readable entry with NO backing buffer -> SDO upload would deref null
+        CoE::addEntry(object, 0, 16, 0, Access::READ, DataType::UNSIGNED16, "no data", nullptr);
+        dict.push_back(std::move(object));
+    }
+
+    auto problems = validateDictionary(dict);
+    ASSERT_EQ(1u, problems.size());
+}
+
+TEST(OD, validate_dictionary_flags_writable_entry_with_null_data)
+{
+    Dictionary dict;
+    {
+        CoE::Object object{0x7000, CoE::ObjectCode::VAR, "Writable VAR without storage", {}};
+        CoE::addEntry(object, 0, 16, 0, Access::WRITE, DataType::UNSIGNED16, "no data", nullptr);
+        dict.push_back(std::move(object));
+    }
+
+    auto problems = validateDictionary(dict);
+    ASSERT_EQ(1u, problems.size());
+}
+
+TEST(OD, validate_dictionary_flags_complex_object_without_subindex0)
+{
+    Dictionary dict;
+    {
+        CoE::Object object{0x1A00, CoE::ObjectCode::ARRAY, "Array missing subindex 0", {}};
+        dict.push_back(std::move(object));
+    }
+
+    auto problems = validateDictionary(dict);
+    ASSERT_EQ(1u, problems.size());
+}
+
+TEST(OD, validate_dictionary_ignores_inaccessible_entry_with_null_data)
+{
+    // A padding/non-SDO entry (access == 0) is never served, so null data is acceptable.
+    Dictionary dict;
+    {
+        CoE::Object object{0x1600, CoE::ObjectCode::VAR, "Padding", {}};
+        CoE::addEntry(object, 0, 16, 0, 0, DataType::UNSIGNED16, "pad", nullptr);
+        dict.push_back(std::move(object));
+    }
+
+    auto problems = validateDictionary(dict);
+    ASSERT_TRUE(problems.empty());
+}

@@ -307,4 +307,53 @@ namespace kickcat::CoE
 
         return {&(*object_it), &(*entry_it)};
     }
+
+
+    std::vector<std::string> validateDictionary(Dictionary const& dict)
+    {
+        std::vector<std::string> problems;
+
+        auto where = [](uint16_t index, int subindex)
+        {
+            std::stringstream ss;
+            ss << "0x" << std::hex << index << std::dec << "." << subindex;
+            return ss.str();
+        };
+
+        for (auto const& object : dict)
+        {
+            bool const is_complex = (object.code == ObjectCode::ARRAY) or (object.code == ObjectCode::RECORD);
+            if (is_complex)
+            {
+                if (object.entries.empty())
+                {
+                    problems.push_back("Object " + where(object.index, 0) + " (" + toString(object.code)
+                        + ") has no entries: complete access dereferences subindex 0");
+                }
+                else if (object.entries.front().data == nullptr)
+                {
+                    problems.push_back("Object " + where(object.index, 0)
+                        + ": subindex 0 (entry count) has null data: complete access dereferences null");
+                }
+            }
+
+            for (auto const& entry : object.entries)
+            {
+                bool const readable = (entry.access & Access::READ) != 0;
+                bool const writable = (entry.access & Access::WRITE) != 0;
+                if ((readable or writable) and (entry.bitlen != 0) and (entry.data == nullptr))
+                {
+                    char const* how = "writable";
+                    if (readable)
+                    {
+                        how = "readable";
+                    }
+                    problems.push_back("Entry " + where(object.index, entry.subindex) + " is " + how
+                        + " (" + Access::toString(entry.access) + ") but has null data: an SDO access dereferences null");
+                }
+            }
+        }
+
+        return problems;
+    }
 }

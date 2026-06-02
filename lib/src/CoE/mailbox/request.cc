@@ -10,6 +10,7 @@ namespace kickcat::mailbox::request
         : AbstractMessage(mailbox_size, timeout)
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
+        , client_buffer_size_(*data_size)
     {
         coe_ = pointData<CoE::Header>(header_);
         sdo_ = pointData<CoE::ServiceData>(coe_);
@@ -142,6 +143,13 @@ namespace kickcat::mailbox::request
         }
 
         // standard or segmented transfer
+        if (header->len < 10)
+        {
+            // a non-expedited upload response carries at least the 10-byte CoE/SDO header;
+            // guards the complete_size read below and the unsigned data_len subtraction.
+            status_ = MessageStatus::COE_WRONG_SERVICE;
+            return ProcessingResult::FINALIZE;
+        }
 
         uint32_t complete_size;
         std::memcpy(&complete_size, payload, sizeof(uint32_t));
@@ -168,6 +176,12 @@ namespace kickcat::mailbox::request
         uint32_t size;
         std::memcpy(&size, payload, sizeof(uint32_t));
         payload += 4;
+
+        if (size > client_buffer_size_)
+        {
+            status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
+            return ProcessingResult::FINALIZE;
+        }
 
         std::memcpy(client_data_, payload, size);
         client_data_ += size;
@@ -207,6 +221,13 @@ namespace kickcat::mailbox::request
         {
             std::memcpy(&size, payload, sizeof(uint32_t));
             payload += sizeof(uint32_t);
+        }
+
+        // *client_data_size_ tracks bytes written so far; never write past the original buffer.
+        if (size > (client_buffer_size_ - *client_data_size_))
+        {
+            status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
+            return ProcessingResult::FINALIZE;
         }
 
         std::memcpy(client_data_, payload, size);

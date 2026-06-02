@@ -25,6 +25,7 @@ namespace kickcat::mailbox::request
         uint8_t* payload_;
         uint8_t* client_data_;
         uint32_t* client_data_size_;
+        uint32_t client_buffer_size_{0};   // original client buffer capacity, fixed at construction
     };
 
     class SDOInformationMessage final : public AbstractMessage
