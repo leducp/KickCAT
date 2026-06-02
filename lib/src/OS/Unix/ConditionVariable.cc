@@ -1,3 +1,5 @@
+#include <cerrno>
+
 #include "Error.h"
 #include "OS/ConditionVariable.h"
 
@@ -85,6 +87,10 @@ namespace kickcat
         while (not stopWaiting())
         {
             int rc = pthread_cond_timedwait(pcond_, mutex.pmutex_, &abstime);
+            if (rc == EINTR)
+            {
+                continue;  // interrupted by a signal: retry against the same absolute deadline
+            }
             if (rc != 0)
             {
                 return rc;

@@ -154,14 +154,14 @@ TEST(Frame, read_error)
             return frame_size;
         }))
         .WillOnce(Return(MAX_ETHERCAT_PAYLOAD_SIZE / 2));
-    ASSERT_EQ(readFrame(io_nominal, frame), -789);
-    ASSERT_EQ(readFrame(io_nominal, frame), 0);
-    ASSERT_EQ(readFrame(io_nominal, frame), -ENOMSG);
+    ASSERT_EQ(readFrame(*io_nominal, frame), -789);
+    ASSERT_EQ(readFrame(*io_nominal, frame), 0);
+    ASSERT_EQ(readFrame(*io_nominal, frame), -ENOMSG);
     ASSERT_FALSE(frame.isDatagramAvailable());
 
     frame.resetContext();
     frame.addDatagram(0, Command::BRD, 0, nullptr, MAX_ETHERCAT_PAYLOAD_SIZE);
-    ASSERT_EQ(readFrame(io_nominal, frame), -ENOMSG);
+    ASSERT_EQ(readFrame(*io_nominal, frame), -ENOMSG);
 }
 
 TEST(Frame, read_garbage)
@@ -170,7 +170,7 @@ TEST(Frame, read_garbage)
     std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
 
     EXPECT_CALL(*io_nominal, read(_,ETH_MAX_SIZE)).WillOnce(Return(ETH_MIN_SIZE));
-    ASSERT_EQ(ETH_MIN_SIZE, readFrame(io_nominal, frame));
+    ASSERT_EQ(ETH_MIN_SIZE, readFrame(*io_nominal, frame));
     ASSERT_TRUE(frame.isDatagramAvailable());
 }
 
@@ -199,7 +199,7 @@ TEST(Frame, write_invalid_frame)
         }
         return ETH_MIN_SIZE;
     }));
-    ASSERT_EQ(ETH_MIN_SIZE, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
+    ASSERT_EQ(ETH_MIN_SIZE, writeFrame(*io_nominal, frame, PRIMARY_IF_MAC));
 }
 
 
@@ -286,7 +286,7 @@ TEST(Frame, write_multiples_datagrams)
 
         return EXPECTED_SIZE;
     }));
-    ASSERT_EQ(EXPECTED_SIZE, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
+    ASSERT_EQ(EXPECTED_SIZE, writeFrame(*io_nominal, frame, PRIMARY_IF_MAC));
 }
 
 TEST(Frame, write_error)
@@ -297,7 +297,7 @@ TEST(Frame, write_error)
     EXPECT_CALL(*io_nominal, write(_,_))
         .WillOnce(Return(-789))
         .WillOnce(Return(0));
-    ASSERT_EQ(-789, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
-    ASSERT_EQ(-EIO, writeFrame(io_nominal, frame, PRIMARY_IF_MAC));
+    ASSERT_EQ(-789, writeFrame(*io_nominal, frame, PRIMARY_IF_MAC));
+    ASSERT_EQ(-EIO, writeFrame(*io_nominal, frame, PRIMARY_IF_MAC));
 }
 

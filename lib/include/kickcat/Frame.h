@@ -80,7 +80,12 @@ namespace kickcat
         bool is_datagram_available_{false};
     };
 
+    int32_t readFrame (AbstractSocket& socket, Frame& frame);
+    int32_t writeFrame(AbstractSocket& socket, Frame& frame, MAC const& src);
+
+    [[deprecated("pass the socket by reference: readFrame(AbstractSocket&, Frame&)")]]
     int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame);
+    [[deprecated("pass the socket by reference: writeFrame(AbstractSocket&, Frame&, MAC const&)")]]
     int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, MAC const& src);
 }
 

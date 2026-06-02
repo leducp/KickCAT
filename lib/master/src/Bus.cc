@@ -509,6 +509,12 @@ namespace kickcat
 
     void Bus::createMapping(uint8_t* iomap)
     {
+        createMapping(iomap, SIZE_MAX);
+    }
+
+
+    void Bus::createMapping(uint8_t* iomap, std::size_t iomap_size)
+    {
         // First we need to know:
         // - how many bits to map per slave
         // - which SM to use
@@ -635,6 +641,18 @@ namespace kickcat
                 }
                 frame.mailbox_status_wkc_read_adjust = adjust;
             }
+        }
+
+        // Validate the client buffer can hold the process image before writing into it.
+        std::size_t required = 0;
+        for (auto const& frame : pi_frames_)
+        {
+            for (auto const& bio : frame.inputs)  { required += bio.size; }
+            for (auto const& bio : frame.outputs) { required += bio.size; }
+        }
+        if (required > iomap_size)
+        {
+            THROW_ERROR("createMapping: iomap buffer too small for the process image");
         }
 
         // Third step: associate client buffer address to block IO and slaves

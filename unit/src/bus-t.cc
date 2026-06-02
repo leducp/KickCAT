@@ -241,6 +241,17 @@ TEST_F(BusTest, error_counters)
 }
 
 
+TEST_F(BusTest, createMapping_throws_when_iomap_too_small)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+
+    // process image is 32 (in) + 48 (out) = 80 bytes; a smaller buffer must be rejected
+    uint8_t too_small[16];
+    ASSERT_THROW(bus.createMapping(too_small, sizeof(too_small)), Error);
+}
+
+
 TEST_F(BusTest, logical_cmd)
 {
     auto& slave = bus.slaves().at(0);
