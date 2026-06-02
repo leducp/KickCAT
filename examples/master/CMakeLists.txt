@@ -1,4 +1,5 @@
 add_subdirectory(common)
+add_subdirectory(ds402_drive)
 add_subdirectory(easycat)
 add_subdirectory(elmo)
 add_subdirectory(freedom-k64f)

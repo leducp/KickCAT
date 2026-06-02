@@ -61,11 +61,13 @@ namespace kickcat::CoE::CiA::DS402
         // For more infos, see DS402, page 37
         enum ControlMode
         {
-            NO_MODE    = -1, // Default value to mean "error occurred"
-            POSITION   = 1,  // Profiled position (point to point) mode
-            VELOCITY   = 3,  // Profiled velocity mode
-            TORQUE     = 4,   // Profiled torque mode
-            POSITION_CYCLIC = 8 // Direct position control without ramps
+            NO_MODE         = -1, // Default value to mean "error occurred"
+            POSITION        = 1,  // Profiled position (point to point) mode
+            VELOCITY        = 3,  // Profiled velocity mode
+            TORQUE          = 4,  // Profiled torque mode
+            POSITION_CYCLIC = 8,  // Cyclic synchronous position (CSP)
+            VELOCITY_CYCLIC = 9,  // Cyclic synchronous velocity (CSV)
+            TORQUE_CYCLIC   = 10  // Cyclic synchronous torque   (CST)
         };
 
     }

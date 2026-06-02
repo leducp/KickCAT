@@ -26,6 +26,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/CoE/OD-t.cc
                             src/ESI/Parser-t.cc
                             src/CoE/DS402StateMachine-t.cc
+                            src/CoE/DS402Drive-t.cc
                             src/mailbox/request-t.cc
                             src/mailbox/response-t.cc
                             src/mailbox/CoE/request-t.cc
