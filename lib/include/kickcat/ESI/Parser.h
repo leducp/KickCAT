@@ -30,6 +30,11 @@ namespace kickcat::ESI
         Device loadDevice      (std::string const& file, DeviceFilter const& filter = {});
         Device loadDeviceString(std::string const& xml,  DeviceFilter const& filter = {});
 
+        // Pure CoE-object synthesis from parsed PDO data (ETG.1000.6 layout),
+        // independent of any XML/parser state. Exposed for direct unit testing.
+        static CoE::Object buildMappingObject   (Pdo const& pdo, bool is_rx);
+        static CoE::Object buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t index, bool is_rx);
+
     private:
         static std::optional<uint32_t> readHexDecAttr(tinyxml2::XMLElement* node, char const* name);
 
@@ -43,16 +48,23 @@ namespace kickcat::ESI
         tinyxml2::XMLElement* selectDevice(DeviceFilter const& filter);
         DeviceSummary         summarize   (tinyxml2::XMLElement* device);
 
-        void parseSyncManagers(tinyxml2::XMLElement* device, std::vector<SyncManager>& out);
+        void parseSyncManagers(tinyxml2::XMLElement* device, std::vector<SmInfo>& out);
         void parseSyncUnits   (tinyxml2::XMLElement* device, std::vector<SyncUnit>&    out);
         void parseFmmus       (tinyxml2::XMLElement* device, std::vector<Fmmu>&        out);
-        void parseMailbox     (tinyxml2::XMLElement* device, Mailbox&                  out);
+        void parseMailbox     (tinyxml2::XMLElement* device, std::optional<Mailbox>&   out);
+        void parsePdos        (tinyxml2::XMLElement* device, char const* element_name, std::vector<Pdo>& out);
+        void parseEeprom      (tinyxml2::XMLElement* device, std::optional<Eeprom>&    out);
+        void parseDc          (tinyxml2::XMLElement* device, std::optional<Dc>&        out);
 
         CoE::Dictionary buildDictionary(tinyxml2::XMLElement* profile,
-                                        std::vector<SyncManager> const& sms);
+                                        std::vector<SmInfo> const& sms);
+
+        // Appends 0x16xx/0x1Axx mapping objects and 0x1C12/0x1C13 SM-assignment
+        // objects to the dictionary based on the parsed Pdo lists, but only
+        // for objects that aren't already declared in <Dictionary>/<Objects>.
+        void synthesizePdoMappingObjects(Device& device);
 
         std::vector<uint8_t> loadHexBinary(tinyxml2::XMLElement* node);
-        std::vector<uint8_t> loadStringData(tinyxml2::XMLElement* node);
 
         void loadDefaultData(tinyxml2::XMLNode* node, CoE::Object& obj, CoE::Entry& entry);
         uint16_t loadAccess(tinyxml2::XMLNode* node);
