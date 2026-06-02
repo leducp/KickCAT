@@ -1,4 +1,3 @@
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <iostream>
 
@@ -8,6 +7,7 @@
 #include "kickcat/CoE/CiA/DS402/Drive.h"
 #include "kickcat/Link.h"
 #include "kickcat/OS/Timer.h"
+#include "kickcat/Units.h"
 #include "kickcat/helpers.h"
 
 using namespace kickcat;
@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
     Timer timer{1ms};
     timer.start();
 
-    double const amplitude_rad = amplitude_deg / 180.0 * M_PI;
+    double const amplitude_rad = amplitude_deg / 180.0 * pi;
     int64_t const loop_count   = static_cast<int64_t>(duration_s * 1000.0);
 
     bool initial_captured = false;
@@ -130,9 +130,10 @@ int main(int argc, char* argv[])
         catch (std::exception const& e)
         {
             std::cerr << "[" << i << "] " << e.what() << std::endl;
-            continue;
         }
 
+        // Always tick the state machine, even if the bus IO threw -- the SM
+        // needs to observe fault/timeout conditions to recover.
         drive.update();
 
         if (drive.isEnabled() and not initial_captured)
@@ -147,7 +148,7 @@ int main(int argc, char* argv[])
         if (initial_captured)
         {
             double t     = seconds_f(elapsed_time(motion_start)).count();
-            double delta = amplitude_rad * std::sin(2.0 * M_PI * frequency_hz * t);
+            double delta = amplitude_rad * std::sin(tau * frequency_hz * t);
             drive.setTargetPosition(initial_rad + delta);
         }
     }
@@ -164,7 +165,10 @@ int main(int argc, char* argv[])
             bus.finalizeDatagrams();
             bus.processAwaitingFrames();
         }
-        catch (...) {}
+        catch (std::exception const& e)
+        {
+            std::cerr << "[shutdown " << i << "] " << e.what() << std::endl;
+        }
         drive.update();
         if (not drive.isEnabled() and not drive.isFaulted()) { break; }
     }

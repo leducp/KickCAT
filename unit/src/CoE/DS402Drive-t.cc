@@ -1,5 +1,3 @@
-#define _USE_MATH_DEFINES
-#include <cmath>
 #include <gtest/gtest.h>
 #include <cstring>
 
@@ -9,15 +7,11 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Error.h"
 #include "kickcat/Slave.h"
+#include "kickcat/Units.h"
 #include "kickcat/CoE/CiA/DS402/Drive.h"
 
 using namespace kickcat;
 using namespace kickcat::CoE::CiA::DS402;
-
-namespace
-{
-    constexpr double TWO_PI = 2.0 * M_PI;
-}
 
 class DS402DriveTest : public testing::Test
 {
@@ -213,11 +207,11 @@ TEST_F(DS402DriveTest, si_position_marvin_units_matches_existing_math)
 {
     drive.setUnits({static_cast<double>(1U << 20), 120.0, 1.0});
 
-    double target_rad = 8.0 / 180.0 * TWO_PI / 2.0;  // 8 degrees
+    double target_rad = 8.0 / 180.0 * tau / 2.0;  // 8 degrees
     drive.setTargetPosition(target_rad);
 
     int32_t expected = static_cast<int32_t>(
-        target_rad * static_cast<double>(1U << 20) * 120.0 / TWO_PI);
+        target_rad * static_cast<double>(1U << 20) * 120.0 / tau);
     EXPECT_EQ(rx.target_position, expected);
 }
 
@@ -241,7 +235,7 @@ TEST_F(DS402DriveTest, si_position_zero_writes_zero)
 TEST_F(DS402DriveTest, si_position_negative_rad_writes_negative_ticks)
 {
     drive.setUnits({1024.0, 1.0, 1.0});
-    drive.setTargetPosition(-TWO_PI);
+    drive.setTargetPosition(-tau);
     EXPECT_EQ(rx.target_position, -1024);
 }
 
@@ -261,7 +255,7 @@ TEST_F(DS402DriveTest, si_position_saturates_on_overflow)
 TEST_F(DS402DriveTest, si_velocity_uses_position_factor)
 {
     drive.setUnits({1024.0, 1.0, 1.0});
-    drive.setTargetVelocity(TWO_PI);
+    drive.setTargetVelocity(tau);
     EXPECT_EQ(rx.target_velocity, 1024);
 }
 
@@ -322,8 +316,8 @@ TEST(DS402DriveDestructorTest, destructor_writes_disable_voltage_to_rx_pdo)
 
     Drive::Input  tx{};
     Drive::Output rx{};
-    rx.control_word = 0xFFFF;
-    rx.target_position = 999;
+    tx.actual_position = 78901;     // holds position to prevent a slam
+    rx.control_word    = 0xFFFF;
     slave.output.data = reinterpret_cast<uint8_t*>(&rx);
     slave.input.data  = reinterpret_cast<uint8_t*>(&tx);
 
@@ -333,7 +327,7 @@ TEST(DS402DriveDestructorTest, destructor_writes_disable_voltage_to_rx_pdo)
     }
 
     EXPECT_EQ(rx.control_word,    control::word::DISABLE_VOLTAGE);
-    EXPECT_EQ(rx.target_position, 0);
+    EXPECT_EQ(rx.target_position, 78901);
     EXPECT_EQ(rx.target_velocity, 0);
     EXPECT_EQ(rx.target_torque,   0);
 }

@@ -10,6 +10,9 @@ namespace kickcat
     constexpr std::size_t operator"" _MiB(unsigned long long const x) { return static_cast<std::size_t>(1024_KiB * x); }
     constexpr std::size_t operator"" _GiB(unsigned long long const x) { return static_cast<std::size_t>(1024_MiB * x); }
     constexpr std::size_t operator"" _TiB(unsigned long long const x) { return static_cast<std::size_t>(1024_GiB * x); }
+
+    constexpr double pi  = 3.14159265358979323846;
+    constexpr double tau = 2.0 * pi;
 }
 
 #endif

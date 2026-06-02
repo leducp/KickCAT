@@ -7,13 +7,12 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Error.h"
 #include "kickcat/Slave.h"
+#include "kickcat/Units.h"
 
 namespace kickcat::CoE::CiA::DS402
 {
     namespace
     {
-        constexpr double TWO_PI = 6.283185307179586;
-
         // 0x00000008 entries are alignment padding (CiA 301 dummy mapping).
         constexpr uint32_t TX_MAPPING[] = {
             0x60410010, 0x60610008, 0x00000008,
@@ -60,8 +59,11 @@ namespace kickcat::CoE::CiA::DS402
     {
         if (out_ != nullptr)
         {
+            // target_position is held at the last measured actual_position so
+            // the motor does not jump while the drive processes the disable.
+            // velocity/torque setpoints of 0 are safe stops in their modes.
             out_->control_word    = control::word::DISABLE_VOLTAGE;
-            out_->target_position = 0;
+            out_->target_position = in_->actual_position;
             out_->target_velocity = 0;
             out_->target_torque   = 0;
         }
@@ -118,7 +120,7 @@ namespace kickcat::CoE::CiA::DS402
         }
 
         units_ = units;
-        pos_ticks_per_rad_       = units.encoder_ticks_per_rev * units.gear_ratio / TWO_PI;
+        pos_ticks_per_rad_       = units.encoder_ticks_per_rev * units.gear_ratio / tau;
         torque_per_mille_per_nm_ = 1000.0 / units.rated_torque_Nm;
     }
 
