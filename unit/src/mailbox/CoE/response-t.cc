@@ -1091,3 +1091,55 @@ TEST(CoE_Roundtrip, sdo_segmented_upload_master_slave)
     ASSERT_EQ(sizeof(blob), received_size);
     ASSERT_EQ(0, std::memcmp(received, blob, sizeof(blob)));
 }
+
+// Mirror of the upload coherency check: the master's segmented-download sender and the slave's
+// segmented-download receiver must agree end to end.
+TEST(CoE_Roundtrip, sdo_segmented_download_master_slave)
+{
+    constexpr uint16_t MBX = 32;
+
+    std::mt19937 rng{0xD0117EA1u};
+    uint8_t blob[50];
+    for (auto& byte : blob) { byte = static_cast<uint8_t>(rng()); }
+
+    CoE::Dictionary dict;
+    {
+        CoE::Object object{0x3000, CoE::ObjectCode::VAR, "Writable blob", {}};
+        object.entries.emplace_back(0, static_cast<uint16_t>(sizeof(blob) * 8), 0,
+                                    CoE::Access::WRITE, CoE::DataType::OCTET_STRING, "blob");
+        object.entries.back().data = std::malloc(sizeof(blob));
+        std::memset(object.entries.back().data, 0, sizeof(blob));
+        dict.push_back(std::move(object));
+    }
+
+    Mailbox slave{MBX, 1};
+    slave.enableCoE(std::move(dict));
+
+    mailbox::request::Mailbox master;
+    master.recv_size = MBX;
+    master.send_size = MBX;
+
+    uint32_t source_size = sizeof(blob);
+    master.createSDO(0x3000, 0, false, CoE::SDO::request::DOWNLOAD, blob, &source_size);
+
+    auto msg = master.send();
+    int guard = 0;
+    while ((msg->status() == mailbox::request::MessageStatus::RUNNING) and (guard++ < 32))
+    {
+        std::vector<uint8_t> request(msg->data(), msg->data() + msg->size());
+        std::vector<uint8_t> reply = slave.processRequest(std::move(request));
+        ASSERT_FALSE(reply.empty());
+        master.receive(reply.data());
+        if (msg->status() != mailbox::request::MessageStatus::RUNNING)
+        {
+            break;
+        }
+        msg = master.send();
+    }
+
+    ASSERT_EQ(mailbox::request::MessageStatus::SUCCESS, msg->status());
+
+    auto [object, entry] = CoE::findObject(slave.getDictionary(), 0x3000, 0);
+    ASSERT_NE(entry, nullptr);
+    ASSERT_EQ(0, std::memcmp(entry->data, blob, sizeof(blob)));
+}

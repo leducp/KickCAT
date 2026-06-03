@@ -438,12 +438,16 @@ TEST_F(PDOTest, configureMapping_already_mapped_entry_is_not_freed)
 {
     // Simulate an entry already aliased (is_mapped=true). It should be re-aliased
     // without calling std::free on its data pointer.
+    // Already aliased: data points at a buffer this Entry does not own, so parsePdoMap must
+    // re-alias without freeing it (a wrong free of this non-heap pointer would trip the sanitizer).
+    uint16_t aliased_value = 0xABCD;
+
     CoE::Dictionary dict;
 
     CoE::Object data_obj{0x6000, CoE::ObjectCode::VAR, "Data", {}};
-    CoE::addEntry<uint16_t>(data_obj, 0, 16, 0, CoE::Access::READ | CoE::Access::WRITE,
-                            CoE::DataType::UNSIGNED16, "Val", uint16_t{0xABCD});
-    // Mark as already aliased — data must not be freed by parsePdoMap
+    data_obj.entries.emplace_back(0, 16, 0, CoE::Access::READ | CoE::Access::WRITE,
+                                  CoE::DataType::UNSIGNED16, "Val");
+    data_obj.entries[0].data = &aliased_value;
     data_obj.entries[0].is_mapped = true;
     dict.push_back(std::move(data_obj));
 

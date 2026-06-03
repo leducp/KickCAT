@@ -12,6 +12,8 @@ declare -A OPT_DEFAULTS=(
     [eeprom_editor]=OFF
     [code_coverage]=OFF
     [af_xdp]=OFF
+    [asan]=OFF
+    [ubsan]=OFF
 )
 
 declare -A OPT_DESCRIPTIONS=(
@@ -24,6 +26,8 @@ declare -A OPT_DESCRIPTIONS=(
     [eeprom_editor]="Build EEPROM editor GUI"
     [code_coverage]="Enable code coverage"
     [af_xdp]="Enable AF_XDP socket"
+    [asan]="Build with AddressSanitizer"
+    [ubsan]="Build with UndefinedBehaviorSanitizer"
 )
 
 declare -A OPT_CMAKE_FLAGS=(
@@ -36,6 +40,8 @@ declare -A OPT_CMAKE_FLAGS=(
     [eeprom_editor]="BUILD_EEPROM_EDITOR"
     [code_coverage]="ENABLE_CODE_COVERAGE"
     [af_xdp]="ENABLE_AF_XDP"
+    [asan]="ENABLE_ASAN"
+    [ubsan]="ENABLE_UBSAN"
 )
 
 # Only options that gate a Conan dependency

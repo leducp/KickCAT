@@ -691,7 +691,7 @@ namespace kickcat
     {
         for (auto const& pi_frame : pi_frames_)
         {
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
 				// copy before: a wrong wkc doesn't mean that all data shall be discarded
                 for (auto& input : pi_frame.inputs)
@@ -740,7 +740,7 @@ namespace kickcat
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
             }
 
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
                 if (wkc != pi_frame.outputs.size())
                 {
@@ -776,7 +776,7 @@ namespace kickcat
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
             }
 
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
                 uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2
                     + pi_frame.mailbox_status_wkc_read_adjust);

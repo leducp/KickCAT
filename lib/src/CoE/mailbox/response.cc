@@ -126,9 +126,18 @@ namespace kickcat::mailbox::response
         auto const* header = pointData<mailbox::Header>(raw_message.data());
         auto const* coe    = pointData<CoE::Header>(header);
         auto const* sdo    = pointData<CoE::ServiceData>(coe);
-        if ((header->type != mailbox::Type::CoE)
-            or (coe->service != CoE::Service::SDO_REQUEST)
-            or (sdo->command != CoE::SDO::request::UPLOAD_SEGMENTED))
+        if ((header->type != mailbox::Type::CoE) or (coe->service != CoE::Service::SDO_REQUEST)
+            or (header->len < 10))
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        if (sdo->command == CoE::SDO::request::DOWNLOAD_SEGMENTED)
+        {
+            return downloadSegment(raw_message, header, sdo);
+        }
+
+        if (sdo->command != CoE::SDO::request::UPLOAD_SEGMENTED)
         {
             return ProcessingResult::NOOP;
         }
@@ -183,6 +192,56 @@ namespace kickcat::mailbox::response
         if (is_last)
         {
             afterHooks(CoE::Access::READ, segmented_entry_);
+            segmented_entry_ = nullptr;
+            return ProcessingResult::FINALIZE;
+        }
+        return ProcessingResult::FINALIZE_AND_KEEP;
+    }
+
+    ProcessingResult SDOMessage::downloadSegment(std::vector<uint8_t> const& raw_message,
+                                                 mailbox::Header const* header, CoE::ServiceData const* sdo)
+    {
+        std::vector<uint8_t> resp(raw_message.size(), 0);
+        auto* rheader = pointData<mailbox::Header>(resp.data());
+        auto* rcoe    = pointData<CoE::Header>(rheader);
+        auto* rsdo    = pointData<CoE::ServiceData>(rcoe);
+        rheader->type = mailbox::Type::CoE;
+
+        auto abortWith = [&](uint32_t code)
+        {
+            rcoe->service = CoE::Service::SDO_REQUEST;
+            rsdo->command = CoE::SDO::request::ABORT;
+            std::memcpy(pointData<uint8_t>(rsdo), &code, sizeof(uint32_t));
+            reply(std::move(resp));
+            segmented_entry_ = nullptr;
+            return ProcessingResult::FINALIZE;
+        };
+
+        if (sdo->complete_access != segmented_toggle_)
+        {
+            return abortWith(CoE::SDO::abort::TOGGLE_BIT_NOT_ALTERNATED);
+        }
+
+        uint8_t const* seg = reinterpret_cast<uint8_t const*>(sdo) + 1;
+        uint32_t size = CoE::segmentDataLength(header->len, sdo);
+        if ((segmented_offset_ + size) > (segmented_entry_->bitlen / 8u))
+        {
+            return abortWith(CoE::SDO::abort::DATA_TYPE_LENGTH_MISMATCH);
+        }
+
+        std::memcpy(reinterpret_cast<uint8_t*>(segmented_entry_->data) + segmented_offset_, seg, size);
+        segmented_offset_ += size;
+
+        rcoe->service         = CoE::Service::SDO_RESPONSE;
+        rsdo->command         = CoE::SDO::response::DOWNLOAD_SEGMENTED;
+        rsdo->complete_access = segmented_toggle_; // echo the toggle
+        rheader->len          = sizeof(CoE::Header) + 1;
+        reply(std::move(resp));
+        segmented_toggle_ = not segmented_toggle_;
+
+        if (sdo->size_indicator) // More Follows == 1 -> last segment
+        {
+            afterHooks(CoE::Access::WRITE, segmented_entry_);
             segmented_entry_ = nullptr;
             return ProcessingResult::FINALIZE;
         }
@@ -320,6 +379,19 @@ namespace kickcat::mailbox::response
         {
             abort(CoE::SDO::abort::DATA_TYPE_LENGTH_MISMATCH);
             return ProcessingResult::FINALIZE;
+        }
+
+        // A non-expedited initiate that does not carry the whole object is a segmented download:
+        // the data arrives in Download SDO Segment Requests. Keep the message alive to receive them.
+        if ((sdo_->transfer_type == 0) and ((header_->len - 10u) < size))
+        {
+            segmented_entry_  = entry;
+            segmented_offset_ = 0;
+            segmented_toggle_ = false;
+            coe_->service = CoE::Service::SDO_RESPONSE;
+            sdo_->command = CoE::SDO::response::DOWNLOAD;
+            reply(std::move(data_));
+            return ProcessingResult::FINALIZE_AND_KEEP;
         }
 
         std::memcpy(entry->data, payload_, size);

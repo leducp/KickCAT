@@ -22,6 +22,8 @@ option(BUILD_TOOLS             "Build tools" ON)
 option(ENABLE_ESI_PARSER       "Enable ESI XML parser" ON)
 option(ENABLE_AF_XDP           "Enable AF_XDP socket for improved performance (requires libxdp, libbpf, clang)" OFF)
 option(ENABLE_CODE_COVERAGE    "Enable code coverage (requires gcovr)" OFF)
+option(ENABLE_ASAN             "Build with AddressSanitizer" OFF)
+option(ENABLE_UBSAN            "Build with UndefinedBehaviorSanitizer" OFF)
 option(BUILD_EEPROM_EDITOR     "Build EEPROM editor GUI (requires imgui, glfw)" OFF)
 option(KICKCAT_INSTALL         "Install KickCAT targets, headers, CMake config and pkg-config files" ${KICKCAT_INSTALL_DEFAULT})
 
@@ -35,7 +37,21 @@ if (NUTTX)
   set(ENABLE_ESI_PARSER     OFF CACHE BOOL "" FORCE)
   set(ENABLE_AF_XDP         OFF CACHE BOOL "" FORCE)
   set(ENABLE_CODE_COVERAGE  OFF CACHE BOOL "" FORCE)
+  set(ENABLE_ASAN           OFF CACHE BOOL "" FORCE)
+  set(ENABLE_UBSAN          OFF CACHE BOOL "" FORCE)
   set(BUILD_EEPROM_EDITOR   OFF CACHE BOOL "" FORCE)
+endif()
+
+if (ENABLE_ASAN)
+  add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address)
+endif()
+
+if (ENABLE_UBSAN)
+  # 'alignment' is excluded on purpose: the EtherCAT frame layer reads/writes packed buffers at
+  # unaligned offsets (supported on the x86/Cortex-M targets). The other UB checks stay on and abort.
+  add_compile_options(-fsanitize=undefined -fno-sanitize=alignment -fno-sanitize-recover=undefined)
+  add_link_options(-fsanitize=undefined)
 endif()
 
 
