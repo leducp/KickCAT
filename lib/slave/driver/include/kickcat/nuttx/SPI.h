@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_NUTTX_SPI_H_
-#define SLAVE_STACK_INCLUDE_NUTTX_SPI_H_
+#ifndef KICKCAT_SLAVE_NUTTX_SPI_H_
+#define KICKCAT_SLAVE_NUTTX_SPI_H_
 
 #include "kickcat/AbstractSPI.h"
 #include <nuttx/spi/spi_transfer.h>

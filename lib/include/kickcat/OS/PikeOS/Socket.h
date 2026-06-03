@@ -1,5 +1,5 @@
-#ifndef KICKAT_PIKEOS_SOCKET_H
-#define KICKAT_PIKEOS_SOCKET_H
+#ifndef KICKCAT_PIKEOS_SOCKET_H
+#define KICKCAT_PIKEOS_SOCKET_H
 
 #include "kickcat/AbstractSocket.h"
 #include "kickcat/OS/PikeOS/ErrorCategory.h"

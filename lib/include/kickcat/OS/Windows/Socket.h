@@ -1,5 +1,5 @@
-#ifndef KICKAT_WINDOWS_SOCKET_H
-#define KICKAT_WINDOWS_SOCKET_H
+#ifndef KICKCAT_WINDOWS_SOCKET_H
+#define KICKCAT_WINDOWS_SOCKET_H
 
 #include <vector>
 

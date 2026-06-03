@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
         printf("Init done \n");
         print_current_state();
 
-        bus.createMapping(io_buffer);
+        bus.createMapping(io_buffer, sizeof(io_buffer));
 
         uint32_t identityObject[256];
         uint32_t identityObjectSize = sizeof(identityObject);

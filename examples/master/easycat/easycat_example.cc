@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
             printf(" - Slave %d\n", slave.address);
         }
 
-        bus.createMapping(io_buffer);
+        bus.createMapping(io_buffer, sizeof(io_buffer));
 
         // Optional: Enable IRQ if needed
         bus.enableIRQ(EcatEvent::DL_STATUS,

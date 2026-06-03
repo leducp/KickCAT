@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_ESC_LAN9252_H_
-#define SLAVE_STACK_INCLUDE_ESC_LAN9252_H_
+#ifndef KICKCAT_SLAVE_ESC_LAN9252_H_
+#define KICKCAT_SLAVE_ESC_LAN9252_H_
 
 #include "kickcat/AbstractESC.h"
 #include "kickcat/AbstractSPI.h"

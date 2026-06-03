@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
         // Map RXPDO
         mapPDO(bus, bus.slaves().at(0), 0x1600, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
 
-        bus.createMapping(io_buffer);
+        bus.createMapping(io_buffer, sizeof(io_buffer));
 
         printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);

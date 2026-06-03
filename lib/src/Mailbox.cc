@@ -277,7 +277,9 @@ namespace kickcat::mailbox::request
         int32_t size = header->len + sizeof(mailbox::Header);
         if (size > static_cast<int32_t>(data_.size()))
         {
-            // reply claims more than the mailbox can hold: reject rather than over-read 'received'
+            // oversized reply: drop rather than over-read 'received' (the message then times out)
+            gateway_error("Reply for gateway index %u claims %d bytes, exceeds mailbox size %zu; dropping it\n",
+                gateway_index_, size, data_.size());
             return ProcessingResult::NOOP;
         }
         data_.resize(size);

@@ -1,4 +1,3 @@
-#include <cassert>
 #include <cstdint>
 #include <cstring>
 
@@ -134,8 +133,8 @@ namespace kickcat::mailbox::response
             return ProcessingResult::NOOP;
         }
 
-        // data_ was moved away with the Initiate Upload Response; build each segment in a fresh
-        // mailbox-sized buffer (the member pointers header_/sdo_/payload_ are stale here).
+        // header_/sdo_/payload_ are stale: data_ was moved out with the initiate reply. Build the
+        // segment in a fresh buffer.
         std::vector<uint8_t> resp(raw_message.size(), 0);
         auto* rheader = pointData<mailbox::Header>(resp.data());
         auto* rcoe    = pointData<CoE::Header>(rheader);
@@ -162,24 +161,13 @@ namespace kickcat::mailbox::response
             chunk = max_seg;
         }
 
-        uint8_t* seg = reinterpret_cast<uint8_t*>(rsdo) + 1;
-        uint8_t seg_data_size = 0;
-        if (chunk < 7)
-        {
-            seg_data_size = static_cast<uint8_t>(7 - chunk);
-            rheader->len = 10;
-        }
-        else
-        {
-            rheader->len = static_cast<uint16_t>(3 + chunk);
-        }
+        uint8_t* seg = reinterpret_cast<uint8_t*>(rsdo) + 1; // resp is zero-init, padding stays 0
         std::memcpy(seg, reinterpret_cast<uint8_t const*>(segmented_entry_->data) + segmented_offset_, chunk);
 
         rcoe->service         = CoE::Service::SDO_RESPONSE;
         rsdo->command         = CoE::SDO::response::UPLOAD_SEGMENTED;
         rsdo->complete_access = segmented_toggle_;          // echo the toggle
-        rsdo->transfer_type   = seg_data_size & 0x1;
-        rsdo->block_size      = (seg_data_size >> 1) & 0x3;
+        rheader->len          = CoE::setSegmentLength(rsdo, chunk);
 
         segmented_offset_ += chunk;
         bool const is_last = (segmented_offset_ == total);
@@ -222,8 +210,7 @@ namespace kickcat::mailbox::response
 
         beforeHooks(CoE::Access::READ, entry);
 
-        // Invariant guaranteed by CoE::validateDictionary() at build time; never null on a valid OD.
-        assert(entry->data != nullptr && "OD entry served over SDO has null data; run CoE::validateDictionary()");
+        // non-null is guaranteed by CoE::validateDictionary() (build-time gate)
 
         uint32_t size = entry->bitlen / 8;
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData);
@@ -256,8 +243,8 @@ namespace kickcat::mailbox::response
             return ProcessingResult::FINALIZE;
         }
 
-        // Segmented: the Initiate Upload Response carries only the complete size; keep this message
-        // alive to answer the Upload SDO Segment Requests that follow (ETG.1000.6 Tables 38/39).
+        // ETG.1000.6 Tables 38/39: reply with the size-only initiate and keep this message alive
+        // to serve the segment requests that follow
         segmented_entry_  = entry;
         segmented_offset_ = 0;
         segmented_toggle_ = false;
@@ -271,7 +258,6 @@ namespace kickcat::mailbox::response
         sdo_->transfer_type = 0;    // complete access -> not expedited
 
         uint32_t size = 0;
-        assert(object->entries.at(0).data != nullptr && "ARRAY/RECORD subindex 0 has null data; run CoE::validateDictionary()");
         uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
         uint16_t skip_offset = object->entries.at(sdo_->subindex).bitoff / 8;
 
@@ -294,7 +280,6 @@ namespace kickcat::mailbox::response
 
             uint16_t entry_size = entry->bitlen / 8;
             uint16_t entry_off  = entry->bitoff / 8 - skip_offset;
-            assert(entry->data != nullptr && "OD entry served over SDO has null data; run CoE::validateDictionary()");
             std::memcpy(payload_ + 4 + entry_off, entry->data, entry_size);
             size = entry_size + entry_off; // only record the last position + last entry size
 
@@ -337,7 +322,6 @@ namespace kickcat::mailbox::response
             return ProcessingResult::FINALIZE;
         }
 
-        assert(entry->data != nullptr && "OD entry written over SDO has null data; run CoE::validateDictionary()");
         std::memcpy(entry->data, payload_, size);
 
         coe_->service = CoE::Service::SDO_RESPONSE;
@@ -363,7 +347,6 @@ namespace kickcat::mailbox::response
             auto* entry = &object->entries.at(0);
             beforeHooks(CoE::Access::WRITE, entry);
 
-            assert(entry->data != nullptr && "ARRAY/RECORD subindex 0 has null data; run CoE::validateDictionary()");
             std::memcpy(entry->data, payload_ + 4, 1);
             current_offset += 1;
 
@@ -392,7 +375,6 @@ namespace kickcat::mailbox::response
             uint32_t entry_off  = entry->bitoff / 8;
             current_offset = start_offset + entry_off - skip_offset;
 
-            assert(entry->data != nullptr && "OD entry written over SDO has null data; run CoE::validateDictionary()");
             std::memcpy(entry->data, current_offset, entry_size);
             current_offset += entry_size;
             subindex++;

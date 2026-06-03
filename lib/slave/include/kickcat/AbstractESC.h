@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_ABSTRACTESC_H_
-#define SLAVE_STACK_INCLUDE_ABSTRACTESC_H_
+#ifndef KICKCAT_SLAVE_ABSTRACTESC_H_
+#define KICKCAT_SLAVE_ABSTRACTESC_H_
 
 #include <cstdint>
 #include <vector>

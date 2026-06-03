@@ -172,7 +172,7 @@ namespace kickcat
             .def("create_mapping", [](Bus &self, int size)
                 {
                     static std::vector<uint8_t> io_buffer(size);
-                    self.createMapping(io_buffer.data());
+                    self.createMapping(io_buffer.data(), io_buffer.size());
                 }, "size"_a = 4096)
             .def("read_sdo", [](Bus &self, Slave& slave, uint16_t index, uint8_t subindex,
                                Bus::Access ca, uint32_t max_data_size = 4,

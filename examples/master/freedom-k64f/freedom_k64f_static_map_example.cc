@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
         printf("Init done \n");
         print_current_state();
 
-        bus.createMapping(io_buffer);
+        bus.createMapping(io_buffer, sizeof(io_buffer));
 
         bus.enableIRQ(EcatEvent::DL_STATUS,
         [&]()

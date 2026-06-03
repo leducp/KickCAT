@@ -324,6 +324,11 @@ namespace kickcat
 
     int32_t XdpSocket::write(void const* frame, int32_t frame_size)
     {
+        if (frame_size < 0 or static_cast<uint32_t>(frame_size) > FRAME_SIZE)
+        {
+            return -EINVAL;
+        }
+
         reclaimCompletedTx();
 
         uint64_t addr = allocFrame();

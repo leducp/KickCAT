@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -17,20 +18,17 @@ namespace kickcat
     {
         if (address_ != nullptr)
         {
-            // Remove the mapped memory segment from the address space of the process.
-            int rc = munmap(address_, size_);
-            if (rc < 0)
+            if (munmap(address_, size_) < 0)
             {
-                THROW_SYSTEM_ERROR("munmap()");
+                perror("~SharedMemory: munmap()");
             }
         }
 
         if (fd_ >= 0)
         {
-            int rc = close(fd_);
-            if (rc < 0)
+            if (close(fd_) < 0)
             {
-                THROW_SYSTEM_ERROR("close()");
+                perror("~SharedMemory: close()");
             }
         }
     }

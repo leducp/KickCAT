@@ -264,7 +264,7 @@ TEST_F(BusTest, logical_cmd)
     }
 
     uint8_t iomap[256];
-    bus.createMapping(iomap);
+    bus.createMapping(iomap, sizeof(iomap));
 
     ASSERT_EQ(32,  slave.input.bsize);
     ASSERT_EQ(255, slave.input.size);
@@ -522,7 +522,7 @@ TEST_F(BusTest, detect_mapping_CoE)
     }
 
     uint8_t iomap[256];
-    bus.createMapping(iomap);
+    bus.createMapping(iomap, sizeof(iomap));
 
     auto& slave = bus.slaves().at(0);
     ASSERT_EQ(5,  slave.output.bsize);
@@ -923,7 +923,7 @@ TEST_F(BusTest, mailbox_status_fmmu_read_check_LRD)
     mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
 
     uint8_t iomap[256];
-    bus.createMapping(iomap);
+    bus.createMapping(iomap, sizeof(iomap));
 
     // Frame layout: [4 PDO][3 pad][1 status] = 8 bytes
     // Status byte at offset 7, bit 0 = SM1 mailbox status
@@ -965,7 +965,7 @@ TEST_F(BusTest, mailbox_status_fmmu_both_LRW)
     mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
 
     uint8_t iomap[256];
-    bus.createMapping(iomap);
+    bus.createMapping(iomap, sizeof(iomap));
 
     // Frame layout: [4 PDO][3 pad][1 read_status][3 pad][1 write_status] = 12 bytes
     // Read status: byte 7, bit 0
@@ -1014,7 +1014,7 @@ TEST_F(BusTest, mailbox_status_fmmu_LWR_uses_pdo_size)
     mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
 
     uint8_t iomap[256];
-    bus.createMapping(iomap);
+    bus.createMapping(iomap, sizeof(iomap));
 
     // LWR WKC should still be 1 (only output PDO, read FMMUs don't respond to LWR)
     uint32_t lwr_data = 0;
@@ -1043,7 +1043,7 @@ TEST_F(BusTest, mailbox_status_fmmu_wkc_error_during_programming)
     mock_link->handleProcess(Command::FPWR, uint8_t{0}, 0);
 
     uint8_t iomap[256];
-    ASSERT_THROW(bus.createMapping(iomap), Error);
+    ASSERT_THROW(bus.createMapping(iomap, sizeof(iomap)), Error);
 }
 
 

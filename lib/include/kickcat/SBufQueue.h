@@ -116,8 +116,7 @@ namespace kickcat
     private:
         void push(Queue& queue, Item const& item)
         {
-            // Signal under the lock: a wakeup that races an unlock can otherwise hand a
-            // consumer an empty ring (stale wakeup -> SBUF_INVALID_INDEX on a non-empty queue).
+            // signal under the lock: signalling after unlock can race a waiter into an empty ring
             LockGuard guard(queue.lock);
             (void) queue.ring.push(item);
             queue.cond.signal();

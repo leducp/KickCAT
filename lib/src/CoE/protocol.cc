@@ -7,6 +7,35 @@
 
 namespace kickcat::CoE
 {
+    uint8_t segmentDataSize(ServiceData const* sdo)
+    {
+        return static_cast<uint8_t>((sdo->block_size << 1) | sdo->transfer_type);
+    }
+
+    uint32_t segmentDataLength(uint16_t mailbox_len, ServiceData const* sdo)
+    {
+        if (mailbox_len == 10)
+        {
+            return 7u - segmentDataSize(sdo);
+        }
+        return static_cast<uint32_t>(mailbox_len) - 3u;
+    }
+
+    uint16_t setSegmentLength(ServiceData* sdo, uint32_t chunk)
+    {
+        uint8_t seg_data_size = 0;
+        uint16_t mailbox_len = static_cast<uint16_t>(3 + chunk);
+        if (chunk < 7)
+        {
+            seg_data_size = static_cast<uint8_t>(7 - chunk);
+            mailbox_len = 10;
+        }
+        sdo->transfer_type = seg_data_size & 0x1;
+        sdo->block_size    = (seg_data_size >> 1) & 0x3;
+        return mailbox_len;
+    }
+
+
     char const* SDO::abort_to_str(uint32_t abort_code)
     {
         using namespace abort;

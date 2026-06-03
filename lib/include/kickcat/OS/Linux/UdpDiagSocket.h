@@ -1,5 +1,5 @@
-#ifndef KICKAT_LINUX_UDP_DIAG_SOCKET_H
-#define KICKAT_LINUX_UDP_DIAG_SOCKET_H
+#ifndef KICKCAT_LINUX_UDP_DIAG_SOCKET_H
+#define KICKCAT_LINUX_UDP_DIAG_SOCKET_H
 
 #include "kickcat/AbstractDiagSocket.h"
 
