@@ -19,6 +19,7 @@ namespace kickcat::mailbox::request
         ProcessingResult processUploadSegmented  (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
         ProcessingResult processDownload         (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
         ProcessingResult processDownloadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
+        void prepareDownloadSegment();
 
         CoE::Header* coe_;
         CoE::ServiceData* sdo_;
@@ -26,6 +27,7 @@ namespace kickcat::mailbox::request
         uint8_t* client_data_;
         uint32_t* client_data_size_;
         uint32_t client_buffer_size_{0};   // original client buffer capacity, fixed at construction
+        uint32_t download_remaining_{0};   // bytes still to send for a segmented download
     };
 
     class SDOInformationMessage final : public AbstractMessage

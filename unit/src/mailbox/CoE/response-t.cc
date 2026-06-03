@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstring>
+#include <random>
+
 #include "mocks/ESC.h"
 
 #include "kickcat/Mailbox.h"
@@ -1035,4 +1038,56 @@ TEST_F(CoE_Response, createSDOMessage_rxpdo_remote_request)
 
     auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
     ASSERT_EQ(nullptr, response_msg);
+}
+
+
+// Self-coherency: the slave's segmented-upload sender and the master's segmented-upload receiver
+// must agree end to end. A small mailbox forces a multi-segment transfer of a random blob.
+TEST(CoE_Roundtrip, sdo_segmented_upload_master_slave)
+{
+    constexpr uint16_t MBX = 32;
+
+    std::mt19937 rng{0xB10B5EEDu};
+    uint8_t blob[50];
+    for (auto& byte : blob) { byte = static_cast<uint8_t>(rng()); }
+
+    CoE::Dictionary dict;
+    {
+        CoE::Object object{0x2000, CoE::ObjectCode::VAR, "Big blob", {}};
+        object.entries.emplace_back(0, static_cast<uint16_t>(sizeof(blob) * 8), 0,
+                                    CoE::Access::READ, CoE::DataType::OCTET_STRING, "blob");
+        object.entries.back().data = std::malloc(sizeof(blob));
+        std::memcpy(object.entries.back().data, blob, sizeof(blob));
+        dict.push_back(std::move(object));
+    }
+
+    Mailbox slave{MBX, 1};
+    slave.enableCoE(std::move(dict));
+
+    mailbox::request::Mailbox master;
+    master.recv_size = MBX;
+    master.send_size = MBX;
+
+    uint8_t received[sizeof(blob)] = {0};
+    uint32_t received_size = sizeof(received);
+    master.createSDO(0x2000, 0, false, CoE::SDO::request::UPLOAD, received, &received_size);
+
+    auto msg = master.send();
+    int guard = 0;
+    while ((msg->status() == mailbox::request::MessageStatus::RUNNING) and (guard++ < 32))
+    {
+        std::vector<uint8_t> request(msg->data(), msg->data() + msg->size());
+        std::vector<uint8_t> reply = slave.processRequest(std::move(request));
+        ASSERT_FALSE(reply.empty());
+        master.receive(reply.data());
+        if (msg->status() != mailbox::request::MessageStatus::RUNNING)
+        {
+            break;
+        }
+        msg = master.send();
+    }
+
+    ASSERT_EQ(mailbox::request::MessageStatus::SUCCESS, msg->status());
+    ASSERT_EQ(sizeof(blob), received_size);
+    ASSERT_EQ(0, std::memcmp(received, blob, sizeof(blob)));
 }

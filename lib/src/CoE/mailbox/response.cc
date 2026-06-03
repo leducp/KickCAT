@@ -68,6 +68,12 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOMessage::process()
     {
+        if (segmented_entry_ != nullptr)
+        {
+            // a segmented upload is in progress; its segments are handled by process(raw_message)
+            return ProcessingResult::NOOP;
+        }
+
         if (header_->len < (sizeof(mailbox::Header) + sizeof(CoE::ServiceData)))
         {
             replyError(std::move(data_), mailbox::Error::SIZE_TOO_SHORT);
@@ -111,9 +117,88 @@ namespace kickcat::mailbox::response
         return ProcessingResult::NOOP;
     }
 
-    ProcessingResult SDOMessage::process(std::vector<uint8_t> const&)
+    ProcessingResult SDOMessage::process(std::vector<uint8_t> const& raw_message)
     {
-        return ProcessingResult::NOOP;
+        if (segmented_entry_ == nullptr)
+        {
+            return ProcessingResult::NOOP; // not serving a segmented upload
+        }
+
+        auto const* header = pointData<mailbox::Header>(raw_message.data());
+        auto const* coe    = pointData<CoE::Header>(header);
+        auto const* sdo    = pointData<CoE::ServiceData>(coe);
+        if ((header->type != mailbox::Type::CoE)
+            or (coe->service != CoE::Service::SDO_REQUEST)
+            or (sdo->command != CoE::SDO::request::UPLOAD_SEGMENTED))
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        // data_ was moved away with the Initiate Upload Response; build each segment in a fresh
+        // mailbox-sized buffer (the member pointers header_/sdo_/payload_ are stale here).
+        std::vector<uint8_t> resp(raw_message.size(), 0);
+        auto* rheader = pointData<mailbox::Header>(resp.data());
+        auto* rcoe    = pointData<CoE::Header>(rheader);
+        auto* rsdo    = pointData<CoE::ServiceData>(rcoe);
+        rheader->type = mailbox::Type::CoE;
+
+        if (sdo->complete_access != segmented_toggle_)
+        {
+            rcoe->service = CoE::Service::SDO_REQUEST;
+            rsdo->command = CoE::SDO::request::ABORT;
+            uint32_t const code = CoE::SDO::abort::TOGGLE_BIT_NOT_ALTERNATED;
+            std::memcpy(pointData<uint8_t>(rsdo), &code, sizeof(uint32_t));
+            reply(std::move(resp));
+            segmented_entry_ = nullptr;
+            return ProcessingResult::FINALIZE;
+        }
+
+        uint32_t const total     = segmented_entry_->bitlen / 8;
+        uint32_t const remaining = total - segmented_offset_;
+        uint32_t const max_seg   = static_cast<uint32_t>(resp.size()) - 9;
+        uint32_t chunk = remaining;
+        if (chunk > max_seg)
+        {
+            chunk = max_seg;
+        }
+
+        uint8_t* seg = reinterpret_cast<uint8_t*>(rsdo) + 1;
+        uint8_t seg_data_size = 0;
+        if (chunk < 7)
+        {
+            seg_data_size = static_cast<uint8_t>(7 - chunk);
+            rheader->len = 10;
+        }
+        else
+        {
+            rheader->len = static_cast<uint16_t>(3 + chunk);
+        }
+        std::memcpy(seg, reinterpret_cast<uint8_t const*>(segmented_entry_->data) + segmented_offset_, chunk);
+
+        rcoe->service         = CoE::Service::SDO_RESPONSE;
+        rsdo->command         = CoE::SDO::response::UPLOAD_SEGMENTED;
+        rsdo->complete_access = segmented_toggle_;          // echo the toggle
+        rsdo->transfer_type   = seg_data_size & 0x1;
+        rsdo->block_size      = (seg_data_size >> 1) & 0x3;
+
+        segmented_offset_ += chunk;
+        bool const is_last = (segmented_offset_ == total);
+        rsdo->size_indicator = 0;
+        if (is_last)
+        {
+            rsdo->size_indicator = 1; // More Follows: this is the last segment
+        }
+
+        reply(std::move(resp));
+        segmented_toggle_ = not segmented_toggle_;
+
+        if (is_last)
+        {
+            afterHooks(CoE::Access::READ, segmented_entry_);
+            segmented_entry_ = nullptr;
+            return ProcessingResult::FINALIZE;
+        }
+        return ProcessingResult::FINALIZE_AND_KEEP;
     }
 
     bool SDOMessage::isUploadAuthorized(CoE::Entry* entry)
@@ -137,34 +222,47 @@ namespace kickcat::mailbox::response
 
         beforeHooks(CoE::Access::READ, entry);
 
+        // Invariant guaranteed by CoE::validateDictionary() at build time; never null on a valid OD.
+        assert(entry->data != nullptr && "OD entry served over SDO has null data; run CoE::validateDictionary()");
+
         uint32_t size = entry->bitlen / 8;
         header_->len  = sizeof(mailbox::Header) + sizeof(CoE::ServiceData);
-
         sdo_->size_indicator = 1;   // always 1 on upload response
+        coe_->service = CoE::Service::SDO_RESPONSE;
+        sdo_->command = CoE::SDO::response::UPLOAD;
+
         if (size <= 4)
         {
             // expedited
-            sdo_->transfer_type  = 1;
-            sdo_->block_size     = 4 - size;
+            sdo_->transfer_type = 1;
+            sdo_->block_size    = 4 - size;
+            std::memcpy(payload_, entry->data, size);
+            reply(std::move(data_));
+            afterHooks(CoE::Access::READ, entry);
+            return ProcessingResult::FINALIZE;
         }
-        else
+
+        sdo_->transfer_type = 0;
+        std::memcpy(payload_, &size, sizeof(uint32_t)); // complete size
+
+        uint32_t const single_frame_max = static_cast<uint32_t>(data_.size()) - 16;
+        if (size <= single_frame_max)
         {
-            sdo_->transfer_type = 0;
-            std::memcpy(payload_, &size, 4);
-            payload_ += 4;
+            // normal: complete size + all data in a single mailbox frame
             header_->len += size;
+            std::memcpy(payload_ + sizeof(uint32_t), entry->data, size);
+            reply(std::move(data_));
+            afterHooks(CoE::Access::READ, entry);
+            return ProcessingResult::FINALIZE;
         }
 
-        // Invariant guaranteed by CoE::validateDictionary() at build time; never null on a valid OD.
-        assert(entry->data != nullptr && "OD entry served over SDO has null data; run CoE::validateDictionary()");
-        std::memcpy(payload_, entry->data, size);
-        coe_->service = CoE::Service::SDO_RESPONSE;
-        sdo_->command = CoE::SDO::response::UPLOAD;
+        // Segmented: the Initiate Upload Response carries only the complete size; keep this message
+        // alive to answer the Upload SDO Segment Requests that follow (ETG.1000.6 Tables 38/39).
+        segmented_entry_  = entry;
+        segmented_offset_ = 0;
+        segmented_toggle_ = false;
         reply(std::move(data_));
-
-        afterHooks(CoE::Access::READ, entry);
-
-        return ProcessingResult::FINALIZE;
+        return ProcessingResult::FINALIZE_AND_KEEP;
     }
 
     ProcessingResult SDOMessage::uploadComplete(CoE::Object* object)

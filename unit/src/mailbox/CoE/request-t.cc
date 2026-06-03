@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstring>
+#include <random>
+
 #include "kickcat/Mailbox.h"
 #include "kickcat/CoE/mailbox/request.h"
 
@@ -171,74 +174,73 @@ TEST_F(CoE_Request, SDO_upload_standard_OK)
 
 TEST_F(CoE_Request, SDO_upload_segmented_OK)
 {
-    int32_t data[6] = {0};
+    // ETG.1000.6 segmented upload: the Initiate Upload Response carries only the complete size,
+    // then the object data arrives in Upload SDO Segment Responses (no index/subindex, no size
+    // prefix; the More Follows bit == 1 marks the LAST segment). This exercises both the
+    // Length > 0x0A path and the compact Length == 0x0A (SegData Size) path, plus toggling.
+    uint8_t data[13] = {0};
     uint32_t data_size = sizeof(data);
+
+    // Random payload so any mis-offset, truncation or duplication in segment assembly is caught
+    // (a monotonic sequence is a weak oracle). Fixed seed keeps the test deterministic.
+    std::mt19937 rng{0xECA7C0DEu};
+    uint8_t expected[sizeof(data)];
+    for (auto& byte : expected) { byte = static_cast<uint8_t>(rng()); }
+
     mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size);
 
     auto message = mailbox.send();
     ASSERT_EQ(MessageStatus::RUNNING, message->status());
-    ASSERT_EQ(mailbox.recv_size, message->size());
 
-    // check message content
     auto const* mbx_section = pointData<mailbox::Header>(message->data());
     auto const* coe_section = pointData<CoE::Header>(mbx_section);
     auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+    ASSERT_EQ(CoE::SDO::request::UPLOAD, sdo_section->command);
 
-    ASSERT_EQ(mailbox::Type::CoE,           mbx_section->type);
-    ASSERT_EQ(CoE::Service::SDO_REQUEST,    coe_section->service);
-    ASSERT_EQ(CoE::SDO::request::UPLOAD,    sdo_section->command);
-    ASSERT_EQ(0x1018,                       sdo_section->index);
-    ASSERT_EQ(1,                            sdo_section->subindex);
-    ASSERT_EQ(false,                        sdo_section->complete_access);
+    uint8_t* seg_data = reinterpret_cast<uint8_t*>(sdo) + 1;
 
-    // reply
-    header->type = mailbox::Type::CoE;
-    header->len = 10 + 8;
-    coe->service = CoE::Service::SDO_RESPONSE;
-    sdo->transfer_type = 0;
-    sdo->block_size = 0; // 4 bytes
-    sdo->command = CoE::SDO::request::UPLOAD;
-    sdo->index = 0x1018;
-    sdo->subindex = 1;
-    int32_t* reply = static_cast<int32_t*>(payload);
-    reply[0] = 24; // complete size - partial (segmented) since more than contains in this header
-    reply[1] = 8;  // segment size
-    reply[2] = 0xDEADBEEF;
-    reply[3] = 0xA5A5A5A5;
+    // Initiate Upload Response: segmented => complete size only, no object data
+    header->type        = mailbox::Type::CoE;
+    header->len         = 10;
+    coe->service        = CoE::Service::SDO_RESPONSE;
+    sdo->command        = CoE::SDO::response::UPLOAD;
+    sdo->transfer_type  = 0;      // normal (not expedited)
+    sdo->size_indicator = 1;      // size indicated
+    sdo->index          = 0x1018;
+    sdo->subindex       = 1;
+    *static_cast<uint32_t*>(payload) = 13;   // complete size
     ASSERT_TRUE(mailbox.receive(raw_message));
+
     message = mailbox.send();
     ASSERT_EQ(MessageStatus::RUNNING, message->status());
     ASSERT_EQ(CoE::SDO::request::UPLOAD_SEGMENTED, sdo_section->command);
+    ASSERT_EQ(0, sdo_section->complete_access);   // toggle starts at 0
 
-    header->len = 10 + 8;
-    sdo->size_indicator = 1;    // more follow
-    sdo->complete_access = 0;
-    sdo->command = CoE::SDO::response::UPLOAD_SEGMENTED;
-    reply[0] = 8;
-    reply[1] = 0xCAFEDECA;
-    reply[2] = 0xD0D0FACE;
+    // Segment 1: Length 0x0B => 8 data octets, not the last segment, toggle 0
+    header->len          = 11;
+    sdo->command         = CoE::SDO::response::UPLOAD_SEGMENTED;
+    sdo->complete_access = 0;     // toggle
+    sdo->size_indicator  = 0;     // More Follows: not last
+    std::memcpy(seg_data, expected, 8);
     ASSERT_TRUE(mailbox.receive(raw_message));
+
     message = mailbox.send();
     ASSERT_EQ(MessageStatus::RUNNING, message->status());
-    ASSERT_EQ(CoE::SDO::request::UPLOAD_SEGMENTED, sdo_section->command);
+    ASSERT_EQ(1, sdo_section->complete_access);   // toggle flipped to 1
 
-    header->len = 10 + 8;
-    sdo->size_indicator = 0;
-    sdo->complete_access = not sdo->complete_access;
-    sdo->command = CoE::SDO::response::UPLOAD_SEGMENTED;
-    reply[0] = 8;
-    reply[1] = 0xD1CECA5E;
-    reply[2] = 0x00B0CAD0;
+    // Segment 2: compact (Length 0x0A, SegData Size 2 => 5 data octets), last segment, toggle 1
+    header->len          = 10;
+    sdo->command         = CoE::SDO::response::UPLOAD_SEGMENTED;
+    sdo->complete_access = 1;     // toggle
+    sdo->size_indicator  = 1;     // More Follows: last segment
+    sdo->transfer_type   = 0;     // SegData Size bit 0
+    sdo->block_size      = 1;     // SegData Size = (1 << 1) | 0 = 2 => 5 octets
+    std::memcpy(seg_data, expected + 8, 5);
     ASSERT_TRUE(mailbox.receive(raw_message));
     ASSERT_EQ(MessageStatus::SUCCESS, message->status());
 
-    ASSERT_EQ(0xDEADBEEF, data[0]);
-    ASSERT_EQ(0xA5A5A5A5, data[1]);
-    ASSERT_EQ(0xCAFEDECA, data[2]);
-    ASSERT_EQ(0xD0D0FACE, data[3]);
-    ASSERT_EQ(0xD1CECA5E, data[4]);
-    ASSERT_EQ(0x00B0CAD0, data[5]);
-    ASSERT_EQ(24, data_size);
+    ASSERT_EQ(13u, data_size);
+    ASSERT_EQ(0, std::memcmp(data, expected, sizeof(data)));
 }
 
 
@@ -309,6 +311,77 @@ TEST_F(CoE_Request, SDO_download_normal_OK)
     sdo->index = 0x1018;
     sdo->subindex = 1;
     ASSERT_TRUE(mailbox.receive(raw_message));
+}
+
+
+TEST_F(CoE_Request, SDO_download_segmented_OK)
+{
+    // ETG.1000.6 segmented download: the Initiate Download Request carries only the complete size,
+    // then the object data is sent in Download SDO Segment Requests. Use a small mailbox so the
+    // payload (13 bytes) must be split, and check the segment requests the master emits.
+    mailbox.recv_size = 16;
+    mailbox.send_size = 16;
+
+    // Random payload so a mis-offset / truncation / duplication in the sender is caught.
+    std::mt19937 rng{0x5E6DA7A1u};
+    uint8_t source[13];
+    for (auto& byte : source) { byte = static_cast<uint8_t>(rng()); }
+    uint32_t data_size = sizeof(source);
+
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::DOWNLOAD, source, &data_size);
+
+    auto message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    auto const* mbx_section = pointData<mailbox::Header>(message->data());
+    auto const* coe_section = pointData<CoE::Header>(mbx_section);
+    auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+    auto const* out_size    = pointData<uint8_t>(sdo_section);                    // initiate: complete size
+    uint8_t const* out_seg  = reinterpret_cast<uint8_t const*>(sdo_section) + 1;  // segment data
+
+    // Initiate Download Request: complete size only (segmented)
+    ASSERT_EQ(CoE::SDO::request::DOWNLOAD, sdo_section->command);
+    ASSERT_EQ(1, sdo_section->size_indicator);
+    uint32_t complete_size = 0;
+    std::memcpy(&complete_size, out_size, sizeof(uint32_t));
+    ASSERT_EQ(13u, complete_size);
+
+    // Initiate Download Response (slave accepts)
+    header->type  = mailbox::Type::CoE;
+    coe->service  = CoE::Service::SDO_RESPONSE;
+    sdo->command  = CoE::SDO::response::DOWNLOAD;
+    sdo->index    = 0x1018;
+    sdo->subindex = 1;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+
+    // Segment 1: 7 data octets, not last, toggle 0
+    message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+    ASSERT_EQ(CoE::SDO::request::DOWNLOAD_SEGMENTED, sdo_section->command);
+    ASSERT_EQ(0, sdo_section->complete_access);   // toggle 0
+    ASSERT_EQ(0, sdo_section->size_indicator);    // More Follows: not last
+    ASSERT_EQ(0, std::memcmp(out_seg, source, 7));
+
+    // Download Segment Response 1 (echo toggle 0)
+    sdo->command         = CoE::SDO::response::DOWNLOAD_SEGMENTED;
+    sdo->complete_access = 0;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+
+    // Segment 2: remaining 6 octets, last, toggle 1, SegData Size = 1 (7 - 6)
+    message = mailbox.send();
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+    ASSERT_EQ(CoE::SDO::request::DOWNLOAD_SEGMENTED, sdo_section->command);
+    ASSERT_EQ(1, sdo_section->complete_access);   // toggle 1
+    ASSERT_EQ(1, sdo_section->size_indicator);    // More Follows: last
+    uint8_t seg_data_size = static_cast<uint8_t>((sdo_section->block_size << 1) | sdo_section->transfer_type);
+    ASSERT_EQ(1, seg_data_size);
+    ASSERT_EQ(0, std::memcmp(out_seg, source + 7, 6));
+
+    // Download Segment Response 2 (echo toggle 1) -> transfer complete
+    sdo->command         = CoE::SDO::response::DOWNLOAD_SEGMENTED;
+    sdo->complete_access = 1;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::SUCCESS, message->status());
 }
 
 

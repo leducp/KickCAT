@@ -39,6 +39,11 @@ namespace kickcat::mailbox::response
         CoE::Header* coe_;
         CoE::ServiceData* sdo_;
         uint8_t* payload_;
+
+        // Segmented upload state: a non-null entry means an upload is in progress across segments.
+        CoE::Entry* segmented_entry_{nullptr};
+        uint32_t    segmented_offset_{0};
+        bool        segmented_toggle_{false};
     };
 
 
