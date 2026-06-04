@@ -18,18 +18,12 @@ namespace kickcat
     {
         if (address_ != nullptr)
         {
-            if (not UnmapViewOfFile(address_))
-            {
-                THROW_LAST_ERROR("UnmapViewOfFile() failed");
-            }
+            UnmapViewOfFile(address_);
         }
 
         if (fd_ != nullptr)
         {
-            if (not CloseHandle(fd_))
-            {
-                THROW_LAST_ERROR("CloseHandle() failed");
-            }
+            CloseHandle(fd_);
         }
     }
 

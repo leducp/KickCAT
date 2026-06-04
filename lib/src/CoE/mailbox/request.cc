@@ -10,6 +10,7 @@ namespace kickcat::mailbox::request
         : AbstractMessage(mailbox_size, timeout)
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
+        , client_buffer_size_(*data_size)
     {
         coe_ = pointData<CoE::Header>(header_);
         sdo_ = pointData<CoE::ServiceData>(coe_);
@@ -33,11 +34,6 @@ namespace kickcat::mailbox::request
         if (request == CoE::SDO::request::DOWNLOAD)
         {
             uint32_t size = *data_size;
-            if (size > (data_.size() - 10))
-            {
-                THROW_ERROR("Segmented download transfer required - not implemented");
-            }
-
             if (size <= 4)
             {
                 // expedited transfer
@@ -46,11 +42,20 @@ namespace kickcat::mailbox::request
                 sdo_->block_size = (4 - size) & 0x3;
                 std::memcpy(payload_, data, size);
             }
-            else
+            else if (static_cast<std::size_t>(size) + 16 <= data_.size())
             {
+                // normal transfer: complete size + all data in a single mailbox (6 mbx hdr + 2 CoE
+                // + 4 ServiceData + 4 complete size = 16 bytes of overhead before the data)
                 header_->len += static_cast<uint16_t>(size);
                 std::memcpy(payload_, &size, sizeof(uint32_t));
                 std::memcpy(payload_ + sizeof(uint32_t), data, size);
+            }
+            else
+            {
+                // ETG.1000.6: the Initiate Download Request carries only the complete size
+                sdo_->size_indicator = 1;
+                std::memcpy(payload_, &size, sizeof(uint32_t));
+                download_remaining_ = size; // client_data_ already points at the source buffer
             }
         }
     }
@@ -101,6 +106,14 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE;
         }
 
+        // the declared service-data length cannot exceed what the mailbox carries; otherwise the
+        // size/segment reads below would run past the end of the received frame
+        if ((sizeof(mailbox::Header) + header->len) > data_.size())
+        {
+            status_ = MessageStatus::COE_WRONG_SERVICE;
+            return ProcessingResult::FINALIZE;
+        }
+
         // everything is fine: process the payload
         switch (sdo_->command)
         {
@@ -142,6 +155,12 @@ namespace kickcat::mailbox::request
         }
 
         // standard or segmented transfer
+        if (header->len < 10)
+        {
+            // guard the complete_size read and the unsigned (header->len - 10) below
+            status_ = MessageStatus::COE_WRONG_SERVICE;
+            return ProcessingResult::FINALIZE;
+        }
 
         uint32_t complete_size;
         std::memcpy(&complete_size, payload, sizeof(uint32_t));
@@ -164,27 +183,20 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE;
         }
 
-        // segmented
-        uint32_t size;
-        std::memcpy(&size, payload, sizeof(uint32_t));
-        payload += 4;
-
-        std::memcpy(client_data_, payload, size);
-        client_data_ += size;
-        *client_data_size_ = size;
-
-        // since transfer is segmented, we need to request the next segment
+        // ETG.1000.6: the segmented Initiate Upload Response carries only the complete size
+        *client_data_size_ = 0;
         coe_->service = CoE::Service::SDO_REQUEST;
         sdo_->command = CoE::SDO::request::UPLOAD_SEGMENTED;
-        sdo_->complete_access = false; // use for toggle bit - first segment shall be set to 0
+        sdo_->complete_access = false; // toggle bit, first segment request is 0
         sdo_->block_size      = 0;
         sdo_->transfer_type   = 0;
         sdo_->size_indicator  = 0;
+        header_->len          = 10;    // Upload SDO Segment Request length (ETG.1000.6 Table 38)
         status_ = MessageStatus::RUNNING;
         return ProcessingResult::CONTINUE;
     }
 
-    ProcessingResult SDOMessage::processUploadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload)
+    ProcessingResult SDOMessage::processUploadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const*)
     {
         if (sdo->command != CoE::SDO::response::UPLOAD_SEGMENTED)
         {
@@ -198,23 +210,29 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE;
         }
 
-        uint32_t size = 0;
-        if (header->len == 10)
+        if (header->len < 10)
         {
-            size = 7 - (sdo->block_size | (sdo->size_indicator << 2));
-        }
-        else
-        {
-            std::memcpy(&size, payload, sizeof(uint32_t));
-            payload += sizeof(uint32_t);
+            status_ = MessageStatus::COE_WRONG_SERVICE;
+            return ProcessingResult::FINALIZE;
         }
 
-        std::memcpy(client_data_, payload, size);
+        // ETG.1000.6 Table 39: data follows the 1-byte segment header
+        uint8_t const* seg_data = reinterpret_cast<uint8_t const*>(sdo) + 1;
+        uint32_t size = CoE::segmentDataLength(header->len, sdo);
+
+        // *client_data_size_ tracks bytes written so far; never write past the original buffer.
+        if (size > (client_buffer_size_ - *client_data_size_))
+        {
+            status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
+            return ProcessingResult::FINALIZE;
+        }
+
+        std::memcpy(client_data_, seg_data, size);
         client_data_ += size;
         *client_data_size_ += size;
 
-        bool more_follow = sdo->size_indicator;
-        if (not more_follow)
+        // More Follows (size_indicator, bit 0): 0x01 marks the last segment.
+        if (sdo->size_indicator)
         {
             status_ = MessageStatus::SUCCESS;
             return ProcessingResult::FINALIZE;
@@ -222,6 +240,38 @@ namespace kickcat::mailbox::request
 
         sdo_->complete_access = not sdo_->complete_access;
         return ProcessingResult::CONTINUE;
+    }
+
+    void SDOMessage::prepareDownloadSegment()
+    {
+        // ETG.1000.6 Table 33: data follows the 1-byte header; min len 0x0A, so a short final
+        // segment still sends 7 octets with SegData Size marking the unused ones
+        uint32_t const max_seg = static_cast<uint32_t>(data_.size()) - 9;
+        uint32_t chunk = download_remaining_;
+        if (chunk > max_seg)
+        {
+            chunk = max_seg;
+        }
+
+        uint8_t* seg_data = reinterpret_cast<uint8_t*>(sdo_) + 1;
+        if (chunk < 7)
+        {
+            std::memset(seg_data, 0, 7); // zero the compact padding octets
+        }
+        std::memcpy(seg_data, client_data_, chunk);
+
+        client_data_        += chunk;
+        download_remaining_ -= chunk;
+
+        coe_->service        = CoE::Service::SDO_REQUEST;
+        sdo_->command        = CoE::SDO::request::DOWNLOAD_SEGMENTED;
+        header_->len         = CoE::setSegmentLength(sdo_, chunk);
+        sdo_->size_indicator = 0;
+        if (download_remaining_ == 0)
+        {
+            sdo_->size_indicator = 1; // More Follows: this is the last segment
+        }
+        // sdo_->complete_access (toggle) is managed by the caller
     }
 
     ProcessingResult SDOMessage::processDownload(mailbox::Header const*, CoE::ServiceData const* sdo, uint8_t const*)
@@ -232,8 +282,17 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE;
         }
 
-        status_ = MessageStatus::SUCCESS; // all checks passed
-        return ProcessingResult::FINALIZE;
+        if (download_remaining_ == 0)
+        {
+            status_ = MessageStatus::SUCCESS; // expedited or single-frame download complete
+            return ProcessingResult::FINALIZE;
+        }
+
+        // segmented: the slave accepted the initiate; start sending segments (toggle starts at 0)
+        sdo_->complete_access = false;
+        prepareDownloadSegment();
+        status_ = MessageStatus::RUNNING;
+        return ProcessingResult::CONTINUE;
     }
 
     ProcessingResult SDOMessage::processDownloadSegmented(mailbox::Header const*, CoE::ServiceData const* sdo, uint8_t const*)
@@ -244,7 +303,22 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE;
         }
 
-        return ProcessingResult::FINALIZE;
+        // toggle echoed by the slave must match the one we sent
+        if (sdo->complete_access != sdo_->complete_access)
+        {
+            status_ = MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT;
+            return ProcessingResult::FINALIZE;
+        }
+
+        if (download_remaining_ == 0)
+        {
+            status_ = MessageStatus::SUCCESS;
+            return ProcessingResult::FINALIZE;
+        }
+
+        sdo_->complete_access = not sdo_->complete_access; // flip toggle for the next segment
+        prepareDownloadSegment();
+        return ProcessingResult::CONTINUE;
     }
 
 
@@ -363,7 +437,9 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE_AND_KEEP;
         }
 
-        if (already_received_size_ < *client_data_size_)
+        // last fragment: succeed unless buffer-too-small was already raised (a strict '<' here
+        // leaves status_ at RUNNING when the reply exactly fills the buffer)
+        if (status_ == MessageStatus::RUNNING)
         {
             status_ = MessageStatus::SUCCESS;
             *client_data_size_ = already_received_size_;

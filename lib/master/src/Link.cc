@@ -122,17 +122,17 @@ namespace kickcat
     {
         Frame frame;
         frame.addDatagram(0, Command::BRD, createAddress(0, 0x0000), nullptr, 1);
-        if (writeFrame(socket_redundancy_, frame, SECONDARY_IF_MAC) < 0)
+        if (writeFrame(*socket_redundancy_, frame, SECONDARY_IF_MAC) < 0)
         {
             link_error("Fail to write on redundancy interface \n");
         }
 
         socket_nominal_->setTimeout(timeout_);
         socket_redundancy_->setTimeout(timeout_);
-        if (readFrame(socket_nominal_, frame) < 0)
+        if (readFrame(*socket_nominal_, frame) < 0)
         {
             link_error("Fail to read nominal interface \n");
-            if (readFrame(socket_redundancy_, frame) < 0)
+            if (readFrame(*socket_redundancy_, frame) < 0)
             {
                 link_error("Fail to read redundancy interface, master redundancy interface is not connected \n");
                 return;
@@ -251,7 +251,7 @@ namespace kickcat
         nanoseconds deadline = since_epoch() + timeout_;
 
         socket_redundancy_->setTimeout(timeout_);
-        if (readFrame(socket_redundancy_, frame_nominal_) < 0)
+        if (readFrame(*socket_redundancy_, frame_nominal_) < 0)
         {
             link_warning("Nominal frame read fail\n");
         }
@@ -261,7 +261,7 @@ namespace kickcat
         nanoseconds timeout_second_socket = std::max(remaining_timeout, min_timeout);
 
         socket_nominal_->setTimeout(timeout_second_socket);
-        if (readFrame(socket_nominal_, frame_redundancy_) < 0)
+        if (readFrame(*socket_nominal_, frame_redundancy_) < 0)
         {
             link_warning("Redundancy frame read fail\n");
         }

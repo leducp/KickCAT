@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_ABSTRACTSPI_H_
-#define SLAVE_STACK_INCLUDE_ABSTRACTSPI_H_
+#ifndef KICKCAT_SLAVE_ABSTRACTSPI_H_
+#define KICKCAT_SLAVE_ABSTRACTSPI_H_
 
 #include <cstdint>
 #include <string>

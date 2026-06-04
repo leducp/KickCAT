@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_PDO_H_
-#define SLAVE_STACK_INCLUDE_PDO_H_
+#ifndef KICKCAT_SLAVE_PDO_H_
+#define KICKCAT_SLAVE_PDO_H_
 
 #include "AbstractESC.h"
 #include "kickcat/protocol.h"

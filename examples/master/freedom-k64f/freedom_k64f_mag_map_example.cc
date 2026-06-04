@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 
         printf("=== PDO Configuration Complete ===\n\n");
 
-        bus.createMapping(io_buffer);
+        bus.createMapping(io_buffer, sizeof(io_buffer));
 
         bus.enableIRQ(EcatEvent::DL_STATUS,
                       [&]()

@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
         }
 
         printf("mapping\n");
-        bus.createMapping(io_buffer);
+        bus.createMapping(io_buffer, sizeof(io_buffer));
 
         for (auto& motor : motors)
         {

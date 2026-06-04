@@ -219,9 +219,9 @@ namespace kickcat
     }
 
 
-    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame)
+    int32_t readFrame(AbstractSocket& socket, Frame& frame)
     {
-        int32_t read = socket->read(frame.data(), ETH_MAX_SIZE);
+        int32_t read = socket.read(frame.data(), ETH_MAX_SIZE);
         if (read < 0)
         {
             link_error("read() failed\n");
@@ -258,11 +258,11 @@ namespace kickcat
     }
 
 
-    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, MAC const& src)
+    int32_t writeFrame(AbstractSocket& socket, Frame& frame, MAC const& src)
     {
         frame.setSourceMAC(src);
         int32_t toWrite = frame.finalize();
-        int32_t written = socket->write(frame.data(), toWrite);
+        int32_t written = socket.write(frame.data(), toWrite);
         frame.clear();
 
         if (written < 0)
@@ -276,5 +276,17 @@ namespace kickcat
         }
 
         return written;
+    }
+
+
+    int32_t readFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame)
+    {
+        return readFrame(*socket, frame);
+    }
+
+
+    int32_t writeFrame(std::shared_ptr<AbstractSocket> socket, Frame& frame, MAC const& src)
+    {
+        return writeFrame(*socket, frame, src);
     }
 }

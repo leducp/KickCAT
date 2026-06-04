@@ -1,6 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <cstring>
+#include <memory>
 #include "mocks/ESC.h"
 #include "kickcat/AbstractESC.h"
 #include "kickcat/ESM.h"
@@ -39,11 +40,11 @@ public:
 
     void SetUp() override
     {
-        sm = new StateMachine(esc_, {{&firstState, &secondState, &thirdState, &fourthState}});
+        sm.reset(new StateMachine(esc_, {{&firstState, &secondState, &thirdState, &fourthState}}));
     }
 
     void expectAlControlRead(uint16_t alControlValue);
-    StateMachine* sm;
+    std::unique_ptr<StateMachine> sm;
 };
 
 MATCHER_P2(StatusMatches, expectedAlStatus, expectedALStatusCode, "Matches status")

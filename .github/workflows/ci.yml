@@ -104,6 +104,35 @@ jobs:
           path: build/coverage_xml.xml
           if-no-files-found: error
 
+  # Sanitizer build + unit tests: ASan + LSan + UBSan (catches overflows, use-after-free, leaks,
+  # and undefined behaviour; alignment is excluded for the packed EtherCAT frame layer).
+  build_sanitizers:
+    needs: py_lint
+    name: Build C++ (ASan + UBSan)
+    runs-on: ubuntu-latest
+    env:
+      UBSAN_OPTIONS: print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-conan-action
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libtinyxml2-dev
+
+      - name: Setup build
+        run: |
+          scripts/configure.sh ${{github.workspace}}/build -ni --with=unit_tests --with=asan --with=ubsan
+          ./scripts/setup_build.sh ${{github.workspace}}/build --build-type Debug
+        shell: bash
+
+      - name: Build
+        run: cmake --build build --config Debug
+
+      - name: Unit Test (sanitizers)
+        working-directory: ${{github.workspace}}/build
+        run: ctest . --output-on-failure
+        shell: bash
+
   build_arm64:
     needs: py_lint
     name: Build C++ (ARM64 - ${{ matrix.preset }})

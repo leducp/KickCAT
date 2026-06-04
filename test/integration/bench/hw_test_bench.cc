@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        bus.createMapping(io_buffer);
+        bus.createMapping(io_buffer, sizeof(io_buffer));
 
         auto cyclic_process_data = [&]()
         {

@@ -1,5 +1,5 @@
-#ifndef SLAVE_STACK_INCLUDE_RPI_SPI_H_
-#define SLAVE_STACK_INCLUDE_RPI_SPI_H_
+#ifndef KICKCAT_SLAVE_RPI_SPI_H_
+#define KICKCAT_SLAVE_RPI_SPI_H_
 
 #include "kickcat/AbstractSPI.h"
 #include <string>

@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
     drive.configure(CoE::CiA::DS402::control::POSITION_CYCLIC);
     drive.setInterpolationTimePeriod(1, -3); // 1ms
 
-    bus.createMapping(io_buffer);
+    bus.createMapping(io_buffer, sizeof(io_buffer));
     bus.requestState(State::SAFE_OP);
     bus.waitForState(State::SAFE_OP, 1000ms);
 

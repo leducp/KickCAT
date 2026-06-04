@@ -25,6 +25,8 @@ namespace kickcat::mailbox::response
 
         ProcessingResult download(CoE::Entry* entry);
         ProcessingResult downloadComplete(CoE::Object* object);
+        ProcessingResult downloadSegment(std::vector<uint8_t> const& raw_message,
+                                         mailbox::Header const* header, CoE::ServiceData const* sdo);
 
         bool isUploadAuthorized(CoE::Entry* entry);
         bool isDownloadAuthorized(CoE::Entry* entry);
@@ -39,6 +41,11 @@ namespace kickcat::mailbox::response
         CoE::Header* coe_;
         CoE::ServiceData* sdo_;
         uint8_t* payload_;
+
+        // Segmented upload state: a non-null entry means an upload is in progress across segments.
+        CoE::Entry* segmented_entry_{nullptr};
+        uint32_t    segmented_offset_{0};
+        bool        segmented_toggle_{false};
     };
 
 

@@ -27,6 +27,13 @@ namespace kickcat::CoE
         uint8_t subindex;
     } __attribute__((__packed__));
 
+    // SDO segment header (ETG.1000.6 Tables 33/39): SegData Size (bits 1..3) records how many of the
+    // 7 compact data octets are unused, and is only meaningful when the mailbox length is 0x0A.
+    // These helpers keep that bit layout in one place across the up/download segment paths.
+    uint8_t segmentDataSize(ServiceData const* sdo);
+    uint32_t segmentDataLength(uint16_t mailbox_len, ServiceData const* sdo); // octets of data in a segment
+    uint16_t setSegmentLength(ServiceData* sdo, uint32_t chunk);              // encode chunk -> mailbox length
+
     struct ServiceDataInfo // ETG1000.6 chapter 5.6.3 SDO Information
     {
         uint16_t opcode : 7,

@@ -1,5 +1,5 @@
-#ifndef KICKAT_LINUX_SOCKET_H
-#define KICKAT_LINUX_SOCKET_H
+#ifndef KICKCAT_LINUX_SOCKET_H
+#define KICKCAT_LINUX_SOCKET_H
 
 #include "kickcat/AbstractSocket.h"
 

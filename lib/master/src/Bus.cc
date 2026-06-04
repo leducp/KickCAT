@@ -509,6 +509,12 @@ namespace kickcat
 
     void Bus::createMapping(uint8_t* iomap)
     {
+        createMapping(iomap, SIZE_MAX);
+    }
+
+
+    void Bus::createMapping(uint8_t* iomap, std::size_t iomap_size)
+    {
         // First we need to know:
         // - how many bits to map per slave
         // - which SM to use
@@ -637,6 +643,18 @@ namespace kickcat
             }
         }
 
+        // Validate the client buffer can hold the process image before writing into it.
+        std::size_t required = 0;
+        for (auto const& frame : pi_frames_)
+        {
+            for (auto const& bio : frame.inputs)  { required += bio.size; }
+            for (auto const& bio : frame.outputs) { required += bio.size; }
+        }
+        if (required > iomap_size)
+        {
+            THROW_ERROR("createMapping: iomap buffer too small for the process image");
+        }
+
         // Third step: associate client buffer address to block IO and slaves
         // Note: inputs are mapped first, outputs second
         uint8_t* pos = iomap;
@@ -673,7 +691,7 @@ namespace kickcat
     {
         for (auto const& pi_frame : pi_frames_)
         {
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
 				// copy before: a wrong wkc doesn't mean that all data shall be discarded
                 for (auto& input : pi_frame.inputs)
@@ -722,7 +740,7 @@ namespace kickcat
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
             }
 
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const*, uint16_t wkc)
             {
                 if (wkc != pi_frame.outputs.size())
                 {
@@ -758,7 +776,7 @@ namespace kickcat
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
             }
 
-            auto process = [pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            auto process = [&pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
                 uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2
                     + pi_frame.mailbox_status_wkc_read_adjust);

@@ -82,7 +82,10 @@ namespace kickcat
 
         // create the mapping between slaves PI and client buffer
         // if OK, set the bus to SAFE_OP state
+        [[deprecated("pass the iomap size so it can be bounds-checked: createMapping(uint8_t*, std::size_t)")]]
         void createMapping(uint8_t* iomap);
+        /// \brief Like createMapping(iomap), but throws if iomap_size cannot hold the process image.
+        void createMapping(uint8_t* iomap, std::size_t iomap_size);
 
         std::vector<Slave>& slaves() { return slaves_; }
 

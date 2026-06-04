@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstring>
+#include <random>
+
 #include "mocks/ESC.h"
 
 #include "kickcat/Mailbox.h"
@@ -112,6 +115,46 @@ public:
     MockESC esc;
     Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
 };
+
+// Behavioural gate: a well-formed OD must let the SDO server serve every accessible entry
+// through the real process() path without undefined behaviour. Combined with the debug asserts
+// in response.cc and/or ASan, this traps any served entry that has no backing storage.
+TEST_F(CoE_Response, SDO_sweep_serves_every_entry_without_ub)
+{
+    ASSERT_TRUE(CoE::validateDictionary(mbx.getDictionary()).empty());
+
+    auto const& dict = mbx.getDictionary();
+    for (auto const& object : dict)
+    {
+        for (auto const& entry : object.entries)
+        {
+            if (entry.access & CoE::Access::READ)
+            {
+                auto msg = createSDOMessage(&mbx, createTestReadSDO(object.index, entry.subindex));
+                ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, msg->process())
+                    << "upload object " << object.index << " subindex " << (int)entry.subindex;
+                (void)mbx.readyToSend();
+            }
+            if (entry.access & CoE::Access::WRITE)
+            {
+                auto msg = createSDOMessage(&mbx, createTestWriteSDO(object.index, entry.subindex, 0));
+                ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, msg->process())
+                    << "download object " << object.index << " subindex " << (int)entry.subindex;
+                (void)mbx.readyToSend();
+            }
+        }
+
+        bool const is_complex = (object.code == CoE::ObjectCode::ARRAY) or (object.code == CoE::ObjectCode::RECORD);
+        if (is_complex)
+        {
+            // Exercises uploadComplete(), which dereferences subindex 0 (the entry count).
+            auto msg = createSDOMessage(&mbx, createTestReadSDO(object.index, 1, true));
+            ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, msg->process())
+                << "complete upload object " << object.index;
+            (void)mbx.readyToSend();
+        }
+    }
+}
 
 TEST_F(CoE_Response, SDO_read_expedited_OK)
 {
@@ -995,4 +1038,108 @@ TEST_F(CoE_Response, createSDOMessage_rxpdo_remote_request)
 
     auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
     ASSERT_EQ(nullptr, response_msg);
+}
+
+
+// Self-coherency: the slave's segmented-upload sender and the master's segmented-upload receiver
+// must agree end to end. A small mailbox forces a multi-segment transfer of a random blob.
+TEST(CoE_Roundtrip, sdo_segmented_upload_master_slave)
+{
+    constexpr uint16_t MBX = 32;
+
+    std::mt19937 rng{0xB10B5EEDu};
+    uint8_t blob[50];
+    for (auto& byte : blob) { byte = static_cast<uint8_t>(rng()); }
+
+    CoE::Dictionary dict;
+    {
+        CoE::Object object{0x2000, CoE::ObjectCode::VAR, "Big blob", {}};
+        object.entries.emplace_back(0, static_cast<uint16_t>(sizeof(blob) * 8), 0,
+                                    CoE::Access::READ, CoE::DataType::OCTET_STRING, "blob");
+        object.entries.back().data = std::malloc(sizeof(blob));
+        std::memcpy(object.entries.back().data, blob, sizeof(blob));
+        dict.push_back(std::move(object));
+    }
+
+    Mailbox slave{MBX, 1};
+    slave.enableCoE(std::move(dict));
+
+    mailbox::request::Mailbox master;
+    master.recv_size = MBX;
+    master.send_size = MBX;
+
+    uint8_t received[sizeof(blob)] = {0};
+    uint32_t received_size = sizeof(received);
+    master.createSDO(0x2000, 0, false, CoE::SDO::request::UPLOAD, received, &received_size);
+
+    auto msg = master.send();
+    int guard = 0;
+    while ((msg->status() == mailbox::request::MessageStatus::RUNNING) and (guard++ < 32))
+    {
+        std::vector<uint8_t> request(msg->data(), msg->data() + msg->size());
+        std::vector<uint8_t> reply = slave.processRequest(std::move(request));
+        ASSERT_FALSE(reply.empty());
+        master.receive(reply.data());
+        if (msg->status() != mailbox::request::MessageStatus::RUNNING)
+        {
+            break;
+        }
+        msg = master.send();
+    }
+
+    ASSERT_EQ(mailbox::request::MessageStatus::SUCCESS, msg->status());
+    ASSERT_EQ(sizeof(blob), received_size);
+    ASSERT_EQ(0, std::memcmp(received, blob, sizeof(blob)));
+}
+
+// Mirror of the upload coherency check: the master's segmented-download sender and the slave's
+// segmented-download receiver must agree end to end.
+TEST(CoE_Roundtrip, sdo_segmented_download_master_slave)
+{
+    constexpr uint16_t MBX = 32;
+
+    std::mt19937 rng{0xD0117EA1u};
+    uint8_t blob[50];
+    for (auto& byte : blob) { byte = static_cast<uint8_t>(rng()); }
+
+    CoE::Dictionary dict;
+    {
+        CoE::Object object{0x3000, CoE::ObjectCode::VAR, "Writable blob", {}};
+        object.entries.emplace_back(0, static_cast<uint16_t>(sizeof(blob) * 8), 0,
+                                    CoE::Access::WRITE, CoE::DataType::OCTET_STRING, "blob");
+        object.entries.back().data = std::malloc(sizeof(blob));
+        std::memset(object.entries.back().data, 0, sizeof(blob));
+        dict.push_back(std::move(object));
+    }
+
+    Mailbox slave{MBX, 1};
+    slave.enableCoE(std::move(dict));
+
+    mailbox::request::Mailbox master;
+    master.recv_size = MBX;
+    master.send_size = MBX;
+
+    uint32_t source_size = sizeof(blob);
+    master.createSDO(0x3000, 0, false, CoE::SDO::request::DOWNLOAD, blob, &source_size);
+
+    auto msg = master.send();
+    int guard = 0;
+    while ((msg->status() == mailbox::request::MessageStatus::RUNNING) and (guard++ < 32))
+    {
+        std::vector<uint8_t> request(msg->data(), msg->data() + msg->size());
+        std::vector<uint8_t> reply = slave.processRequest(std::move(request));
+        ASSERT_FALSE(reply.empty());
+        master.receive(reply.data());
+        if (msg->status() != mailbox::request::MessageStatus::RUNNING)
+        {
+            break;
+        }
+        msg = master.send();
+    }
+
+    ASSERT_EQ(mailbox::request::MessageStatus::SUCCESS, msg->status());
+
+    auto [object, entry] = CoE::findObject(slave.getDictionary(), 0x3000, 0);
+    ASSERT_NE(entry, nullptr);
+    ASSERT_EQ(0, std::memcmp(entry->data, blob, sizeof(blob)));
 }
