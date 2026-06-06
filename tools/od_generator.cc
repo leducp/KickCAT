@@ -265,6 +265,10 @@ int main(int argc, char *argv[])
 
     auto dictionary = loadOD(esi_file);
 
+    // Backing storage is structural, separate from ESI default values: give every
+    // SDO-accessible entry zero-initialized storage when the ESI declared no default.
+    CoE::materializeStorage(dictionary);
+
     auto problems = CoE::validateDictionary(dictionary);
     if (not problems.empty())
     {
@@ -275,8 +279,7 @@ int main(int argc, char *argv[])
             std::cerr << "  - " << problem << "\n";
         }
         std::cerr << problems.size() << " problem(s) found; refusing to generate "
-                  << OD_POPULATOR_FILE << ".\n"
-                  << "Every readable/writable object needs a value (ESI <DefaultData>/<DefaultValue>).\n";
+                  << OD_POPULATOR_FILE << ".\n";
         return 2;
     }
 

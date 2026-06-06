@@ -85,6 +85,31 @@ TEST_F(CoE_Request, emergency_callback_not_related_message)
     ASSERT_EQ(0, mailbox.emergencies.size());
 }
 
+TEST_F(CoE_Request, SDO_abort_reaches_pending_request_not_check_message)
+{
+    // Bus::init seeds a CheckMessage ahead of any SDO. An "Abort SDO Transfer"
+    // is itself an SDO_REQUEST (ETG.1000.6 Table 40); it must reach the pending
+    // SDO transfer rather than being swallowed by CheckMessage.
+    mailbox.to_process.push_back(std::make_shared<CheckMessage>(mailbox));
+
+    int32_t data = 0;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1c13, 0, false, CoE::SDO::request::UPLOAD, &data, &data_size);
+    auto sdoMsg = mailbox.send();   // appended after the CheckMessage
+
+    header->address = 0;
+    header->type    = mailbox::Type::CoE;
+    coe->service    = CoE::Service::SDO_REQUEST;
+    sdo->command    = CoE::SDO::request::ABORT;
+    sdo->index      = 0x1c13;
+    sdo->subindex   = 0;
+    *static_cast<uint32_t*>(payload) = CoE::SDO::abort::OBJECT_DOES_NOT_EXIST;
+
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_NE(MessageStatus::RUNNING, sdoMsg->status());  // not left hanging by CheckMessage
+    ASSERT_NE(MessageStatus::SUCCESS, sdoMsg->status());  // terminated as an abort
+}
+
 TEST_F(CoE_Request, SDO_inactive_mailbox)
 {
     mailbox.recv_size = 0;

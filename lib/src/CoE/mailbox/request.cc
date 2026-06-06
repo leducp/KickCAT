@@ -493,6 +493,14 @@ namespace kickcat::mailbox::request
             auto const* coe = pointData<CoE::Header>(header);
             if (coe->service == CoE::Service::SDO_REQUEST)
             {
+                // An "Abort SDO Transfer" is itself an SDO_REQUEST (ETG.1000.6
+                // Table 40); it terminates a pending transfer, so leave it for
+                // that SDOMessage rather than swallowing it here.
+                auto const* sdo = pointData<CoE::ServiceData>(coe);
+                if (sdo->command == CoE::SDO::request::ABORT)
+                {
+                    return ProcessingResult::NOOP;
+                }
                 auto repr = CoE::toString(coe);
                 coe_warning("WARNING: slave is trying to do an SDO request -> dropping\n");
                 coe_warning("%s\n", repr.c_str());

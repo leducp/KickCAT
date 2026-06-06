@@ -1072,10 +1072,13 @@ TEST(ESIParser, pdos_synthesize_legacy_mapping_objects)
     ASSERT_EQ(assigned_tx, 0x1A00u);
 }
 
-TEST(ESIParser, pdos_do_not_overwrite_explicit_dictionary_objects)
+TEST(ESIParser, pdo_entry_is_authoritative_over_explicit_mapping_object)
 {
-    // If the slave's <Dictionary> already declares 0x1600, our auto-generated
-    // mapping object must not displace it.
+    // ETG.2010 Tables 14/15: the PDO mapping is defined by <Pdo>/<Entry>, so for a
+    // mapping-object index (0x16xx/0x1Axx) the <Entry>-derived mapping is
+    // authoritative over a conflicting explicit <Object> (whose DefaultData may be
+    // a vendor typo, e.g. Beckhoff EL4004). The explicit object here is a stand-in
+    // that must be replaced by the <Entry> version.
     char const* xml = R"(<?xml version="1.0"?>
         <EtherCATInfo>
             <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
@@ -1107,7 +1110,123 @@ TEST(ESIParser, pdos_do_not_overwrite_explicit_dictionary_objects)
     auto dictionary = parser.loadString(xml);
     auto [obj, _] = findObject(dictionary, 0x1600, 0);
     ASSERT_NE(obj, nullptr);
-    ASSERT_EQ(obj->name, "Explicit RxPDO map");  // explicit declaration wins
+    ASSERT_EQ(obj->name, "Auto-generated map");          // <Entry>-derived object replaced the explicit one
+    ASSERT_EQ(obj->code, CoE::ObjectCode::RECORD);
+
+    auto [_o, entry1] = findObject(dictionary, 0x1600, 1);
+    ASSERT_NE(entry1, nullptr);
+    uint32_t packed;
+    std::memcpy(&packed, entry1->data, 4);
+    ASSERT_EQ(packed, (0x7000u << 16) | (1u << 8) | 16u);  // mapping from <Entry>
+}
+
+TEST(ESIParser, sm_assignment_is_authoritative_over_explicit_over_assignment)
+{
+    // ETG.2010 Table 14: only PDOs "mapped by default" (those carrying @Sm) belong
+    // to a SyncManager's default assignment, at 0x1C10 + SM index. When an explicit
+    // 0x1C12 over-assigns a phantom PDO with no <RxPdo> (e.g. the shared dictionary
+    // in Beckhoff EL4004), the @Sm-derived assignment replaces it.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType><Name>UINT</Name><BitSize>16</BitSize></DataType>
+                            <DataType>
+                                <Name>UINT_ARR2</Name><BaseType>UINT</BaseType><BitSize>32</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>2</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT1C12</Name><BitSize>48</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>Count</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><Name>Elements</Name><Type>UINT_ARR2</Type><BitSize>32</BitSize><BitOffs>16</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1C12</Index>
+                                <Name>Explicit over-assignment</Name>
+                                <Type>DT1C12</Type>
+                                <BitSize>48</BitSize>
+                                <Info>
+                                    <SubItem><Name>Count</Name><Info><DefaultData>02</DefaultData></Info></SubItem>
+                                    <SubItem><Name>E1</Name><Info><DefaultData>0016</DefaultData></Info></SubItem>
+                                    <SubItem><Name>E2</Name><Info><DefaultData>0116</DefaultData></Info></SubItem>
+                                </Info>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <RxPdo Sm="2">
+                    <Index>#x1600</Index>
+                    <Name>Outputs</Name>
+                    <Entry><Index>#x7000</Index><SubIndex>1</SubIndex><BitLen>16</BitLen></Entry>
+                </RxPdo>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+
+    auto [obj, e0] = findObject(dictionary, 0x1C12, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->name, "RxPDO assign");        // @Sm-derived object replaced the explicit one
+    ASSERT_EQ(obj->entries.size(), 2u);          // count + 1 assigned PDO (phantom 0x1601 dropped)
+    uint8_t count;
+    std::memcpy(&count, e0->data, 1);
+    ASSERT_EQ(count, 1u);
+    uint16_t assigned;
+    std::memcpy(&assigned, obj->entries[1].data, 2);
+    ASSERT_EQ(assigned, 0x1600u);
+}
+
+TEST(ESIParser, mapping_target_subindex_reconciled_against_object)
+{
+    // ETG.1000.6 Tables 74/75: a mapping entry references object:subindex. Here the
+    // <Entry> names 0x7000:17 (a vendor typo, as in EL4004 rev>=0x13) but object
+    // 0x7000 declares its 16-bit value at sub 1. The object dictionary is the
+    // authority, so the mapping must be retargeted to the resolvable sub 1.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType><Name>UINT</Name><BitSize>16</BitSize></DataType>
+                            <DataType>
+                                <Name>DT7000</Name><BitSize>24</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>Max</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><SubIdx>1</SubIdx><Name>Value</Name><Type>UINT</Type><BitSize>16</BitSize><BitOffs>8</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x7000</Index><Name>AO</Name><Type>DT7000</Type><BitSize>24</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <RxPdo Sm="2">
+                    <Index>#x1600</Index>
+                    <Name>Outputs</Name>
+                    <Entry><Index>#x7000</Index><SubIndex>17</SubIndex><BitLen>16</BitLen></Entry>
+                </RxPdo>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+
+    auto [obj, entry1] = findObject(dictionary, 0x1600, 1);
+    ASSERT_NE(entry1, nullptr);
+    uint32_t packed;
+    std::memcpy(&packed, entry1->data, 4);
+    ASSERT_EQ(packed, (0x7000u << 16) | (1u << 8) | 16u);  // retargeted 0x7000:17 -> 0x7000:1
 }
 
 TEST(ESIParser, loadDevice_parses_eeprom)

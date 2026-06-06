@@ -41,9 +41,9 @@ namespace kickcat
                 return not(al_watchdog_process_data & 0x1);
             }
 
-            static Context build(uint8_t state, uint8_t statusCode = StatusCode::NO_ERROR)
+            static Context build(uint8_t state, uint8_t statusCode = StatusCode::ECAT_NO_ERROR)
             {
-                if (statusCode == NO_ERROR)
+                if (statusCode == StatusCode::ECAT_NO_ERROR)
                 {
                     return Context{state, statusCode, 0};
                 }

@@ -26,6 +26,10 @@ namespace kickcat
 
         StatusCode configureMapping(CoE::Dictionary& dict);
 
+        // Meaningful only after configure().
+        bool hasInput()  const { return sm_input_.type  != SyncManager::Unused; }
+        bool hasOutput() const { return sm_output_.type != SyncManager::Unused; }
+
     private:
 
         std::vector<uint16_t> parseAssignment(CoE::Dictionary& dict, uint16_t assign_idx);

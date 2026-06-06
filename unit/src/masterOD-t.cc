@@ -415,7 +415,7 @@ TEST(MasterODPopulate, optional_subindices_exist_with_defaults)
 
     std::vector<Slave> slaves(1);
     slaves[0].address = 0x1001;
-    slaves[0].sii.strings = {"AD-4242"};
+    slaves[0].sii.strings = {"", "AD-4242"};  // strings[0] is the reserved empty; index 1 is the first real string
     slaves[0].sii.general.device_order_id = 1;
     slaves[0].sii.general.port_0 = 1;   // MII
     slaves[0].sii.general.port_1 = 2;   // EBUS
@@ -474,7 +474,8 @@ TEST(MasterODPopulate, mandatory_subindices_from_spec)
 
     std::vector<Slave> slaves(1);
     // Point device_name_id at the first SII string (1-based index per ETG.2010).
-    slaves[0].sii.strings = {"Acme Drive"};
+    // strings[0] is the reserved empty placeholder, matching parseStrings()/serialize().
+    slaves[0].sii.strings = {"", "Acme Drive"};
     slaves[0].sii.general.device_name_id = 1;
     slaves[0].sii.info.mailbox_protocol = eeprom::MailboxProtocol::CoE | eeprom::MailboxProtocol::FoE;
 

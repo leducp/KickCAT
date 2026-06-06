@@ -240,6 +240,9 @@ namespace kickcat
             if (text == "MBoxIn")  { out = MailboxIn;  return; }
             if (text == "Outputs") { out = Output;     return; }
             if (text == "Inputs")  { out = Input;      return; }
+            // ETG.2000 <Sm> values: process data over a Dynamic Process Data Channel.
+            if (text == "DynamicOutputs") { out = Output; return; }
+            if (text == "DynamicInputs")  { out = Input;  return; }
 
             std::string what = "SyncManager::Type: unknown text '";
             what.append(text);
@@ -267,6 +270,9 @@ namespace kickcat
             if (text == "Outputs")   { out = Outputs;   return; }
             if (text == "Inputs")    { out = Inputs;    return; }
             if (text == "MBoxState") { out = MBoxState; return; }
+            // ETG.2000 <Fmmu> values: Rx/TxPDO over a Dynamic Process Data Channel.
+            if (text == "DynamicOutputs") { out = Outputs; return; }
+            if (text == "DynamicInputs")  { out = Inputs;  return; }
 
             std::string what = "fmmu::Type: unknown text '";
             what.append(text);

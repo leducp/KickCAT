@@ -109,9 +109,10 @@ TEST_F(PDOTest, configure_success)
     ASSERT_EQ(0, pdo_.configure());
 }
 
-TEST_F(PDOTest, configure_failure_no_buffered_sm)
+TEST_F(PDOTest, configure_mailbox_only_leaves_both_unused)
 {
-    // Replace all SMs with mailbox-only (control=0x02), so findSm(BUFFERED) throws
+    // Only mailbox SMs, no process data: a mailbox-only slave is valid. configure
+    // tolerates it (returns 0) and leaves both directions Unused.
     SyncManager::Register mbx{};
     mbx.control = SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ;
     for (int i = 0; i < 5; ++i)
@@ -122,7 +123,27 @@ TEST_F(PDOTest, configure_failure_no_buffered_sm)
                        { std::memcpy(ptr, &mbx, sizeof(SyncManager::Register)); }),
                 Return(sizeof(SyncManager::Register))));
     }
-    ASSERT_EQ(-EINVAL, pdo_.configure());
+    ASSERT_EQ(0, pdo_.configure());
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.isConfigOk());
+}
+
+TEST_F(PDOTest, configure_input_only_leaves_output_unused)
+{
+    // Input-only terminal (e.g. a digital input like EL1008): no buffered-write SM.
+    // configure must still succeed; the output direction stays Unused.
+    SyncManager::Register empty{};  // index 3 (output) replaced by an empty SM
+    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 3), _, sizeof(SyncManager::Register)))
+        .WillByDefault(DoAll(
+            Invoke([empty](uint16_t, void *ptr, uint16_t)
+                   { std::memcpy(ptr, &empty, sizeof(SyncManager::Register)); }),
+            Return(sizeof(SyncManager::Register))));
+
+    ASSERT_EQ(0, pdo_.configure());
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.isConfigOk());
+
+    // Output is Unused -> activating it touches no ESC register; input still does.
+    EXPECT_CALL(esc_, write(_, _, _)).Times(0);
+    pdo_.activateOutput(true);
 }
 
 // ---- isConfigOk() ----
@@ -130,7 +151,7 @@ TEST_F(PDOTest, configure_failure_no_buffered_sm)
 TEST_F(PDOTest, isConfigOk_no_error)
 {
     configurePdo();
-    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.isConfigOk());
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.isConfigOk());
 }
 
 TEST_F(PDOTest, isConfigOk_invalid_input_length_mismatch)
@@ -310,13 +331,73 @@ static CoE::Dictionary createMappingDict(bool with_input_assign, bool with_outpu
 TEST_F(PDOTest, configureMapping_no_assignments_returns_ok)
 {
     CoE::Dictionary dict = createMappingDict(false, false);
-    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
+}
+
+TEST_F(PDOTest, configureMapping_copies_sub_byte_default_into_buffer)
+{
+    // A BOOL entry (bitlen 1) occupies 1 byte; its default must be copied into the
+    // process image. With a bits/8 sizing the copy would be 0 bytes (default lost).
+    CoE::Dictionary dict;
+    {
+        CoE::Object obj{0x6000, CoE::ObjectCode::VAR, "Input bit", {}};
+        CoE::addEntry<uint8_t>(obj, 0, 1, 0, CoE::Access::READ | CoE::Access::WRITE,
+                               CoE::DataType::BOOLEAN, "bit", uint8_t{1});
+        dict.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1A00, CoE::ObjectCode::RECORD, "TxPDO map", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0, CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{1});
+        CoE::addEntry<uint32_t>(obj, 1, 32, 8, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M1",
+                                makeMappingEntry(0x6000, 0, 1));
+        dict.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1C13, CoE::ObjectCode::RECORD, "TxPDO assign", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0, CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{1});
+        CoE::addEntry<uint16_t>(obj, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
+        dict.push_back(std::move(obj));
+    }
+
+    input_[0] = 0;
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
+    ASSERT_EQ(input_[0], 1);  // BOOL default copied, not zero bytes
+}
+
+TEST_F(PDOTest, configureMapping_skips_padding_gap_entry)
+{
+    // A mapping entry with index 0 is an alignment gap: it reserves bits but maps
+    // to no object. It must be skipped, not looked up (which would fail). Common
+    // in analog terminals (e.g. Beckhoff EL30xx) that pad before the real value.
+    CoE::Dictionary dict;
+    {
+        CoE::Object obj{0x6000, CoE::ObjectCode::VAR, "Input", {}};
+        CoE::addEntry<uint16_t>(obj, 0, 16, 0, CoE::Access::READ | CoE::Access::WRITE,
+                                CoE::DataType::UNSIGNED16, "Val", uint16_t{0});
+        dict.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1A00, CoE::ObjectCode::RECORD, "TxPDO map", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0,  CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{2});
+        CoE::addEntry<uint32_t>(obj, 1, 32, 8,  CoE::Access::READ, CoE::DataType::UNSIGNED32, "pad",
+                                makeMappingEntry(0, 0, 4));            // gap: index 0
+        CoE::addEntry<uint32_t>(obj, 2, 32, 40, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M1",
+                                makeMappingEntry(0x6000, 0, 16));
+        dict.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1C13, CoE::ObjectCode::RECORD, "TxPDO assign", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0, CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{1});
+        CoE::addEntry<uint16_t>(obj, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
+        dict.push_back(std::move(obj));
+    }
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
 }
 
 TEST_F(PDOTest, configureMapping_input_aliases_entry_to_buffer)
 {
     CoE::Dictionary dict = createMappingDict(true, false);
-    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
 
     auto [obj, entry] = CoE::findObject(dict, 0x6000, 0);
     ASSERT_NE(nullptr, entry);
@@ -328,7 +409,7 @@ TEST_F(PDOTest, configureMapping_input_aliases_entry_to_buffer)
 TEST_F(PDOTest, configureMapping_output_aliases_entry_to_buffer)
 {
     CoE::Dictionary dict = createMappingDict(false, true);
-    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
 
     auto [obj, entry] = CoE::findObject(dict, 0x7000, 0);
     ASSERT_NE(nullptr, entry);
@@ -340,7 +421,7 @@ TEST_F(PDOTest, configureMapping_output_aliases_entry_to_buffer)
 TEST_F(PDOTest, configureMapping_both_assignments_succeed)
 {
     CoE::Dictionary dict = createMappingDict(true, true);
-    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
 }
 
 TEST_F(PDOTest, configureMapping_input_pdo_map_missing_returns_invalid_input)
@@ -462,7 +543,7 @@ TEST_F(PDOTest, configureMapping_already_mapped_entry_is_not_freed)
     CoE::addEntry<uint16_t>(assign, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
     dict.push_back(std::move(assign));
 
-    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
 
     auto [obj, entry] = CoE::findObject(dict, 0x6000, 0);
     ASSERT_NE(nullptr, entry);
@@ -491,7 +572,7 @@ TEST_F(PDOTest, configureMapping_null_old_data_no_memcpy)
     CoE::addEntry<uint16_t>(assign, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
     dict.push_back(std::move(assign));
 
-    ASSERT_EQ(StatusCode::NO_ERROR, pdo_.configureMapping(dict));
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
 
     auto [obj, entry] = CoE::findObject(dict, 0x6000, 0);
     ASSERT_NE(nullptr, entry);

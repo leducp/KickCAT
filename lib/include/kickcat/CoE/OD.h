@@ -244,13 +244,24 @@ namespace kickcat::CoE
     ///        cyclic path. An empty result means the dictionary is safe to serve.
     std::vector<std::string> validateDictionary(Dictionary const& dict);
 
+    /// \brief Give every SDO-accessible entry (access != 0, bitlen > 0) zero-initialized backing
+    ///        storage if it has none. Backing storage is a structural requirement, distinct from an
+    ///        ESI <DefaultData>/<DefaultValue> (which, when present, has already filled it). Additive:
+    ///        entries that already own storage are left untouched, and missing entries are not
+    ///        fabricated - only existing entries gain storage.
+    void materializeStorage(Dictionary& dict);
+
     template<typename T>
     void addEntry(Object &object, uint8_t subindex, uint16_t bitlen, uint16_t bitoff,
                   uint16_t access, DataType type, std::string const& description, T data)
     {
         object.entries.emplace_back(subindex, bitlen, bitoff, access, type, description);
         auto& alloc = object.entries.back().data;
-        std::size_t size = bitlen / 8;
+        std::size_t size = (bitlen + 7) / 8;  // sub-byte entries (BOOL/bitN) still need 1 byte
+        if (size == 0)
+        {
+            size = 1;
+        }
         alloc = std::malloc(size);
 
         if constexpr(std::is_same_v<const char*, T>)

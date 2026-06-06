@@ -79,15 +79,22 @@ namespace kickcat
 
         auto createSocket = [&](std::string& ifname, std::string const& tap_name) -> std::shared_ptr<AbstractSocket>
         {
-            if (ifname == "tap:server")
+            // "tap:server" / "tap:client" use the default shared-memory name; an
+            // optional ":<name>" suffix overrides it so independent server/client
+            // pairs can coexist (e.g. "tap:server:bench1").
+            std::pair<std::string, bool> const tap_kinds[] = {{"tap:server", true}, {"tap:client", false}};
+            for (auto const& [prefix, init] : tap_kinds)
             {
-                ifname = tap_name;
-                return std::make_shared<TapSocket>(true);
-            }
-            if (ifname == "tap:client")
-            {
-                ifname = tap_name;
-                return std::make_shared<TapSocket>(false);
+                if (ifname == prefix)
+                {
+                    ifname = tap_name;
+                    return std::make_shared<TapSocket>(init);
+                }
+                if (ifname.rfind(prefix + ":", 0) == 0)
+                {
+                    ifname = ifname.substr(prefix.size() + 1);
+                    return std::make_shared<TapSocket>(init);
+                }
             }
             if (ifname.empty())
             {

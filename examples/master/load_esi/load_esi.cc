@@ -36,7 +36,7 @@ int main(int argc, char const* argv[])
     printf("Profile: %s\n",        parser.profile());
 
 
-    printf("Load %ld object\n", coe_dict.size());
+    printf("Load %zu object\n", coe_dict.size());
     for (auto const& entry : coe_dict)
     {
         printf("%s\n", CoE::toString(entry).c_str());

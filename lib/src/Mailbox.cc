@@ -204,7 +204,11 @@ namespace kickcat::mailbox::request
     AbstractMessage::AbstractMessage(uint16_t mailbox_size, nanoseconds timeout)
         : timeout_{timeout}
     {
-        data_.resize(mailbox_size);
+        // A slave may advertise a mailbox protocol yet a zero (or sub-header) mailbox
+        // size in its SII (seen in the wild, e.g. Beckhoff AMP8805-A000). The buffer
+        // must still hold a header, otherwise data() is null and the writes below
+        // dereference it.
+        data_.resize(std::max<std::size_t>(mailbox_size, sizeof(mailbox::Header)));
         header_ = reinterpret_cast<mailbox::Header*>(data_.data());
         header_->address  = 0;            // Default: local processing address
         status_ = MessageStatus::RUNNING; // Default mode is running to send the msg on the bus

@@ -237,5 +237,5 @@ TEST_F(ESMStateSafeOPTest, xx_SafeOP_to_Op)
     context.is_valid_output_data = true;
     Context newContext = safeop.routine(context, ALControl{State::OPERATIONAL});
 
-    expectAlStatus(newContext, State::OPERATIONAL, StatusCode::NO_ERROR);
+    expectAlStatus(newContext, State::OPERATIONAL, StatusCode::ECAT_NO_ERROR);
 }

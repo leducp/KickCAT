@@ -332,6 +332,16 @@ std::optional<uint32_t> Parser::readHexDecAttr(XMLElement* node, char const* nam
     return parseHexDec<uint32_t>(raw, std::string{"@"} + name);
 }
 
+std::optional<CoE::DataType> Parser::coeTypeFromLabel(std::string const& label)
+{
+    auto it = BASIC_TYPES.find(label);
+    if (it == BASIC_TYPES.end())
+    {
+        return std::nullopt;
+    }
+    return it->second;
+}
+
 void Parser::openFile(std::string const& file)
 {
     XMLError result = doc_.LoadFile(file.c_str());
@@ -472,8 +482,38 @@ Device Parser::loadDeviceString(std::string const& xml, DeviceFilter const& filt
 
 Device Parser::loadDeviceImpl(DeviceFilter const& filter)
 {
-    auto* device_node = selectDevice(filter);
+    return buildDeviceFromElement(selectDevice(filter));
+}
 
+std::vector<Device> Parser::loadAllDevices(std::string const& file, std::vector<std::string>* errors)
+{
+    openFile(file);
+    std::vector<Device> out;
+    std::size_t index = 0;
+    for (auto* d = devices_->FirstChildElement("Device"); d != nullptr; d = d->NextSiblingElement("Device"), ++index)
+    {
+        try
+        {
+            out.push_back(buildDeviceFromElement(d));
+        }
+        catch (std::exception const& e)
+        {
+            if (errors != nullptr)
+            {
+                std::string msg = "device[" + std::to_string(index) + "] (";
+                msg += textOrEmpty(d->FirstChildElement("Type"));
+                msg += "): ";
+                msg += e.what();
+                errors->push_back(std::move(msg));
+            }
+        }
+    }
+    return out;
+}
+
+Device Parser::buildDeviceFromElement(XMLElement* device_node)
+{
+    profile_no_.clear();  // per-device: don't leak a prior device's value via profile()
     Device device;
     device.vendor_name = vendor_name_;
     // <Vendor>/<Id> is mandatory per ETG.2000 in spirit, but real vendor ESI
@@ -720,6 +760,13 @@ void Parser::parsePdos(XMLElement* device, char const* element_name, std::vector
         Pdo pdo;
 
         std::string where = element_name;
+        // Legacy aggregate catalogs declare PDOs by template reference
+        // (<RxPdo Ref="...">) with no inline <Index>; skip those rather than
+        // rejecting the whole device (the part is defined fully elsewhere).
+        if (findText(pdo_node, "Index") == nullptr)
+        {
+            continue;
+        }
         // <Index>/@DependOnSlot/@DependOnSlotGroup are modular-device attributes
         // and are not read.
         pdo.index = requireNumber<uint16_t>(pdo_node, "Index", where);
@@ -914,37 +961,192 @@ CoE::Object Parser::buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t
 
 void Parser::synthesizePdoMappingObjects(Device& device)
 {
-    // Per-PDO mapping objects (0x16xx, 0x1Axx) — only add when the slave's
-    // <Dictionary> doesn't already declare them explicitly. Explicit wins.
-    for (auto const& pdo : device.rx_pdos)
+    // ETG.2010 Table 15: PDO mapping (0x16xx/0x1Axx) is defined by <Pdo>/<Entry>,
+    // authoritative over an explicit <Object> of the same index. Override only on a
+    // genuine conflict, so consistent slaves keep the explicit object's metadata; an
+    // unrepresentable PDO is skipped rather than failing the slave.
+    auto mappingsAgree = [](CoE::Object const& lhs, CoE::Object const& rhs)
     {
-        if (not dictionaryContains(device.dictionary, pdo.index))
+        if (lhs.entries.size() != rhs.entries.size())
         {
-            device.dictionary.push_back(buildMappingObject(pdo, true));
+            return false;
         }
-    }
-    for (auto const& pdo : device.tx_pdos)
-    {
-        if (not dictionaryContains(device.dictionary, pdo.index))
+        for (std::size_t i = 1; i < rhs.entries.size(); ++i)
         {
-            device.dictionary.push_back(buildMappingObject(pdo, false));
+            if ((lhs.entries[i].bitlen != 32) or (rhs.entries[i].bitlen != 32)
+                or (lhs.entries[i].data == nullptr) or (rhs.entries[i].data == nullptr))
+            {
+                return false;
+            }
+            uint32_t a;
+            uint32_t b;
+            std::memcpy(&a, lhs.entries[i].data, sizeof(uint32_t));
+            std::memcpy(&b, rhs.entries[i].data, sizeof(uint32_t));
+            if (a != b)
+            {
+                return false;
+            }
         }
-    }
+        return true;
+    };
 
-    // SM assignment objects 0x1C12 (RxPDO) and 0x1C13 (TxPDO). Per ETG.1000.6
-    // these list the indexes of mapping objects assigned to the master->slave
-    // and slave->master SyncManagers respectively. NOTE: we lump ALL rx_pdos
-    // under 0x1C12 and ALL tx_pdos under 0x1C13 regardless of each Pdo's @Sm
-    // attribute. Modular devices using non-default SMs (e.g. Sm=4 for RxPDO)
-    // are misrepresented by this synthesis — the per-SM correct form would be
-    // one assignment object per unique pdo.sm value at 0x1C10 + sm_index.
-    if (not device.rx_pdos.empty() and not dictionaryContains(device.dictionary, 0x1C12))
+    auto synthesize = [&](std::vector<Pdo> const& pdos, bool is_rx)
     {
-        device.dictionary.push_back(buildAssignmentObject(device.rx_pdos, 0x1C12, true));
-    }
-    if (not device.tx_pdos.empty() and not dictionaryContains(device.dictionary, 0x1C13))
+        for (auto const& pdo : pdos)
+        {
+            try
+            {
+                auto obj = buildMappingObject(pdo, is_rx);
+                CoE::Object* existing = nullptr;
+                for (auto& o : device.dictionary)
+                {
+                    if (o.index == pdo.index) { existing = &o; break; }
+                }
+                if (existing == nullptr)
+                {
+                    device.dictionary.push_back(std::move(obj));
+                }
+                else if (not pdo.entries.empty() and not mappingsAgree(*existing, obj))
+                {
+                    *existing = std::move(obj);
+                }
+            }
+            catch (std::exception const& e)
+            {
+                esi_warning("Skipping PDO mapping 0x%04x: %s\n", pdo.index, e.what());
+            }
+        }
+    };
+    synthesize(device.rx_pdos, true);
+    synthesize(device.tx_pdos, false);
+
+    // ETG.2010 Table 14: only PDOs "mapped by default" (carrying @Sm) belong to a
+    // SyncManager's assignment, at 0x1C10 + SM index. @Sm is authoritative; override
+    // an explicit assignment object only when it disagrees (e.g. an over-assigning
+    // shared dictionary).
+    auto assignmentsAgree = [](CoE::Object const& lhs, CoE::Object const& rhs)
     {
-        device.dictionary.push_back(buildAssignmentObject(device.tx_pdos, 0x1C13, false));
+        if (lhs.entries.size() != rhs.entries.size())
+        {
+            return false;
+        }
+        for (std::size_t i = 1; i < rhs.entries.size(); ++i)
+        {
+            if ((lhs.entries[i].data == nullptr) or (rhs.entries[i].data == nullptr))
+            {
+                return false;
+            }
+            uint16_t a;
+            uint16_t b;
+            std::memcpy(&a, lhs.entries[i].data, sizeof(uint16_t));
+            std::memcpy(&b, rhs.entries[i].data, sizeof(uint16_t));
+            if (a != b)
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    auto synthesizeAssignment = [&](std::vector<Pdo> const& pdos, bool is_rx)
+    {
+        std::vector<int32_t> sms;
+        for (auto const& pdo : pdos)
+        {
+            if (pdo.sm.has_value() and std::find(sms.begin(), sms.end(), *pdo.sm) == sms.end())
+            {
+                sms.push_back(*pdo.sm);
+            }
+        }
+        for (int32_t sm : sms)
+        {
+            std::vector<Pdo> group;
+            for (auto const& pdo : pdos)
+            {
+                if (pdo.sm.has_value() and *pdo.sm == sm)
+                {
+                    group.push_back(pdo);
+                }
+            }
+            uint16_t obj_index = static_cast<uint16_t>(0x1C10 + sm);
+            auto obj = buildAssignmentObject(group, obj_index, is_rx);
+            CoE::Object* existing = nullptr;
+            for (auto& o : device.dictionary)
+            {
+                if (o.index == obj_index) { existing = &o; break; }
+            }
+            if (existing == nullptr)
+            {
+                device.dictionary.push_back(std::move(obj));
+            }
+            else if (not assignmentsAgree(*existing, obj))
+            {
+                *existing = std::move(obj);
+            }
+        }
+    };
+    synthesizeAssignment(device.rx_pdos, true);
+    synthesizeAssignment(device.tx_pdos, false);
+
+    // ETG.1000.6 Tables 74/75: a mapping entry references object:subindex. Vendor
+    // ESI sometimes names a subindex absent from the target object's DataType while
+    // the value lives at another (e.g. EL4004 maps 0x7000:17, but later revisions
+    // declare the value at 0x7000:1). The object dictionary is the structural
+    // authority, so retarget a dangling reference to the object's unique entry of
+    // matching bit length.
+    for (auto& obj : device.dictionary)
+    {
+        bool const is_mapping = (obj.index >= 0x1600 and obj.index <= 0x17FF)
+                             or (obj.index >= 0x1A00 and obj.index <= 0x1BFF);
+        if (not is_mapping)
+        {
+            continue;
+        }
+        for (auto& entry : obj.entries)
+        {
+            if (entry.subindex == 0 or entry.data == nullptr or entry.bitlen != 32)
+            {
+                continue;
+            }
+            uint32_t mapping;
+            std::memcpy(&mapping, entry.data, sizeof(uint32_t));
+            uint16_t index = static_cast<uint16_t>(mapping >> 16);
+            uint8_t  sub   = static_cast<uint8_t>(mapping >> 8);
+            uint8_t  bits  = static_cast<uint8_t>(mapping);
+            if (index == 0)
+            {
+                continue;  // padding gap
+            }
+
+            auto [target_obj, target_entry] = CoE::findObject(device.dictionary, index, sub);
+            if (target_entry != nullptr or target_obj == nullptr)
+            {
+                continue;  // already resolves, or the whole object is absent
+            }
+
+            int found_sub = -1;
+            int matches    = 0;
+            for (auto const& te : target_obj->entries)
+            {
+                bool const is_data_sub = (te.subindex >= 1) or (target_obj->code == CoE::ObjectCode::VAR);
+                if (is_data_sub and te.bitlen == bits)
+                {
+                    matches++;
+                    found_sub = te.subindex;
+                }
+            }
+            if (matches != 1)
+            {
+                continue;
+            }
+
+            uint32_t fixed = (static_cast<uint32_t>(index) << 16)
+                           | (static_cast<uint32_t>(found_sub) << 8)
+                           | bits;
+            std::memcpy(entry.data, &fixed, sizeof(uint32_t));
+            esi_warning("PDO 0x%04x: retargeted mapping 0x%04x:%u -> 0x%04x:%d (object declares data there)\n",
+                obj.index, index, sub, index, found_sub);
+        }
     }
 }
 
@@ -1300,6 +1502,10 @@ std::vector<uint8_t> Parser::loadHexBinary(XMLElement* node)
         return {};
     }
     std::string field = raw;
+    // Real ESI files wrap long hex payloads (e.g. <ConfigData>) across lines, so
+    // strip embedded whitespace before pairing nibbles.
+    field.erase(std::remove_if(field.begin(), field.end(),
+        [](unsigned char c){ return std::isspace(c) != 0; }), field.end());
     if (field.size() % 2 != 0)
     {
         throw std::invalid_argument("ESI: hex binary <" + std::string{node->Value()}
@@ -1346,7 +1552,7 @@ void Parser::loadDefaultData(XMLNode* node, CoE::Object& obj, CoE::Entry& entry)
         // order (ASCII bytes for strings, little-endian for numerics).
         std::vector<uint8_t> data = loadHexBinary(node_default_data);
 
-        if (data.size() != (entry.bitlen / 8))
+        if (data.size() != ((entry.bitlen + 7u) / 8u))
         {
             esi_warning("Cannot load default data for 0x%04x.%d, expected size mismatch.\n"
                     "-> Got %ld bits, expected: %d bit\n"
@@ -1366,7 +1572,7 @@ void Parser::loadDefaultData(XMLNode* node, CoE::Object& obj, CoE::Entry& entry)
 
     if (char const* default_value = findText(node_info, "DefaultValue"))
     {
-        uint32_t size = entry.bitlen / 8;
+        uint32_t size = (entry.bitlen + 7u) / 8u;  // sub-byte entries occupy 1 byte
         if (size == 0)
         {
             return;
@@ -1679,43 +1885,44 @@ CoE::Object Parser::createObject(XMLNode* node)
                 // <Elements>255</Elements> (real ETG examples have this), the
                 // post-increment wraps 255 -> 0 and the loop never terminates.
                 uint16_t elements = requireNumber<uint16_t>(node_array_info, "Elements", sub_where);
-                if (elements == 0)
-                {
-                    throw std::invalid_argument("ESI: <Elements> is zero in " + sub_where);
-                }
                 if (elements > 0xFF)
                 {
                     throw std::invalid_argument("ESI: <Elements> > 255 exceeds CoE SubIndex space in " + sub_where);
                 }
-                uint16_t total_bitlen   = requireNumber<uint16_t>(node_subitem, "BitSize", sub_where);
-                uint16_t element_bitoff = requireNumber<uint16_t>(node_subitem, "BitOffs", sub_where);
-                if (total_bitlen % elements != 0)
+                // An empty array (<Elements>0</Elements>) is degenerate but shipped
+                // by real vendors; emit no element entries rather than rejecting.
+                if (elements != 0)
                 {
-                    throw std::invalid_argument("ESI: array <BitSize> " + std::to_string(total_bitlen)
-                        + " not divisible by <Elements> " + std::to_string(elements) + " in " + sub_where);
-                }
-                uint16_t element_bitlen = static_cast<uint16_t>(total_bitlen / elements);
-
-                for (uint16_t i = 1; i <= elements; ++i)
-                {
-                    // Use uint32_t for the intermediate offset arithmetic to
-                    // detect the (degenerate but reachable) case where the
-                    // final offset exceeds the uint16_t range.
-                    uint32_t offset = static_cast<uint32_t>(element_bitoff)
-                                    + static_cast<uint32_t>(element_bitlen) * (i - 1);
-                    if (offset > 0xFFFF)
+                    uint16_t total_bitlen   = requireNumber<uint16_t>(node_subitem, "BitSize", sub_where);
+                    uint16_t element_bitoff = requireNumber<uint16_t>(node_subitem, "BitOffs", sub_where);
+                    if (total_bitlen % elements != 0)
                     {
-                        throw std::invalid_argument("ESI: array element bitoff " + std::to_string(offset)
-                            + " exceeds uint16 range in " + sub_where);
+                        throw std::invalid_argument("ESI: array <BitSize> " + std::to_string(total_bitlen)
+                            + " not divisible by <Elements> " + std::to_string(elements) + " in " + sub_where);
                     }
-                    CoE::Entry e;
-                    e.type        = entry.type;
-                    e.access      = entry.access;
-                    e.description = entry.description;
-                    e.bitlen      = element_bitlen;
-                    e.bitoff      = static_cast<uint16_t>(offset);
-                    e.subindex    = static_cast<uint8_t>(i);
-                    object.entries.push_back(std::move(e));
+                    uint16_t element_bitlen = static_cast<uint16_t>(total_bitlen / elements);
+
+                    for (uint16_t i = 1; i <= elements; ++i)
+                    {
+                        // Use uint32_t for the intermediate offset arithmetic to
+                        // detect the (degenerate but reachable) case where the
+                        // final offset exceeds the uint16_t range.
+                        uint32_t offset = static_cast<uint32_t>(element_bitoff)
+                                        + static_cast<uint32_t>(element_bitlen) * (i - 1);
+                        if (offset > 0xFFFF)
+                        {
+                            throw std::invalid_argument("ESI: array element bitoff " + std::to_string(offset)
+                                + " exceeds uint16 range in " + sub_where);
+                        }
+                        CoE::Entry e;
+                        e.type        = entry.type;
+                        e.access      = entry.access;
+                        e.description = entry.description;
+                        e.bitlen      = element_bitlen;
+                        e.bitoff      = static_cast<uint16_t>(offset);
+                        e.subindex    = static_cast<uint8_t>(i);
+                        object.entries.push_back(std::move(e));
+                    }
                 }
             }
         }

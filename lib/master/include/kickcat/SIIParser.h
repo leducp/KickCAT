@@ -47,12 +47,17 @@ namespace kickcat::eeprom
 
         void parse(uint8_t const* data, std::size_t size);
 
-        /// \brief Resolve a 1-based SII string index (ETG.2010). Empty for index 0 or out-of-range.
+        /// \brief Resolve a 1-based SII string index (ETG.2010 Category STRINGS, Table 6:
+        ///        index 0 = empty string). strings[0] is that reserved placeholder.
         std::string_view getString(uint8_t index) const
         {
-            if ((index == 0) or (index > strings.size())) { return {}; }
-            return strings[index - 1];
+            if ((index == 0) or (index >= strings.size())) { return {}; }
+            return strings[index];
         }
+
+        /// \brief Add a string to the pool (deduplicated) and return its 1-based index.
+        ///        Empty text, or a full pool (255 strings), yields 0 (no string).
+        uint8_t registerString(std::string const& text);
 
         template<typename T>
         void parse(std::vector<T> const& data)
