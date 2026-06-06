@@ -682,11 +682,13 @@ TEST(ESIParser, loadDevice_parses_mailbox)
     ESI::Parser parser;
     ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
 
-    ASSERT_TRUE (device.mailbox.data_link_layer);
-    ASSERT_FALSE(device.mailbox.real_time_mode);
+    ASSERT_TRUE(device.mailbox.has_value());
+    auto const& mailbox = *device.mailbox;
+    ASSERT_TRUE (mailbox.data_link_layer);
+    ASSERT_FALSE(mailbox.real_time_mode);
 
-    ASSERT_TRUE(device.mailbox.coe.has_value());
-    auto const& coe = *device.mailbox.coe;
+    ASSERT_TRUE(mailbox.coe.has_value());
+    auto const& coe = *mailbox.coe;
     ASSERT_TRUE(coe.sdo_info);
     ASSERT_TRUE(coe.complete_access);
     ASSERT_TRUE(coe.pdo_assign);
@@ -708,8 +710,8 @@ TEST(ESIParser, loadDevice_parses_mailbox)
     ASSERT_TRUE(coe_ic0.complete_access);
     ASSERT_EQ(coe_ic0.comment, "Assign RxPDO 0x1600");
 
-    ASSERT_TRUE(device.mailbox.eoe.has_value());
-    auto const& eoe = *device.mailbox.eoe;
+    ASSERT_TRUE(mailbox.eoe.has_value());
+    auto const& eoe = *mailbox.eoe;
     ASSERT_TRUE(eoe.ip);
     ASSERT_TRUE(eoe.mac);
     ASSERT_FALSE(eoe.time_stamp);
@@ -719,8 +721,8 @@ TEST(ESIParser, loadDevice_parses_mailbox)
     ASSERT_EQ(eoe.init_cmds[0].transitions[1], ESI::transition::PS);
     ASSERT_EQ(eoe.init_cmds[0].type, 5);
 
-    ASSERT_TRUE(device.mailbox.aoe.has_value());
-    auto const& aoe = *device.mailbox.aoe;
+    ASSERT_TRUE(mailbox.aoe.has_value());
+    auto const& aoe = *mailbox.aoe;
     ASSERT_TRUE(aoe.ads_router);
     ASSERT_TRUE(aoe.generate_own_net_id);
     ASSERT_FALSE(aoe.initialize_own_net_id);
@@ -728,8 +730,8 @@ TEST(ESIParser, loadDevice_parses_mailbox)
     ASSERT_EQ(aoe.init_cmds[0].comment, "AoE init");
     ASSERT_EQ(aoe.init_cmds[0].data.size(), 4u);
 
-    ASSERT_TRUE(device.mailbox.soe.has_value());
-    auto const& soe = *device.mailbox.soe;
+    ASSERT_TRUE(mailbox.soe.has_value());
+    auto const& soe = *mailbox.soe;
     ASSERT_TRUE(soe.channel_count.has_value());
     ASSERT_EQ(*soe.channel_count, 2);
     ASSERT_TRUE(soe.drive_follows_bit3);
@@ -737,8 +739,8 @@ TEST(ESIParser, loadDevice_parses_mailbox)
     ASSERT_EQ(soe.init_cmds[0].idn, 32);
     ASSERT_EQ(soe.init_cmds[0].channel, 1);
 
-    ASSERT_TRUE(device.mailbox.foe.has_value());
-    ASSERT_TRUE(device.mailbox.voe.has_value());
+    ASSERT_TRUE(mailbox.foe.has_value());
+    ASSERT_TRUE(mailbox.voe.has_value());
 }
 
 TEST(ESIParser, mailbox_absent_when_block_missing)
@@ -746,13 +748,7 @@ TEST(ESIParser, mailbox_absent_when_block_missing)
     ESI::Parser parser;
     ESI::Device device = parser.loadDevice("kickcat_esi_test_multi_device.xml");
 
-    ASSERT_FALSE(device.mailbox.data_link_layer);
-    ASSERT_FALSE(device.mailbox.coe.has_value());
-    ASSERT_FALSE(device.mailbox.eoe.has_value());
-    ASSERT_FALSE(device.mailbox.foe.has_value());
-    ASSERT_FALSE(device.mailbox.soe.has_value());
-    ASSERT_FALSE(device.mailbox.aoe.has_value());
-    ASSERT_FALSE(device.mailbox.voe.has_value());
+    ASSERT_FALSE(device.mailbox.has_value());
 }
 
 TEST(ESIParser, mailbox_throws_on_unknown_transition)
@@ -997,9 +993,233 @@ TEST(ESIParser, mailbox_soe_initcmd_channel_defaults_to_zero)
 
     ESI::Parser parser;
     ESI::Device device = parser.loadDeviceString(xml);
-    ASSERT_TRUE(device.mailbox.soe.has_value());
-    ASSERT_EQ(device.mailbox.soe->init_cmds.size(), 1u);
-    ASSERT_EQ(device.mailbox.soe->init_cmds[0].channel, 0);
+    ASSERT_TRUE(device.mailbox.has_value());
+    ASSERT_TRUE(device.mailbox->soe.has_value());
+    ASSERT_EQ(device.mailbox->soe->init_cmds.size(), 1u);
+    ASSERT_EQ(device.mailbox->soe->init_cmds[0].channel, 0);
+}
+
+TEST(ESIParser, loadDevice_parses_pdos)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
+
+    ASSERT_EQ(device.rx_pdos.size(), 1u);
+    auto const& rx = device.rx_pdos[0];
+    ASSERT_EQ(rx.index, 0x1600u);
+    ASSERT_EQ(rx.name,  "Outputs");
+    ASSERT_TRUE(rx.sm.has_value());
+    ASSERT_EQ(*rx.sm,    2);
+    ASSERT_TRUE(rx.pdo_order.has_value());
+    ASSERT_EQ(*rx.pdo_order, 5);
+    ASSERT_TRUE(rx.mandatory);
+    ASSERT_TRUE(rx.fixed);
+    ASSERT_EQ(rx.exclude.size(), 1u);
+    ASSERT_EQ(rx.exclude[0], 0x1601u);
+    ASSERT_EQ(rx.entries.size(), 1u);
+    ASSERT_EQ(rx.entries[0].index,    0x7000u);
+    ASSERT_EQ(rx.entries[0].subindex, 1u);
+    ASSERT_EQ(rx.entries[0].bit_len,  16u);
+    ASSERT_EQ(rx.entries[0].name,     "OutputWord");
+    ASSERT_EQ(rx.entries[0].data_type, "UINT");
+
+    ASSERT_EQ(device.tx_pdos.size(), 1u);
+    auto const& tx = device.tx_pdos[0];
+    ASSERT_EQ(tx.index, 0x1A00u);
+    ASSERT_TRUE(tx.os_fac.has_value());
+    ASSERT_EQ(*tx.os_fac, 2);
+    ASSERT_EQ(tx.entries.size(), 2u);
+    ASSERT_EQ(tx.entries[1].name,    "Status");
+    ASSERT_EQ(tx.entries[1].bit_len, 8u);
+}
+
+TEST(ESIParser, pdos_synthesize_legacy_mapping_objects)
+{
+    // Fixture's <RxPdo Index=0x1600> and <TxPdo Index=0x1A00> are not in
+    // <Dictionary>/<Objects>. The parser should synthesize them plus the
+    // 0x1C12/0x1C13 SM-assignment objects for legacy callers.
+    ESI::Parser parser;
+    auto dictionary = parser.loadFile("kickcat_esi_test_sm_fmmu.xml");
+
+    auto [obj_1600, _e1] = findObject(dictionary, 0x1600, 0);
+    ASSERT_NE(obj_1600, nullptr);
+    ASSERT_EQ(obj_1600->code, CoE::ObjectCode::RECORD);
+    ASSERT_EQ(obj_1600->entries.size(), 2u);  // size + 1 entry
+    uint8_t entry_count;
+    std::memcpy(&entry_count, obj_1600->entries[0].data, 1);
+    ASSERT_EQ(entry_count, 1u);
+    uint32_t packed;
+    std::memcpy(&packed, obj_1600->entries[1].data, 4);
+    ASSERT_EQ(packed, (0x7000u << 16) | (1u << 8) | 16u);
+
+    auto [obj_1A00, _e2] = findObject(dictionary, 0x1A00, 0);
+    ASSERT_NE(obj_1A00, nullptr);
+    ASSERT_EQ(obj_1A00->entries.size(), 3u);  // size + 2 entries
+
+    auto [obj_1C12, _e3] = findObject(dictionary, 0x1C12, 0);
+    ASSERT_NE(obj_1C12, nullptr);
+    ASSERT_EQ(obj_1C12->code, CoE::ObjectCode::ARRAY);
+    ASSERT_EQ(obj_1C12->entries.size(), 2u);  // size + 1 assigned PDO
+    uint16_t assigned_rx;
+    std::memcpy(&assigned_rx, obj_1C12->entries[1].data, 2);
+    ASSERT_EQ(assigned_rx, 0x1600u);
+
+    auto [obj_1C13, _e4] = findObject(dictionary, 0x1C13, 0);
+    ASSERT_NE(obj_1C13, nullptr);
+    ASSERT_EQ(obj_1C13->entries.size(), 2u);
+    uint16_t assigned_tx;
+    std::memcpy(&assigned_tx, obj_1C13->entries[1].data, 2);
+    ASSERT_EQ(assigned_tx, 0x1A00u);
+}
+
+TEST(ESIParser, pdos_do_not_overwrite_explicit_dictionary_objects)
+{
+    // If the slave's <Dictionary> already declares 0x1600, our auto-generated
+    // mapping object must not displace it.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1600</Index>
+                                <Name>Explicit RxPDO map</Name>
+                                <Type>UDINT</Type>
+                                <BitSize>32</BitSize>
+                                <Flags><Access>rw</Access></Flags>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <RxPdo Sm="2">
+                    <Index>#x1600</Index>
+                    <Name>Auto-generated map</Name>
+                    <Entry><Index>#x7000</Index><SubIndex>1</SubIndex><BitLen>16</BitLen></Entry>
+                </RxPdo>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+    auto [obj, _] = findObject(dictionary, 0x1600, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->name, "Explicit RxPDO map");  // explicit declaration wins
+}
+
+TEST(ESIParser, loadDevice_parses_eeprom)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
+
+    ASSERT_TRUE(device.eeprom.has_value());
+    auto const& eep = *device.eeprom;
+    ASSERT_TRUE(eep.assign_to_pdi);
+    ASSERT_TRUE(eep.byte_size.has_value());
+    ASSERT_EQ(*eep.byte_size, 2048);
+    ASSERT_EQ(eep.config_data.size(), 16u);
+    ASSERT_EQ(eep.config_data[0], 0x05);
+    ASSERT_EQ(eep.bootstrap.size(), 8u);
+    ASSERT_EQ(eep.categories.size(), 2u);
+
+    ASSERT_EQ(eep.categories[0].cat_no, 30);
+    ASSERT_TRUE(eep.categories[0].data_string.has_value());
+    ASSERT_EQ(*eep.categories[0].data_string, "BootCfg");
+    ASSERT_FALSE(eep.categories[0].preserve_online_data);
+
+    ASSERT_EQ(eep.categories[1].cat_no, 40);
+    ASSERT_TRUE(eep.categories[1].preserve_online_data);
+    ASSERT_EQ(eep.categories[1].data.size(), 4u);
+    ASSERT_EQ(eep.categories[1].data[0], 0xDE);
+}
+
+TEST(ESIParser, loadDevice_eeprom_raw_data_form)
+{
+    // Eeprom can also carry a raw image directly as <Data>; the structured
+    // form (ByteSize/ConfigData/etc.) must not be required in that case.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Eeprom>
+                    <Data>0102030405060708</Data>
+                </Eeprom>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_TRUE(device.eeprom.has_value());
+    ASSERT_EQ(device.eeprom->raw_data.size(), 8u);
+    ASSERT_EQ(device.eeprom->raw_data[7], 0x08u);
+    ASSERT_FALSE(device.eeprom->byte_size.has_value());
+}
+
+TEST(ESIParser, loadDevice_parses_dc)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_sm_fmmu.xml");
+
+    ASSERT_TRUE(device.dc.has_value());
+    auto const& dc = *device.dc;
+    ASSERT_TRUE (dc.potential_reference_clock);
+    ASSERT_FALSE(dc.pdo_oversampling);
+    ASSERT_FALSE(dc.external_ref_clock);
+    ASSERT_EQ(dc.op_modes.size(), 2u);
+
+    auto const& synchron = dc.op_modes[0];
+    ASSERT_EQ(synchron.name,            "Synchron");
+    ASSERT_EQ(synchron.desc,            "SM-Synchron");
+    ASSERT_EQ(synchron.assign_activate, 0x300u);
+    ASSERT_FALSE(synchron.activate_additional.has_value());
+
+    ASSERT_TRUE(synchron.cycle_time[0].has_value());
+    ASSERT_EQ(synchron.cycle_time[0]->value, 1000000);
+    ASSERT_TRUE(synchron.cycle_time[0]->factor.has_value());
+    ASSERT_EQ(*synchron.cycle_time[0]->factor, 1);
+
+    ASSERT_TRUE(synchron.shift_time[0].has_value());
+    ASSERT_EQ(synchron.shift_time[0]->value, 100);
+    ASSERT_TRUE(synchron.shift_time[0]->input.has_value());
+    ASSERT_TRUE(*synchron.shift_time[0]->input);
+    ASSERT_TRUE(synchron.shift_time[0]->output_delay_time.has_value());
+    ASSERT_EQ(*synchron.shift_time[0]->output_delay_time, 500);
+
+    // <Sm No="3"> with one oversampled <Pdo OSFac="2">#x1A00</Pdo>; the obsolete
+    // <SyncType> child is present in the fixture but must not be surfaced.
+    ASSERT_EQ(synchron.sm_configs.size(), 1u);
+    ASSERT_EQ(synchron.sm_configs[0].no,           3);
+    ASSERT_EQ(synchron.sm_configs[0].pdos.size(),  1u);
+    ASSERT_EQ(synchron.sm_configs[0].pdos[0].index, 0x1A00u);
+    ASSERT_TRUE(synchron.sm_configs[0].pdos[0].os_fac.has_value());
+    ASSERT_EQ(*synchron.sm_configs[0].pdos[0].os_fac, 2);
+
+    auto const& freerun = dc.op_modes[1];
+    ASSERT_EQ(freerun.name,            "FreeRun");
+    ASSERT_EQ(freerun.assign_activate, 0u);
+    ASSERT_FALSE(freerun.cycle_time[0].has_value());
+    ASSERT_TRUE(freerun.sm_configs.empty());
+}
+
+TEST(ESIParser, eeprom_dc_absent_when_blocks_missing)
+{
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDevice("kickcat_esi_test_multi_device.xml");
+
+    ASSERT_FALSE(device.eeprom.has_value());
+    ASSERT_FALSE(device.dc.has_value());
 }
 
 TEST(ESIParser, throws_on_unknown_fmmu_text)
@@ -1034,6 +1254,573 @@ TEST(ESIParser, throws_on_unknown_fmmu_text)
     }
 }
 
+TEST(ESIParser, string_default_data_not_reversed)
+{
+    // <DefaultData>4B69636B43415421</DefaultData> is hex for "KickCAT!".
+    // The bytes must land in natural order (was reversed pre-fix).
+    ESI::Parser parser;
+    auto dictionary = parser.loadFile("kickcat_esi_test_basic.xml");
+    auto [object, entry] = findObject(dictionary, 0x1008, 0);
+    ASSERT_NE(object, nullptr);
+    ASSERT_EQ(entry->type, CoE::DataType::VISIBLE_STRING);
+    ASSERT_NE(entry->data, nullptr);
+    ASSERT_EQ(std::memcmp(entry->data, "KickCAT!", 8), 0);
+}
+
+TEST(ESIParser, x1C00_not_duplicated_when_explicit)
+{
+    // ESI declares 0x1C00 explicitly. The synthesised one must not appear.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType>
+                                <Name>SM_ARR</Name><BaseType>USINT</BaseType><BitSize>16</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>1</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT1C00</Name><BitSize>16</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>Count</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x1C00</Index><Name>Explicit SM types</Name><Type>DT1C00</Type><BitSize>16</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Sm StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+    int count = 0;
+    for (auto const& o : dictionary)
+    {
+        if (o.index == 0x1C00) { ++count; }
+    }
+    ASSERT_EQ(count, 1);
+    auto [obj, _] = findObject(dictionary, 0x1C00, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->name, "Explicit SM types");
+}
+
+TEST(ESIParser, array_with_255_elements_does_not_hang)
+{
+    // PR4 reviewer found: uint8_t loop counter wraps at elements=255 (real
+    // ETG examples have this). Pin the fix.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType>
+                                <Name>BigArr</Name><BaseType>USINT</BaseType><BitSize>2040</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>255</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT</Name><BitSize>2048</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>n</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><SubIdx>1</SubIdx><Name>arr</Name><Type>BigArr</Type><BitSize>2040</BitSize><BitOffs>8</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x2000</Index><Name>BigRecord</Name><Type>DT</Type><BitSize>2048</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+    auto [obj, _] = findObject(dictionary, 0x2000, 0);
+    ASSERT_NE(obj, nullptr);
+    // SubIndex 0 + 255 array elements
+    ASSERT_EQ(obj->entries.size(), 256u);
+}
+
+TEST(ESIParser, array_with_more_than_255_elements_throws)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType>
+                                <Name>TooBig</Name><BaseType>USINT</BaseType><BitSize>2048</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>256</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT</Name><BitSize>2056</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>n</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><SubIdx>1</SubIdx><Name>arr</Name><Type>TooBig</Type><BitSize>2048</BitSize><BitOffs>8</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x2000</Index><Name>R</Name><Type>DT</Type><BitSize>2056</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ASSERT_THROW((void) parser.loadString(xml), std::invalid_argument);
+}
+
+TEST(ESIParser, throws_on_odd_length_hex_binary)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1000</Index>
+                                <Name>X</Name>
+                                <Type>UDINT</Type>
+                                <BitSize>32</BitSize>
+                                <Info><DefaultData>012</DefaultData></Info>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("odd length"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_numeric_overflow)
+{
+    // SubIndex is uint8_t; #xFF01 overflows -> must throw, not silently wrap.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <Mailbox>
+                    <CoE>
+                        <InitCmd>
+                            <Transition>PS</Transition>
+                            <Index>#x1000</Index>
+                            <SubIndex>#xFF01</SubIndex>
+                            <Data>00</Data>
+                        </InitCmd>
+                    </CoE>
+                </Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("out of range"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_missing_vendor_id)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object><Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Id"),     std::string::npos) << msg;
+        ASSERT_NE(msg.find("Vendor"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, empty_vendor_id_element_tolerated)
+{
+    // <Id></Id> (present but empty) should default to vendor_id=0 — real
+    // vendor catalogs ship placeholder empty Id elements.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id></Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_EQ(device.vendor_id, 0u);
+}
+
+TEST(ESIParser, throws_on_array_bitsize_not_divisible_by_elements)
+{
+    // BitSize=10, Elements=3 -> 10/3=3 truncates 1 bit silently if unchecked.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType>
+                                <Name>Odd</Name><BaseType>USINT</BaseType><BitSize>10</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>3</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT</Name><BitSize>18</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>n</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><SubIdx>1</SubIdx><Name>arr</Name><Type>Odd</Type><BitSize>10</BitSize><BitOffs>8</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x2000</Index><Name>R</Name><Type>DT</Type><BitSize>18</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("divisible"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_duplicate_rx_pdo_index)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <RxPdo Sm="2"><Index>#x1600</Index><Name>A</Name></RxPdo>
+                <RxPdo Sm="2"><Index>#x1600</Index><Name>B</Name></RxPdo>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("duplicate"), std::string::npos) << msg;
+        ASSERT_NE(msg.find("0x1600"),    std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_eeprom_data_and_byte_size_both_present)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Eeprom>
+                    <Data>0102</Data>
+                    <ByteSize>2048</ByteSize>
+                </Eeprom>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("mutually exclusive"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_dictionary_without_objects)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ASSERT_THROW((void) parser.loadString(xml), std::invalid_argument);
+}
+
+TEST(ESIParser, dtypes_missing_gives_contextual_error_for_non_basic_type)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <Objects>
+                            <Object><Index>#x2000</Index><Name>X</Name><Type>MyRecord</Type><BitSize>16</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("DataTypes"),    std::string::npos) << msg;
+        ASSERT_NE(msg.find("Object 0x2000"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, signed_type_accepts_unsigned_bit_pattern)
+{
+    // SoE InitCmd IDN is int32_t in the schema, but real ESIs use #xFFFFFFFF
+    // as a bit-pattern sentinel meaning -1. The narrower accepts this.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Mailbox>
+                    <SoE>
+                        <InitCmd>
+                            <Transition>PS</Transition>
+                            <IDN>#xFFFFFFFF</IDN>
+                            <Data>00</Data>
+                        </InitCmd>
+                    </SoE>
+                </Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_TRUE(device.mailbox.has_value());
+    ASSERT_TRUE(device.mailbox->soe.has_value());
+    ASSERT_EQ(device.mailbox->soe->init_cmds.size(), 1u);
+    ASSERT_EQ(device.mailbox->soe->init_cmds[0].idn, -1);
+}
+
+TEST(ESIParser, stoll_overflow_carries_esi_context)
+{
+    // A decimal number exceeding INT64_MAX must surface ESI context, not the
+    // raw std::out_of_range message.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>99999999999999999999999</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Vendor/Id"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, non_hex_data_carries_esi_context)
+{
+    // <Data>GGGG</Data>: per-byte parse fails. Error must name the element
+    // and offending pair, not just raw "stoi".
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1000</Index><Name>X</Name><Type>UDINT</Type><BitSize>32</BitSize>
+                                <Info><DefaultData>GGGGGGGG</DefaultData></Info>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("non-hex"),    std::string::npos) << msg;
+        ASSERT_NE(msg.find("DefaultData"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, bypass_sites_now_throw_on_overflow)
+{
+    // ProfileNo > UINT16_MAX must throw via parseHexDec<uint16_t> now.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>#x10000</ProfileNo></Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("Profile/ProfileNo"), std::string::npos) << msg;
+        ASSERT_NE(msg.find("out of range"),       std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_empty_document)
+{
+    ESI::Parser parser;
+    ASSERT_THROW((void) parser.loadString("<?xml version=\"1.0\"?>\n<!-- nothing -->"),
+                 std::invalid_argument);
+}
+
+TEST(ESIParser, profile_no_reset_between_loads)
+{
+    ESI::Parser parser;
+    ESI::Device d1 = parser.loadDevice("kickcat_esi_test_basic.xml");
+    ASSERT_EQ(d1.profile_no, 5001u);
+
+    // Second device has no <Profile> — profile_no must NOT carry over.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">NoProfile</Type>
+                <Name>NoProfile</Name>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+    ESI::Device d2 = parser.loadDeviceString(xml);
+    ASSERT_EQ(d2.profile_no, 0u);
+    ASSERT_STREQ(parser.profile(), "");
+}
+
+TEST(ESIParser, device_without_profile_parses)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">SimpleIO</Type>
+                <Name>Simple IO Terminal</Name>
+                <Sm StartAddress="#x1000" ControlByte="#x64" Enable="1">Outputs</Sm>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_EQ(device.sync_managers.size(), 1u);
+    // Synthesised 0x1C00 from the single <Sm> still appears
+    auto [obj, _] = findObject(device.dictionary, 0x1C00, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->entries.size(), 2u);  // size + 1 SM
+}
+
 TEST(ESIParser, CoE_alias_is_backwards_compatible)
 {
     // The CoE::EsiParser alias must still resolve to ESI::Parser.
@@ -1041,4 +1828,164 @@ TEST(ESIParser, CoE_alias_is_backwards_compatible)
     auto dictionary = parser.loadFile("kickcat_esi_test_basic.xml");
     ASSERT_EQ(dictionary.size(), 9u);
     ASSERT_STREQ(parser.vendor(), "KickCAT");
+}
+
+TEST(ESIParser, buildMappingObject_throws_when_more_than_255_entries)
+{
+    ESI::Pdo pdo;
+    pdo.index = 0x1600;
+    pdo.name  = "Too many entries";
+    pdo.entries.resize(256);  // SubIndex space is a single byte
+
+    try
+    {
+        (void) ESI::Parser::buildMappingObject(pdo, true);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("255 entries"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, buildAssignmentObject_throws_when_more_than_255_pdos)
+{
+    std::vector<ESI::Pdo> pdos(256);
+    for (std::size_t i = 0; i < pdos.size(); ++i)
+    {
+        pdos[i].index = static_cast<uint16_t>(0x1600 + i);
+    }
+
+    try
+    {
+        (void) ESI::Parser::buildAssignmentObject(pdos, 0x1C12, true);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("255 PDOs"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, throws_on_eeprom_category_without_payload)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Eeprom>
+                    <ByteSize>2048</ByteSize>
+                    <ConfigData>05060708</ConfigData>
+                    <Category><CatNo>30</CatNo></Category>
+                </Eeprom>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("missing payload"), std::string::npos) << msg;
+    }
+}
+
+TEST(ESIParser, eeprom_category_empty_datastring_is_empty_string)
+{
+    // <DataString/> is a valid (empty) xs:string per the schema: payload is
+    // selected by element presence, so the category parses with an empty value.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Eeprom>
+                    <ByteSize>2048</ByteSize>
+                    <ConfigData>05060708</ConfigData>
+                    <Category><CatNo>30</CatNo><DataString></DataString></Category>
+                </Eeprom>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_TRUE(device.eeprom.has_value());
+    ASSERT_EQ(device.eeprom->categories.size(), 1u);
+    ASSERT_TRUE(device.eeprom->categories[0].data_string.has_value());
+    ASSERT_TRUE(device.eeprom->categories[0].data_string->empty());
+}
+
+TEST(ESIParser, throws_on_eeprom_category_empty_datauint)
+{
+    // A numeric payload still requires a value: empty <DataUINT/> must throw.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Eeprom>
+                    <ByteSize>2048</ByteSize>
+                    <ConfigData>05060708</ConfigData>
+                    <Category><CatNo>30</CatNo><DataUINT></DataUINT></Category>
+                </Eeprom>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ASSERT_THROW((void) parser.loadDeviceString(xml), std::invalid_argument);
+}
+
+TEST(ESIParser, throws_on_dc_opmode_missing_mandatory_fields)
+{
+    char const* missing_name = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Dc><OpMode><AssignActivate>#x300</AssignActivate></OpMode></Dc>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    char const* missing_assign_activate = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Dc><OpMode><Name>Sync</Name></OpMode></Dc>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    char const* sm_missing_no = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Dc><OpMode>
+                    <Name>Sync</Name><AssignActivate>#x300</AssignActivate>
+                    <Sm><Pdo OSFac="2">#x1A00</Pdo></Sm>
+                </OpMode></Dc>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    ASSERT_THROW((void) parser.loadString(missing_name),            std::invalid_argument);
+    ASSERT_THROW((void) parser.loadString(missing_assign_activate), std::invalid_argument);
+
+    try
+    {
+        (void) parser.loadString(sm_missing_no);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("@No"), std::string::npos) << msg;
+    }
 }

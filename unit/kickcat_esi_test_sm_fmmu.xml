@@ -46,6 +46,36 @@
 				<Sm MinSize="40" MaxSize="1486" DefaultSize="128" StartAddress="#x1400" ControlByte="#x22" Enable="1" Virtual="1">MBoxIn</Sm>
 				<Sm DefaultSize="40" StartAddress="#x1800" ControlByte="#x64" Enable="1" OpOnly="true">Outputs</Sm>
 				<Sm DefaultSize="22" StartAddress="#x1c00" ControlByte="#x20" Enable="1">Inputs</Sm>
+				<RxPdo Sm="2" Mandatory="1" Fixed="1" PdoOrder="5">
+					<Index>#x1600</Index>
+					<Name>Outputs</Name>
+					<Exclude>#x1601</Exclude>
+					<Entry>
+						<Index>#x7000</Index>
+						<SubIndex>1</SubIndex>
+						<BitLen>16</BitLen>
+						<Name>OutputWord</Name>
+						<DataType>UINT</DataType>
+					</Entry>
+				</RxPdo>
+				<TxPdo Sm="3" OSFac="2">
+					<Index>#x1A00</Index>
+					<Name>Inputs</Name>
+					<Entry>
+						<Index>#x6000</Index>
+						<SubIndex>1</SubIndex>
+						<BitLen>16</BitLen>
+						<Name>InputWord</Name>
+						<DataType>UINT</DataType>
+					</Entry>
+					<Entry>
+						<Index>#x6000</Index>
+						<SubIndex>2</SubIndex>
+						<BitLen>8</BitLen>
+						<Name>Status</Name>
+						<DataType>USINT</DataType>
+					</Entry>
+				</TxPdo>
 				<Mailbox DataLinkLayer="true">
 					<AoE AdsRouter="true" GenerateOwnNetId="1">
 						<InitCmd>
@@ -87,6 +117,36 @@
 					</SoE>
 					<VoE/>
 				</Mailbox>
+				<Dc PotentialReferenceClock="1" PdoOversampling="false">
+					<OpMode>
+						<Name>Synchron</Name>
+						<Desc>SM-Synchron</Desc>
+						<AssignActivate>#x300</AssignActivate>
+						<CycleTimeSync0 Factor="1">1000000</CycleTimeSync0>
+						<ShiftTimeSync0 Input="true" OutputDelayTime="500">100</ShiftTimeSync0>
+						<Sm No="3">
+							<SyncType>0</SyncType>
+							<Pdo OSFac="2">#x1A00</Pdo>
+						</Sm>
+					</OpMode>
+					<OpMode>
+						<Name>FreeRun</Name>
+						<AssignActivate>#x000</AssignActivate>
+					</OpMode>
+				</Dc>
+				<Eeprom AssignToPdi="true">
+					<ByteSize>2048</ByteSize>
+					<ConfigData>05000000F00000000000000000000000</ConfigData>
+					<BootStrap>0010800010108000</BootStrap>
+					<Category>
+						<CatNo>30</CatNo>
+						<DataString>BootCfg</DataString>
+					</Category>
+					<Category PreserveOnlineData="1">
+						<CatNo>40</CatNo>
+						<Data>DEADBEEF</Data>
+					</Category>
+				</Eeprom>
 			</Device>
 		</Devices>
 	</Descriptions>

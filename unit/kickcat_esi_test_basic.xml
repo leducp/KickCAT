@@ -286,7 +286,7 @@
 								<Type>STRING(8)</Type>
 								<BitSize>64</BitSize>
 								<Info>
-									<DefaultData>4B69636B434154210</DefaultData>
+									<DefaultData>4B69636B43415421</DefaultData>
 								</Info>
 								<Flags>
 									<Access>ro</Access>

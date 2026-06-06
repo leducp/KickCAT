@@ -1,6 +1,7 @@
 #ifndef KICKCAT_ESI_DEVICE_H
 #define KICKCAT_ESI_DEVICE_H
 
+#include <array>
 #include <cstdint>
 #include <cstddef>
 #include <optional>
@@ -12,9 +13,11 @@
 
 namespace kickcat::ESI
 {
-    struct SyncManager
+    // Distinct from kickcat::SyncManager (the runtime register-layout namespace,
+    // which it would otherwise shadow): the parsed attributes of an ESI <Sm>.
+    struct SmInfo
     {
-        kickcat::SyncManager::Type type = kickcat::SyncManager::Unused;
+        SyncManager::Type type = SyncManager::Unused;
         uint16_t min_size       = 0;
         uint16_t max_size       = 0;
         uint16_t default_size   = 0;
@@ -149,6 +152,125 @@ namespace kickcat::ESI
         std::optional<VoE> voe;
     };
 
+    // ETG.2000 RxPdo/TxPdo: a Process Data Object declared at device level. The
+    // master uses these to compose the 0x1C12/0x1C13 SyncManager assignment and
+    // the 0x16xx/0x1Axx mapping CoE objects when the slave doesn't expose them
+    // directly in <Objects>.
+    struct PdoEntry
+    {
+        uint16_t    index    = 0;
+        uint8_t     subindex = 0;
+        uint16_t    bit_len  = 0;
+        std::string name;
+        std::string comment;
+        std::string data_type;  // ESI text label (e.g. "UINT", "UDINT")
+
+        bool                       fixed = false;
+        std::optional<int32_t>     safety_conn_number;
+        std::string                safety_pdo_entry_type;
+    };
+
+    struct Pdo
+    {
+        uint16_t              index = 0;
+        std::string           name;
+        std::optional<int32_t> sm;             // index into Device::sync_managers
+        std::optional<int32_t> su;             // index into Device::sync_units
+        bool                  fixed                 = false;
+        bool                  mandatory             = false;
+        bool                  is_virtual            = false;
+        std::optional<int32_t> os_fac;
+        std::optional<int32_t> os_min;
+        std::optional<int32_t> os_max;
+        std::optional<int32_t> os_index_inc;
+        std::optional<int32_t> pdo_order;
+        bool                  overwritten_by_module = false;
+        bool                  sra_parameter         = false;
+        std::string           safety_pdo_type;
+        std::optional<int32_t> safety_conn_number;
+        std::vector<uint16_t> exclude;         // mutually exclusive PDO indexes
+        std::vector<int32_t>  excluded_sm;
+        std::vector<PdoEntry> entries;
+    };
+
+    // ETG.2000 <Eeprom>: describes the slave's SII content. Two mutually
+    // exclusive forms — raw_data populated (full image as hex) OR the
+    // structured form (byte_size + config_data + optional bootstrap +
+    // categories).
+    struct Eeprom
+    {
+        struct Category
+        {
+            int32_t                    cat_no = 0;
+            std::vector<uint8_t>       data;          // <Data>
+            std::optional<std::string> data_string;   // <DataString>
+            std::optional<int32_t>     data_uint;     // <DataUINT>
+            std::optional<int32_t>     data_udint;    // <DataUDINT>
+            bool                       preserve_online_data = false;
+        };
+
+        std::vector<uint8_t>     raw_data;        // <Data> at Eeprom level (raw image)
+        std::optional<int32_t>   byte_size;
+        std::vector<uint8_t>     config_data;     // first 16 SII bytes
+        std::vector<uint8_t>     config_data2;
+        std::vector<uint8_t>     bootstrap;       // bootstrap mailbox config
+        std::vector<Category>    categories;
+        bool                     assign_to_pdi = false;
+    };
+
+    // ETG.2000 <Dc>/<OpMode>: distributed-clocks configuration.
+    struct OpMode
+    {
+        struct SyncTime
+        {
+            int32_t                value = 0;
+            std::optional<int32_t> factor;
+        };
+
+        struct ShiftTime
+        {
+            int32_t                value = 0;
+            std::optional<int32_t> factor;
+            std::optional<bool>    input;
+            std::optional<int32_t> output_delay_time;
+            std::optional<int32_t> input_delay_time;
+        };
+
+        // <OpMode>/<Sm No="..">. The SyncType/CycleTime/ShiftTime children are
+        // obsolete in the ESI XSD and have no fields here.
+        struct SmConfig
+        {
+            struct PdoRef
+            {
+                uint16_t               index = 0;
+                std::optional<int32_t> os_fac;   // <Pdo>/@OSFac: oversampling factor
+            };
+
+            int32_t             no = 0;   // required @No: target SyncManager index
+            std::vector<PdoRef> pdos;
+        };
+
+        std::string             name;
+        std::string             desc;
+        uint32_t                assign_activate = 0;
+        std::optional<uint32_t> activate_additional;
+
+        std::array<std::optional<SyncTime>,  4> cycle_time;   // CycleTimeSync0..3
+        std::array<std::optional<ShiftTime>, 4> shift_time;   // ShiftTimeSync0..3
+        std::vector<SmConfig>                   sm_configs;
+    };
+
+    struct Dc
+    {
+        bool                unknown_frmw              = false;
+        bool                unknown_64bit             = false;
+        bool                external_ref_clock        = false;
+        bool                potential_reference_clock = false;
+        bool                time_loop_control_only    = false;
+        bool                pdo_oversampling          = false;
+        std::vector<OpMode> op_modes;
+    };
+
     struct DeviceSummary
     {
         std::string type;
@@ -179,10 +301,14 @@ namespace kickcat::ESI
         std::string  vendor_name;
         uint32_t     vendor_id = 0;
 
-        std::vector<SyncManager> sync_managers;
+        std::vector<SmInfo>      sync_managers;
         std::vector<SyncUnit>    sync_units;
         std::vector<Fmmu>        fmmus;
-        Mailbox                  mailbox;
+        std::optional<Mailbox>   mailbox;
+        std::vector<Pdo>         rx_pdos;
+        std::vector<Pdo>         tx_pdos;
+        std::optional<Eeprom>    eeprom;
+        std::optional<Dc>        dc;
 
         CoE::Dictionary          dictionary;
     };

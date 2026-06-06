@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -97,8 +98,11 @@ namespace
         return text;
     }
 
-    // Parent + child-name overload: fetches then validates.
-    char const* requireText(XMLNode* parent, char const* child, std::string const& where)
+    // Parent + child-name convenience: fetches the child element, then
+    // delegates to requireText. Distinct name from requireText to avoid an
+    // overload-resolution trap where a derived-class pointer (XMLElement*)
+    // silently binds to the wrong overload.
+    char const* requireChildText(XMLNode* parent, char const* child, std::string const& where)
     {
         return requireText(parent->FirstChildElement(child), child, where);
     }
@@ -114,37 +118,108 @@ namespace
         return elem->GetText();
     }
 
-    int64_t parseHexDec(std::string text)
+    int64_t parseHexDec(std::string text, std::string const& where = {})
     {
+        auto fail = [&](char const* msg)
+        {
+            std::string what = "ESI: ";
+            what += msg;
+            what += " '";
+            what += text;
+            what += "'";
+            if (not where.empty())
+            {
+                what += " in ";
+                what += where;
+            }
+            throw std::invalid_argument(what);
+        };
+
         if (text.empty())
         {
-            throw std::invalid_argument("ESI: empty numeric value");
+            fail("empty numeric value");
         }
-        if (text.rfind("#x", 0) == 0)
+        try
         {
-            if (text.size() == 2)
+            if (text.rfind("#x", 0) == 0)
             {
-                throw std::invalid_argument("ESI: '#x' with no hex digits");
+                if (text.size() == 2) { fail("'#x' with no hex digits"); }
+                text[0] = '0';
+                return std::stoll(text, nullptr, 16);
             }
-            text[0] = '0';
-            return std::stoll(text, nullptr, 16);
+            if (text.rfind("0x", 0) == 0 or text.rfind("0X", 0) == 0)
+            {
+                if (text.size() == 2) { fail("'0x' with no hex digits"); }
+                return std::stoll(text, nullptr, 16);
+            }
+            return std::stoll(text, nullptr, 10);
         }
-        if (text.rfind("0x", 0) == 0 or text.rfind("0X", 0) == 0)
+        catch (std::invalid_argument const&)
         {
-            if (text.size() == 2)
-            {
-                throw std::invalid_argument("ESI: '0x' with no hex digits");
-            }
-            return std::stoll(text, nullptr, 16);
+            fail("invalid numeric value");
         }
-        return std::stoll(text, nullptr, 10);
+        catch (std::out_of_range const&)
+        {
+            fail("numeric value exceeds int64 range");
+        }
+        return 0;  // unreachable; fail() always throws
+    }
+
+    // Narrow an int64_t to T with bounds checking. For signed T, also accepts
+    // the unsigned bit pattern in [0, max-of-make_unsigned_t<T>] so that real
+    // ETG ESIs using #xFFFFFFFF as a signed-int32 sentinel parse as -1 rather
+    // than throwing.
+    template<typename T>
+    T narrowChecked(int64_t value, std::string const& text, std::string const& where)
+    {
+        static_assert(sizeof(T) <= sizeof(int64_t), "narrowChecked unsupported for T wider than int64");
+        auto fail = [&](char const* kind)
+        {
+            std::string what = "ESI: value '";
+            what += text;
+            what += "' out of range for ";
+            what += std::to_string(sizeof(T) * 8);
+            what += "-bit ";
+            what += kind;
+            what += " type in ";
+            what += where;
+            throw std::invalid_argument(what);
+        };
+
+        if constexpr (std::is_signed_v<T>)
+        {
+            using U = std::make_unsigned_t<T>;
+            int64_t lo = static_cast<int64_t>(std::numeric_limits<T>::min());
+            int64_t hi = static_cast<int64_t>(std::numeric_limits<U>::max());
+            if (value < lo or value > hi)
+            {
+                fail("signed");
+            }
+            return static_cast<T>(static_cast<U>(value));
+        }
+        else
+        {
+            int64_t hi = static_cast<int64_t>(std::numeric_limits<T>::max());
+            if (value < 0 or value > hi)
+            {
+                fail("unsigned");
+            }
+            return static_cast<T>(value);
+        }
+    }
+
+    template<typename T>
+    T parseHexDec(std::string text, std::string const& where)
+    {
+        int64_t value = parseHexDec(text, where);
+        return narrowChecked<T>(value, text, where);
     }
 
     template<typename T>
     T requireNumber(XMLNode* parent, char const* child, std::string const& where)
     {
-        char const* text = requireText(parent, child, where);
-        return static_cast<T>(parseHexDec(text));
+        char const* text = requireChildText(parent, child, where);
+        return parseHexDec<T>(text, where);
     }
 
     std::string objectLabel(uint16_t index)
@@ -254,7 +329,7 @@ std::optional<uint32_t> Parser::readHexDecAttr(XMLElement* node, char const* nam
     {
         return std::nullopt;
     }
-    return static_cast<uint32_t>(parseHexDec(raw));
+    return parseHexDec<uint32_t>(raw, std::string{"@"} + name);
 }
 
 void Parser::openFile(std::string const& file)
@@ -279,7 +354,17 @@ void Parser::openString(std::string const& xml)
 
 void Parser::resolveTopLevel()
 {
-    root_       = doc_.RootElement();
+    // Reset per-load cached state so values from a previous load don't bleed
+    // through if the next ESI omits an optional element.
+    vendor_name_.clear();
+    profile_no_.clear();
+    dtypes_ = nullptr;
+
+    root_ = doc_.RootElement();
+    if (root_ == nullptr)
+    {
+        throw std::invalid_argument("ESI: document has no root element");
+    }
     vendor_xml_ = requireChild(root_, "Vendor");
     auto desc   = requireChild(root_, "Descriptions");
     devices_    = requireChild(desc,  "Devices");
@@ -387,18 +472,19 @@ Device Parser::loadDeviceString(std::string const& xml, DeviceFilter const& filt
 
 Device Parser::loadDeviceImpl(DeviceFilter const& filter)
 {
-    auto* device_node  = selectDevice(filter);
-    auto* profile_node = requireChild(device_node, "Profile");
+    auto* device_node = selectDevice(filter);
 
     Device device;
     device.vendor_name = vendor_name_;
-    if (auto* id = vendor_xml_->FirstChildElement("Id"); id != nullptr)
+    // <Vendor>/<Id> is mandatory per ETG.2000 in spirit, but real vendor ESI
+    // files (notably some catalog placeholders) ship with <Id></Id> empty.
+    // Require the element to be present; allow empty text -> vendor_id = 0
+    // to preserve compatibility with those files.
+    auto* id_node = requireChild(vendor_xml_, "Id");
+    char const* id_text = id_node->GetText();
+    if (id_text != nullptr and *id_text != '\0')
     {
-        char const* text = id->GetText();
-        if (text != nullptr and *text != '\0')
-        {
-            device.vendor_id = static_cast<uint32_t>(parseHexDec(text));
-        }
+        device.vendor_id = parseHexDec<uint32_t>(id_text, "Vendor/Id");
     }
 
     auto* type_node = device_node->FirstChildElement("Type");
@@ -409,19 +495,33 @@ Device Parser::loadDeviceImpl(DeviceFilter const& filter)
     device.name         = textOrEmpty(device_node->FirstChildElement("Name"));
     device.group_type   = textOrEmpty(device_node->FirstChildElement("GroupType"));
 
-    auto* profile_no = profile_node->FirstChildElement("ProfileNo");
-    profile_no_ = textOrEmpty(profile_no);
-    if (not profile_no_.empty())
+    // <Profile> is optional in real-world ESIs — Beckhoff IO terminal entries
+    // and other simple slaves have no CoE dictionary. Accept devices without
+    // <Profile>; the dictionary will only contain the synthesised 0x1C00/PDO
+    // mapping objects derived from <Sm>/<Pdo> declarations.
+    auto* profile_node = device_node->FirstChildElement("Profile");
+    if (profile_node != nullptr)
     {
-        device.profile_no = static_cast<uint16_t>(parseHexDec(profile_no_));
+        auto* profile_no = profile_node->FirstChildElement("ProfileNo");
+        profile_no_ = textOrEmpty(profile_no);
+        if (not profile_no_.empty())
+        {
+            device.profile_no = parseHexDec<uint16_t>(profile_no_, "Profile/ProfileNo");
+        }
     }
 
     parseSyncManagers(device_node, device.sync_managers);
     parseSyncUnits   (device_node, device.sync_units);
     parseFmmus       (device_node, device.fmmus);
     parseMailbox     (device_node, device.mailbox);
+    parsePdos        (device_node, "RxPdo", device.rx_pdos);
+    parsePdos        (device_node, "TxPdo", device.tx_pdos);
+    parseEeprom      (device_node, device.eeprom);
+    parseDc          (device_node, device.dc);
+    // Modular-device composition (<Slots>/<ModuleGroups>) is not modeled.
 
     device.dictionary = buildDictionary(profile_node, device.sync_managers);
+    synthesizePdoMappingObjects(device);
     return device;
 }
 
@@ -457,7 +557,7 @@ namespace transition
     }
 }
 
-void Parser::parseMailbox(XMLElement* device, Mailbox& out)
+void Parser::parseMailbox(XMLElement* device, std::optional<Mailbox>& out)
 {
     // The <Device>/<Mailbox> block is distinct from <Device>/<Info>/<Mailbox>
     // (which carries request/response timeouts). Iterate children only — never
@@ -468,8 +568,9 @@ void Parser::parseMailbox(XMLElement* device, Mailbox& out)
         return;
     }
 
-    out.data_link_layer = readBoolAttr(mbx, "DataLinkLayer");
-    out.real_time_mode  = readBoolAttr(mbx, "RealTimeMode");
+    out.emplace();
+    out->data_link_layer = readBoolAttr(mbx, "DataLinkLayer");
+    out->real_time_mode  = readBoolAttr(mbx, "RealTimeMode");
 
     if (auto* coe = mbx->FirstChildElement("CoE"))
     {
@@ -488,8 +589,7 @@ void Parser::parseMailbox(XMLElement* device, Mailbox& out)
             block.eds_file = eds;
         }
 
-        // CoE/Object (legacy form per ETG.2000 — flagged obsolete in the XSD) is
-        // intentionally ignored; modern ESIs use <InitCmd> below.
+        // CoE/Object (obsolete in the XSD) is ignored; modern ESIs use <InitCmd>.
         for (auto* ic = coe->FirstChildElement("InitCmd"); ic != nullptr; ic = ic->NextSiblingElement("InitCmd"))
         {
             Mailbox::CoE::InitCmd cmd;
@@ -504,7 +604,7 @@ void Parser::parseMailbox(XMLElement* device, Mailbox& out)
             cmd.comment = commentOf(ic);
             block.init_cmds.push_back(std::move(cmd));
         }
-        out.coe = std::move(block);
+        out->coe = std::move(block);
     }
 
     if (auto* eoe = mbx->FirstChildElement("EoE"))
@@ -523,12 +623,12 @@ void Parser::parseMailbox(XMLElement* device, Mailbox& out)
             cmd.comment = commentOf(ic);
             block.init_cmds.push_back(std::move(cmd));
         }
-        out.eoe = std::move(block);
+        out->eoe = std::move(block);
     }
 
     if (mbx->FirstChildElement("FoE") != nullptr)
     {
-        out.foe = Mailbox::FoE{};
+        out->foe = Mailbox::FoE{};
     }
 
     if (auto* soe = mbx->FirstChildElement("SoE"))
@@ -547,7 +647,7 @@ void Parser::parseMailbox(XMLElement* device, Mailbox& out)
             cmd.comment = commentOf(ic);
             block.init_cmds.push_back(std::move(cmd));
         }
-        out.soe = std::move(block);
+        out->soe = std::move(block);
     }
 
     if (auto* aoe = mbx->FirstChildElement("AoE"))
@@ -565,23 +665,490 @@ void Parser::parseMailbox(XMLElement* device, Mailbox& out)
             cmd.comment = commentOf(ic);
             block.init_cmds.push_back(std::move(cmd));
         }
-        out.aoe = std::move(block);
+        out->aoe = std::move(block);
     }
 
     if (mbx->FirstChildElement("VoE") != nullptr)
     {
-        out.voe = Mailbox::VoE{};
+        out->voe = Mailbox::VoE{};
     }
 
-    // <Mailbox>/<VendorSpecific> is part of the schema but intentionally not
-    // surfaced on the Mailbox aggregate — open vendor content has no consumer.
+    // <Mailbox>/<VendorSpecific> is open vendor content and is not surfaced.
 }
 
-void Parser::parseSyncManagers(XMLElement* device, std::vector<SyncManager>& out)
+namespace
+{
+    PdoEntry parsePdoEntry(XMLElement* node, std::string const& where)
+    {
+        PdoEntry entry;
+        entry.index   = requireNumber<uint16_t>(node, "Index", where);
+        // SubIndex is optional per the XSD (minOccurs=0); padding entries use 0.
+        if (char const* sub = findText(node, "SubIndex"))
+        {
+            entry.subindex = parseHexDec<uint8_t>(sub, where + " SubIndex");
+        }
+        entry.bit_len = requireNumber<uint16_t>(node, "BitLen", where);
+
+        if (char const* name = findText(node, "Name"))
+        {
+            entry.name = name;
+        }
+        if (char const* comment = findText(node, "Comment"))
+        {
+            entry.comment = comment;
+        }
+        if (char const* data_type = findText(node, "DataType"))
+        {
+            entry.data_type = data_type;
+        }
+
+        entry.fixed              = readBoolAttr(node, "Fixed");
+        entry.safety_conn_number = readIntAttr (node, "SafetyConnNumber");
+        if (char const* type = node->Attribute("SafetyPdoEntryType"))
+        {
+            entry.safety_pdo_entry_type = type;
+        }
+        return entry;
+    }
+}
+
+void Parser::parsePdos(XMLElement* device, char const* element_name, std::vector<Pdo>& out)
+{
+    for (auto* pdo_node = device->FirstChildElement(element_name); pdo_node != nullptr;
+         pdo_node       = pdo_node->NextSiblingElement(element_name))
+    {
+        Pdo pdo;
+
+        std::string where = element_name;
+        // <Index>/@DependOnSlot/@DependOnSlotGroup are modular-device attributes
+        // and are not read.
+        pdo.index = requireNumber<uint16_t>(pdo_node, "Index", where);
+
+        char buf[40];
+        std::snprintf(buf, sizeof(buf), "%s 0x%04x", element_name, pdo.index);
+        where = buf;
+
+        // <Name> is mandatory per PdoType. Multi-language variants (@LcId) are
+        // not distinguished; the first <Name> wins.
+        pdo.name = requireChildText(pdo_node, "Name", where);
+
+        pdo.sm                    = readIntAttr (pdo_node, "Sm");
+        pdo.su                    = readIntAttr (pdo_node, "Su");
+        pdo.fixed                 = readBoolAttr(pdo_node, "Fixed");
+        pdo.mandatory             = readBoolAttr(pdo_node, "Mandatory");
+        pdo.is_virtual            = readBoolAttr(pdo_node, "Virtual");
+        pdo.os_fac                = readIntAttr (pdo_node, "OSFac");
+        pdo.os_min                = readIntAttr (pdo_node, "OSMin");
+        pdo.os_max                = readIntAttr (pdo_node, "OSMax");
+        pdo.os_index_inc          = readIntAttr (pdo_node, "OSIndexInc");
+        pdo.pdo_order             = readIntAttr (pdo_node, "PdoOrder");
+        pdo.overwritten_by_module = readBoolAttr(pdo_node, "OverwrittenByModule");
+        pdo.sra_parameter         = readBoolAttr(pdo_node, "SRA_Parameter");
+        pdo.safety_conn_number    = readIntAttr (pdo_node, "SafetyConnNumber");
+        if (char const* type = pdo_node->Attribute("SafetyPdoType"))
+        {
+            pdo.safety_pdo_type = type;
+        }
+
+        for (auto* ex = pdo_node->FirstChildElement("Exclude"); ex != nullptr; ex = ex->NextSiblingElement("Exclude"))
+        {
+            char const* text = ex->GetText();
+            if (text == nullptr)
+            {
+                throw std::invalid_argument("ESI: empty <Exclude> in " + where);
+            }
+            pdo.exclude.push_back(parseHexDec<uint16_t>(text, where + " Exclude"));
+        }
+        for (auto* ex_sm = pdo_node->FirstChildElement("ExcludedSm"); ex_sm != nullptr; ex_sm = ex_sm->NextSiblingElement("ExcludedSm"))
+        {
+            char const* text = ex_sm->GetText();
+            if (text == nullptr)
+            {
+                throw std::invalid_argument("ESI: empty <ExcludedSm> in " + where);
+            }
+            pdo.excluded_sm.push_back(parseHexDec<int32_t>(text, where + " ExcludedSm"));
+        }
+        for (auto* entry = pdo_node->FirstChildElement("Entry"); entry != nullptr; entry = entry->NextSiblingElement("Entry"))
+        {
+            pdo.entries.push_back(parsePdoEntry(entry, where + " Entry"));
+        }
+
+        for (auto const& existing : out)
+        {
+            if (existing.index == pdo.index)
+            {
+                char buf[64];
+                std::snprintf(buf, sizeof(buf), "ESI: duplicate %s <Index> 0x%04x", element_name, pdo.index);
+                throw std::invalid_argument(buf);
+            }
+        }
+        out.push_back(std::move(pdo));
+    }
+}
+
+namespace
+{
+    bool dictionaryContains(CoE::Dictionary const& dict, uint16_t index)
+    {
+        for (auto const& obj : dict)
+        {
+            if (obj.index == index)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+// Build the per-PDO mapping object (0x16xx or 0x1Axx) from a parsed Pdo.
+// Layout per ETG.1000.6: SubIndex 0 = entry count (uint8), SubIndex N =
+// packed uint32 = (Index << 16) | (SubIndex << 8) | BitLen.
+CoE::Object Parser::buildMappingObject(Pdo const& pdo, bool is_rx)
+{
+    CoE::Object obj;
+    obj.index = pdo.index;
+    obj.code  = CoE::ObjectCode::RECORD;
+    if (not pdo.name.empty())
+    {
+        obj.name = pdo.name;
+    }
+    else if (is_rx)
+    {
+        obj.name = "RxPDO Mapping";
+    }
+    else
+    {
+        obj.name = "TxPDO Mapping";
+    }
+
+    if (pdo.entries.size() > 0xFF)
+    {
+        throw std::invalid_argument("ESI: PDO has more than 255 entries (cannot synthesize mapping)");
+    }
+
+    CoE::Entry subindex0{0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Number of entries"};
+    subindex0.data = std::malloc(1);
+    uint8_t count = static_cast<uint8_t>(pdo.entries.size());
+    std::memcpy(subindex0.data, &count, 1);
+    obj.entries.push_back(std::move(subindex0));
+
+    uint16_t bitoff = 8;  // SubIndex 0 occupies the first byte (bits 0..7)
+    for (std::size_t i = 0; i < pdo.entries.size(); ++i)
+    {
+        auto const& e = pdo.entries[i];
+        if (e.bit_len > 0xFF)
+        {
+            throw std::invalid_argument("ESI: PDO entry BitLen > 255 cannot fit in mapping word");
+        }
+        CoE::Entry entry;
+        entry.subindex    = static_cast<uint8_t>(i + 1);
+        entry.bitlen      = 32;
+        entry.bitoff      = bitoff;
+        entry.access      = CoE::Access::READ;
+        entry.type        = CoE::DataType::UNSIGNED32;
+        if (not e.name.empty())
+        {
+            entry.description = e.name;
+        }
+        else
+        {
+            entry.description = "Entry " + std::to_string(i + 1);
+        }
+        entry.data        = std::malloc(sizeof(uint32_t));
+        uint32_t packed = (static_cast<uint32_t>(e.index) << 16)
+                        | (static_cast<uint32_t>(e.subindex) << 8)
+                        | static_cast<uint32_t>(e.bit_len);
+        std::memcpy(entry.data, &packed, sizeof(uint32_t));
+        obj.entries.push_back(std::move(entry));
+        bitoff = static_cast<uint16_t>(bitoff + 32);
+    }
+    return obj;
+}
+
+// Build the SM-assignment object (0x1C12 for RxPDO, 0x1C13 for TxPDO).
+// SubIndex 0 = PDO count (uint8), SubIndex N = PDO mapping index (uint16).
+CoE::Object Parser::buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t index, bool is_rx)
+{
+    CoE::Object obj;
+    obj.index = index;
+    obj.code  = CoE::ObjectCode::ARRAY;
+    if (is_rx)
+    {
+        obj.name = "RxPDO assign";
+    }
+    else
+    {
+        obj.name = "TxPDO assign";
+    }
+
+    if (pdos.size() > 0xFF)
+    {
+        throw std::invalid_argument("ESI: more than 255 PDOs assigned to a SyncManager");
+    }
+
+    CoE::Entry subindex0{0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Number of assigned PDOs"};
+    subindex0.data = std::malloc(1);
+    uint8_t count = static_cast<uint8_t>(pdos.size());
+    std::memcpy(subindex0.data, &count, 1);
+    obj.entries.push_back(std::move(subindex0));
+
+    uint16_t bitoff = 8;  // SubIndex 0 occupies the first byte (bits 0..7)
+    for (std::size_t i = 0; i < pdos.size(); ++i)
+    {
+        CoE::Entry entry;
+        entry.subindex    = static_cast<uint8_t>(i + 1);
+        entry.bitlen      = 16;
+        entry.bitoff      = bitoff;
+        entry.access      = CoE::Access::READ;
+        entry.type        = CoE::DataType::UNSIGNED16;
+        entry.description = "PDO " + std::to_string(i + 1);
+        entry.data        = std::malloc(sizeof(uint16_t));
+        uint16_t pdo_index = pdos[i].index;
+        std::memcpy(entry.data, &pdo_index, sizeof(uint16_t));
+        obj.entries.push_back(std::move(entry));
+        bitoff = static_cast<uint16_t>(bitoff + 16);
+    }
+    return obj;
+}
+
+void Parser::synthesizePdoMappingObjects(Device& device)
+{
+    // Per-PDO mapping objects (0x16xx, 0x1Axx) — only add when the slave's
+    // <Dictionary> doesn't already declare them explicitly. Explicit wins.
+    for (auto const& pdo : device.rx_pdos)
+    {
+        if (not dictionaryContains(device.dictionary, pdo.index))
+        {
+            device.dictionary.push_back(buildMappingObject(pdo, true));
+        }
+    }
+    for (auto const& pdo : device.tx_pdos)
+    {
+        if (not dictionaryContains(device.dictionary, pdo.index))
+        {
+            device.dictionary.push_back(buildMappingObject(pdo, false));
+        }
+    }
+
+    // SM assignment objects 0x1C12 (RxPDO) and 0x1C13 (TxPDO). Per ETG.1000.6
+    // these list the indexes of mapping objects assigned to the master->slave
+    // and slave->master SyncManagers respectively. NOTE: we lump ALL rx_pdos
+    // under 0x1C12 and ALL tx_pdos under 0x1C13 regardless of each Pdo's @Sm
+    // attribute. Modular devices using non-default SMs (e.g. Sm=4 for RxPDO)
+    // are misrepresented by this synthesis — the per-SM correct form would be
+    // one assignment object per unique pdo.sm value at 0x1C10 + sm_index.
+    if (not device.rx_pdos.empty() and not dictionaryContains(device.dictionary, 0x1C12))
+    {
+        device.dictionary.push_back(buildAssignmentObject(device.rx_pdos, 0x1C12, true));
+    }
+    if (not device.tx_pdos.empty() and not dictionaryContains(device.dictionary, 0x1C13))
+    {
+        device.dictionary.push_back(buildAssignmentObject(device.tx_pdos, 0x1C13, false));
+    }
+}
+
+void Parser::parseEeprom(XMLElement* device, std::optional<Eeprom>& out)
+{
+    auto* eep = device->FirstChildElement("Eeprom");
+    if (eep == nullptr)
+    {
+        return;
+    }
+
+    Eeprom block;
+    block.assign_to_pdi = readBoolAttr(eep, "AssignToPdi");
+
+    // EepromType is an xs:choice between raw <Data> and the structured form
+    // (<ByteSize>+<ConfigData>+…). Reject documents carrying both so the error
+    // names the real problem.
+    auto* data_raw   = eep->FirstChildElement("Data");
+    auto* byte_size  = eep->FirstChildElement("ByteSize");
+    if (data_raw != nullptr and byte_size != nullptr)
+    {
+        throw std::invalid_argument(
+            "ESI: <Eeprom> has both <Data> (raw form) and <ByteSize> (structured form); "
+            "they are mutually exclusive per the schema");
+    }
+    if (data_raw != nullptr)
+    {
+        block.raw_data = loadHexBinary(data_raw);
+        out = std::move(block);
+        return;
+    }
+
+    // ByteSize and ConfigData are mandatory children of the structured form.
+    block.byte_size   = parseHexDec<int32_t>(requireChildText(eep, "ByteSize", "Eeprom"), "Eeprom/ByteSize");
+    block.config_data = loadHexBinary(requireChild(eep, "ConfigData"));
+
+    if (auto* cfg2 = eep->FirstChildElement("ConfigData2"))
+    {
+        block.config_data2 = loadHexBinary(cfg2);
+    }
+    if (auto* boot = eep->FirstChildElement("BootStrap"))
+    {
+        block.bootstrap = loadHexBinary(boot);
+    }
+    for (auto* cat = eep->FirstChildElement("Category"); cat != nullptr; cat = cat->NextSiblingElement("Category"))
+    {
+        Eeprom::Category c;
+        c.cat_no = requireNumber<int32_t>(cat, "CatNo", "Eeprom/Category");
+        c.preserve_online_data = readBoolAttr(cat, "PreserveOnlineData");
+        // Payload is an xs:choice; pick by element presence, not text content,
+        // so an empty <DataString/> reads as an empty string rather than absent.
+        // The numeric forms still require a value.
+        if (auto* d = cat->FirstChildElement("Data"))
+        {
+            c.data = loadHexBinary(d);
+        }
+        else if (auto* s = cat->FirstChildElement("DataString"))
+        {
+            char const* text = s->GetText();
+            if (text != nullptr)
+            {
+                c.data_string = text;
+            }
+            else
+            {
+                c.data_string.emplace();
+            }
+        }
+        else if (cat->FirstChildElement("DataUINT") != nullptr)
+        {
+            c.data_uint = parseHexDec<int32_t>(requireChildText(cat, "DataUINT", "Eeprom/Category"), "Eeprom/Category/DataUINT");
+        }
+        else if (cat->FirstChildElement("DataUDINT") != nullptr)
+        {
+            c.data_udint = parseHexDec<int32_t>(requireChildText(cat, "DataUDINT", "Eeprom/Category"), "Eeprom/Category/DataUDINT");
+        }
+        else
+        {
+            throw std::invalid_argument("ESI: <Category> in Eeprom/Category missing payload (expected one of Data/DataString/DataUINT/DataUDINT)");
+        }
+        block.categories.push_back(std::move(c));
+    }
+
+    out = std::move(block);
+}
+
+namespace
+{
+    std::optional<OpMode::SyncTime> parseSyncTime(XMLElement* parent, char const* name)
+    {
+        auto* node = parent->FirstChildElement(name);
+        if (node == nullptr)
+        {
+            return std::nullopt;
+        }
+        OpMode::SyncTime st;
+        char const* text = node->GetText();
+        if (text != nullptr)
+        {
+            st.value = parseHexDec<int32_t>(text, std::string{"Dc/OpMode/"} + name);
+        }
+        st.factor = readIntAttr(node, "Factor");
+        return st;
+    }
+
+    std::optional<OpMode::ShiftTime> parseShiftTime(XMLElement* parent, char const* name)
+    {
+        auto* node = parent->FirstChildElement(name);
+        if (node == nullptr)
+        {
+            return std::nullopt;
+        }
+        OpMode::ShiftTime st;
+        char const* text = node->GetText();
+        if (text != nullptr)
+        {
+            st.value = parseHexDec<int32_t>(text, std::string{"Dc/OpMode/"} + name);
+        }
+        st.factor             = readIntAttr(node, "Factor");
+        if (node->Attribute("Input") != nullptr)
+        {
+            st.input = readBoolAttr(node, "Input");
+        }
+        st.output_delay_time  = readIntAttr(node, "OutputDelayTime");
+        st.input_delay_time   = readIntAttr(node, "InputDelayTime");
+        return st;
+    }
+}
+
+void Parser::parseDc(XMLElement* device, std::optional<Dc>& out)
+{
+    auto* dc = device->FirstChildElement("Dc");
+    if (dc == nullptr)
+    {
+        return;
+    }
+
+    Dc block;
+    block.unknown_frmw              = readBoolAttr(dc, "UnknownFRMW");
+    block.unknown_64bit             = readBoolAttr(dc, "Unknown64Bit");
+    block.external_ref_clock        = readBoolAttr(dc, "ExternalRefClock");
+    block.potential_reference_clock = readBoolAttr(dc, "PotentialReferenceClock");
+    block.time_loop_control_only    = readBoolAttr(dc, "TimeLoopControlOnly");
+    block.pdo_oversampling          = readBoolAttr(dc, "PdoOversampling");
+
+    static char const* const CYCLE_NAMES[4] = {"CycleTimeSync0", "CycleTimeSync1", "CycleTimeSync2", "CycleTimeSync3"};
+    static char const* const SHIFT_NAMES[4] = {"ShiftTimeSync0", "ShiftTimeSync1", "ShiftTimeSync2", "ShiftTimeSync3"};
+
+    for (auto* om = dc->FirstChildElement("OpMode"); om != nullptr; om = om->NextSiblingElement("OpMode"))
+    {
+        OpMode mode;
+        mode.name = requireChildText(om, "Name", "Dc/OpMode");
+        if (char const* desc = findText(om, "Desc"))
+        {
+            mode.desc = desc;
+        }
+        mode.assign_activate = requireNumber<uint32_t>(om, "AssignActivate", "Dc/OpMode");
+        if (char const* aa = findText(om, "ActivateAdditional"))
+        {
+            mode.activate_additional = parseHexDec<uint32_t>(aa, "Dc/OpMode/ActivateAdditional");
+        }
+        for (int i = 0; i < 4; ++i)
+        {
+            mode.cycle_time[i] = parseSyncTime (om, CYCLE_NAMES[i]);
+            mode.shift_time[i] = parseShiftTime(om, SHIFT_NAMES[i]);
+        }
+
+        // <OpMode>/<Sm No="..">: @No plus the <Pdo>/@OSFac oversampling map. The
+        // SyncType/CycleTime/ShiftTime children are obsolete in the XSD; skipped.
+        for (auto* sm = om->FirstChildElement("Sm"); sm != nullptr; sm = sm->NextSiblingElement("Sm"))
+        {
+            OpMode::SmConfig cfg;
+            auto no = readIntAttr(sm, "No");
+            if (not no)
+            {
+                throw std::invalid_argument("ESI: <Sm> in Dc/OpMode missing required @No");
+            }
+            cfg.no = *no;
+
+            for (auto* p = sm->FirstChildElement("Pdo"); p != nullptr; p = p->NextSiblingElement("Pdo"))
+            {
+                char const* text = p->GetText();
+                if (text == nullptr)
+                {
+                    throw std::invalid_argument("ESI: empty <Pdo> in Dc/OpMode/Sm");
+                }
+                OpMode::SmConfig::PdoRef ref;
+                ref.index  = parseHexDec<uint16_t>(text, "Dc/OpMode/Sm/Pdo");
+                ref.os_fac = readIntAttr(p, "OSFac");
+                cfg.pdos.push_back(ref);
+            }
+            mode.sm_configs.push_back(std::move(cfg));
+        }
+        block.op_modes.push_back(std::move(mode));
+    }
+
+    out = std::move(block);
+}
+
+void Parser::parseSyncManagers(XMLElement* device, std::vector<SmInfo>& out)
 {
     for (auto* sm = device->FirstChildElement("Sm"); sm != nullptr; sm = sm->NextSiblingElement("Sm"))
     {
-        SyncManager entry;
+        SmInfo entry;
 
         char const* text = sm->GetText();
         if (text != nullptr)
@@ -640,22 +1207,45 @@ void Parser::parseFmmus(XMLElement* device, std::vector<Fmmu>& out)
     }
 }
 
-CoE::Dictionary Parser::buildDictionary(XMLElement* profile, std::vector<SyncManager> const& sms)
+CoE::Dictionary Parser::buildDictionary(XMLElement* profile, std::vector<SmInfo> const& sms)
 {
-    auto* dictionary = requireChild(profile,    "Dictionary");
-    dtypes_          = requireChild(dictionary, "DataTypes");
-    auto* objects    = requireChild(dictionary, "Objects");
-
     CoE::Dictionary out;
 
-    for (auto* node_object = objects->FirstChildElement(); node_object != nullptr; node_object = node_object->NextSiblingElement())
+    // Profile is optional (see loadDeviceImpl). If absent, skip the inline
+    // dictionary entirely and proceed straight to the synthesised 0x1C00 below.
+    // DataTypes is also optional per the XSD (DictionaryType minOccurs=0); a
+    // device whose Objects only reference basic types has no <DataTypes>.
+    // Objects is required when Dictionary is present.
+    dtypes_ = nullptr;
+    XMLElement* dictionary = nullptr;
+    if (profile != nullptr)
     {
-        out.push_back(createObject(node_object));
+        dictionary = profile->FirstChildElement("Dictionary");
+    }
+    if (dictionary != nullptr)
+    {
+        dtypes_       = dictionary->FirstChildElement("DataTypes");
+        // <Dictionary> itself is optional, but when present the XSD requires an
+        // <Objects> child (DictionaryType sequence).
+        auto* objects = requireChild(dictionary, "Objects");
+        for (auto* node_object = objects->FirstChildElement(); node_object != nullptr; node_object = node_object->NextSiblingElement())
+        {
+            out.push_back(createObject(node_object));
+        }
     }
 
-    // Synthesize CoE object 0x1C00 (Sync Manager Communication Type) from
-    // the device's <Sm> declarations so legacy callers of loadFile/loadString
-    // still get an SM-type array in their CoE::Dictionary.
+    // Synthesize CoE object 0x1C00 (Sync Manager Communication Type) from the
+    // device's <Sm> declarations so callers of loadFile/loadString still get an
+    // SM-type array in their CoE::Dictionary. An explicit 0x1C00 in the ESI wins.
+    if (dictionaryContains(out, 0x1C00))
+    {
+        return out;
+    }
+    if (sms.size() > 0xFF)
+    {
+        throw std::invalid_argument("ESI: more than 255 <Sm> entries cannot fit in 0x1C00 SubIndex space");
+    }
+
     CoE::Object sms_type;
     sms_type.index = 0x1c00;
     sms_type.code  = CoE::ObjectCode::ARRAY;
@@ -710,25 +1300,35 @@ std::vector<uint8_t> Parser::loadHexBinary(XMLElement* node)
         return {};
     }
     std::string field = raw;
+    if (field.size() % 2 != 0)
+    {
+        throw std::invalid_argument("ESI: hex binary <" + std::string{node->Value()}
+            + "> has odd length (" + std::to_string(field.size()) + " chars)");
+    }
     std::vector<uint8_t> data;
     data.reserve(field.size() / 2);
 
     for (std::size_t i = 0; i < field.size(); i += 2)
     {
-        std::string hex = field.substr(i, 2);
-        uint8_t byte = static_cast<uint8_t>(std::stoi(hex, nullptr, 16));
-        data.push_back(byte);
+        char buf[3] = {field[i], field[i + 1], '\0'};
+        char* end = nullptr;
+        unsigned long byte = std::strtoul(buf, &end, 16);
+        if (end != buf + 2)
+        {
+            std::string what = "ESI: hex binary <";
+            what += node->Value();
+            what += "> contains non-hex pair '";
+            what += buf;
+            what += "' at byte ";
+            what += std::to_string(i / 2);
+            throw std::invalid_argument(what);
+        }
+        data.push_back(static_cast<uint8_t>(byte));
     }
 
     return data;
 }
 
-std::vector<uint8_t> Parser::loadStringData(XMLElement* node)
-{
-    auto data = loadHexBinary(node);
-    std::reverse(data.begin(), data.end());
-    return data;
-}
 
 void Parser::loadDefaultData(XMLNode* node, CoE::Object& obj, CoE::Entry& entry)
 {
@@ -741,15 +1341,10 @@ void Parser::loadDefaultData(XMLNode* node, CoE::Object& obj, CoE::Entry& entry)
     auto node_default_data = node_info->FirstChildElement("DefaultData");
     if (node_default_data != nullptr)
     {
-        std::vector<uint8_t> data;
-        if (entry.type == CoE::DataType::VISIBLE_STRING)
-        {
-            data = loadStringData(node_default_data);
-        }
-        else
-        {
-            data = loadHexBinary(node_default_data);
-        }
+        // VISIBLE_STRING and other binary defaults share the same loader; the
+        // ESI <DefaultData> hex-binary content is already in the natural byte
+        // order (ASCII bytes for strings, little-endian for numerics).
+        std::vector<uint8_t> data = loadHexBinary(node_default_data);
 
         if (data.size() != (entry.bitlen / 8))
         {
@@ -760,15 +1355,23 @@ void Parser::loadDefaultData(XMLNode* node, CoE::Object& obj, CoE::Entry& entry)
                 data.size() * 8, entry.bitlen);
             return;
         }
-        entry.data = std::malloc(entry.bitlen / 8);
+        if (data.empty())
+        {
+            return;
+        }
+        entry.data = std::malloc(data.size());
         std::memcpy(entry.data, data.data(), data.size());
         return;
     }
 
     if (char const* default_value = findText(node_info, "DefaultValue"))
     {
-        int64_t value = parseHexDec(default_value);
         uint32_t size = entry.bitlen / 8;
+        if (size == 0)
+        {
+            return;
+        }
+        int64_t value = parseHexDec(default_value, objectLabel(obj.index) + " DefaultValue");
         uint32_t copy_size = std::min<uint32_t>(size, sizeof(int64_t));
         entry.data = std::malloc(size);
         if (copy_size < size)
@@ -889,6 +1492,10 @@ CoE::DataType Parser::resolveType(std::string const& type_name, int depth)
         return CoE::DataType::VISIBLE_STRING;
     }
 
+    if (dtypes_ == nullptr)
+    {
+        return CoE::DataType::UNKNOWN;
+    }
     auto dtype = dtypes_->FirstChildElement();
     while (dtype)
     {
@@ -949,7 +1556,7 @@ std::tuple<CoE::DataType, uint16_t, uint16_t> Parser::parseType(XMLNode* node)
     uint16_t bitoff = 0;
     if (char const* bitoff_text = findText(node, "BitOffs"))
     {
-        bitoff = static_cast<uint16_t>(parseHexDec(bitoff_text));
+        bitoff = parseHexDec<uint16_t>(bitoff_text, "<BitOffs>");
     }
 
     return {type, bitlen, bitoff};
@@ -959,6 +1566,10 @@ XMLNode* Parser::findNodeType(XMLNode* node, std::string const& where)
 {
     char const* raw_type = requireText(node->FirstChildElement("Type"), "Type", where);
 
+    if (dtypes_ == nullptr)
+    {
+        return nullptr;
+    }
     auto dtype = dtypes_->FirstChildElement();
     while (dtype)
     {
@@ -983,7 +1594,7 @@ CoE::Object Parser::createObject(XMLNode* node)
     object.index = requireNumber<uint16_t>(node, "Index", "Object");
 
     std::string where = objectLabel(object.index);
-    object.name = requireText(node, "Name", where);
+    object.name = requireChildText(node, "Name", where);
 
     auto [type, bitlen, bitoff] = parseType(node);
     if (CoE::isBasic(type))
@@ -1005,6 +1616,11 @@ CoE::Object Parser::createObject(XMLNode* node)
     auto node_type = findNodeType(node, where);
     if (node_type == nullptr)
     {
+        if (dtypes_ == nullptr)
+        {
+            throw std::invalid_argument("ESI: " + where + " references a user-defined <Type> "
+                "but no <DataTypes> section is present in <Dictionary>");
+        }
         throw std::invalid_argument("ESI: unresolved <Type> reference in " + where);
     }
     auto node_subitem = node_type->FirstChildElement("SubItem");
@@ -1059,20 +1675,47 @@ CoE::Object Parser::createObject(XMLNode* node)
             }
             else
             {
-                uint8_t  elements       = requireNumber<uint8_t> (node_array_info, "Elements", sub_where);
+                // uint16_t loop counter is required: with an 8-bit counter and
+                // <Elements>255</Elements> (real ETG examples have this), the
+                // post-increment wraps 255 -> 0 and the loop never terminates.
+                uint16_t elements = requireNumber<uint16_t>(node_array_info, "Elements", sub_where);
                 if (elements == 0)
                 {
                     throw std::invalid_argument("ESI: <Elements> is zero in " + sub_where);
                 }
-                uint16_t element_bitlen = static_cast<uint16_t>(requireNumber<uint16_t>(node_subitem, "BitSize", sub_where) / elements);
-                uint16_t element_bitoff = requireNumber<uint16_t>(node_subitem, "BitOffs", sub_where);
-
-                for (uint8_t i = 1; i <= elements; ++i)
+                if (elements > 0xFF)
                 {
-                    entry.bitlen   = element_bitlen;
-                    entry.bitoff   = static_cast<uint16_t>(element_bitoff + element_bitlen * (i - 1));
-                    entry.subindex = i;
-                    object.entries.push_back(std::move(entry));
+                    throw std::invalid_argument("ESI: <Elements> > 255 exceeds CoE SubIndex space in " + sub_where);
+                }
+                uint16_t total_bitlen   = requireNumber<uint16_t>(node_subitem, "BitSize", sub_where);
+                uint16_t element_bitoff = requireNumber<uint16_t>(node_subitem, "BitOffs", sub_where);
+                if (total_bitlen % elements != 0)
+                {
+                    throw std::invalid_argument("ESI: array <BitSize> " + std::to_string(total_bitlen)
+                        + " not divisible by <Elements> " + std::to_string(elements) + " in " + sub_where);
+                }
+                uint16_t element_bitlen = static_cast<uint16_t>(total_bitlen / elements);
+
+                for (uint16_t i = 1; i <= elements; ++i)
+                {
+                    // Use uint32_t for the intermediate offset arithmetic to
+                    // detect the (degenerate but reachable) case where the
+                    // final offset exceeds the uint16_t range.
+                    uint32_t offset = static_cast<uint32_t>(element_bitoff)
+                                    + static_cast<uint32_t>(element_bitlen) * (i - 1);
+                    if (offset > 0xFFFF)
+                    {
+                        throw std::invalid_argument("ESI: array element bitoff " + std::to_string(offset)
+                            + " exceeds uint16 range in " + sub_where);
+                    }
+                    CoE::Entry e;
+                    e.type        = entry.type;
+                    e.access      = entry.access;
+                    e.description = entry.description;
+                    e.bitlen      = element_bitlen;
+                    e.bitoff      = static_cast<uint16_t>(offset);
+                    e.subindex    = static_cast<uint8_t>(i);
+                    object.entries.push_back(std::move(e));
                 }
             }
         }

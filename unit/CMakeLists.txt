@@ -38,12 +38,29 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/Time.cc
 )
 
-# ESI fixtures used by Parser-t.cc
-file(COPY ${CMAKE_SOURCE_DIR}/examples/slave/nuttx/xmc4800/boards/wdc_foot/foot.xml DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_basic.xml DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_complex.xml DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_multi_device.xml DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY ${CMAKE_SOURCE_DIR}/unit/kickcat_esi_test_sm_fmmu.xml      DESTINATION ${CMAKE_BINARY_DIR})
+# ESI fixtures for Parser-t.cc, copied next to the test binary as a build
+# dependency so editing a fixture re-copies it without re-running CMake.
+set(KICKCAT_ESI_FIXTURES
+    ${CMAKE_SOURCE_DIR}/examples/slave/nuttx/xmc4800/boards/wdc_foot/foot.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_basic.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_complex.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_multi_device.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_sm_fmmu.xml
+)
+
+set(KICKCAT_ESI_FIXTURES_COPIED "")
+foreach(fixture ${KICKCAT_ESI_FIXTURES})
+    get_filename_component(fixture_name ${fixture} NAME)
+    add_custom_command(
+        OUTPUT  ${CMAKE_BINARY_DIR}/${fixture_name}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${fixture} ${CMAKE_BINARY_DIR}/${fixture_name}
+        DEPENDS ${fixture}
+        COMMENT "Copying ESI fixture ${fixture_name}"
+        VERBATIM)
+    list(APPEND KICKCAT_ESI_FIXTURES_COPIED ${CMAKE_BINARY_DIR}/${fixture_name})
+endforeach()
+add_custom_target(kickcat_unit_fixtures DEPENDS ${KICKCAT_ESI_FIXTURES_COPIED})
+add_dependencies(kickcat_unit kickcat_unit_fixtures)
 
 target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
 target_include_directories(kickcat_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
