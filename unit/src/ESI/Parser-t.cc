@@ -1175,13 +1175,77 @@ TEST(ESIParser, sm_assignment_is_authoritative_over_explicit_over_assignment)
     auto [obj, e0] = findObject(dictionary, 0x1C12, 0);
     ASSERT_NE(obj, nullptr);
     ASSERT_EQ(obj->name, "RxPDO assign");        // @Sm-derived object replaced the explicit one
-    ASSERT_EQ(obj->entries.size(), 2u);          // count + 1 assigned PDO (phantom 0x1601 dropped)
+    ASSERT_EQ(obj->entries.size(), 3u);          // declared 3-slot capacity preserved (not shrunk)
     uint8_t count;
     std::memcpy(&count, e0->data, 1);
-    ASSERT_EQ(count, 1u);
+    ASSERT_EQ(count, 1u);                        // active count = 1 (phantom 0x1601 dropped)
     uint16_t assigned;
     std::memcpy(&assigned, obj->entries[1].data, 2);
     ASSERT_EQ(assigned, 0x1600u);
+    uint16_t spare;                              // spare slot present, emptied, re-assignable by a master
+    std::memcpy(&spare, obj->entries[2].data, 2);
+    ASSERT_EQ(spare, 0u);
+}
+
+TEST(ESIParser, mapping_object_keeps_declared_slot_capacity)
+{
+    // A declared mapping object (DT1600 here advertises 7 re-map slots) must keep its
+    // slot capacity even when the default <RxPdo> uses fewer entries, so a master can
+    // re-map beyond the default PDO. Active count is the <Entry> count; spare slots
+    // stay present and empty.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType>
+                            <DataType>
+                                <Name>UDINT_ARR7</Name><BaseType>UDINT</BaseType><BitSize>224</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>7</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT1600</Name><BitSize>232</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>Count</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><Name>Elements</Name><Type>UDINT_ARR7</Type><BitSize>224</BitSize><BitOffs>8</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x1600</Index><Name>RxPDO Map</Name><Type>DT1600</Type><BitSize>232</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+                <RxPdo Sm="2">
+                    <Index>#x1600</Index>
+                    <Name>RPDO</Name>
+                    <Entry><Index>#x6040</Index><SubIndex>0</SubIndex><BitLen>16</BitLen></Entry>
+                    <Entry><Index>#x607A</Index><SubIndex>0</SubIndex><BitLen>32</BitLen></Entry>
+                </RxPdo>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+
+    auto [obj, e0] = findObject(dictionary, 0x1600, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->entries.size(), 8u);          // sub0 + 7 declared slots, not shrunk to 3
+    uint8_t count;
+    std::memcpy(&count, e0->data, 1);
+    ASSERT_EQ(count, 2u);                         // active entries = the 2 <Entry>
+
+    uint32_t packed;
+    std::memcpy(&packed, obj->entries[1].data, 4);
+    ASSERT_EQ(packed, (0x6040u << 16) | 16u);     // active mapping from <Entry>
+
+    auto [_o, spare] = findObject(dictionary, 0x1600, 5);
+    ASSERT_NE(spare, nullptr);                     // a spare re-map slot exists (the bug)
+    uint32_t spare_val;
+    std::memcpy(&spare_val, spare->data, 4);
+    ASSERT_EQ(spare_val, 0u);                      // and is empty
 }
 
 TEST(ESIParser, mapping_target_subindex_reconciled_against_object)
@@ -1227,6 +1291,75 @@ TEST(ESIParser, mapping_target_subindex_reconciled_against_object)
     uint32_t packed;
     std::memcpy(&packed, entry1->data, 4);
     ASSERT_EQ(packed, (0x7000u << 16) | (1u << 8) | 16u);  // retargeted 0x7000:17 -> 0x7000:1
+}
+
+TEST(ESIParser, synthesized_mapping_access_is_spec_faithful)
+{
+    // ETG.1000.6: a non-fixed PDO mapping object and the SM assignment object are
+    // read-write in PRE_OP (the master may re-map); a Fixed PDO's mapping stays
+    // read-only. The fixture's <RxPdo> is Fixed, its <TxPdo> is not.
+    ESI::Parser parser;
+    auto dictionary = parser.loadFile("kickcat_esi_test_sm_fmmu.xml");
+
+    auto [rx, rx0] = findObject(dictionary, 0x1600, 0);
+    ASSERT_NE(rx, nullptr);
+    ASSERT_EQ(rx0->access, CoE::Access::READ);                                   // Fixed -> read-only
+    ASSERT_EQ(rx->entries.at(1).access, CoE::Access::READ);
+
+    auto [tx, tx0] = findObject(dictionary, 0x1A00, 0);
+    ASSERT_NE(tx, nullptr);
+    ASSERT_EQ(tx0->access, CoE::Access::READ | CoE::Access::WRITE_PREOP);        // not fixed -> RW in PRE_OP
+    ASSERT_EQ(tx->entries.at(1).access, CoE::Access::READ | CoE::Access::WRITE_PREOP);
+
+    auto [assign, a0] = findObject(dictionary, 0x1C12, 0);
+    ASSERT_NE(assign, nullptr);
+    ASSERT_EQ(a0->access, CoE::Access::READ | CoE::Access::WRITE_PREOP);         // SM assignment -> RW in PRE_OP
+}
+
+TEST(ESIParser, synthesizes_pdo_target_object_when_absent)
+{
+    // ETG.2010: legacy terminals (e.g. EL3xxx analog) describe process data only via
+    // <TxPdo>/<Entry>, never as a <Dictionary> object. The parser must materialize the
+    // target object (here 0x3101) so PDO mapping resolves and the slave can serve it.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary><DataTypes></DataTypes><Objects></Objects></Dictionary>
+                </Profile>
+                <TxPdo Sm="3">
+                    <Index>#x1A00</Index>
+                    <Name>Inputs</Name>
+                    <Entry><Index>#x3101</Index><SubIndex>1</SubIndex><BitLen>8</BitLen><Name>Status</Name></Entry>
+                    <Entry><Index>#x3101</Index><SubIndex>2</SubIndex><BitLen>16</BitLen><Name>Value</Name></Entry>
+                </TxPdo>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+
+    auto [obj, e0] = findObject(dictionary, 0x3101, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->code, CoE::ObjectCode::RECORD);
+    uint8_t count;
+    std::memcpy(&count, e0->data, 1);
+    ASSERT_EQ(count, 2u);                       // subindex 0 holds the highest subindex
+
+    auto [_o1, e1] = findObject(dictionary, 0x3101, 1);
+    ASSERT_NE(e1, nullptr);
+    ASSERT_EQ(e1->bitlen, 8u);
+    ASSERT_EQ(e1->type, CoE::DataType::UNSIGNED8);   // fallback type from bit length
+
+    auto [_o2, e2] = findObject(dictionary, 0x3101, 2);
+    ASSERT_NE(e2, nullptr);
+    ASSERT_EQ(e2->bitlen, 16u);
+
+    // The mapping object 0x1A00 was synthesized and now references a resolvable target.
+    auto [map, m0] = findObject(dictionary, 0x1A00, 0);
+    ASSERT_NE(map, nullptr);
 }
 
 TEST(ESIParser, loadDevice_parses_eeprom)

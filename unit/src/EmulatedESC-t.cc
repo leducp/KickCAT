@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "kickcat/ESC/EmulatedESC.h"
+#include "kickcat/LoopbackSocket.h"
 
 using namespace kickcat;
 
@@ -282,6 +283,146 @@ TEST(EmulatedESC, ecat_PDOs)
 
     esc.read(0x3000, &read_test, sizeof(uint64_t));
     ASSERT_EQ(read_test, payload);
+}
+
+TEST(EmulatedESC, ecat_fpxx_matches_station_alias)
+{
+    EmulatedESC esc;
+    uint16_t wkc = 0;
+    DatagramHeader header{Command::APWR, 0, 0, sizeof(uint16_t), 0, 0, 0, 0};
+
+    uint16_t station = 0x1000;
+    header.address = createAddress(0, reg::STATION_ADDR);
+    esc.processDatagram(&header, &station, &wkc);
+
+    uint16_t alias = 0xABCD;
+    esc.write(reg::STATION_ALIAS, &alias, sizeof(alias));
+
+    // FPRD addressed by the station alias is answered like the station address.
+    header.command = Command::FPRD;
+    header.address = createAddress(alias, 0x0040);
+    header.len = sizeof(uint64_t);
+    uint64_t read_test = 0;
+    wkc = 0;
+    esc.processDatagram(&header, &read_test, &wkc);
+    ASSERT_EQ(wkc, 1);
+
+    // A non-matching position is still ignored.
+    header.address = createAddress(0x7777, 0x0040);
+    wkc = 0;
+    esc.processDatagram(&header, &read_test, &wkc);
+    ASSERT_EQ(wkc, 0);
+}
+
+TEST(EmulatedESC, ecat_fmmu_out_of_bounds_is_skipped)
+{
+    EmulatedESC esc;
+
+    uint8_t current = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &current, 1);
+    uint8_t next = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &next, 1);
+
+    fmmu::Register fmmu;
+    memset(&fmmu, 0, sizeof(fmmu::Register));
+    fmmu.type  = 1;                 // read access
+    fmmu.logical_address  = 0x2000;
+    fmmu.length           = 16;
+    fmmu.logical_stop_bit = 0x7;
+    fmmu.physical_address = 0x0800;   // below the process-data RAM window -> invalid
+    fmmu.activate         = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(fmmu::Register));
+
+    // Configuration must not produce an out-of-bounds pointer, and the bad FMMU
+    // must not be mapped: a logical read on its address gets no working counter.
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+    uint64_t buf = 0;
+    uint16_t wkc = 0;
+    esc.processDatagram(&header, &buf, &wkc);
+
+    header.command = Command::LRD;
+    header.address = 0x2000;
+    wkc = 0;
+    esc.processDatagram(&header, &buf, &wkc);
+    ASSERT_EQ(wkc, 0);
+}
+
+TEST(EmulatedESC, ecat_frmw_reads_reference_clock)
+{
+    EmulatedESC esc;
+    uint16_t wkc = 0;
+    DatagramHeader header{Command::APWR, 0, 0, sizeof(uint16_t), 0, 0, 0, 0};
+
+    uint16_t station = 0x1001;
+    header.address = createAddress(0, reg::STATION_ADDR);
+    esc.processDatagram(&header, &station, &wkc);
+
+    uint64_t systime = 0x1122334455667788ull;
+    esc.write(reg::DC_SYSTEM_TIME, &systime, sizeof(systime));
+
+    // FRMW addressed to the slave reads its DC system time (the reference clock)
+    // and increments the working counter - this is what static drift compensation
+    // relies on.
+    header.command = Command::FRMW;
+    header.address = createAddress(station, reg::DC_SYSTEM_TIME);
+    header.len = sizeof(uint64_t);
+    uint64_t read_back = 0;
+    wkc = 0;
+    esc.processDatagram(&header, &read_back, &wkc);
+    ASSERT_EQ(wkc, 1);
+    ASSERT_EQ(read_back, systime);
+}
+
+TEST(EmulatedESC, ecat_eeprom_reload_reapplies_config)
+{
+    EmulatedESC esc;
+    std::vector<uint16_t> image(128, 0);
+    image[4] = 0xBEEF;                 // station alias word in the EEPROM
+    esc.loadEeprom(image);
+
+    uint16_t alias = 0;
+    esc.read(reg::STATION_ALIAS, &alias, sizeof(alias));
+    ASSERT_EQ(alias, 0xBEEF);
+
+    // Corrupt the alias register; a Reload command must restore it from the EEPROM.
+    uint16_t junk = 0x1234;
+    esc.write(reg::STATION_ALIAS, &junk, sizeof(junk));
+
+    uint16_t reload = eeprom::Control::RELOAD;
+    esc.write(reg::EEPROM_CONTROL, &reload, sizeof(reload));
+
+    uint16_t wkc = 0;
+    DatagramHeader nop{Command::NOP, 0, 0, 0, 0, 0, 0, 0};
+    esc.processDatagram(&nop, nullptr, &wkc);   // runs the internal logic -> RELOAD
+
+    esc.read(reg::STATION_ALIAS, &alias, sizeof(alias));
+    ASSERT_EQ(alias, 0xBEEF);
+}
+
+TEST(LoopbackSocket, runs_frame_through_slave_and_ticks)
+{
+    EmulatedESC esc;
+    int ticks = 0;
+    LoopbackSocket sock({&esc}, [&]() { ticks++; });
+
+    Frame frame;
+    uint16_t value = 0;
+    frame.addDatagram(0, Command::BRD, createAddress(0, reg::TYPE), &value, sizeof(value));
+    int32_t size = frame.finalize();
+
+    uint8_t buffer[ETH_MAX_SIZE];
+    ASSERT_EQ(sock.write(frame.data(), size), size);
+    ASSERT_EQ(ticks, 1);                              // slave application advanced once
+
+    ASSERT_EQ(sock.read(buffer, sizeof(buffer)), size);  // processed frame returned once
+    ASSERT_EQ(sock.read(buffer, sizeof(buffer)), 0);     // nothing pending afterwards
+
+    // The slave answered: the working counter is incremented in the returned datagram.
+    Frame response;
+    std::memcpy(response.data(), buffer, size);
+    auto [header, data, wkc] = response.peekDatagram();
+    ASSERT_NE(header, nullptr);
+    ASSERT_EQ(*wkc, 1);
 }
 
 TEST(EmulatedESC, watchdog)

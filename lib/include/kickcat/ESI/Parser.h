@@ -68,6 +68,10 @@ namespace kickcat::ESI
         CoE::Dictionary buildDictionary(tinyxml2::XMLElement* profile,
                                         std::vector<SmInfo> const& sms);
 
+        // Materializes the data objects (e.g. 0x3xxx/0x6xxx/0x7xxx) referenced by
+        // <Pdo>/<Entry> but not declared in <Dictionary>, so the mapping resolves.
+        void synthesizePdoTargetObjects(Device& device);
+
         // Appends 0x16xx/0x1Axx mapping objects and 0x1C12/0x1C13 SM-assignment
         // objects to the dictionary based on the parsed Pdo lists, but only
         // for objects that aren't already declared in <Dictionary>/<Objects>.

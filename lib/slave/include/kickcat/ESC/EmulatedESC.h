@@ -188,6 +188,9 @@ namespace kickcat
         void processWriteCommand    (DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset);
         void processReadWriteCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset);
 
+        // FPxx target: configured station address, or the station alias when set.
+        bool matchesConfiguredAddress(uint16_t position) const;
+
         void processLRD(DatagramHeader* header, void* data, uint16_t* wkc);
         void processLWR(DatagramHeader* header, void* data, uint16_t* wkc);
         void processLRW(DatagramHeader* header, void* data, uint16_t* wkc);

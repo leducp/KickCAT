@@ -1,8 +1,11 @@
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
+#include <iostream>
 #include <string>
 #include <vector>
+
+#include <argparse/argparse.hpp>
 
 #include "kickcat/ESI/Parser.h"
 #include "kickcat/ESI/SIIBuilder.h"
@@ -59,7 +62,24 @@ static bool resolveAssignment(CoE::Dictionary& dict, uint16_t assign_idx, std::s
 
 int main(int argc, char** argv)
 {
-    fs::path dir = argv[1];
+    argparse::ArgumentParser program("esi_validate");
+
+    std::string path_arg;
+    program.add_argument("path")
+        .help("ESI XML directory to validate (parse + build SII + resolve PDO maps)")
+        .store_into(path_arg);
+
+    try
+    {
+        program.parse_args(argc, argv);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << e.what() << std::endl << program;
+        return 2;
+    }
+
+    fs::path dir = path_arg;
     int files = 0, total = 0, built = 0, build_fail = 0, sii_ok = 0, sii_fail = 0;
     int map_ok = 0, map_fail = 0;
 

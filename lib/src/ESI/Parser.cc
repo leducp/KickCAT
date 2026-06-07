@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <string>
 
@@ -561,6 +562,7 @@ Device Parser::buildDeviceFromElement(XMLElement* device_node)
     // Modular-device composition (<Slots>/<ModuleGroups>) is not modeled.
 
     device.dictionary = buildDictionary(profile_node, device.sync_managers);
+    synthesizePdoTargetObjects(device);
     synthesizePdoMappingObjects(device);
     return device;
 }
@@ -874,7 +876,15 @@ CoE::Object Parser::buildMappingObject(Pdo const& pdo, bool is_rx)
         throw std::invalid_argument("ESI: PDO has more than 255 entries (cannot synthesize mapping)");
     }
 
-    CoE::Entry subindex0{0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Number of entries"};
+    // ETG.1000.6: a PDO mapping object is read-write in PRE_OP (the master may
+    // re-map) unless the PDO content is fixed (PdoFixedContent), then read-only.
+    uint16_t map_access = CoE::Access::READ | CoE::Access::WRITE_PREOP;
+    if (pdo.fixed)
+    {
+        map_access = CoE::Access::READ;
+    }
+
+    CoE::Entry subindex0{0, 8, 0, map_access, CoE::DataType::UNSIGNED8, "Number of entries"};
     subindex0.data = std::malloc(1);
     uint8_t count = static_cast<uint8_t>(pdo.entries.size());
     std::memcpy(subindex0.data, &count, 1);
@@ -892,7 +902,7 @@ CoE::Object Parser::buildMappingObject(Pdo const& pdo, bool is_rx)
         entry.subindex    = static_cast<uint8_t>(i + 1);
         entry.bitlen      = 32;
         entry.bitoff      = bitoff;
-        entry.access      = CoE::Access::READ;
+        entry.access      = map_access;
         entry.type        = CoE::DataType::UNSIGNED32;
         if (not e.name.empty())
         {
@@ -934,7 +944,11 @@ CoE::Object Parser::buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t
         throw std::invalid_argument("ESI: more than 255 PDOs assigned to a SyncManager");
     }
 
-    CoE::Entry subindex0{0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Number of assigned PDOs"};
+    // ETG.1000.6: the SM PDO-assignment object is read-write in PRE_OP so the
+    // master can (re)assign PDOs to the SyncManager.
+    uint16_t const assign_access = CoE::Access::READ | CoE::Access::WRITE_PREOP;
+
+    CoE::Entry subindex0{0, 8, 0, assign_access, CoE::DataType::UNSIGNED8, "Number of assigned PDOs"};
     subindex0.data = std::malloc(1);
     uint8_t count = static_cast<uint8_t>(pdos.size());
     std::memcpy(subindex0.data, &count, 1);
@@ -947,7 +961,7 @@ CoE::Object Parser::buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t
         entry.subindex    = static_cast<uint8_t>(i + 1);
         entry.bitlen      = 16;
         entry.bitoff      = bitoff;
-        entry.access      = CoE::Access::READ;
+        entry.access      = assign_access;
         entry.type        = CoE::DataType::UNSIGNED16;
         entry.description = "PDO " + std::to_string(i + 1);
         entry.data        = std::malloc(sizeof(uint16_t));
@@ -957,6 +971,125 @@ CoE::Object Parser::buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t
         bitoff = static_cast<uint16_t>(bitoff + 16);
     }
     return obj;
+}
+
+void Parser::synthesizePdoTargetObjects(Device& device)
+{
+    // ETG.2010: a <Pdo>/<Entry> fully specifies its mapped object. Legacy terminals
+    // (e.g. EL3xxx, 0x3xxx area) describe process data only via <Entry>, never as a
+    // <Dictionary> object, so parsePdoMap can't resolve it. Materialize the missing
+    // targets from the entry metadata; additive, declared objects are untouched.
+    struct Field
+    {
+        uint16_t      bitlen = 0;
+        std::string   name;
+        CoE::DataType type = CoE::DataType::UNKNOWN;
+        bool          writable = false;  // RxPDO target -> master writes it
+    };
+    std::map<uint16_t, std::map<uint8_t, Field>> targets;
+
+    auto collect = [&](std::vector<Pdo> const& pdos, bool is_rx)
+    {
+        for (auto const& pdo : pdos)
+        {
+            for (auto const& e : pdo.entries)
+            {
+                if (e.index == 0 or dictionaryContains(device.dictionary, e.index))
+                {
+                    continue;  // padding gap, or the object is already declared
+                }
+                Field& field = targets[e.index][e.subindex];
+                field.bitlen = e.bit_len;
+                field.name   = e.name;
+                auto type    = coeTypeFromLabel(e.data_type);
+                if (type.has_value())
+                {
+                    field.type = *type;
+                }
+                else if (e.bit_len == 1)
+                {
+                    field.type = CoE::DataType::BOOLEAN;
+                }
+                else if (e.bit_len <= 8)
+                {
+                    field.type = CoE::DataType::UNSIGNED8;
+                }
+                else if (e.bit_len <= 16)
+                {
+                    field.type = CoE::DataType::UNSIGNED16;
+                }
+                else if (e.bit_len <= 32)
+                {
+                    field.type = CoE::DataType::UNSIGNED32;
+                }
+                else
+                {
+                    field.type = CoE::DataType::UNSIGNED64;
+                }
+                if (is_rx)
+                {
+                    field.writable = true;
+                }
+            }
+        }
+    };
+    collect(device.rx_pdos, true);
+    collect(device.tx_pdos, false);
+
+    auto accessOf = [](Field const& f)
+    {
+        if (f.writable)
+        {
+            return static_cast<uint16_t>(CoE::Access::READ | CoE::Access::WRITE | CoE::Access::RxPDO);
+        }
+        return static_cast<uint16_t>(CoE::Access::READ | CoE::Access::TxPDO);
+    };
+
+    for (auto const& [index, fields] : targets)
+    {
+        uint8_t max_sub = 0;
+        for (auto const& [sub, field] : fields)
+        {
+            if (sub > max_sub)
+            {
+                max_sub = sub;
+            }
+        }
+
+        CoE::Object obj;
+        obj.index = index;
+
+        if (max_sub == 0)
+        {
+            // Single value mapped at subindex 0 -> VAR. Storage is left to
+            // CoE::materializeStorage (host/sim startup), as for any data object.
+            Field const& field = fields.at(0);
+            obj.code = CoE::ObjectCode::VAR;
+            obj.name = field.name;
+            obj.entries.emplace_back(0, field.bitlen, 0, accessOf(field), field.type, field.name);
+            device.dictionary.push_back(std::move(obj));
+            continue;
+        }
+
+        obj.code = CoE::ObjectCode::RECORD;
+        obj.name = "PDO data";
+        CoE::Entry count{0, 8, 0, CoE::Access::READ, CoE::DataType::UNSIGNED8, "Number of entries"};
+        count.data = std::malloc(1);
+        std::memcpy(count.data, &max_sub, 1);
+        obj.entries.push_back(std::move(count));
+
+        uint16_t bitoff = 8;
+        for (auto const& [sub, field] : fields)
+        {
+            if (sub == 0)
+            {
+                continue;  // a record's subindex 0 is the count, not a data field
+            }
+            obj.entries.emplace_back(sub, field.bitlen, bitoff, accessOf(field), field.type, field.name);
+            bitoff = static_cast<uint16_t>(bitoff + field.bitlen);
+        }
+        device.dictionary.push_back(std::move(obj));
+    }
 }
 
 void Parser::synthesizePdoMappingObjects(Device& device)
@@ -990,6 +1123,31 @@ void Parser::synthesizePdoMappingObjects(Device& device)
         return true;
     };
 
+    // A declared object's slot count is the master's re-map/re-assign capacity (e.g.
+    // DT1600's 16 slots vs a 4-entry default PDO). Grow the synthesized object to that
+    // capacity so a master can re-map beyond the default; spare slots are empty but
+    // present and keep the slot template (width/type/access) of the last active entry.
+    auto padToCapacity = [](CoE::Object& obj, std::size_t capacity)
+    {
+        if (obj.entries.empty())
+        {
+            return;
+        }
+        // Take the slot template from the last active entry before growing the vector.
+        uint16_t const bitlen = obj.entries.back().bitlen;
+        uint16_t const access = obj.entries.back().access;
+        CoE::DataType const type = obj.entries.back().type;
+        uint16_t bitoff = static_cast<uint16_t>(obj.entries.back().bitoff + bitlen);
+        for (std::size_t sub = obj.entries.size(); sub < capacity; ++sub)
+        {
+            CoE::Entry e{static_cast<uint8_t>(sub), bitlen, bitoff, access, type,
+                         "Entry " + std::to_string(sub)};
+            e.data = std::calloc(1, (bitlen + 7u) / 8u);  // empty slot
+            obj.entries.push_back(std::move(e));
+            bitoff = static_cast<uint16_t>(bitoff + bitlen);
+        }
+    };
+
     auto synthesize = [&](std::vector<Pdo> const& pdos, bool is_rx)
     {
         for (auto const& pdo : pdos)
@@ -1008,6 +1166,7 @@ void Parser::synthesizePdoMappingObjects(Device& device)
                 }
                 else if (not pdo.entries.empty() and not mappingsAgree(*existing, obj))
                 {
+                    padToCapacity(obj, existing->entries.size());
                     *existing = std::move(obj);
                 }
             }
@@ -1081,6 +1240,7 @@ void Parser::synthesizePdoMappingObjects(Device& device)
             }
             else if (not assignmentsAgree(*existing, obj))
             {
+                padToCapacity(obj, existing->entries.size());  // preserve declared re-assign capacity
                 *existing = std::move(obj);
             }
         }

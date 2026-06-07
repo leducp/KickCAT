@@ -30,63 +30,10 @@
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
 #include "kickcat/SocketNull.h"
+#include "kickcat/LoopbackSocket.h"
 
 using namespace kickcat;
 namespace fs = std::filesystem;
-
-// Master frames are processed in place by the emulated slave, then the slave's
-// ESM is ticked once. One writeThenRead == one simulator iteration.
-class LoopbackSocket final : public AbstractSocket
-{
-public:
-    LoopbackSocket(std::vector<EmulatedESC*> escs, std::function<void()> tick)
-        : escs_(std::move(escs)), tick_(std::move(tick)) {}
-
-    void open(std::string const&) override {}
-    void setTimeout(nanoseconds) override {}
-    void close() noexcept override {}
-
-    int32_t write(void const* data, int32_t size) override
-    {
-        Frame frame;
-        std::memcpy(frame.data(), data, static_cast<size_t>(size));
-        while (true)
-        {
-            auto [header, payload, wkc] = frame.peekDatagram();
-            if (header == nullptr)
-            {
-                break;
-            }
-            for (auto* esc : escs_)
-            {
-                esc->processDatagram(header, payload, wkc);
-            }
-        }
-        tick_();
-        std::memcpy(buffer_, frame.data(), static_cast<size_t>(size));
-        size_ = size;
-        pending_ = true;
-        return size;
-    }
-
-    int32_t read(void* data, int32_t) override
-    {
-        if (not pending_)
-        {
-            return 0;
-        }
-        std::memcpy(data, buffer_, static_cast<size_t>(size_));
-        pending_ = false;
-        return size_;
-    }
-
-private:
-    std::vector<EmulatedESC*> escs_;
-    std::function<void()> tick_;
-    uint8_t buffer_[ETH_MAX_SIZE];
-    int32_t size_    = 0;
-    bool    pending_ = false;
-};
 
 enum class Reached { INIT_FAIL, INIT, PRE_OP, SAFE_OP, OP };
 
