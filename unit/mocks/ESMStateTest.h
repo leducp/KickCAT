@@ -61,9 +61,9 @@ public:
         pdo_.configure();
     }
 
-    void expectAlStatus(Context context, State state, StatusCode statusCode = StatusCode::NO_ERROR)
+    void expectAlStatus(Context context, State state, StatusCode statusCode = StatusCode::ECAT_NO_ERROR)
     {
-        if (statusCode == StatusCode::NO_ERROR)
+        if (statusCode == StatusCode::ECAT_NO_ERROR)
         {
             EXPECT_EQ(context.al_status, state);
         }

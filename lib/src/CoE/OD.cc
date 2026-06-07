@@ -356,4 +356,39 @@ namespace kickcat::CoE
 
         return problems;
     }
+
+    void materializeStorage(Dictionary& dict)
+    {
+        auto ensure = [](Entry& entry)
+        {
+            if ((entry.data != nullptr) or (entry.bitlen == 0))
+            {
+                return;
+            }
+            std::size_t size = (entry.bitlen + 7) / 8;
+            if (size == 0)
+            {
+                size = 1;
+            }
+            entry.data = std::calloc(1, size);
+        };
+
+        for (auto& object : dict)
+        {
+            bool const is_complex = (object.code == ObjectCode::ARRAY) or (object.code == ObjectCode::RECORD);
+            // Complete access dereferences subindex 0 regardless of its access bits.
+            if (is_complex and not object.entries.empty())
+            {
+                ensure(object.entries.front());
+            }
+
+            for (auto& entry : object.entries)
+            {
+                if ((entry.access & (Access::READ | Access::WRITE)) != 0)
+                {
+                    ensure(entry);
+                }
+            }
+        }
+    }
 }

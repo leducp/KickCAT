@@ -258,3 +258,59 @@ TEST(OD, validate_dictionary_ignores_inaccessible_entry_with_null_data)
     auto problems = validateDictionary(dict);
     ASSERT_TRUE(problems.empty());
 }
+
+TEST(OD, materialize_storage_allocates_accessible_entries_zeroed)
+{
+    Dictionary dict;
+    {
+        CoE::Object object{0x6000, CoE::ObjectCode::VAR, "Input", {}};
+        CoE::addEntry(object, 0, 1,  0, Access::READ,  DataType::BOOLEAN,    "bit",  nullptr);
+        CoE::addEntry(object, 1, 16, 8, Access::WRITE, DataType::UNSIGNED16, "word", nullptr);
+        dict.push_back(std::move(object));
+    }
+
+    ASSERT_FALSE(validateDictionary(dict).empty());  // null data before materialization
+
+    materializeStorage(dict);
+
+    auto& entries = dict.front().entries;
+    ASSERT_NE(entries[0].data, nullptr);  // BOOL (bitlen 1) gets 1 byte, not 0
+    ASSERT_NE(entries[1].data, nullptr);
+    ASSERT_EQ(*static_cast<uint8_t const*>(entries[0].data),  0);  // zero-initialized
+    ASSERT_EQ(*static_cast<uint16_t const*>(entries[1].data), 0);
+    ASSERT_TRUE(validateDictionary(dict).empty());
+}
+
+TEST(OD, materialize_storage_preserves_existing_data_and_skips_inaccessible)
+{
+    Dictionary dict;
+    {
+        CoE::Object object{0x1018, CoE::ObjectCode::VAR, "Identity", {}};
+        CoE::addEntry<uint32_t>(object, 0, 32, 0, Access::READ, DataType::UNSIGNED32, "has value", 0xCAFEu);
+        CoE::addEntry(object, 1, 16, 32, 0, DataType::UNSIGNED16, "padding", nullptr);  // access == 0
+        dict.push_back(std::move(object));
+    }
+
+    void const* existing = dict.front().entries[0].data;
+    materializeStorage(dict);
+
+    ASSERT_EQ(dict.front().entries[0].data, existing);                 // untouched
+    ASSERT_EQ(*static_cast<uint32_t const*>(dict.front().entries[0].data), 0xCAFEu);
+    ASSERT_EQ(dict.front().entries[1].data, nullptr);                  // inaccessible: left null
+}
+
+TEST(OD, materialize_storage_allocates_complex_subindex0)
+{
+    Dictionary dict;
+    {
+        // ARRAY whose count (subindex 0) has access 0: complete access still dereferences it.
+        CoE::Object object{0x1C12, CoE::ObjectCode::ARRAY, "RxPDO assign", {}};
+        CoE::addEntry(object, 0, 8, 0, 0, DataType::UNSIGNED8, "count", nullptr);
+        dict.push_back(std::move(object));
+    }
+
+    materializeStorage(dict);
+
+    ASSERT_NE(dict.front().entries.front().data, nullptr);
+    ASSERT_TRUE(validateDictionary(dict).empty());
+}

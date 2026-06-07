@@ -143,7 +143,7 @@ namespace kickcat
 
     enum StatusCode : uint16_t
     {
-        NO_ERROR                              = 0x0000,
+        ECAT_NO_ERROR                         = 0x0000,  // ECAT_ prefix: bare NO_ERROR collides with the Windows API macro (winerror.h)
         UNSPECIFIED_ERROR                     = 0x0001,
         NO_MEMORY                             = 0x0002,
         INVALID_REVISION                      = 0x0004,

@@ -237,7 +237,7 @@ int main(int argc, char* argv[])
             {
                 printf("!!! WARNING !!!\n");
                 printf("Current EEPROM addressing scheme is one byte: max EEPROM size is 16Kbit (2KiB)\n");
-                printf("but the given EEPROM file size is %ldB which exceed the maximum possible target size\n", size);
+                printf("but the given EEPROM file size is %zuB which exceed the maximum possible target size\n", size);
                 printf("If you wish to continue, the written size will be truncated to 2KiB\n");
 
                 if (not askContinue())
@@ -251,7 +251,7 @@ int main(int argc, char* argv[])
         for (uint32_t i = 0; i < buffer.size(); i++)
         {
             bus.writeEeprom(slave, i, static_cast<void*>(&buffer[i]), 2);
-            printf("\r Updating: %d/%lu", i + 1, buffer.size());
+            printf("\r Updating: %d/%zu", i + 1, buffer.size());
             fflush(stdout);
         }
         printf("\n");

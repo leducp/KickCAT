@@ -53,16 +53,23 @@ namespace kickcat
         }
         int size = eeprom_file.tellg();
         eeprom_file.seekg (0, std::ios::beg);
-        eeprom_.resize(size / 2); // vector of uint16_t so / 2 since the size is in byte
-        eeprom_file.read((char*)eeprom_.data(), size);
+        std::vector<uint8_t> image(static_cast<std::size_t>(size));
+        eeprom_file.read(reinterpret_cast<char*>(image.data()), size);
         eeprom_file.close();
 
-        loadEeprom();
+        loadEeprom(image);
     }
 
     void EmulatedESC::loadEeprom(std::vector<uint16_t> const& eeprom_data)
     {
         eeprom_ = eeprom_data;
+        loadEeprom();
+    }
+
+    void EmulatedESC::loadEeprom(std::vector<uint8_t> const& image)
+    {
+        eeprom_.assign((image.size() + 1) / 2, 0);  // word-addressed; odd trailing byte zero-filled
+        std::memcpy(eeprom_.data(), image.data(), image.size());
         loadEeprom();
     }
 

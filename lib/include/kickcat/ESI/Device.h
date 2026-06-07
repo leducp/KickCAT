@@ -211,7 +211,7 @@ namespace kickcat::ESI
 
         std::vector<uint8_t>     raw_data;        // <Data> at Eeprom level (raw image)
         std::optional<int32_t>   byte_size;
-        std::vector<uint8_t>     config_data;     // first 16 SII bytes
+        std::vector<uint8_t>     config_data;     // SII config area (words 0..6; CRC word excluded)
         std::vector<uint8_t>     config_data2;
         std::vector<uint8_t>     bootstrap;       // bootstrap mailbox config
         std::vector<Category>    categories;

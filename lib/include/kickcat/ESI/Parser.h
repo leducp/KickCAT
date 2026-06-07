@@ -30,10 +30,18 @@ namespace kickcat::ESI
         Device loadDevice      (std::string const& file, DeviceFilter const& filter = {});
         Device loadDeviceString(std::string const& xml,  DeviceFilter const& filter = {});
 
+        // Build every <Device> in the file from a single parse. Devices that fail
+        // to parse are skipped; their type + error is appended to `errors` (if given).
+        std::vector<Device> loadAllDevices(std::string const& file, std::vector<std::string>* errors = nullptr);
+
         // Pure CoE-object synthesis from parsed PDO data (ETG.1000.6 layout),
         // independent of any XML/parser state. Exposed for direct unit testing.
         static CoE::Object buildMappingObject   (Pdo const& pdo, bool is_rx);
         static CoE::Object buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t index, bool is_rx);
+
+        // Map an ESI basic-type label ("BOOL", "UINT", ...) to its CoE::DataType,
+        // whose value is the ETG SII data-type code. nullopt for unknown labels.
+        static std::optional<CoE::DataType> coeTypeFromLabel(std::string const& label);
 
     private:
         static std::optional<uint32_t> readHexDecAttr(tinyxml2::XMLElement* node, char const* name);
@@ -44,6 +52,7 @@ namespace kickcat::ESI
 
         std::vector<DeviceSummary> listDevicesImpl();
         Device                     loadDeviceImpl(DeviceFilter const& filter);
+        Device                     buildDeviceFromElement(tinyxml2::XMLElement* device_node);
 
         tinyxml2::XMLElement* selectDevice(DeviceFilter const& filter);
         DeviceSummary         summarize   (tinyxml2::XMLElement* device);

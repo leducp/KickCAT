@@ -25,6 +25,7 @@ namespace kickcat
         // Helpers to load the eeprom
         void loadEeprom(std::string const& eeprom_path);
         void loadEeprom(std::vector<uint16_t> const& eeprom_data);
+        void loadEeprom(std::vector<uint8_t> const& image);  // word-addressed; odd trailing byte zero-filled
 
         // Access from ECAT POV
         void processDatagram(DatagramHeader* header, void* data, uint16_t* wkc);

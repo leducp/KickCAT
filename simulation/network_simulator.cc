@@ -1,12 +1,16 @@
 #include <algorithm>
 #include <argparse/argparse.hpp>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <numeric>
+#include <optional>
 
+#include "kickcat/CoE/OD.h"
 #include "kickcat/ESI/Parser.h"
+#include "kickcat/ESI/SIIBuilder.h"
 #include "kickcat/CoE/mailbox/response.h"
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
@@ -61,7 +65,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-        std::vector<std::string> expanded_slave_configs;
+    std::vector<std::string> expanded_slave_configs;
 
     if (slave_number > 0)
     {
@@ -82,7 +86,7 @@ int main(int argc, char* argv[])
         expanded_slave_configs = slave_configs;
     }
 
-	if (slave_configs.empty())
+    if (expanded_slave_configs.empty())
     {
         std::cerr << "No slave configuration files provided" << std::endl;
         std::cerr << program;
@@ -130,19 +134,59 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        if (not config.contains("eeprom"))
+        std::unique_ptr<EmulatedESC> esc;
+        std::optional<CoE::Dictionary> esi_coe;  // CoE dictionary derived from the ESI device, if any
+
+        if (config.contains("esi"))
         {
-            std::cerr << "Config file " << config_path << " missing 'eeprom' field" << std::endl;
+            // Build the EEPROM image (and CoE dictionary) from a selected ESI device.
+            fs::path esi_full_path = config_dir / config["esi"].get<std::string>();
+            ESI::DeviceFilter filter;
+            if (config.contains("device_type"))  { filter.type         = config["device_type"].get<std::string>(); }
+            if (config.contains("product_code")) { filter.product_code = config["product_code"].get<uint32_t>();    }
+            if (config.contains("revision_no"))  { filter.revision_no  = config["revision_no"].get<uint32_t>();     }
+
+            try
+            {
+                ESI::Device dev = parser.loadDevice(esi_full_path.string(), filter);
+                CoE::materializeStorage(dev.dictionary);
+
+                esc = std::make_unique<EmulatedESC>();
+                esc->loadEeprom(ESI::buildEepromImage(dev));
+
+                if (dev.mailbox and dev.mailbox->coe)
+                {
+                    esi_coe = std::move(dev.dictionary);
+                }
+            }
+            catch (std::exception const& e)
+            {
+                std::cerr << "Failed to build EEPROM from ESI " << esi_full_path << ": " << e.what() << std::endl;
+                return 1;
+            }
+        }
+        else if (config.contains("eeprom"))
+        {
+            fs::path eeprom_full_path = config_dir / config["eeprom"].get<std::string>();
+            esc = std::make_unique<EmulatedESC>(eeprom_full_path.string().c_str());
+        }
+        else
+        {
+            std::cerr << "Config file " << config_path << " missing 'eeprom' or 'esi' field" << std::endl;
             return 1;
         }
 
-        std::string eeprom_path = config["eeprom"];
-        fs::path eeprom_full_path = config_dir / eeprom_path;
-        auto esc = std::make_unique<EmulatedESC>(eeprom_full_path.string().c_str());
         auto pdo = std::make_unique<PDO>(esc.get());
         auto slave = std::make_unique<Slave>(esc.get(), pdo.get());
 
-        if (config.contains("coe_xml"))
+        if (esi_coe)
+        {
+            auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
+            mbx->enableCoE(std::move(*esi_coe));
+            slave->setMailbox(mbx.get());
+            mailboxes.push_back(std::move(mbx));
+        }
+        else if (config.contains("coe_xml"))
         {
             std::string coe_xml_path = config["coe_xml"];
             fs::path coe_xml_full_path = config_dir / coe_xml_path;
@@ -230,6 +274,7 @@ int main(int argc, char* argv[])
             slaves[i]->routine();
             if (slaves[i]->state() == State::SAFE_OP)
             {
+                // input-only slaves reach OP without this (handled slave-side in SafeOP)
                 if (output_pdo[i][1] != 0xFF)
                 {
                     slaves[i]->validateOutputData();

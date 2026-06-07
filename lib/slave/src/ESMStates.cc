@@ -116,14 +116,14 @@ namespace kickcat::ESM
             if (mbx_)
             {
                 StatusCode mapping_rc = pdo_.configureMapping(mbx_->getDictionary());
-                if (mapping_rc != StatusCode::NO_ERROR)
+                if (mapping_rc != StatusCode::ECAT_NO_ERROR)
                 {
                     return Context::build(id_, mapping_rc);
                 }
             }
 
             StatusCode pdo_sm_config_status_code = pdo_.isConfigOk();
-            if (pdo_sm_config_status_code != StatusCode::NO_ERROR)
+            if (pdo_sm_config_status_code != StatusCode::ECAT_NO_ERROR)
             {
                 return Context::build(id_, pdo_sm_config_status_code);
             }
@@ -152,7 +152,7 @@ namespace kickcat::ESM
 
     void SafeOP::onEntry(Context oldStatus, Context newStatus)
     {
-        if (oldStatus.state() == State::OPERATIONAL and newStatus.al_status_code != StatusCode::NO_ERROR)
+        if (oldStatus.state() == State::OPERATIONAL and newStatus.al_status_code != StatusCode::ECAT_NO_ERROR)
         {
             pdo_.activateOutput(false);
         }
@@ -174,12 +174,14 @@ namespace kickcat::ESM
         }
 
         StatusCode pdo_sm_config_status_code = pdo_.isConfigOk();
-        if (pdo_sm_config_status_code != StatusCode::NO_ERROR)
+        if (pdo_sm_config_status_code != StatusCode::ECAT_NO_ERROR)
         {
             return Context::build(State::PRE_OP, pdo_sm_config_status_code);
         }
 
-        if (control.requestedState() == State::OPERATIONAL and currentStatus.is_valid_output_data)
+        // An input-only slave has no output data to validate, so it may still reach OP.
+        bool const outputs_valid = currentStatus.is_valid_output_data or not pdo_.hasOutput();
+        if (control.requestedState() == State::OPERATIONAL and outputs_valid)
         {
             return Context::build(State::OPERATIONAL);
         }
@@ -218,7 +220,7 @@ namespace kickcat::ESM
         }
 
         StatusCode pdo_sm_config_status_code = pdo_.isConfigOk();
-        if (pdo_sm_config_status_code != StatusCode::NO_ERROR)
+        if (pdo_sm_config_status_code != StatusCode::ECAT_NO_ERROR)
         {
             return Context::build(PRE_OP, pdo_sm_config_status_code);
         }

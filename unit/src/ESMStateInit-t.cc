@@ -41,7 +41,7 @@ TEST_F(ESMStateInitTest, 2B_ErrInit_to_Init)
                                        ALControl{State::INIT | State::ERROR_ACK});
 
     EXPECT_EQ(newContext.al_status, State::INIT);
-    EXPECT_EQ(newContext.al_status_code, StatusCode::NO_ERROR);
+    EXPECT_EQ(newContext.al_status_code, StatusCode::ECAT_NO_ERROR);
 }
 
 TEST_F(ESMStateInitTest, 3A_Init_to_PreOP)

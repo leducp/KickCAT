@@ -1,6 +1,7 @@
 #include "SIIParser.h"
 #include "debug.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace kickcat::eeprom
@@ -336,6 +337,31 @@ namespace kickcat::eeprom
         return out;
     }
 
+
+    uint8_t SII::registerString(std::string const& text)
+    {
+        if (strings.empty())
+        {
+            strings.emplace_back();   // reserved index 0 (empty string)
+        }
+        if (text.empty())
+        {
+            return 0;
+        }
+        for (std::size_t i = 1; i < strings.size(); ++i)
+        {
+            if (strings[i] == text)
+            {
+                return static_cast<uint8_t>(i);
+            }
+        }
+        if (strings.size() > 0xFF)
+        {
+            return 0;
+        }
+        strings.push_back(text);
+        return static_cast<uint8_t>(strings.size() - 1);
+    }
 
     uint16_t computeInfoCRC(InfoEntry const& info)
     {
