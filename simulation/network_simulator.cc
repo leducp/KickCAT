@@ -13,6 +13,7 @@
 #include "kickcat/ESI/Parser.h"
 #include "kickcat/ESI/SIIBuilder.h"
 #include "kickcat/CoE/mailbox/response.h"
+#include "kickcat/EmulatedNetwork.h"
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
 #include "kickcat/OS/Time.h"
@@ -28,10 +29,27 @@ namespace fs = std::filesystem;
 static volatile std::sig_atomic_t running = 1;
 static void signalHandler(int) { running = 0; }
 
+// Example fault injection: SIGUSR1 breaks a configured wire, SIGUSR2 heals it.
+// The handler only flags the request; it is applied from the main loop where the
+// network object is in scope (setLinkState is not async-signal-safe). SIGUSR1/2 are
+// POSIX-only; on platforms without them the break/heal API is still usable directly.
+static volatile std::sig_atomic_t link_event = 0;  // 0: none, 1: break, 2: heal
+#ifdef SIGUSR1
+static void linkSignalHandler(int sig)
+{
+    if (sig == SIGUSR1) { link_event = 1; }
+    if (sig == SIGUSR2) { link_event = 2; }
+}
+#endif
+
 int main(int argc, char* argv[])
 {
     std::signal(SIGINT,  signalHandler);
     std::signal(SIGTERM, signalHandler);
+#ifdef SIGUSR1
+    std::signal(SIGUSR1, linkSignalHandler);
+    std::signal(SIGUSR2, linkSignalHandler);
+#endif
 
     argparse::ArgumentParser program("network_simulator");
 
@@ -47,6 +65,19 @@ int main(int argc, char* argv[])
         .default_value(0)
         .scan<'i', int>()
         .store_into(slave_number);
+
+    std::string redundancy_interface;
+    program.add_argument("-r", "--redundancy")
+        .help("redundancy network interface (enables cable-redundancy routing)")
+        .default_value(std::string{})
+        .store_into(redundancy_interface);
+
+    std::vector<int> break_link;
+    program.add_argument("--break-link")
+        .help("two slave indices A B; SIGUSR1 breaks / SIGUSR2 heals the wire between them")
+        .nargs(2)
+        .scan<'i', int>()
+        .store_into(break_link);
 
     std::vector<std::string> slave_configs;
     program.add_argument("-s", "--slaves")
@@ -250,27 +281,52 @@ int main(int argc, char* argv[])
         slaves.push_back(std::move(slave));
     }
 
-    // Configure DL status for each ESC based on its position in the chain.
-    // Port 0 is always connected (upstream to master or previous slave).
-    // Port 1 is connected if there is a downstream slave.
-    for (size_t i = 0; i < escs.size(); ++i)
+    // Physical layer: route frames through the slaves in real EtherCAT order and
+    // let the engine derive DL_STATUS from the wiring. Default is a daisy chain.
+    std::vector<EmulatedESC*> esc_ptrs;
+    esc_ptrs.reserve(escs.size());
+    for (auto& esc : escs)
     {
-        uint16_t dl_status = 0;
-        dl_status |= (1 << 4);  // PL_port0
-        dl_status |= (1 << 9);  // COM_port0
+        esc_ptrs.push_back(esc.get());
+    }
+    EmulatedNetwork network(std::move(esc_ptrs));
 
-        if (i + 1 < escs.size())
-        {
-            dl_status |= (1 << 5);  // PL_port1
-            dl_status |= (1 << 11); // COM_port1
-        }
+    bool redundancy = not redundancy_interface.empty();
+    if (redundancy and not escs.empty())
+    {
+        // The redundant master port closes the ring on the tail slave's open port.
+        network.setRedundancyInjection(escs.size() - 1, 1);
+    }
 
-        escs[i]->write(reg::ESC_DL_STATUS, &dl_status, sizeof(dl_status));
+    // Wire to break/heal on SIGUSR1/SIGUSR2 (defaults to the first downstream link).
+    size_t break_a = 0;
+    size_t break_b = 1;
+    if (break_link.size() == 2)
+    {
+        break_a = static_cast<size_t>(break_link[0]);
+        break_b = static_cast<size_t>(break_link[1]);
     }
 
     printf("Start EtherCAT network simulator on %s with %zu slaves\n", interface.c_str(), escs.size());
-    auto [socket, _] = createSockets(interface, "");
-    socket->setTimeout(100ms);  // wake periodically so SIGINT/SIGTERM is honored when idle
+    if (redundancy)
+    {
+        printf("Cable redundancy enabled on %s (SIGUSR1 breaks / SIGUSR2 heals link %zu-%zu)\n",
+               redundancy_interface.c_str(), break_a, break_b);
+    }
+    auto [socket, socket_redundancy] = createSockets(interface, redundancy_interface);
+    // Idle wake-up so SIGINT/SIGTERM is honored. With redundancy both sockets are
+    // polled every loop, so keep the timeout short to stay responsive to the master
+    // (which reads the cross-over port within its own timeout).
+    nanoseconds read_timeout = 100ms;
+    if (redundancy)
+    {
+        read_timeout = 1ms;
+    }
+    socket->setTimeout(read_timeout);
+    if (redundancy)
+    {
+        socket_redundancy->setTimeout(read_timeout);
+    }
 
     std::vector<nanoseconds> stats;
     stats.reserve(1000);
@@ -284,29 +340,61 @@ int main(int argc, char* argv[])
     uint8_t current_value = 0x11;
     constexpr uint32_t ITER = 1000;
 
-    while (running)
+    int exit_code = 0;   // set non-zero on a fatal frame-write error so callers can detect it
+
+    // Route one frame received on `in` and send the response the way the physical
+    // layer would: out the opposite master port when the ring is intact, looped back
+    // to the same port when the segment is broken. `redundant_path` picks the tail
+    // injection order. Returns true if a frame was actually serviced.
+    auto serviceFrame = [&](AbstractSocket* in, AbstractSocket* opposite, bool redundant_path)
     {
         Frame frame;
-        int32_t r = socket->read(frame.data(), ETH_MAX_SIZE);
-        if (r < 0)
+        int32_t n = in->read(frame.data(), ETH_MAX_SIZE);
+        if (n <= 0)
         {
-            continue;  // timeout / no frame: re-check `running` (shutdown) and retry
+            return false;
+        }
+        network.route(frame, redundant_path);
+
+        AbstractSocket* out = in;            // broken segment: loop back to the same port
+        if (network.ringIntact())
+        {
+            out = opposite;                  // intact ring: leave by the opposite port
+        }
+        if (out->write(frame.data(), n) < 0)
+        {
+            printf("Write back frame: something wrong happened. Aborting...\n");
+            exit_code = -2;
+            running = 0;
+        }
+        return true;
+    };
+
+    while (running)
+    {
+        if (link_event != 0)
+        {
+            bool up = (link_event == 2);
+            link_event = 0;
+            network.setLinkState(break_a, break_b, up);
+            char const* action = "broken";
+            if (up)
+            {
+                action = "healed";
+            }
+            printf("Link %zu-%zu %s\n", break_a, break_b, action);
         }
 
         auto t1 = since_epoch();
 
-        while (true)
+        bool serviced = serviceFrame(socket.get(), socket_redundancy.get(), false);
+        if (redundancy)
         {
-            auto [header, data, wkc] = frame.peekDatagram();
-            if (header == nullptr)
-            {
-                break;
-            }
-
-            for (auto& esc : escs)
-            {
-                esc->processDatagram(header, data, wkc);
-            }
+            serviced |= serviceFrame(socket_redundancy.get(), socket.get(), true);
+        }
+        if (not serviced)
+        {
+            continue;  // both ports idle: re-check `running` (shutdown) and retry
         }
 
         for (size_t i = 0; i < slaves.size(); ++i)
@@ -346,12 +434,6 @@ int main(int argc, char* argv[])
             }
         }
 
-        int32_t written = socket->write(frame.data(), r);
-        if (written < 0)
-        {
-            printf("Write back frame: something wrong happened. Aborting...\n");
-            return -2;
-        }
         auto t2 = since_epoch();
 
         stats.push_back(t2 - t1);
@@ -367,5 +449,5 @@ int main(int argc, char* argv[])
         }
     }
 
-    return 0;
+    return exit_code;
 }

@@ -105,9 +105,7 @@ int main(int argc, char** argv)
     pdo.setInput(inputs.data(), PDO_SIZE);
     pdo.setOutput(outputs.data(), PDO_SIZE);
 
-    uint16_t dl_status = (1 << 4) | (1 << 9);  // single slave: only port 0 is connected
-    esc.write(reg::ESC_DL_STATUS, &dl_status, sizeof(dl_status));
-    sl.start();
+    sl.start();   // DL_STATUS is derived from the topology by the LoopbackSocket's network
 
     // 3. Wire a master Bus to the slave through the in-process loopback. The tick
     //    advances the slave once per frame; once the master is driving process

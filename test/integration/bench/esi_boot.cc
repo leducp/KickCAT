@@ -66,9 +66,7 @@ static Reached bootDevice(ESI::Device& dev, nanoseconds wait_timeout)
     pdo->setInput(input_pdo.data(), PDO_MAX_SIZE);
     pdo->setOutput(output_pdo.data(), PDO_MAX_SIZE);
 
-    uint16_t dl_status = (1 << 4) | (1 << 9);  // single slave: only port0 connected
-    esc->write(reg::ESC_DL_STATUS, &dl_status, sizeof(dl_status));
-    sl->start();
+    sl->start();   // DL_STATUS is derived from the topology by the LoopbackSocket's network
 
     // Once the master is driving process data (OP phase), a slave with outputs
     // needs its output data declared valid to leave SAFE_OP. Keyed on the phase,
