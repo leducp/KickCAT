@@ -18,6 +18,11 @@ namespace kickcat::slave
         Slave(AbstractESC* esc, PDO* pdo);
 
         void setMailbox(mailbox::response::Mailbox* mbx);
+
+        // Object dictionary for PDO mapping and bind(), owned by the application and injected
+        // here (a mailboxless terminal has one too); it must outlive the slave.
+        void setDictionary(CoE::Dictionary* dictionary);
+
         void start();
         void routine();
         State state();
@@ -26,10 +31,9 @@ namespace kickcat::slave
         template<typename T>
         void bind(uint16_t idx, T*& ptr, uint8_t subindex = 0)
         {
-            if (mbx_)
+            if (dictionary_)
             {
-                auto& dict = mbx_->getDictionary();
-                auto [obj, entry] = kickcat::CoE::findObject(dict, idx, subindex);
+                auto [obj, entry] = kickcat::CoE::findObject(*dictionary_, idx, subindex);
                 if (entry)
                 {
                     ptr = static_cast<std::remove_reference_t<decltype(*ptr)> *>(entry->data);
@@ -40,6 +44,7 @@ namespace kickcat::slave
     private:
         AbstractESC* esc_;
         mailbox::response::Mailbox* mbx_{nullptr};
+        CoE::Dictionary* dictionary_{nullptr};
         PDO* pdo_;
 
         ESM::Init init_{*esc_, *pdo_};

@@ -105,6 +105,7 @@ int main(int argc, char* argv[])
     std::vector<std::unique_ptr<PDO>> pdos;
     std::vector<std::unique_ptr<Slave>> slaves;
     std::vector<std::unique_ptr<mailbox::response::Mailbox>> mailboxes;
+    std::vector<std::unique_ptr<CoE::Dictionary>> dictionaries;  // application owns the ODs
     std::vector<std::vector<uint8_t>> input_pdo;
     std::vector<std::vector<uint8_t>> output_pdo;
 
@@ -112,6 +113,7 @@ int main(int argc, char* argv[])
     pdos.reserve(slave_count);
     slaves.reserve(slave_count);
     mailboxes.reserve(slave_count);
+    dictionaries.reserve(slave_count);
     input_pdo.reserve(slave_count);
     output_pdo.reserve(slave_count);
 
@@ -146,6 +148,7 @@ int main(int argc, char* argv[])
 
         std::unique_ptr<EmulatedESC> esc;
         std::optional<CoE::Dictionary> esi_coe;  // CoE dictionary derived from the ESI device, if any
+        bool esi_coe_advertised = false;         // true => device declares a CoE mailbox (SDO on the wire)
 
         if (config.contains("esi"))
         {
@@ -169,9 +172,12 @@ int main(int argc, char* argv[])
                 esc = std::make_unique<EmulatedESC>();
                 esc->loadEeprom(ESI::buildEepromImage(dev));
 
-                if (dev.mailbox and dev.mailbox->coe)
+                if (not dev.dictionary.empty())
                 {
                     esi_coe = std::move(dev.dictionary);
+                    // A mailboxless terminal (e.g. a digital I/O like EL1004) still gets its OD,
+                    // but only a device that declares a CoE mailbox is reachable by SDO.
+                    esi_coe_advertised = (dev.mailbox and dev.mailbox->coe);
                 }
             }
             catch (std::exception const& e)
@@ -199,12 +205,20 @@ int main(int argc, char* argv[])
         auto pdo = std::make_unique<PDO>(esc.get());
         auto slave = std::make_unique<Slave>(esc.get(), pdo.get());
 
+        // The OD (owned here in `dictionaries`) is injected into the slave always, and into a
+        // mailbox only if the device advertises CoE - so a mailboxless terminal still maps PDOs.
         if (esi_coe)
         {
-            auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
-            mbx->enableCoE(std::move(*esi_coe));
-            slave->setMailbox(mbx.get());
-            mailboxes.push_back(std::move(mbx));
+            dictionaries.push_back(std::make_unique<CoE::Dictionary>(std::move(*esi_coe)));
+            CoE::Dictionary* dictionary = dictionaries.back().get();
+            slave->setDictionary(dictionary);
+            if (esi_coe_advertised)
+            {
+                auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
+                mbx->enableCoE(*dictionary);
+                slave->setMailbox(mbx.get());
+                mailboxes.push_back(std::move(mbx));
+            }
         }
         else if (config.contains("coe_xml"))
         {
@@ -215,9 +229,11 @@ int main(int argc, char* argv[])
                 std::cerr << "CoE XML file not found: " << coe_xml_full_path << std::endl;
                 return 1;
             }
+            dictionaries.push_back(std::make_unique<CoE::Dictionary>(parser.loadFile(coe_xml_full_path.string())));
+            CoE::Dictionary* dictionary = dictionaries.back().get();
             auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
-            auto dictionary = parser.loadFile(coe_xml_full_path.string());
-            mbx->enableCoE(std::move(dictionary));
+            mbx->enableCoE(*dictionary);
+            slave->setDictionary(dictionary);
             slave->setMailbox(mbx.get());
             mailboxes.push_back(std::move(mbx));
         }

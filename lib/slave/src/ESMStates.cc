@@ -14,7 +14,7 @@ namespace kickcat::ESM
     {
         if (mbx_)
         {
-            mbx_->activate(false); // reset dictionary here?
+            mbx_->activate(false);
         }
         pdo_.activateInput(false);
         pdo_.activateOutput(false);
@@ -113,9 +113,9 @@ namespace kickcat::ESM
                 return Context::build(id_, StatusCode::INVALID_SYNC_MANAGER_CONFIGURATION);
             }
 
-            if (mbx_)
+            if (dictionary_)
             {
-                StatusCode mapping_rc = pdo_.configureMapping(mbx_->getDictionary());
+                StatusCode mapping_rc = pdo_.configureMapping(*dictionary_);
                 if (mapping_rc != StatusCode::ECAT_NO_ERROR)
                 {
                     return Context::build(id_, mapping_rc);

@@ -16,6 +16,11 @@ namespace kickcat::ESM
         mbx_ = mbx;
     }
 
+    void AbstractState::setDictionary(CoE::Dictionary* dictionary)
+    {
+        dictionary_ = dictionary;
+    }
+
     void AbstractState::onEntry(Context, Context) {};
 
     uint8_t AbstractState::id()

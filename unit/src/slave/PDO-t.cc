@@ -55,6 +55,8 @@ public:
         pdo_.setInput(input_, PDO_SIZE);
         pdo_.setOutput(output_, PDO_SIZE);
         setupSmReads();
+        // configureMapping needs the SM resolved by configure(); production maps after it too.
+        pdo_.configure();
     }
 
     void setupSmReads()
@@ -68,10 +70,11 @@ public:
                     Return(sizeof(SyncManager::Register))));
         };
 
+        // Conventional layout: SM2 = outputs (0x1C12), SM3 = inputs (0x1C13).
         setupSm(0, sm_mbx_in_);
         setupSm(1, sm_mbx_out_);
-        setupSm(2, sm_pdo_in_);
-        setupSm(3, sm_pdo_out_);
+        setupSm(2, sm_pdo_out_);
+        setupSm(3, sm_pdo_in_);
         setupSm(4, sm_empty_);
 
         // PDI control byte used by activateSm/deactivateSm:
@@ -131,8 +134,8 @@ TEST_F(PDOTest, configure_input_only_leaves_output_unused)
 {
     // Input-only terminal (e.g. a digital input like EL1008): no buffered-write SM.
     // configure must still succeed; the output direction stays Unused.
-    SyncManager::Register empty{};  // index 3 (output) replaced by an empty SM
-    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 3), _, sizeof(SyncManager::Register)))
+    SyncManager::Register empty{};  // SM2 (output) replaced by an empty SM
+    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 2), _, sizeof(SyncManager::Register)))
         .WillByDefault(DoAll(
             Invoke([empty](uint16_t, void *ptr, uint16_t)
                    { std::memcpy(ptr, &empty, sizeof(SyncManager::Register)); }),
@@ -159,7 +162,7 @@ TEST_F(PDOTest, isConfigOk_invalid_input_length_mismatch)
     configurePdo();
     SyncManager::Register bad = sm_pdo_in_;
     bad.length = PDO_SIZE + 1;
-    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 2), _, sizeof(SyncManager::Register)))
+    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 3), _, sizeof(SyncManager::Register)))
         .WillByDefault(DoAll(
             Invoke([bad](uint16_t, void *ptr, uint16_t)
                    { std::memcpy(ptr, &bad, sizeof(SyncManager::Register)); }),
@@ -172,7 +175,7 @@ TEST_F(PDOTest, isConfigOk_invalid_output_length_mismatch)
     configurePdo();
     SyncManager::Register bad = sm_pdo_out_;
     bad.length = PDO_SIZE + 1;
-    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 3), _, sizeof(SyncManager::Register)))
+    ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 2), _, sizeof(SyncManager::Register)))
         .WillByDefault(DoAll(
             Invoke([bad](uint16_t, void *ptr, uint16_t)
                    { std::memcpy(ptr, &bad, sizeof(SyncManager::Register)); }),
@@ -184,44 +187,46 @@ TEST_F(PDOTest, isConfigOk_invalid_output_length_mismatch)
 
 TEST_F(PDOTest, activateOutput_unused_type_no_esc_calls)
 {
-    // Before configure(), sm_output_.type == SyncManager::Unused
+    // Fresh PDO: the fixture configures in SetUp, so test the pre-configure state here.
+    PDO unconfigured{&esc_};
     EXPECT_CALL(esc_, write(_, _, _)).Times(0);
-    pdo_.activateOutput(true);
+    unconfigured.activateOutput(true);
 }
 
 TEST_F(PDOTest, activateInput_unused_type_no_esc_calls)
 {
+    PDO unconfigured{&esc_};
     EXPECT_CALL(esc_, write(_, _, _)).Times(0);
-    pdo_.activateInput(true);
+    unconfigured.activateInput(true);
 }
 
 TEST_F(PDOTest, activateOutput_true_calls_activateSm)
 {
     configurePdo();
-    EXPECT_CALL(esc_, write(smPdiAddr(3), _, sizeof(uint8_t))).Times(1);
+    EXPECT_CALL(esc_, write(smPdiAddr(2), _, sizeof(uint8_t))).Times(1);
     pdo_.activateOutput(true);
 }
 
 TEST_F(PDOTest, activateInput_true_calls_activateSm)
 {
     configurePdo();
-    EXPECT_CALL(esc_, write(smPdiAddr(2), _, sizeof(uint8_t))).Times(1);
+    EXPECT_CALL(esc_, write(smPdiAddr(3), _, sizeof(uint8_t))).Times(1);
     pdo_.activateInput(true);
 }
 
 TEST_F(PDOTest, activateOutput_false_calls_deactivateSm)
 {
     configurePdo();
-    setupDeactivatePdi(3);
-    EXPECT_CALL(esc_, write(smPdiAddr(3), _, sizeof(uint8_t))).Times(1);
+    setupDeactivatePdi(2);
+    EXPECT_CALL(esc_, write(smPdiAddr(2), _, sizeof(uint8_t))).Times(1);
     pdo_.activateOutput(false);
 }
 
 TEST_F(PDOTest, activateInput_false_calls_deactivateSm)
 {
     configurePdo();
-    setupDeactivatePdi(2);
-    EXPECT_CALL(esc_, write(smPdiAddr(2), _, sizeof(uint8_t))).Times(1);
+    setupDeactivatePdi(3);
+    EXPECT_CALL(esc_, write(smPdiAddr(3), _, sizeof(uint8_t))).Times(1);
     pdo_.activateInput(false);
 }
 
@@ -578,4 +583,53 @@ TEST_F(PDOTest, configureMapping_null_old_data_no_memcpy)
     ASSERT_NE(nullptr, entry);
     ASSERT_TRUE(entry->is_mapped);
     ASSERT_EQ(static_cast<void *>(input_), entry->data);
+}
+
+TEST_F(PDOTest, configureMapping_mailboxless_input_on_sm0_uses_0x1C10)
+{
+    // EL1004-class terminal: no mailbox, process input on SM0, so its assignment is at
+    // 0x1C10 (not the mailbox-slave 0x1C13). The mapped entry must still alias the buffer.
+    auto setupSm = [this](int idx, SyncManager::Register const& sm)
+    {
+        ON_CALL(esc_, read(static_cast<uint16_t>(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * idx), _, sizeof(SyncManager::Register)))
+            .WillByDefault(DoAll(
+                Invoke([sm](uint16_t, void* ptr, uint16_t) { std::memcpy(ptr, &sm, sizeof(SyncManager::Register)); }),
+                Return(sizeof(SyncManager::Register))));
+    };
+    SyncManager::Register sm_in_sm0 = makeSM(PDO_IN_ADDR, PDO_SIZE, SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ);
+    setupSm(0, sm_in_sm0);
+    setupSm(1, sm_empty_);
+    setupSm(2, sm_empty_);
+    setupSm(3, sm_empty_);
+    setupSm(4, sm_empty_);
+    ASSERT_EQ(0, pdo_.configure());
+
+    CoE::Dictionary dict;
+    {
+        CoE::Object obj{0x6000, CoE::ObjectCode::VAR, "Input", {}};
+        CoE::addEntry<uint16_t>(obj, 0, 16, 0, CoE::Access::READ | CoE::Access::WRITE,
+                                CoE::DataType::UNSIGNED16, "Val", uint16_t{0x1234});
+        dict.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1A00, CoE::ObjectCode::RECORD, "TxPDO map", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0, CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{1});
+        CoE::addEntry<uint32_t>(obj, 1, 32, 8, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M1",
+                                makeMappingEntry(0x6000, 0, 16));
+        dict.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1C10, CoE::ObjectCode::RECORD, "TxPDO assign", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0, CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{1});
+        CoE::addEntry<uint16_t>(obj, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
+        dict.push_back(std::move(obj));
+    }
+
+    ASSERT_EQ(StatusCode::ECAT_NO_ERROR, pdo_.configureMapping(dict));
+
+    auto [obj2, entry2] = CoE::findObject(dict, 0x6000, 0);
+    ASSERT_NE(nullptr, entry2);
+    ASSERT_TRUE(entry2->is_mapped);
+    ASSERT_EQ(static_cast<void *>(input_), entry2->data);
+    ASSERT_EQ(0x1234, *static_cast<uint16_t *>(entry2->data));
 }

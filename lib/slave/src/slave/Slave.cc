@@ -17,6 +17,15 @@ namespace kickcat::slave
         OP_.setMailbox(mbx);
     }
 
+    void Slave::setDictionary(CoE::Dictionary* dictionary)
+    {
+        dictionary_ = dictionary;
+        init_.setDictionary(dictionary);
+        preOp_.setDictionary(dictionary);
+        safeOP_.setDictionary(dictionary);
+        OP_.setDictionary(dictionary);
+    }
+
     void Slave::start()
     {
         stateMachine_.start();

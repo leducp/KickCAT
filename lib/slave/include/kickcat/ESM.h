@@ -61,6 +61,7 @@ namespace kickcat
         public:
             AbstractState(uint8_t id, AbstractESC& esc, PDO& pdo);
             void setMailbox(mailbox::response::Mailbox* mbx);
+            void setDictionary(CoE::Dictionary* dictionary);
             virtual Context routine(Context currentStatus, ALControl alControl);
             virtual void onEntry(Context oldStatus, Context newStatus);
 
@@ -69,6 +70,7 @@ namespace kickcat
             AbstractESC& esc_;
             PDO& pdo_;
             mailbox::response::Mailbox* mbx_{};
+            CoE::Dictionary* dictionary_{};
 
             virtual Context routineInternal(Context currentStatus, ALControl alControl) = 0;
 

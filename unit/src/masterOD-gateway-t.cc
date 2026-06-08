@@ -33,11 +33,13 @@ public:
     void SetUp() override
     {
         MasterOD od(testIdentity());
-        mbx.enableCoE(od.createDictionary());
+        dict_ = od.createDictionary();
+        mbx.enableCoE(dict_);
         bus.setMasterMailbox(&mbx);
     }
 
     std::shared_ptr<MockLink> link{std::make_shared<MockLink>()};
+    CoE::Dictionary dict_{};  // declared before mbx so it outlives the reference
     mailbox::response::Mailbox mbx{MBX_SIZE};
     Bus bus{link};
 };

@@ -35,7 +35,8 @@ class Mailbox_Response : public ::testing::Test
 public:
     void SetUp() override
     {
-        mbx.enableCoE(createResponseTestDictionary());
+        dict = createResponseTestDictionary();
+        mbx.enableCoE(dict);
 
         EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * 0, _, sizeof(SyncManager::Register)))
             .WillRepeatedly(DoAll(
@@ -82,6 +83,7 @@ public:
     MockESC esc;
     SyncManager::Register sm_in {RESP_MBX_IN_ADDR,  RESP_MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
     SyncManager::Register sm_out{RESP_MBX_OUT_ADDR, RESP_MBX_SIZE, SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
+    CoE::Dictionary dict{};  // declared before mbx so it outlives the reference
     Mailbox mbx{&esc, RESP_MBX_SIZE, 2};
 };
 
@@ -389,7 +391,8 @@ class Mailbox_Response_Standalone : public ::testing::Test
 public:
     void SetUp() override
     {
-        mbx.enableCoE(createResponseTestDictionary());
+        dict = createResponseTestDictionary();
+        mbx.enableCoE(dict);
     }
 
     std::vector<uint8_t> buildRawSDORead(uint16_t index, uint8_t subindex)
@@ -403,6 +406,7 @@ public:
         return raw;
     }
 
+    CoE::Dictionary dict{};  // declared before mbx so it outlives the reference
     Mailbox mbx{RESP_MBX_SIZE, 2};
 };
 

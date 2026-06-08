@@ -55,8 +55,9 @@ static Reached bootDevice(ESI::Device& dev, nanoseconds wait_timeout)
     if (dev.mailbox and dev.mailbox->coe)
     {
         mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
-        mbx->enableCoE(std::move(dev.dictionary));
+        mbx->enableCoE(dev.dictionary);     // dev owns the OD; injected into both
         sl->setMailbox(mbx.get());
+        sl->setDictionary(&dev.dictionary);
     }
 
     std::vector<uint8_t> input_pdo(PDO_MAX_SIZE);
@@ -93,7 +94,8 @@ static Reached bootDevice(ESI::Device& dev, nanoseconds wait_timeout)
     std::vector<uint8_t> io_buffer(16384);
     try
     {
-        bus.init(100ms);
+        bus.init(100ms);  // process-data watchdog enabled and now deterministic: it only monitors
+                          // slaves that have outputs, so input-only terminals no longer bounce.
         if (bus.slaves().size() != 1)
         {
             return Reached::INIT_FAIL;

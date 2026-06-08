@@ -109,10 +109,12 @@ class CoE_Response : public ::testing::Test
 public:
     void SetUp() override
     {
-        mbx.enableCoE(std::move(createTestDictionary()));
+        dict = createTestDictionary();
+        mbx.enableCoE(dict);
     }
 
     MockESC esc;
+    CoE::Dictionary dict{};  // declared before mbx so it outlives the reference
     Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
 };
 
@@ -356,7 +358,7 @@ TEST_F(CoE_Response, SDO_read_non_expedited)
         CoE::addEntry<uint64_t>(object, 0, 64, 0, CoE::Access::READ, static_cast<CoE::DataType>(0x001B), "Large Entry", large_data);
         dict.push_back(std::move(object));
     }
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     std::vector<uint8_t> raw_message = createTestReadSDO(0x8000, 0);
     auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
@@ -396,7 +398,7 @@ TEST_F(CoE_Response, SDO_write_non_expedited)
         CoE::addEntry<uint64_t>(object, 0, 64, 0, CoE::Access::WRITE, static_cast<CoE::DataType>(0x001B), "Large Entry", large_data);
         dict.push_back(std::move(object));
     }
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     // Create a non-expedited download message
     std::vector<uint8_t> raw_message(TEST_MAILBOX_SIZE, 0);
@@ -454,7 +456,7 @@ TEST_F(CoE_Response, SDO_read_unauthorized)
         CoE::addEntry<uint32_t>(object, 0, 32, 0, CoE::Access::WRITE, static_cast<CoE::DataType>(7), "Write Only", 0);
         dict.push_back(std::move(object));
     }
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     std::vector<uint8_t> raw_message = createTestReadSDO(0x9000, 0);
     auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
@@ -558,7 +560,7 @@ TEST_F(CoE_Response, SDO_read_CA_unauthorized_entry)
         CoE::addEntry<uint32_t>(object, 2, 32, 40, CoE::Access::WRITE, static_cast<CoE::DataType>(7), "Write Only", 0);
         dict.push_back(std::move(object));
     }
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     std::vector<uint8_t> raw_message = createTestReadSDO(0xA000, 0, true);
     auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
@@ -596,7 +598,7 @@ TEST_F(CoE_Response, SDO_write_CA_unauthorized_entry)
         CoE::addEntry<uint32_t>(object, 2, 32, 40, CoE::Access::WRITE, static_cast<CoE::DataType>(7), "Write Only", 0);
         dict.push_back(std::move(object));
     }
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     uint32_t data[3] = {5, 0x11111111, 0x22222222};
     uint32_t data_size = sizeof(data);
@@ -1062,7 +1064,7 @@ TEST(CoE_Roundtrip, sdo_segmented_upload_master_slave)
     }
 
     Mailbox slave{MBX, 1};
-    slave.enableCoE(std::move(dict));
+    slave.enableCoE(dict);
 
     mailbox::request::Mailbox master;
     master.recv_size = MBX;
@@ -1113,7 +1115,7 @@ TEST(CoE_Roundtrip, sdo_segmented_download_master_slave)
     }
 
     Mailbox slave{MBX, 1};
-    slave.enableCoE(std::move(dict));
+    slave.enableCoE(dict);
 
     mailbox::request::Mailbox master;
     master.recv_size = MBX;

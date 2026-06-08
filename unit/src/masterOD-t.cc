@@ -61,9 +61,11 @@ public:
     void SetUp() override
     {
         MasterOD od(defaultIdentity());
-        mbx.enableCoE(od.createDictionary());
+        dict_ = od.createDictionary();
+        mbx.enableCoE(dict_);
     }
 
+    CoE::Dictionary dict_{};  // declared before mbx so it outlives the reference
     mailbox::response::Mailbox mbx{MBX_SIZE};
 };
 
@@ -221,8 +223,9 @@ TEST_F(MasterODTest, optional_strings_omitted_when_empty)
     minimal.vendor_id = 0x42;
     MasterOD od_minimal(minimal);
 
+    CoE::Dictionary dict_minimal = od_minimal.createDictionary();
     mailbox::response::Mailbox mbx_minimal{MBX_SIZE};
-    mbx_minimal.enableCoE(od_minimal.createDictionary());
+    mbx_minimal.enableCoE(dict_minimal);
 
     // 0x1008 should not exist
     auto reply = mbx_minimal.processRequest(buildSDOUpload(0x1008, 0));
@@ -278,7 +281,7 @@ TEST(MasterODPopulate, creates_config_objects_from_sii)
     od.populate(dict, slaves);
 
     mailbox::response::Mailbox mbx{MBX_SIZE};
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     auto const& configs = od.configurationData();
     ASSERT_EQ(2u, configs.size());
@@ -329,7 +332,7 @@ TEST(MasterODPopulate, hole_subindex_aborts_cleanly)
     od.populate(dict, slaves);
 
     mailbox::response::Mailbox mbx{MBX_SIZE};
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     for (uint8_t hole : {uint8_t{9}, uint8_t{32}, uint8_t{41}})
     {
@@ -371,7 +374,7 @@ TEST(MasterODPopulate, entry_pointers_survive_dictionary_move)
     od.populate(dict, slaves);
 
     mailbox::response::Mailbox mbx{MBX_SIZE};
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     auto const& configs = od.configurationData();
     ASSERT_EQ(2u, configs.size());
@@ -395,7 +398,7 @@ TEST(MasterODPopulate, number_of_entries_is_highest_supported_subindex)
     od.populate(dict, slaves);
 
     mailbox::response::Mailbox mbx{MBX_SIZE};
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     auto reply = mbx.processRequest(buildSDOUpload(0x8000, 0));
     ASSERT_FALSE(reply.empty());
@@ -426,7 +429,7 @@ TEST(MasterODPopulate, optional_subindices_exist_with_defaults)
     od.populate(dict, slaves);
 
     mailbox::response::Mailbox mbx{MBX_SIZE};
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     // :02 Type — from SII general order string
     auto reply_type = mbx.processRequest(buildSDOUpload(0x8000, 2));
@@ -483,7 +486,7 @@ TEST(MasterODPopulate, mandatory_subindices_from_spec)
     od.populate(dict, slaves);
 
     mailbox::response::Mailbox mbx{MBX_SIZE};
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     // :03 Name
     auto reply_name = mbx.processRequest(buildSDOUpload(0x8000, 3));
@@ -535,7 +538,7 @@ TEST(MasterODPopulate, name_falls_back_when_sii_has_no_string)
     od.populate(dict, slaves);
 
     mailbox::response::Mailbox mbx{MBX_SIZE};
-    mbx.enableCoE(std::move(dict));
+    mbx.enableCoE(dict);
 
     auto reply0 = mbx.processRequest(buildSDOUpload(0x8000, 3));
     auto reply1 = mbx.processRequest(buildSDOUpload(0x8001, 3));
