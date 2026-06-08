@@ -170,14 +170,18 @@ namespace kickcat
         };
         std::vector<SM> syncs_;
 
-        struct PDO
+        // physical is a flat offset into the ESC memory map, so one FMMU list covers
+        // both process-data RAM and register space (e.g. an SM mailbox-status bit).
+        struct Fmmu
         {
             uint32_t logical_address;
-            uint8_t* physical_address;
-            uint16_t size;
+            uint8_t* physical;
+            uint32_t bit_length;
+            uint8_t  logical_start_bit;
+            uint8_t  physical_start_bit;
+            bool     is_input;          // FMMU type 1: slave -> master
         };
-        std::vector<PDO> rx_pdos_;
-        std::vector<PDO> tx_pdos_;
+        std::vector<Fmmu> fmmus_;
 
         void loadEeprom();
 
@@ -194,13 +198,14 @@ namespace kickcat
         void processLRD(DatagramHeader* header, void* data, uint16_t* wkc);
         void processLWR(DatagramHeader* header, void* data, uint16_t* wkc);
         void processLRW(DatagramHeader* header, void* data, uint16_t* wkc);
-        uint16_t processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, void* data);
+        // Return true if any FMMU's logical range fell inside this datagram.
+        bool processFmmus(bool read, DatagramHeader const* header, void* frame);
+        bool copyFmmu(Fmmu const& fmmu, bool read, DatagramHeader const* header, void* frame);
 
         void configureSMs();
-        void configurePDOs();
+        void configureFmmus();
 
         int32_t computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access);
-        std::tuple<uint8_t*, uint8_t*, uint16_t> computeLogicalIntersection(DatagramHeader const* header, void* data, PDO const& pdo);
 
         nanoseconds pdiWatchdog();  // Get configured PDI watchdog
         nanoseconds pdoWatchdog();  // Get configured PDO watchdog

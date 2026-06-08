@@ -151,11 +151,13 @@ namespace kickcat
                 }
             }
 
+            // PDI reads the output image and writes the input image; a sub-byte/register
+            // FMMU has a zero-byte span, so it never matches a process-data access here.
             if (access & Access::PDI_READ)
             {
-                for (auto& pdo : rx_pdos_)
+                for (auto& fmmu : fmmus_)
                 {
-                    if ((pos < pdo.physical_address) or ((pos + to_copy) > (pdo.physical_address + pdo.size)))
+                    if (fmmu.is_input or (pos < fmmu.physical) or ((pos + to_copy) > (fmmu.physical + fmmu.bit_length / 8)))
                     {
                         continue;
                     }
@@ -166,9 +168,9 @@ namespace kickcat
 
             if (access & Access::PDI_WRITE)
             {
-                for (auto& pdo : tx_pdos_)
+                for (auto& fmmu : fmmus_)
                 {
-                    if ((pos < pdo.physical_address) or ((pos + to_copy) > (pdo.physical_address + pdo.size)))
+                    if ((not fmmu.is_input) or (pos < fmmu.physical) or ((pos + to_copy) > (fmmu.physical + fmmu.bit_length / 8)))
                     {
                         continue;
                     }
@@ -221,40 +223,100 @@ namespace kickcat
     }
 
 
-    uint16_t EmulatedESC::processPDO(std::vector<PDO> const& pdos, bool read, DatagramHeader* header, void* data)
+    bool EmulatedESC::copyFmmu(Fmmu const& fmmu, bool read, DatagramHeader const* header, void* frame)
     {
-        int wkc = 0;
-        for (auto const& pdo : pdos)
-        {
-            auto[frame, internal, to_copy] = computeLogicalIntersection(header, data, pdo);
-            if (to_copy == 0)
-            {
-                continue;
-            }
+        uint32_t const start = header->address;
+        uint32_t const end   = start + header->len;
 
+        // Byte-aligned fast path; sub-byte mappings fall through to the bit loop below.
+        if ((fmmu.logical_start_bit == 0) and (fmmu.physical_start_bit == 0) and ((fmmu.bit_length % 8) == 0))
+        {
+            uint32_t const size = fmmu.bit_length / 8;
+            uint32_t const min  = std::max(start, fmmu.logical_address);
+            uint32_t const max  = std::min(end,   fmmu.logical_address + size);
+            if (max <= min)
+            {
+                return false;
+            }
+            uint32_t const to_copy = max - min;
+            uint8_t* frame_p = static_cast<uint8_t*>(frame) + (min - start);
+            uint8_t* phys_p  = fmmu.physical + (min - fmmu.logical_address);
             if (read)
             {
-                std::memcpy(frame, internal, to_copy);
+                std::memcpy(frame_p, phys_p, to_copy);
             }
             else
             {
-                std::memcpy(internal, frame, to_copy);
+                std::memcpy(phys_p, frame_p, to_copy);
                 lastLogicalWrite_ = since_epoch();   // update watchdog
             }
-            ++wkc;
+            return true;
         }
-        return wkc;
+
+        bool hit   = false;
+        bool wrote = false;
+        for (uint32_t b = 0; b < fmmu.bit_length; ++b)
+        {
+            uint32_t const logical_bit  = fmmu.logical_start_bit + b;
+            uint32_t const logical_byte = fmmu.logical_address + (logical_bit / 8);
+            if ((logical_byte < start) or (logical_byte >= end))
+            {
+                continue;
+            }
+            uint8_t* frame_byte = static_cast<uint8_t*>(frame) + (logical_byte - start);
+            uint8_t const  loff = logical_bit % 8;
+            uint32_t const physical_bit = fmmu.physical_start_bit + b;
+            uint8_t* phys_byte = fmmu.physical + (physical_bit / 8);
+            uint8_t const  poff = physical_bit % 8;
+            if (read)
+            {
+                uint8_t const bit = (*phys_byte >> poff) & 1u;
+                *frame_byte = static_cast<uint8_t>((*frame_byte & ~(1u << loff)) | (bit << loff));
+            }
+            else
+            {
+                uint8_t const bit = (*frame_byte >> loff) & 1u;
+                *phys_byte = static_cast<uint8_t>((*phys_byte & ~(1u << poff)) | (bit << poff));
+                wrote = true;
+            }
+            hit = true;
+        }
+        if (wrote)
+        {
+            lastLogicalWrite_ = since_epoch();   // update watchdog
+        }
+        return hit;
+    }
+
+    bool EmulatedESC::processFmmus(bool read, DatagramHeader const* header, void* frame)
+    {
+        bool hit = false;
+        for (auto const& fmmu : fmmus_)
+        {
+            if (fmmu.is_input != read)   // read direction serves input FMMUs, write serves outputs
+            {
+                continue;
+            }
+            hit |= copyFmmu(fmmu, read, header, frame);
+        }
+        return hit;
     }
 
 
     void EmulatedESC::processLRD(DatagramHeader* header, void* data, uint16_t* wkc)
     {
-        *wkc += processPDO(tx_pdos_, true, header, data);
+        if (processFmmus(true, header, data))   // ETG.1000.4: one increment per direction, not per FMMU
+        {
+            *wkc += 1;
+        }
     }
 
     void EmulatedESC::processLWR(DatagramHeader* header, void* data, uint16_t* wkc)
     {
-        *wkc += processPDO(rx_pdos_, false, header, data);
+        if (processFmmus(false, header, data))
+        {
+            *wkc += 1;
+        }
     }
 
     void EmulatedESC::processLRW(DatagramHeader* header, void* data, uint16_t* wkc)
@@ -262,8 +324,16 @@ namespace kickcat
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
         std::memcpy(swap, data, header->len);
 
-        *wkc += processPDO(tx_pdos_, true,  header, data);      // read directly in the frame
-        *wkc += processPDO(rx_pdos_, false, header, swap) * 2;  // write from the swap
+        bool const read  = processFmmus(true,  header, data);   // read directly into the frame
+        bool const write = processFmmus(false, header, swap);   // write from the pre-read copy
+        if (read)
+        {
+            *wkc += 1;
+        }
+        if (write)
+        {
+            *wkc += 2;
+        }
     }
 
 
@@ -420,7 +490,7 @@ namespace kickcat
                 {
                     if (before == State::PRE_OP)
                     {
-                        configurePDOs();
+                        configureFmmus();
                     }
                     break;
                 }
@@ -577,10 +647,9 @@ namespace kickcat
     }
 
 
-    void EmulatedESC::configurePDOs()
+    void EmulatedESC::configureFmmus()
     {
-        tx_pdos_.clear();
-        rx_pdos_.clear();
+        fmmus_.clear();
         for (int i = 0; i < 16; ++i)
         {
             auto const& fmmu = memory_.fmmu[i];
@@ -588,53 +657,27 @@ namespace kickcat
             {
                 continue;
             }
-
-            // A malformed FMMU (physical address below the process-data RAM window, or a
-            // region that runs past its 0xf000-byte end) must not produce a pointer that
-            // reads/writes out of bounds during logical access. Skip it.
-            if (fmmu.physical_address < 0x1000
-                or static_cast<std::size_t>(fmmu.physical_address - 0x1000) + fmmu.length > sizeof(memory_.process_data_ram))
+            if ((fmmu.type != 1) and (fmmu.type != 2))
             {
                 continue;
             }
 
-            PDO pdo;
-            pdo.size = fmmu.length;
-            pdo.logical_address = fmmu.logical_address;
-            pdo.physical_address = memory_.process_data_ram + (fmmu.physical_address - 0x1000);
-
-            if (fmmu.type == 1)
-            {
-                tx_pdos_.push_back(pdo);
-            }
-            else if (fmmu.type == 2)
-            {
-                rx_pdos_.push_back(pdo);
-            }
-            else
+            // Reject a span that runs past the flat memory map, else logical access
+            // would dereference out of bounds.
+            if (static_cast<std::size_t>(fmmu.physical_address) + fmmu.length > sizeof(memory_))
             {
                 continue;
             }
+
+            Fmmu f;
+            f.logical_address    = fmmu.logical_address;
+            f.physical           = reinterpret_cast<uint8_t*>(&memory_) + fmmu.physical_address;
+            f.bit_length         = (fmmu.length - 1u) * 8u + (fmmu.logical_stop_bit - fmmu.logical_start_bit + 1u);
+            f.logical_start_bit  = fmmu.logical_start_bit;
+            f.physical_start_bit = fmmu.physical_start_bit;
+            f.is_input           = (fmmu.type == 1);
+            fmmus_.push_back(f);
         }
-    }
-
-
-    std::tuple<uint8_t*, uint8_t*, uint16_t> EmulatedESC::computeLogicalIntersection(DatagramHeader const* header, void* data, PDO const& pdo)
-    {
-        uint32_t start_logical_address = header->address;
-        uint32_t end_logical_address = header->address + header->len;
-
-        uint32_t address_min = std::max(start_logical_address, pdo.logical_address);
-        uint32_t address_max = std::min(end_logical_address, pdo.logical_address + pdo.size);
-        if (address_max < address_min)
-        {
-            return {nullptr, nullptr, 0};
-        }
-        uint32_t to_copy = address_max - address_min;
-        uint32_t phys_offset = address_min - pdo.logical_address;
-        uint32_t frame_offset = address_min - start_logical_address;
-
-        return {static_cast<uint8_t*>(data) + frame_offset, pdo.physical_address + phys_offset, to_copy};
     }
 
 

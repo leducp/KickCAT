@@ -329,7 +329,7 @@ TEST(EmulatedESC, ecat_fmmu_out_of_bounds_is_skipped)
     fmmu.logical_address  = 0x2000;
     fmmu.length           = 16;
     fmmu.logical_stop_bit = 0x7;
-    fmmu.physical_address = 0x0800;   // below the process-data RAM window -> invalid
+    fmmu.physical_address = 0xFFF8;   // 0xFFF8 + 16 runs past the 0x10000 memory map
     fmmu.activate         = 1;
     esc.write(reg::FMMU + 0x00, &fmmu, sizeof(fmmu::Register));
 
@@ -345,6 +345,61 @@ TEST(EmulatedESC, ecat_fmmu_out_of_bounds_is_skipped)
     wkc = 0;
     esc.processDatagram(&header, &buf, &wkc);
     ASSERT_EQ(wkc, 0);
+}
+
+TEST(EmulatedESC, ecat_fmmu_maps_register_bit)
+{
+    // A single-bit FMMU into register space (physical < 0x1000) is how a master maps
+    // an SM mailbox-status bit into the logical image; the generic engine handles it
+    // with no dedicated path.
+    EmulatedESC esc;
+
+    uint8_t current = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &current, 1);
+    uint8_t next = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &next, 1);
+
+    fmmu::Register fmmu;
+    memset(&fmmu, 0, sizeof(fmmu::Register));
+    fmmu.type  = 1;                 // read access (slave -> master)
+    fmmu.logical_address    = 0x2000;
+    fmmu.length             = 1;
+    fmmu.logical_start_bit  = 2;    // land the bit at logical bit 2
+    fmmu.logical_stop_bit   = 2;
+    fmmu.physical_address   = reg::SYNC_MANAGER_1 + reg::SM_STATS;
+    fmmu.physical_start_bit = 3;    // SM mailbox-full status bit
+    fmmu.activate           = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(fmmu::Register));
+
+    DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
+    uint64_t buf = 0;
+    uint16_t wkc = 0;
+    esc.processDatagram(&header, &buf, &wkc);
+
+    // Set the source register bit, then read it through the FMMU.
+    uint8_t status = 0;
+    esc.read(reg::SYNC_MANAGER_1 + reg::SM_STATS, &status, 1);
+    status |= (1 << 3);
+    esc.write(reg::SYNC_MANAGER_1 + reg::SM_STATS, &status, 1);
+
+    uint8_t frame = 0x00;
+    header.command = Command::LRD;
+    header.address = 0x2000;
+    header.len     = 1;
+    wkc = 0;
+    esc.processDatagram(&header, &frame, &wkc);
+    ASSERT_EQ(wkc, 1);
+    ASSERT_EQ(frame & (1 << 2), (1 << 2));   // register bit 3 -> logical bit 2
+
+    // Clear it and confirm the mapped bit follows.
+    status &= ~(1 << 3);
+    esc.write(reg::SYNC_MANAGER_1 + reg::SM_STATS, &status, 1);
+    frame = 0xFF;
+    header.address = 0x2000;
+    wkc = 0;
+    esc.processDatagram(&header, &frame, &wkc);
+    ASSERT_EQ(wkc, 1);
+    ASSERT_EQ(frame & (1 << 2), 0);
 }
 
 TEST(EmulatedESC, ecat_frmw_reads_reference_clock)
