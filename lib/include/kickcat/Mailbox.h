@@ -191,8 +191,7 @@ namespace kickcat::mailbox::response
 
         ~Mailbox() = default;
 
-        // References an application-owned dictionary (injected into the slave too): the OD
-        // belongs to the application, never to the mailbox transport. It must outlive the mailbox.
+        // Non-owning: references an application-owned dictionary that must outlive the mailbox.
         void enableCoE(CoE::Dictionary& dictionary);
         CoE::Dictionary& getDictionary(){return *dictionary_;}
 

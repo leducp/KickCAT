@@ -19,9 +19,8 @@ namespace kickcat::slave
 
         void setMailbox(mailbox::response::Mailbox* mbx);
 
-        // Object dictionary used for PDO mapping and bind(). A CoE slave gets it from its
-        // mailbox automatically (setMailbox), a mailboxless terminal sets it directly here;
-        // either way the OD belongs to the slave, not the mailbox transport.
+        // Object dictionary for PDO mapping and bind(), owned by the application and injected
+        // here (a mailboxless terminal has one too); it must outlive the slave.
         void setDictionary(CoE::Dictionary* dictionary);
 
         void start();

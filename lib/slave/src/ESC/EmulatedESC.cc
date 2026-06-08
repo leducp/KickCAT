@@ -650,6 +650,7 @@ namespace kickcat
     void EmulatedESC::configureFmmus()
     {
         fmmus_.clear();
+        has_output_fmmu_ = false;
         for (int i = 0; i < 16; ++i)
         {
             auto const& fmmu = memory_.fmmu[i];
@@ -661,10 +662,17 @@ namespace kickcat
             {
                 continue;
             }
+            if (fmmu.logical_stop_bit < fmmu.logical_start_bit)
+            {
+                continue;  // malformed: the unsigned span below would wrap to a huge bit_length
+            }
 
-            // Reject a span that runs past the flat memory map, else logical access
-            // would dereference out of bounds.
-            if (static_cast<std::size_t>(fmmu.physical_address) + fmmu.length > sizeof(memory_))
+            uint32_t const bit_length = (fmmu.length - 1u) * 8u + (fmmu.logical_stop_bit - fmmu.logical_start_bit + 1u);
+
+            // Reject a span that runs past the flat memory map (a non-zero physical start bit
+            // can push the last byte one past `length`), else logical access dereferences OOB.
+            uint32_t const physical_bytes = (fmmu.physical_start_bit + bit_length + 7u) / 8u;
+            if (static_cast<std::size_t>(fmmu.physical_address) + physical_bytes > sizeof(memory_))
             {
                 continue;
             }
@@ -672,12 +680,17 @@ namespace kickcat
             Fmmu f;
             f.logical_address    = fmmu.logical_address;
             f.physical           = reinterpret_cast<uint8_t*>(&memory_) + fmmu.physical_address;
-            f.bit_length         = (fmmu.length - 1u) * 8u + (fmmu.logical_stop_bit - fmmu.logical_start_bit + 1u);
+            f.bit_length         = bit_length;
             f.logical_start_bit  = fmmu.logical_start_bit;
             f.physical_start_bit = fmmu.physical_start_bit;
             f.is_input           = (fmmu.type == 1);
+            if (not f.is_input)
+            {
+                has_output_fmmu_ = true;
+            }
             fmmus_.push_back(f);
         }
+        lastLogicalWrite_ = since_epoch();  // restart the output watchdog window at PDO (re)config
     }
 
 
@@ -697,6 +710,10 @@ namespace kickcat
 
     void EmulatedESC::checkWatchdog()
     {
+        if (not has_output_fmmu_)
+        {
+            return; // no outputs: the process-data watchdog has nothing to monitor
+        }
         nanoseconds delay = pdoWatchdog();
         if (delay == 0ns)
         {

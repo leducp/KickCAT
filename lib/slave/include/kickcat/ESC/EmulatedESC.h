@@ -182,6 +182,7 @@ namespace kickcat
             bool     is_input;          // FMMU type 1: slave -> master
         };
         std::vector<Fmmu> fmmus_;
+        bool has_output_fmmu_{false};   // process-data watchdog only applies when outputs exist
 
         void loadEeprom();
 

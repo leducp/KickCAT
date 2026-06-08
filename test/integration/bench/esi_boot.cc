@@ -94,9 +94,8 @@ static Reached bootDevice(ESI::Device& dev, nanoseconds wait_timeout)
     std::vector<uint8_t> io_buffer(16384);
     try
     {
-        bus.init(0ms);  // disable the process-data watchdog: this harness tests bootability,
-                        // not watchdog timing, and a wall-clock watchdog makes OP non-deterministic
-                        // under parallel CPU contention (slaves bounce OP->SAFE_OP).
+        bus.init(100ms);  // process-data watchdog enabled and now deterministic: it only monitors
+                          // slaves that have outputs, so input-only terminals no longer bounce.
         if (bus.slaves().size() != 1)
         {
             return Reached::INIT_FAIL;

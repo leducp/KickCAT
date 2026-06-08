@@ -480,33 +480,51 @@ TEST(LoopbackSocket, runs_frame_through_slave_and_ticks)
     ASSERT_EQ(*wkc, 1);
 }
 
+static void configureOutputFmmuAndEnterSafeOP(EmulatedESC& esc, uint8_t fmmu_type)
+{
+    uint8_t pre_op = State::PRE_OP;
+    esc.write(reg::AL_STATUS, &pre_op, 1);
+    uint8_t safe_op = State::SAFE_OP;
+    esc.write(reg::AL_CONTROL, &safe_op, 1);
+
+    fmmu::Register fmmu;
+    memset(&fmmu, 0, sizeof(fmmu::Register));
+    fmmu.type             = fmmu_type;   // 2 = output (master->slave), 1 = input
+    fmmu.logical_address  = 0x2000;
+    fmmu.length           = 1;
+    fmmu.logical_stop_bit = 0x7;
+    fmmu.physical_address = 0x1000;
+    fmmu.activate         = 1;
+    esc.write(reg::FMMU + 0x00, &fmmu, sizeof(fmmu::Register));
+}
+
 TEST(EmulatedESC, watchdog)
 {
     EmulatedESC esc;
     uint16_t wkc = 0;
     DatagramHeader header{Command::NOP, 0, 0, 0, 0, 0, 0, 0};
 
-    // Configure Watchdog
-    // Divider: 100us (2498 + 2) * 40ns = 2500 * 40ns = 100,000ns = 100us
+    // The process-data watchdog monitors outputs, so an output FMMU must be configured (and
+    // the PRE_OP->SAFE_OP transition run) before it is armed.
+    configureOutputFmmuAndEnterSafeOP(esc, 2);
+
+    // Divider: (2498 + 2) * 40ns = 100us. Watchdog Time PDO: 100 * 100us = 10ms.
     uint16_t divider = 2498;
     esc.write(reg::WDG_DIVIDER, &divider, 2);
-
-    // Watchdog Time PDO: 100 units of 100us = 10ms
     uint16_t wdg_time = 100;
     esc.write(reg::WDG_TIME_PDO, &wdg_time, 2);
 
-    // Trigger processInternalLogic
-    esc.processDatagram(&header, nullptr, &wkc);
+    esc.processDatagram(&header, nullptr, &wkc);  // runs configureFmmus + arms the watchdog
+
+    uint8_t safe_op = State::SAFE_OP;             // settle AL_STATUS so configureFmmus runs only once
+    esc.write(reg::AL_STATUS, &safe_op, 1);
 
     uint16_t status = 0;
     esc.read(reg::WDOG_STATUS, &status, 2);
+    EXPECT_EQ(status & 0x01, 1);  // SPEC: bit 0 of 0x0440 is 1 if OK, 0 if expired
 
-    // SPEC: Bit 0 of 0x0440 is 1 if OK, 0 if expired.
-    EXPECT_EQ(status & 0x01, 1);
-
-    // Advance time beyond 10ms
-    // since_epoch() increments by 1ms per call in unit tests.
-    for(int i = 0; i < 20; ++i)
+    // since_epoch() advances 1ms per call in unit tests; 20 cycles exceeds the 10ms window.
+    for (int i = 0; i < 20; ++i)
     {
         esc.processDatagram(&header, nullptr, &wkc);
     }
@@ -517,5 +535,34 @@ TEST(EmulatedESC, watchdog)
     uint8_t counter = 0;
     esc.read(reg::WDOG_COUNTER_PDO, &counter, 1);
     EXPECT_GT(counter, 0);
+}
+
+TEST(EmulatedESC, watchdog_inactive_without_outputs)
+{
+    // An input-only terminal has no output FMMU, so the process-data watchdog never fires
+    // (it monitors output delivery). Without this, every digital-input slave bounces to SAFE_OP.
+    EmulatedESC esc;
+    uint16_t wkc = 0;
+    DatagramHeader header{Command::NOP, 0, 0, 0, 0, 0, 0, 0};
+
+    configureOutputFmmuAndEnterSafeOP(esc, 1);  // input FMMU only
+
+    uint16_t divider = 2498;
+    esc.write(reg::WDG_DIVIDER, &divider, 2);
+    uint16_t wdg_time = 100;
+    esc.write(reg::WDG_TIME_PDO, &wdg_time, 2);
+
+    for (int i = 0; i < 30; ++i)
+    {
+        esc.processDatagram(&header, nullptr, &wkc);
+    }
+
+    uint16_t status = 0;
+    esc.read(reg::WDOG_STATUS, &status, 2);
+    EXPECT_EQ(status & 0x01, 1);  // still healthy: no outputs to monitor
+
+    uint8_t counter = 0;
+    esc.read(reg::WDOG_COUNTER_PDO, &counter, 1);
+    EXPECT_EQ(counter, 0);
 }
 

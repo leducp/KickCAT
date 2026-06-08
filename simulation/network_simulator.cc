@@ -205,8 +205,8 @@ int main(int argc, char* argv[])
         auto pdo = std::make_unique<PDO>(esc.get());
         auto slave = std::make_unique<Slave>(esc.get(), pdo.get());
 
-        // The application owns the OD; it is injected into the slave (for bind / PDO mapping)
-        // and, only when the device advertises a CoE mailbox, into the mailbox transport too.
+        // The OD (owned here in `dictionaries`) is injected into the slave always, and into a
+        // mailbox only if the device advertises CoE - so a mailboxless terminal still maps PDOs.
         if (esi_coe)
         {
             dictionaries.push_back(std::make_unique<CoE::Dictionary>(std::move(*esi_coe)));
