@@ -68,6 +68,15 @@ uv pip install .
 uv pip install --no-build-isolation -Cbuild-dir=/tmp/build -v .
 ```
 
+The wheel build enables the EEPROM-editor GUI (`BUILD_EEPROM_EDITOR=ON` in
+`pyproject.toml`), which needs `imgui` and `glfw`. The cibuildwheel images provide
+them; on a bare environment that lacks them, either install them (via conan) or
+disable the GUI for the build:
+
+```bash
+uv pip install --config-setting=cmake.define.BUILD_EEPROM_EDITOR=OFF .
+```
+
 #### Multi wheel (CI)
 This project use cibuildwheel to generate multiples wheel to support all configurations. To use it locally, call:
 ```bash
@@ -426,6 +435,15 @@ Expected output:
 ## Simulator
 
 Test your EtherCAT applications without physical hardware using the built-in network simulator.
+See [`simulation/README.md`](simulation/README.md) for the full guide (architecture, config schema, named TAP segments).
+
+The quickest way to drive an emulated slave is the **in-process** example — master and slave in one process, no network setup:
+
+```bash
+./build/examples/master/simulated_bus/simulated_bus -f "Beckhoff EL1xxx.xml" -t EL1008
+```
+
+The two-process `network_simulator` (below) is closer to a real setup and lets an unmodified master example connect over a TAP socket.
 
 ### Transport Options
 

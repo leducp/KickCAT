@@ -1,0 +1,5 @@
+if (ENABLE_ESI_PARSER)
+    add_executable(simulated_bus simulated_bus.cc ${OS_SRCS})
+    target_link_libraries(simulated_bus kickcat argparse::argparse)
+    set_kickcat_properties(simulated_bus)
+endif ()

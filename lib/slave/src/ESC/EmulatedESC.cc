@@ -76,6 +76,13 @@ namespace kickcat
 
     void EmulatedESC::loadEeprom()
     {
+        // Reads words 0 and 4; a RELOAD command can reach this before any image is
+        // loaded (empty eeprom_), so guard against an out-of-bounds access.
+        if (eeprom_.size() <= 4)
+        {
+            return;
+        }
+
         // Device emulation
         memory_.esc_configuration = eeprom_[0] >> 8;
 
@@ -260,6 +267,16 @@ namespace kickcat
     }
 
 
+    bool EmulatedESC::matchesConfiguredAddress(uint16_t position) const
+    {
+        if (position == memory_.station_address)
+        {
+            return true;
+        }
+        return (memory_.station_alias != 0) and (position == memory_.station_alias);
+    }
+
+
     void EmulatedESC::processEcatRequest(DatagramHeader* header, void* data, uint16_t* wkc)
     {
         auto [position, offset] = extractAddress(header->address);
@@ -298,9 +315,11 @@ namespace kickcat
             }
 
             //************* Fixed Pos. ************//
+            // A configured slave answers FPxx on its station address or, when set, its
+            // station alias (ETG.1000.4 configured-address addressing).
             case Command::FPRD:
             {
-                if (position == memory_.station_address)
+                if (matchesConfiguredAddress(position))
                 {
                     processReadCommand(header, data, wkc, offset);
                 }
@@ -308,7 +327,7 @@ namespace kickcat
             }
             case Command::FPWR:
             {
-                if (position == memory_.station_address)
+                if (matchesConfiguredAddress(position))
                 {
                     processWriteCommand(header, data, wkc, offset);
                 }
@@ -316,7 +335,7 @@ namespace kickcat
             }
             case Command::FPRW:
             {
-                if (position == memory_.station_address)
+                if (matchesConfiguredAddress(position))
                 {
                     processReadWriteCommand(header, data, wkc, offset);
                 }
@@ -334,8 +353,34 @@ namespace kickcat
             case Command::LRW:  { processLRW(header, data, wkc); break; }
 
             //******** Auto Inc. Multiples ********//
-            case Command::ARMW: { break; }
-            case Command::FRMW: { break; }
+            // Read-multiple-write (DC time distribution): the reference slave reads
+            // its register into the frame, every other slave writes the frame value.
+            case Command::ARMW:
+            {
+                if (position == 0)
+                {
+                    processReadCommand(header, data, wkc, offset);
+                }
+                else
+                {
+                    processWriteCommand(header, data, wkc, offset);
+                }
+                ++position;
+                header->address = createAddress(position, offset);
+                break;
+            }
+            case Command::FRMW:
+            {
+                if (matchesConfiguredAddress(position))
+                {
+                    processReadCommand(header, data, wkc, offset);
+                }
+                else
+                {
+                    processWriteCommand(header, data, wkc, offset);
+                }
+                break;
+            }
 
             //*************** Misc. ***************//
             case Command::NOP:  { break; }
@@ -444,6 +489,10 @@ namespace kickcat
             }
             case eeprom::Control::RELOAD:
             {
+                // Re-apply the EEPROM-derived configuration to the registers (station
+                // alias, ESC configuration), as a real ESC does on a Reload command.
+                loadEeprom();
+                memory_.eeprom_control &= ~0x0700; // clear order
                 break;
             }
         }
@@ -536,6 +585,15 @@ namespace kickcat
         {
             auto const& fmmu = memory_.fmmu[i];
             if (fmmu.activate == 0)
+            {
+                continue;
+            }
+
+            // A malformed FMMU (physical address below the process-data RAM window, or a
+            // region that runs past its 0xf000-byte end) must not produce a pointer that
+            // reads/writes out of bounds during logical access. Skip it.
+            if (fmmu.physical_address < 0x1000
+                or static_cast<std::size_t>(fmmu.physical_address - 0x1000) + fmmu.length > sizeof(memory_.process_data_ram))
             {
                 continue;
             }

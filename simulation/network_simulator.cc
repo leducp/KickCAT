@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <argparse/argparse.hpp>
+#include <csignal>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -24,8 +25,14 @@ using namespace kickcat::slave;
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
+static volatile std::sig_atomic_t running = 1;
+static void signalHandler(int) { running = 0; }
+
 int main(int argc, char* argv[])
 {
+    std::signal(SIGINT,  signalHandler);
+    std::signal(SIGTERM, signalHandler);
+
     argparse::ArgumentParser program("network_simulator");
 
     std::string interface;
@@ -108,7 +115,10 @@ int main(int argc, char* argv[])
     input_pdo.reserve(slave_count);
     output_pdo.reserve(slave_count);
 
-    constexpr uint32_t PDO_MAX_SIZE = 32;
+    // Sized for a full frame: a slave's process data can far exceed a toy 32-byte
+    // buffer, and updateInput/updateOutput copy the SM length, so a small buffer
+    // would overflow on real devices.
+    constexpr uint32_t PDO_MAX_SIZE = 4096;
     ESI::Parser parser;
 
     for (const auto& config_path : expanded_slave_configs)
@@ -141,6 +151,11 @@ int main(int argc, char* argv[])
         {
             // Build the EEPROM image (and CoE dictionary) from a selected ESI device.
             fs::path esi_full_path = config_dir / config["esi"].get<std::string>();
+            if (not fs::exists(esi_full_path))
+            {
+                std::cerr << "ESI file not found: " << esi_full_path << std::endl;
+                return 1;
+            }
             ESI::DeviceFilter filter;
             if (config.contains("device_type"))  { filter.type         = config["device_type"].get<std::string>(); }
             if (config.contains("product_code")) { filter.product_code = config["product_code"].get<uint32_t>();    }
@@ -168,6 +183,11 @@ int main(int argc, char* argv[])
         else if (config.contains("eeprom"))
         {
             fs::path eeprom_full_path = config_dir / config["eeprom"].get<std::string>();
+            if (not fs::exists(eeprom_full_path))
+            {
+                std::cerr << "EEPROM file not found: " << eeprom_full_path << std::endl;
+                return 1;
+            }
             esc = std::make_unique<EmulatedESC>(eeprom_full_path.string().c_str());
         }
         else
@@ -190,6 +210,11 @@ int main(int argc, char* argv[])
         {
             std::string coe_xml_path = config["coe_xml"];
             fs::path coe_xml_full_path = config_dir / coe_xml_path;
+            if (not fs::exists(coe_xml_full_path))
+            {
+                std::cerr << "CoE XML file not found: " << coe_xml_full_path << std::endl;
+                return 1;
+            }
             auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
             auto dictionary = parser.loadFile(coe_xml_full_path.string());
             mbx->enableCoE(std::move(dictionary));
@@ -229,7 +254,7 @@ int main(int argc, char* argv[])
 
     printf("Start EtherCAT network simulator on %s with %zu slaves\n", interface.c_str(), escs.size());
     auto [socket, _] = createSockets(interface, "");
-    socket->setTimeout(-1ns);
+    socket->setTimeout(100ms);  // wake periodically so SIGINT/SIGTERM is honored when idle
 
     std::vector<nanoseconds> stats;
     stats.reserve(1000);
@@ -243,14 +268,13 @@ int main(int argc, char* argv[])
     uint8_t current_value = 0x11;
     constexpr uint32_t ITER = 1000;
 
-    while (true)
+    while (running)
     {
         Frame frame;
         int32_t r = socket->read(frame.data(), ETH_MAX_SIZE);
         if (r < 0)
         {
-            printf("Something wrong happened. Aborting...\n");
-            return -1;
+            continue;  // timeout / no frame: re-check `running` (shutdown) and retry
         }
 
         auto t1 = since_epoch();
@@ -274,13 +298,19 @@ int main(int argc, char* argv[])
             slaves[i]->routine();
             if (slaves[i]->state() == State::SAFE_OP)
             {
-                // input-only slaves reach OP without this (handled slave-side in SafeOP)
-                if (output_pdo[i][1] != 0xFF)
+                // Re-validate every cycle the master is delivering output data (any
+                // byte differs from the 0xFF init) - not once - so the slave recovers
+                // if it drops back from OP (e.g. a transient process-data watchdog).
+                // Input-only slaves reach OP slave-side without this.
+                bool const written = std::any_of(output_pdo[i].begin(), output_pdo[i].end(),
+                    [](uint8_t b) { return b != 0xFF; });
+                if (written)
                 {
                     slaves[i]->validateOutputData();
                 }
             }
 
+            // Placeholder demo input (not a real process), advanced below.
             std::fill(input_pdo[i].begin(), input_pdo[i].end(), current_value);
         }
 
