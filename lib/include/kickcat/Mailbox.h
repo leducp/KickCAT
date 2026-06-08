@@ -191,8 +191,10 @@ namespace kickcat::mailbox::response
 
         ~Mailbox() = default;
 
-        void enableCoE(CoE::Dictionary&& dictionary);
-        CoE::Dictionary& getDictionary(){return dictionary_;}
+        // References an application-owned dictionary (injected into the slave too): the OD
+        // belongs to the application, never to the mailbox transport. It must outlive the mailbox.
+        void enableCoE(CoE::Dictionary& dictionary);
+        CoE::Dictionary& getDictionary(){return *dictionary_;}
 
         // --- ESC-coupled methods (requires to pass the ESC to the constructor) ---
         int32_t configure();
@@ -238,7 +240,7 @@ namespace kickcat::mailbox::response
         uint16_t max_msgs_;
 
         std::vector<std::function<std::shared_ptr<AbstractMessage>(Mailbox*, std::vector<uint8_t>&&)>> factories_;
-        CoE::Dictionary dictionary_;
+        CoE::Dictionary* dictionary_{nullptr};         // application-owned, set by enableCoE
 
         std::list<std::shared_ptr<AbstractMessage>> to_process_;    /// Received messages, waiting to be processed
         std::queue<std::vector<uint8_t>> to_send_;                  /// Messages to send (replies from a received messages)

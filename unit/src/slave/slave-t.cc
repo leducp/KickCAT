@@ -55,6 +55,7 @@ public:
     SyncManager::Register pdo_in_ {PDO_IN_ADDR,  sizeof(buffer_in_),  SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ,  0, SM_ACTIVATE_ENABLE, 0};
     SyncManager::Register pdo_out_{PDO_OUT_ADDR, sizeof(buffer_out_), SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_WRITE, 0, SM_ACTIVATE_ENABLE, 0};
 
+    CoE::Dictionary dict_{};  // application-owned OD (declared before mbx_ so it outlives it)
     mailbox::response::Mailbox mbx_{&esc_, MBX_SIZE};
 
     uint16_t al_control_{State::INIT};
@@ -116,9 +117,11 @@ public:
 
     void configureMailbox()
     {
-        mbx_.enableCoE(createTestDictionary());
+        dict_ = createTestDictionary();
+        mbx_.enableCoE(dict_);         // application-owned OD, referenced by the mailbox
         ASSERT_EQ(0, mbx_.configure());
         slave_.setMailbox(&mbx_);
+        slave_.setDictionary(&dict_);  // and injected into the slave for bind / mapping
     }
 
     void configurePdo()
@@ -503,4 +506,65 @@ TEST_F(SlaveTest, bind_different_objects_return_different_pointers)
     ASSERT_NE(nullptr, ptr_a);
     ASSERT_NE(nullptr, ptr_b);
     ASSERT_NE(static_cast<void*>(ptr_a), static_cast<void*>(ptr_b));
+}
+
+
+// --- Mailboxless terminal: an app-owned OD (no mailbox) still maps PDOs ---
+
+TEST_F(SlaveTest, dictionary_without_mailbox_maps_pdo_on_sm0_and_binds)
+{
+    // EL1004-class: no mailbox, process input on SM0 (assignment object 0x1C10). The
+    // application owns the OD and injects it via setDictionary; the slave still reaches
+    // SAFE_OP, maps the entry, and bind() resolves - with no mailbox at all.
+    SyncManager::Register sm_in_sm0{PDO_IN_ADDR, sizeof(buffer_in_),
+        SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ, 0, SM_ACTIVATE_ENABLE, 0};
+    SyncManager::Register sm_empty{};
+    auto setSm = [this](int idx, SyncManager::Register const& sm)
+    {
+        ON_CALL(esc_, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * idx, _, sizeof(SyncManager::Register)))
+            .WillByDefault(DoAll(
+                Invoke([sm](uint16_t, void* ptr, uint16_t)
+                {
+                    std::memcpy(ptr, &sm, sizeof(SyncManager::Register));
+                }),
+                Return(0)));
+    };
+    setSm(0, sm_in_sm0);
+    setSm(1, sm_empty);
+    setSm(2, sm_empty);
+    setSm(3, sm_empty);
+
+    {
+        CoE::Object obj{0x6000, CoE::ObjectCode::VAR, "Input", {}};
+        CoE::addEntry<uint16_t>(obj, 0, 16, 0, CoE::Access::READ | CoE::Access::WRITE,
+                                CoE::DataType::UNSIGNED16, "Val", uint16_t{0x1234});
+        dict_.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1A00, CoE::ObjectCode::RECORD, "TxPDO map", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0, CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{1});
+        CoE::addEntry<uint32_t>(obj, 1, 32, 8, CoE::Access::READ, CoE::DataType::UNSIGNED32, "M1",
+                                (static_cast<uint32_t>(0x6000) << 16) | 16u);
+        dict_.push_back(std::move(obj));
+    }
+    {
+        CoE::Object obj{0x1C10, CoE::ObjectCode::RECORD, "TxPDO assign", {}};
+        CoE::addEntry<uint8_t> (obj, 0, 8,  0, CoE::Access::READ, CoE::DataType::UNSIGNED8,  "Count", uint8_t{1});
+        CoE::addEntry<uint16_t>(obj, 1, 16, 8, CoE::Access::READ, CoE::DataType::UNSIGNED16, "PDO 1", uint16_t{0x1A00});
+        dict_.push_back(std::move(obj));
+    }
+
+    slave_.setDictionary(&dict_);  // app-owned OD, no mailbox
+
+    slave_.start();
+    goToSafeOP();
+
+    auto [obj, entry] = CoE::findObject(dict_, 0x6000, 0);
+    ASSERT_NE(nullptr, entry);
+    ASSERT_TRUE(entry->is_mapped);
+    ASSERT_EQ(static_cast<void*>(buffer_in_), entry->data);
+
+    uint16_t* bound = nullptr;
+    slave_.bind(0x6000, bound);
+    ASSERT_EQ(static_cast<void*>(buffer_in_), static_cast<void*>(bound));
 }

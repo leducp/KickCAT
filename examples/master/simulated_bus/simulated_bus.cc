@@ -94,8 +94,9 @@ int main(int argc, char** argv)
     if (dev.mailbox and dev.mailbox->coe)
     {
         mbx = std::make_unique<mailbox::response::Mailbox>(&esc, 1024);
-        mbx->enableCoE(std::move(dev.dictionary));
+        mbx->enableCoE(dev.dictionary);     // dev owns the OD; injected into both
         sl.setMailbox(mbx.get());
+        sl.setDictionary(&dev.dictionary);
     }
 
     constexpr uint32_t PDO_SIZE = 4096;  // a full frame: never overflow on large PDOs

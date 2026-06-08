@@ -206,11 +206,13 @@ namespace kickcat
 
     StatusCode PDO::configureMapping(CoE::Dictionary& dict)
     {
+        // Assignment object is 0x1C10 + SM index (ETG.1000.6), not a fixed SM2/SM3:
+        // a mailboxless terminal carries process data on SM0/SM1.
+        if (hasInput())
         {
             uint16_t bit_offset = 0;
-            std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C13);
-
-            for (auto pdo : pdo_indices)
+            uint16_t assign_idx = static_cast<uint16_t>(0x1C10 + sm_input_.index);
+            for (auto pdo : parseAssignment(dict, assign_idx))
             {
                 if (not parsePdoMap(dict, pdo, input_, bit_offset, input_size_))
                 {
@@ -219,11 +221,11 @@ namespace kickcat
             }
         }
 
+        if (hasOutput())
         {
             uint16_t bit_offset = 0;
-            std::vector<uint16_t> pdo_indices = parseAssignment(dict, 0x1C12);
-
-            for (auto pdo : pdo_indices)
+            uint16_t assign_idx = static_cast<uint16_t>(0x1C10 + sm_output_.index);
+            for (auto pdo : parseAssignment(dict, assign_idx))
             {
                 if (not parsePdoMap(dict, pdo, output_, bit_offset, output_size_))
                 {

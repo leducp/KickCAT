@@ -41,9 +41,10 @@ int main(int, char*[])
 
     mailbox::response::Mailbox mbx(&esc, 1024);
     auto dictionary = CoE::createOD();
-    mbx.enableCoE(std::move(dictionary));
+    mbx.enableCoE(dictionary);          // the firmware owns the OD; the mailbox references it
 
     slave.setMailbox(&mbx);
+    slave.setDictionary(&dictionary);   // and the slave uses it for bind / PDO mapping
     pdo.setInput(buffer_in, PDO_MAX_SIZE);
     pdo.setOutput(buffer_out, PDO_MAX_SIZE);
     
