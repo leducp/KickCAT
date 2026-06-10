@@ -485,7 +485,11 @@ namespace kickcat
         nanoseconds now = since_ecat_epoch();
         uint64_t raw_now = now.count();
         link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
-        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr,  sizeof(uint64_t), process, error);
+
+        // Slaves not matching the FRMW address write the payload to their own clock. Pre-fill it
+        // with master time: slaves cut from the reference by a ring split track master time instead
+        // of being slammed to zero by the redundancy frame copy.
+        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
     }
 
 
@@ -503,9 +507,22 @@ namespace kickcat
         };
         std::vector<DCSlaveSync> dc_syncs;
 
-        auto error = [](DatagramState const& state)
+        // process callbacks keep references into dc_syncs: no reallocation allowed past this point
+        size_t dc_slaves_count = 0;
+        for (auto const& slave : slaves_)
         {
-            THROW_ERROR_DATAGRAM("Error while reading DC sync status", state);
+            if (slave.isDCSupport() and &slave != dc_slave_)
+            {
+                ++dc_slaves_count;
+            }
+        }
+        dc_syncs.reserve(dc_slaves_count);
+
+        bool datagram_error = false;
+        auto error = [&datagram_error](DatagramState const& state)
+        {
+            dc_error("DC sync status: datagram %s\n", toString(state));
+            datagram_error = true;
         };
 
         for (auto& slave : slaves_)
@@ -532,7 +549,7 @@ namespace kickcat
         }
         link_->processDatagrams();
 
-        bool synchronized = true;
+        bool synchronized = not datagram_error;
         for (auto const& sync : dc_syncs)
         {
             // DC_SYSTEM_TIME_DIFF uses sign-magnitude encoding (bit 31 = sign, bits 30:0 = magnitude)

@@ -109,11 +109,23 @@ namespace kickcat
                 case Command::APRD:
                 case Command::FPRD:
                 case Command::LRD:
-                case Command::FRMW:
-                case Command::ARMW:
                 {
                     // no-op or read only command: clear the area
                     std::memset(pos, 0, data_size);
+                    break;
+                }
+                case Command::FRMW:
+                case Command::ARMW:
+                {
+                    // non-matching slaves write the payload to memory: keep caller data when provided
+                    if (data == nullptr)
+                    {
+                        std::memset(pos, 0, data_size);
+                    }
+                    else
+                    {
+                        std::memcpy(pos, data, data_size);
+                    }
                     break;
                 }
                 default:
