@@ -375,11 +375,8 @@ namespace kickcat
         uint8_t forwarded[4];
         uint8_t malformed_frame;
         uint8_t pdi;
-        uint16_t spi_pdi;
-        uint16_t uc_pdi;
-        uint16_t avalon_pdi;
-        uint16_t axi_pdi;
-        uint8_t lost_link[4];
+        uint16_t pdi_error_code; // 0x30E:0x30F - interpretation depends on the PDI type
+        uint8_t lost_link[4];    // 0x310:0x313
     } __attribute__((__packed__));
 
     std::string toString(ErrorCounters const& counters);

@@ -251,6 +251,11 @@ int main(int argc, char *argv[])
             bus.sendLogicalWrite(false_alarm); // Update outputPDO
             bus.processAwaitingFrames();
             bus.finalizeDatagrams();
+
+            if ((i % 1000) == 0)
+            {
+                bus.isDCSynchronized(1000ns);
+            }
         }
         catch (kickcat::ErrorDatagram const& e)
         {
@@ -294,11 +299,6 @@ int main(int argc, char *argv[])
                     printf("  Motor %zu fault: error_code=0x%04x\n", m, motors[m].input->error_code);
                 }
             }
-        }
-
-        if ((i % 1000) == 0)
-        {
-            bus.isDCSynchronized(1000ns);
         }
 
         timer.wait_next_tick();

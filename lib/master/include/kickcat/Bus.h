@@ -129,7 +129,8 @@ namespace kickcat
         /// \details Reads the system time difference register (0x092C) of each DC slave.
         ///          The value converges to zero when the slave is synchronized with the reference clock.
         /// \param  threshold  Maximum acceptable time difference in nanoseconds
-        /// \return true if all DC slaves are synchronized within the given threshold
+        /// \return true if all DC slaves are synchronized within the given threshold,
+        ///         false if any status could not be read (lost frame, invalid working counter)
         bool isDCSynchronized(nanoseconds threshold = 1000ns, bool log_all = false);
 
 
