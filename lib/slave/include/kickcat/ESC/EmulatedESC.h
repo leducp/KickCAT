@@ -34,6 +34,11 @@ namespace kickcat
         int32_t read (uint16_t address, void* data,       uint16_t size) override;
         int32_t write(uint16_t address, void const* data, uint16_t size) override;
 
+        // Per-ESC store-and-forward processing delay. The network routing engine
+        // accumulates it along the physical path to produce DC port receive-times.
+        nanoseconds forwardingDelay() const           { return forwarding_delay_; }
+        void setForwardingDelay(nanoseconds delay)    { forwarding_delay_ = delay; }
+
     private:
         struct Memory
         {
@@ -214,6 +219,13 @@ namespace kickcat
         nanoseconds lastLogicalWrite_{since_epoch()};
 
         nanoseconds last_write_eeprom_{since_epoch()};
+
+        // Store-and-forward propagation delay: the time for a frame to pass from this
+        // ESC to the next. Real (and, being a buffer model rather than cut-through,
+        // potentially larger than real hardware) - independent of the host clock the
+        // registers read from. The DC phase measures and compensates it; it must stay
+        // the single source of truth shared with SYNC0/SYNC1 timing, else sync drifts.
+        nanoseconds forwarding_delay_{300ns};
     };
 }
 

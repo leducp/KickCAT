@@ -12,6 +12,8 @@ target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/ESC/Lan9252.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/ESC/XMC4800.cc
 
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/EmulatedNetwork.cc
+
   ${CMAKE_CURRENT_SOURCE_DIR}/src/slave/Slave.cc
 )
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "kickcat/AbstractSocket.h"
+#include "kickcat/EmulatedNetwork.h"
 #include "kickcat/Frame.h"
 #include "kickcat/ESC/EmulatedESC.h"
 
@@ -21,7 +22,7 @@ namespace kickcat
     {
     public:
         LoopbackSocket(std::vector<EmulatedESC*> escs, std::function<void()> tick)
-            : escs_(std::move(escs))
+            : network_(std::move(escs))
             , tick_(std::move(tick))
         {
         }
@@ -30,22 +31,15 @@ namespace kickcat
         void setTimeout(nanoseconds) override {}
         void close() noexcept override {}
 
+        // Topology / fault-injection passthrough for tests that need more than the
+        // default daisy chain.
+        EmulatedNetwork& network() { return network_; }
+
         int32_t write(void const* data, int32_t size) override
         {
             Frame frame;
             std::memcpy(frame.data(), data, static_cast<size_t>(size));
-            while (true)
-            {
-                auto [header, payload, wkc] = frame.peekDatagram();
-                if (header == nullptr)
-                {
-                    break;
-                }
-                for (auto* esc : escs_)
-                {
-                    esc->processDatagram(header, payload, wkc);
-                }
-            }
+            network_.route(frame);
             tick_();
             std::memcpy(buffer_, frame.data(), static_cast<size_t>(size));
             size_ = size;
@@ -70,7 +64,7 @@ namespace kickcat
         }
 
     private:
-        std::vector<EmulatedESC*> escs_;
+        EmulatedNetwork network_;
         std::function<void()> tick_;
         uint8_t buffer_[ETH_MAX_SIZE];
         int32_t size_    = 0;
