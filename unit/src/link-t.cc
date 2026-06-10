@@ -39,6 +39,24 @@ public:
         ASSERT_EQ(link.callbacks_[0].status, DatagramState::SEND_ERROR);
     }
 
+    // Friendship does not extend to the generated test subclasses: expose the
+    // private state needed by the tests here.
+    void setIndexes(uint8_t index)
+    {
+        link.index_head_ = index;
+        link.index_queue_ = index;
+    }
+
+    DatagramState datagramStatus(uint8_t index)
+    {
+        return link.callbacks_[index].status;
+    }
+
+    uint8_t sentFrames()
+    {
+        return link.sent_frame_;
+    }
+
     template<typename T>
     void checkSendFrameRedundancy(std::vector<DatagramCheck<T>> expecteds)
     {
@@ -628,6 +646,64 @@ TEST_F(LinkTest, process_datagrams_line_cut_between_slaves)
 }
 
 
+TEST_F(LinkTest, process_datagrams_lrw_in_mapping_splices_both_copies)
+{
+    InSequence s;
+
+    // Split ring: slave 0's input (bytes 0-3) is in the prefix copy, slave 1's (bytes 4-7)
+    // in the suffix copy. Only the description-driven merge can rebuild the full payload.
+    int64_t sent      = 0x00000000FFFFFFFF;
+    int64_t tail_copy = 0x0102030405060708; // suffix: slave 1 input valid (bytes 4-7, LE)
+    int64_t head_copy = 0x1112131415161718; // prefix: slave 0 input valid (bytes 0-3, LE)
+    int64_t merged    = 0x0102030415161718;
+
+    LogicalFrameDescription desc{};
+    desc.address = 0;
+    desc.logical_size = sizeof(sent);
+    desc.pdo_size = sizeof(sent);
+    desc.entries = {{3, 0, 4}, {3, 4, 4}};
+    link.setLogicalMapping({desc});
+
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {Command::LRW, sent});
+    addDatagram(Command::LRW, sent, merged, 6, false);
+    checkSendFrameRedundancy(expecteds_1);
+
+    io_redundancy->handleReply<int64_t>({tail_copy}, 3); // lands in the nominal frame
+    io_nominal->handleReply<int64_t>({head_copy}, 3);    // lands in the redundancy frame
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, process_datagrams_lrw_keeps_processed_copy)
+{
+    InSequence s;
+
+    // Inputs and outputs share logical addresses: the unprocessed ring copy echoes the
+    // output payload where the processed one carries inputs. OR-ing them would corrupt
+    // the inputs - the merge must keep the processed (nominal) copy.
+    int64_t output_payload = 0x00000000FFFFFFFF;
+    int64_t processed      = 0x0102030405060708;
+    Command cmd = Command::LRW;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, output_payload});
+    addDatagram(cmd, output_payload, processed, 3, false);
+    checkSendFrameRedundancy(expecteds_1);
+
+    io_redundancy->handleReply<int64_t>({processed}, 3);   // copy processed by the slaves
+    io_nominal->handleReply<int64_t>({output_payload}, 0); // unprocessed echo
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
 TEST_F(LinkTest, process_datagrams_multiple_frames)
 {
     InSequence s;
@@ -1111,5 +1187,530 @@ TEST_F(LinkTest, event_callback)
         checkIRQ(false, 0);                         // No IRQ, no trigger (falling edge)
     }
     checkIRQ(false, EcatEvent::DC_LATCH);           // call default callback -> test that nothing crash
+}
+
+
+TEST_F(LinkTest, process_datagrams_stale_frame_on_nominal_socket_keeps_current_cycle)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t stale_data   = 0x00000000DEADBEEF;
+    int64_t current_data = 0x0001020304050607;
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+
+    // Cycle 1: sent on the nominal interface only, no response - reported lost. The mock
+    // keeps the cycle-1 frame queued on io_nominal to replay it as a stale response later.
+    addDatagram(cmd, skip, current_data, 2, false);
+    io_nominal->checkSendFrame(expecteds_1);
+    EXPECT_CALL(*io_redundancy, write(_,_)).WillOnce(Return(0));
+    io_redundancy->readError();
+    io_nominal->readError();
+
+    link.processDatagrams();
+
+    ASSERT_EQ(0, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);
+    ASSERT_EQ(DatagramState::LOST, last_error);
+
+    // Cycle 2: the redundancy socket delivers the current response while the nominal
+    // socket delivers the stale cycle-1 one.
+    addDatagram(cmd, skip, current_data, 2, false);
+    checkSendFrameRedundancy(expecteds_1);
+    io_redundancy->handleReply<int64_t>({current_data}, 2); // current frame
+    io_nominal->handleReply<int64_t>({stale_data}, 1);      // stale cycle-1 frame (index 0)
+    io_redundancy->readError();                             // retry read granted by the dropped datagram
+    io_nominal->readError();
+
+    link.processDatagrams();
+
+    // Current datagram dispatched with the current data, stale one silently dropped.
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);
+}
+
+
+TEST_F(LinkTest, process_datagrams_stale_pair_is_dropped)
+{
+    InSequence s;
+
+    int64_t sent         = 0x00000000FFFFFFFF;
+    int64_t stale_data   = 0x00000000DEADBEEF;
+    int64_t current_data = 0x0102030405060708;
+
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {Command::LRW, sent});
+
+    LogicalFrameDescription desc{};
+    desc.address = 0;
+    desc.logical_size = sizeof(sent);
+    desc.pdo_size = sizeof(sent);
+    desc.entries = {{3, 0, 8}};
+    link.setLogicalMapping({desc});
+
+    auto queueLRW = [&]()
+    {
+        link.addDatagram(Command::LRW, 0, &sent, sizeof(sent),
+            [&](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                process_callback_counter++;
+                EXPECT_EQ(3, wkc); // sum of both current copies
+                EXPECT_EQ(0, std::memcmp(data, &current_data, sizeof(current_data)));
+                return DatagramState::OK;
+            },
+            [&](DatagramState const& status)
+            {
+                error_callback_counter++;
+                last_error = status;
+            });
+    };
+
+    // Cycle 1: no response on either interface - reported lost, both mocks keep the
+    // cycle-1 frame queued.
+    queueLRW();
+    checkSendFrameRedundancy(expecteds_1);
+    io_redundancy->readError();
+    io_nominal->readError();
+
+    link.processDatagrams();
+
+    ASSERT_EQ(0, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);
+    ASSERT_EQ(DatagramState::LOST, last_error);
+    last_error = DatagramState::OK;
+
+    // Cycle 2: both interfaces deliver the stale cycle-1 pair first, the current pair behind.
+    queueLRW();
+    checkSendFrameRedundancy(expecteds_1);
+    io_redundancy->handleReply<int64_t>({stale_data}, 1);
+    io_nominal->handleReply<int64_t>({stale_data}, 1);
+    io_redundancy->handleReply<int64_t>({current_data}, 2);
+    io_nominal->handleReply<int64_t>({current_data}, 1);
+
+    link.processDatagrams();
+
+    // The stale pair was dropped by the in-flight window: only the current pair was dispatched.
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(1, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, process_datagrams_mismatched_pair_dispatches_both_datagrams)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 1111;
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_15(15, {cmd, skip, false}); // no payload for logical read.
+    std::vector<DatagramCheck<int64_t>> expecteds_4(4, {cmd, skip, false});
+    std::vector<int64_t> answers_15(15, logical_read);
+    std::vector<int64_t> answers_4(4, logical_read);
+    std::vector<int64_t> skips_4(4, skip);
+
+    // Frame 1 is lost on the nominal interface at send time: only the redundancy
+    // socket will ever deliver it.
+    EXPECT_CALL(*io_nominal, write(_,_)).WillOnce(Return(0));
+    io_redundancy->checkSendFrame(expecteds_15);
+    io_nominal->checkSendFrame(expecteds_4);
+    io_redundancy->checkSendFrame(expecteds_4);
+
+    for (int32_t j = 0; j < 19; j++)
+    {
+        addDatagram(cmd, skip, logical_read, 2, false);
+    }
+
+    // First read round pairs frame 1 (from io_redundancy) with frame 2 (from io_nominal):
+    // mismatched indexes, frame 1 datagrams dispatched, frame 2 copies dropped.
+    io_redundancy->handleReply<int64_t>(answers_15, 2);
+    io_nominal->handleReply<int64_t>(skips_4, 0);
+    // Retry read granted by the dropped datagrams: frame 2 recovered from io_redundancy.
+    io_redundancy->handleReply<int64_t>(answers_4, 2);
+    io_nominal->readError();
+    io_redundancy->readError();
+    io_nominal->readError();
+
+    link.processDatagrams();
+
+    ASSERT_EQ(19, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, process_datagrams_merged_pair_aggregates_irq_of_both_copies)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t logical_read = 0x0001020304050607;
+    Command cmd = Command::LRD;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // no payload for logical read.
+
+    bool dl_status_event = false;
+    bool sm0_status_event = false;
+    link.attachEcatEventCallback(EcatEvent::DL_STATUS,  [&](){ dl_status_event = true; });
+    link.attachEcatEventCallback(EcatEvent::SM0_STATUS, [&](){ sm0_status_event = true; });
+
+    addDatagram(cmd, skip, logical_read, 2, false);
+    checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
+
+    // Each ring segment reports its own events: the merged pair must carry both.
+    io_redundancy->handleReply<int64_t>({logical_read}, 2, EcatEvent::DL_STATUS);
+    io_nominal->handleReply<int64_t>({skip}, 0, EcatEvent::SM0_STATUS);
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+    ASSERT_TRUE(dl_status_event);
+    ASSERT_TRUE(sm0_status_event);
+}
+
+
+TEST_F(LinkTest, process_datagrams_never_downgrades_ok_status)
+{
+    uint8_t data = 3;
+    Command cmd = Command::BWR;
+    std::vector<DatagramCheck<uint8_t>> expecteds_small(1, {cmd, data});
+    std::vector<uint8_t> answers_small(1, data);
+
+    std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE> big_payload;
+    std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE> big_garbage;
+    std::fill(std::begin(big_payload), std::end(big_payload), 2);
+    std::fill(std::begin(big_garbage), std::end(big_garbage), 0xAA);
+
+    std::vector<DatagramCheck<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>>> expecteds_big(1, {cmd, big_payload});
+    std::vector<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>> answers_big(1, big_payload);
+    std::vector<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>> answers_garbage(1, big_garbage);
+
+    InSequence s;
+
+    checkSendFrameRedundancy(expecteds_big);   // frame 1: index 0 alone (fills the frame)
+    checkSendFrameRedundancy(expecteds_small); // frame 2: index 1 alone
+
+    addDatagram(cmd, big_payload, big_payload, 2);
+    addDatagram(cmd, data, data, 2);
+
+    // Round 1: index 0 dispatched OK from the redundancy socket alone; the nominal
+    // socket keeps its copy queued.
+    io_redundancy->handleReply<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>>(answers_big, 2);
+    io_nominal->readError();
+    // Round 2: the nominal socket delivers the index-0 duplicate (garbage payload):
+    // already OK, it must be skipped, and the dropped index-1 copy grants a retry.
+    io_redundancy->handleReply<uint8_t>(answers_small, 2);
+    io_nominal->handleReply<std::array<uint8_t, MAX_ETHERCAT_PAYLOAD_SIZE>>(answers_garbage, 0);
+    // Round 3: index 1 recovered from the nominal socket.
+    io_redundancy->readError();
+    io_nominal->handleReply<uint8_t>(answers_small, 2);
+
+    link.processDatagrams();
+
+    ASSERT_EQ(2, process_callback_counter); // duplicate dispatch skipped
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+    ASSERT_EQ(DatagramState::OK, datagramStatus(0));
+    ASSERT_EQ(DatagramState::OK, datagramStatus(1));
+}
+
+
+TEST_F(LinkTest, send_error_marks_wrapped_indexes)
+{
+    // Start near the index wrap so the frame spans indexes 254, 255, 0, 1.
+    setIndexes(254);
+    for (int32_t i = 0; i < 4; ++i)
+    {
+        link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, nullptr, nullptr);
+    }
+
+    EXPECT_CALL(*io_nominal, write(_,_)).WillOnce(Return(-1));
+    EXPECT_CALL(*io_redundancy, write(_,_)).WillOnce(Return(-1));
+
+    link.finalizeDatagrams();
+
+    ASSERT_EQ(0, sentFrames());
+    ASSERT_EQ(DatagramState::SEND_ERROR, datagramStatus(254));
+    ASSERT_EQ(DatagramState::SEND_ERROR, datagramStatus(255));
+    ASSERT_EQ(DatagramState::SEND_ERROR, datagramStatus(0));
+    ASSERT_EQ(DatagramState::SEND_ERROR, datagramStatus(1));
+}
+
+
+TEST_F(LinkTest, process_datagrams_split_read_or_merge_per_command)
+{
+    InSequence s;
+
+    int64_t skip{0};
+    int64_t half_head = 0x0001020300000000;
+    int64_t half_tail = 0x0000000004050607;
+    int64_t full      = 0x0001020304050607;
+
+    // LRD is covered elsewhere: pin the other OR-merged read commands. BRW reads
+    // OR-accumulate over the echoed payload (zero here), so it merges the same way.
+    std::vector<Command> commands{Command::BRD, Command::APRD, Command::FPRD, Command::BRW};
+    for (auto cmd : commands)
+    {
+        std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, skip, false}); // payload zeroed for read commands.
+        addDatagram(cmd, skip, full, 2, false);
+        checkSendFrameRedundancy(expecteds_1); // check frame is sent on both interfaces.
+
+        // Line cut between slaves: each socket returns half the payload.
+        io_redundancy->handleReply<int64_t>({half_tail}, 1);
+        io_nominal->handleReply<int64_t>({half_head}, 1);
+
+        link.processDatagrams();
+    }
+
+    ASSERT_EQ(4, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, process_datagrams_single_responder_rw_takes_answered_copy)
+{
+    InSequence s;
+
+    // RW command addressed to a slave on the head segment of a split ring: the read data
+    // is only in the head copy, the tail copy streams the echoed request through unprocessed.
+    int64_t sent      = 0x00000000FFFFFFFF;
+    int64_t read_data = 0x0102030405060708;
+    std::vector<Command> commands{Command::FPRW, Command::APRW};
+    for (auto cmd : commands)
+    {
+        std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, sent});
+        addDatagram(cmd, sent, read_data, 3, false);
+        checkSendFrameRedundancy(expecteds_1);
+
+        io_redundancy->handleReply<int64_t>({sent}, 0);    // tail copy: echo, lands in the nominal frame
+        io_nominal->handleReply<int64_t>({read_data}, 3);  // head copy: slave answered
+
+        link.processDatagrams();
+    }
+
+    ASSERT_EQ(2, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, lrw_mapping_dispatched_by_logical_address)
+{
+    InSequence s;
+
+    // Two mapped logical frames with different layouts: each LRW pair must be spliced
+    // with the description matching its own logical address.
+    int64_t sent = 0x00000000FFFFFFFF;
+
+    LogicalFrameDescription desc0{};
+    desc0.address = 0;
+    desc0.logical_size = sizeof(sent);
+    desc0.pdo_size = sizeof(sent);
+    desc0.entries = {{3, 0, 4}, {3, 4, 4}}; // two slaves: prefix covers bytes 0-3 only
+    LogicalFrameDescription desc1{};
+    desc1.address = 0x800;
+    desc1.logical_size = sizeof(sent);
+    desc1.pdo_size = sizeof(sent);
+    desc1.entries = {{3, 0, 8}};            // one slave: prefix covers the full payload
+    link.setLogicalMapping({desc0, desc1});
+
+    int64_t tail0   = 0x0102030405060708;
+    int64_t head0   = 0x1112131415161718;
+    int64_t merged0 = 0x0102030415161718; // bytes 0-3 from the prefix copy
+    int64_t tail1   = 0x2122232425262728;
+    int64_t head1   = 0x3132333435363738;
+    int64_t merged1 = head1;              // full payload from the prefix copy
+
+    int32_t checked = 0;
+    auto queueLRW = [&](uint32_t address, int64_t expected)
+    {
+        link.addDatagram(Command::LRW, address, &sent, sizeof(sent),
+            [&checked, expected](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+            {
+                ++checked;
+                EXPECT_EQ(6, wkc);
+                EXPECT_EQ(0, std::memcmp(data, &expected, sizeof(expected)));
+                return DatagramState::OK;
+            },
+            [&](DatagramState const& status)
+            {
+                error_callback_counter++;
+                last_error = status;
+            });
+    };
+
+    std::vector<DatagramCheck<int64_t>> expecteds_2(2, {Command::LRW, sent});
+    queueLRW(0, merged0);
+    queueLRW(0x800, merged1);
+    checkSendFrameRedundancy(expecteds_2);
+
+    io_redundancy->handleReply<int64_t>({tail0, tail1}, 3); // suffix copies, nominal frame
+    io_nominal->handleReply<int64_t>({head0, head1}, 3);    // prefix copies, redundancy frame
+
+    link.processDatagrams();
+
+    ASSERT_EQ(2, checked);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, process_datagrams_lrw_outside_mapping_takes_covering_copy)
+{
+    InSequence s;
+
+    // No logical mapping provided and the processed copy landed on the redundancy side:
+    // the fallback must take the copy that covered the slaves, not the echoed one.
+    int64_t output_payload = 0x00000000FFFFFFFF;
+    int64_t processed      = 0x0102030405060708;
+    Command cmd = Command::LRW;
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {cmd, output_payload});
+    addDatagram(cmd, output_payload, processed, 3, false);
+    checkSendFrameRedundancy(expecteds_1);
+
+    io_redundancy->handleReply<int64_t>({output_payload}, 0); // unprocessed echo
+    io_nominal->handleReply<int64_t>({processed}, 3);         // copy processed by the slaves
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+TEST_F(LinkTest, lrw_not_matching_mapping_layout_uses_single_segment_rule)
+{
+    InSequence s;
+
+    // An LRW at a mapped address but with a different length is not the mapped datagram:
+    // splicing it with the mapping layout would write logical_size bytes over a smaller
+    // payload. It must take the single-segment rule instead.
+    int64_t sent      = 0x00000000FFFFFFFF;
+    int64_t tail_copy = 0x0102030405060708;
+    int64_t head_copy = 0x1112131415161718;
+
+    LogicalFrameDescription desc{};
+    desc.address = 0;
+    desc.logical_size = 16; // twice the datagram length below
+    desc.pdo_size = 16;
+    desc.entries = {{3, 0, 4}, {3, 4, 4}};
+    link.setLogicalMapping({desc});
+
+    std::vector<DatagramCheck<int64_t>> expecteds_1(1, {Command::LRW, sent});
+    addDatagram(Command::LRW, sent, tail_copy, 6, false); // nominal copy kept untouched
+    checkSendFrameRedundancy(expecteds_1);
+
+    io_redundancy->handleReply<int64_t>({tail_copy}, 3);
+    io_nominal->handleReply<int64_t>({head_copy}, 3);
+
+    link.processDatagrams();
+
+    ASSERT_EQ(1, process_callback_counter);
+    ASSERT_EQ(0, error_callback_counter);
+    ASSERT_EQ(DatagramState::OK, last_error);
+}
+
+
+// Hand-built 3-slave frame: inputs of 4 bytes at offsets 0/8/16, each slave contributing 3 (in+out).
+// Buffer roles follow Link::read()'s socket crossover: on a split ring `nominal` holds the
+// tail-injected copy (bus-order suffix), `redundancy` the head-injected copy (bus-order prefix).
+class LRWMergeTest : public testing::Test
+{
+public:
+    void SetUp() override
+    {
+        desc.logical_size = 26;
+        desc.pdo_size = 24; // last 2 bytes emulate a mailbox status area
+        for (int i = 0; i < 3; ++i)
+        {
+            desc.entries.push_back({3, i * 8, 4});
+        }
+
+        for (size_t i = 0; i < sizeof(nominal); ++i)
+        {
+            nominal[i] = static_cast<uint8_t>(0x10 + i);
+            redundancy[i] = static_cast<uint8_t>(0xA0 + i);
+        }
+    }
+
+protected:
+    LogicalFrameDescription desc{};
+    uint8_t nominal[26];
+    uint8_t redundancy[26];
+};
+
+
+TEST_F(LRWMergeTest, intact_ring_keeps_nominal_copy)
+{
+    // Intact ring: the head-injected copy processed every slave and exits at the tail, so it
+    // lands in the nominal buffer; the tail-injected copy streams through unprocessed (wkc 0).
+    uint8_t const expected[26] = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C,
+                                  0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29};
+    mergeSplitLRW(desc, nominal, redundancy, 9, 0);
+    ASSERT_EQ(0, std::memcmp(nominal, expected, sizeof(expected)));
+}
+
+
+TEST_F(LRWMergeTest, break_on_last_cable_takes_head_copy)
+{
+    // Break between the last slave and the tail master port: the tail-injected copy loops back
+    // before reaching any slave (wkc 0), the head-injected copy processed everyone.
+    mergeSplitLRW(desc, nominal, redundancy, 0, 9);
+    ASSERT_EQ(0, std::memcmp(nominal, redundancy, sizeof(redundancy)));
+}
+
+
+TEST_F(LRWMergeTest, split_after_slave0_takes_head_input_from_prefix_copy)
+{
+    // Break between slave 0 and slave 1: the head copy processed slave 0 (wkc 3, prefix ->
+    // redundancy buffer), the tail copy processed slaves 1 and 2 (wkc 6 -> nominal buffer).
+    mergeSplitLRW(desc, nominal, redundancy, 6, 3);
+
+    uint8_t const expected[26] = {0xA0, 0xA1, 0xA2, 0xA3,  // slave 0 input: prefix (redundancy)
+                                  0x14, 0x15, 0x16, 0x17,  // gap (outputs): nominal
+                                  0x18, 0x19, 0x1A, 0x1B,  // slave 1 input: suffix (nominal)
+                                  0x1C, 0x1D, 0x1E, 0x1F,
+                                  0x20, 0x21, 0x22, 0x23,  // slave 2 input: suffix (nominal)
+                                  0x24, 0x25, 0x26, 0x27,
+                                  0x28 | 0xB8, 0x29 | 0xB9}; // status area: OR of both copies
+    ASSERT_EQ(0, std::memcmp(nominal, expected, sizeof(expected)));
+}
+
+
+TEST_F(LRWMergeTest, split_before_last_slave)
+{
+    // Break between slave 1 and slave 2: the head copy processed slaves 0 and 1 (wkc 6,
+    // prefix -> redundancy buffer), the tail copy processed slave 2 only (wkc 3).
+    mergeSplitLRW(desc, nominal, redundancy, 3, 6);
+
+    uint8_t const expected[26] = {0xA0, 0xA1, 0xA2, 0xA3,  // slave 0 input: prefix (redundancy)
+                                  0x14, 0x15, 0x16, 0x17,
+                                  0xA8, 0xA9, 0xAA, 0xAB,  // slave 1 input: prefix (redundancy)
+                                  0x1C, 0x1D, 0x1E, 0x1F,
+                                  0x20, 0x21, 0x22, 0x23,  // slave 2 input: suffix (nominal)
+                                  0x24, 0x25, 0x26, 0x27,
+                                  0x28 | 0xB8, 0x29 | 0xB9};
+    ASSERT_EQ(0, std::memcmp(nominal, expected, sizeof(expected)));
+}
+
+
+TEST_F(LRWMergeTest, wkc_inside_a_contribution_attributes_started_slave_to_prefix)
+{
+    // wkc 4 lands inside slave 1's contribution of 3 (partial answer: the summed-wkc check
+    // discards the cycle anyway): the attribution must keep copying until the count is
+    // covered, so slave 1 is taken from the prefix copy like slave 0.
+    mergeSplitLRW(desc, nominal, redundancy, 5, 4);
+
+    uint8_t const expected[26] = {0xA0, 0xA1, 0xA2, 0xA3,  // slave 0 input: prefix (redundancy)
+                                  0x14, 0x15, 0x16, 0x17,
+                                  0xA8, 0xA9, 0xAA, 0xAB,  // slave 1 input: prefix (redundancy)
+                                  0x1C, 0x1D, 0x1E, 0x1F,
+                                  0x20, 0x21, 0x22, 0x23,  // slave 2 input: suffix (nominal)
+                                  0x24, 0x25, 0x26, 0x27,
+                                  0x28 | 0xB8, 0x29 | 0xB9};
+    ASSERT_EQ(0, std::memcmp(nominal, expected, sizeof(expected)));
 }
 }

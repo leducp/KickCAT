@@ -16,6 +16,13 @@ struct SDOAnswer
 } __attribute__((__packed__));
 
 
+struct BusAccessor : public Bus
+{
+    using Bus::Bus;
+    using Bus::pi_frames_;
+};
+
+
 class BusTest : public testing::Test
 {
 public:
@@ -28,29 +35,35 @@ public:
 
     void addFetchEepromWord(uint32_t word)
     {
-        // broadcastWrite: set address
-        mock_link->handleWriteThenRead(Command::BWR, 1);
+        // broadcastWrite: set address (wkc checked against slave count)
+        mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
 
-        // areEepromReady: check status (not busy)
-        mock_link->handleProcess(Command::FPRD, uint16_t{0x0080}, 1);
+        // areEepromReady: one status FPRD (not busy) per slave
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, uint16_t{0x0080}, 1);
+        }
 
-        // readEeprom: fetch data word
-        mock_link->handleProcess(Command::FPRD, word, 1);
+        // readEeprom: one data FPRD per pending slave (same content for all)
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, word, 1);
+        }
     }
 
     void detectAndReset()
     {
         // detectSlaves: broadcastRead
-        mock_link->handleWriteThenRead(Command::BRD, 1);
+        mock_link->handleWriteThenRead(Command::BRD, nb_slaves_);
 
         // reset slaves
         for (int i = 0; i < 11; ++i)
         {
-            mock_link->handleWriteThenRead(Command::BWR, 1);
+            mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
         }
         for (int i = 0; i < 3; ++i)
         {
-            mock_link->handleWriteThenRead(Command::BRD, 1);
+            mock_link->handleWriteThenRead(Command::BRD, nb_slaves_);
         }
     }
 
@@ -59,27 +72,36 @@ public:
         detectAndReset();
 
         // PDIO Watchdog: 3 broadcastWrites (divider, time PDI, time PDO)
-        mock_link->handleWriteThenRead(Command::BWR, 1);
-        mock_link->handleWriteThenRead(Command::BWR, 1);
-        mock_link->handleWriteThenRead(Command::BWR, 1);
+        mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
+        mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
+        mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
 
         // eeprom to master
-        mock_link->handleWriteThenRead(Command::BWR, 1);
+        mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
 
-        // setAddresses
+        // setAddresses: all APWR datagrams are packed in a single frame
         mock_link->handleWriteThenRead(Command::APWR, 1);
 
-        // fetchESC
-        mock_link->handleProcess(Command::FPRD, ESC::Description{0x4, 0, 0, 8, 8, 16, 0xf, 0x1cc}, 1);
+        // fetchESC: one FPRD per slave
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, ESC::Description{0x4, 0, 0, 8, 8, 16, 0xf, 0x1cc}, 1);
+        }
 
-        // fetch DL status
-        mock_link->handleProcess(Command::FPRD, uint16_t(0x0030), 1); // PL_port0 and PL_port1 active
+        // fetch DL status: one FPRD per slave
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, uint16_t(0x0030), 1); // PL_port0 and PL_port1 active
+        }
 
         // requestState: INIT
-        mock_link->handleWriteThenRead(Command::BWR, 1);
+        mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
 
-        // waitForState: check state INIT
-        mock_link->handleProcess(Command::FPRD, uint8_t(State::INIT), 1);
+        // waitForState: one AL status check per slave
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, uint8_t(State::INIT), 1);
+        }
 
         // fetchEeprom
         addFetchEepromWord(0);
@@ -130,36 +152,50 @@ public:
 
         addFetchEepromWord(0xFFFFFFFF);     // end of eeprom
 
-        // configureMailboxes
-        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+        // configureMailboxes: one FPWR per slave
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+        }
 
         // requestState: PREOP
-        mock_link->handleWriteThenRead(Command::BWR, 1);
+        mock_link->handleWriteThenRead(Command::BWR, nb_slaves_);
 
-        // waitForState: check state PREOP
-        mock_link->handleProcess(Command::FPRD, uint8_t(State::PRE_OP), 1);
+        // waitForState: one AL status check per slave
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, uint8_t(State::PRE_OP), 1);
+        }
 
-        // checkMailboxes: write check + read check
-        mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
-        mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+        // checkMailboxes: write checks (all slaves) then read checks (all slaves)
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
+        }
+        for (int i = 0; i < nb_slaves_; ++i)
+        {
+            mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+        }
 
         bus.init(watchdog);
 
-        ASSERT_EQ(1, bus.detectedSlaves());
+        ASSERT_EQ(nb_slaves_, bus.detectedSlaves());
 
-        auto const& slave = bus.slaves().at(0);
-        ASSERT_EQ(0xCAFEDECA, slave.sii.info.vendor_id);
-        ASSERT_EQ(0xA5A5A5A5, slave.sii.info.product_code);
-        ASSERT_EQ(0x5A5A5A5A, slave.sii.info.revision_number);
-        ASSERT_EQ(0x12345678, slave.sii.info.serial_number);
-        ASSERT_EQ(0x1000,     slave.mailbox.recv_offset);
-        ASSERT_EQ(0x2000,     slave.mailbox.send_offset);
-        ASSERT_EQ(0x0100,     slave.mailbox.recv_size);
-        ASSERT_EQ(0x0200,     slave.mailbox.send_size);
+        for (auto const& slave : bus.slaves())
+        {
+            ASSERT_EQ(0xCAFEDECA, slave.sii.info.vendor_id);
+            ASSERT_EQ(0xA5A5A5A5, slave.sii.info.product_code);
+            ASSERT_EQ(0x5A5A5A5A, slave.sii.info.revision_number);
+            ASSERT_EQ(0x12345678, slave.sii.info.serial_number);
+            ASSERT_EQ(0x1000,     slave.mailbox.recv_offset);
+            ASSERT_EQ(0x2000,     slave.mailbox.send_offset);
+            ASSERT_EQ(0x0100,     slave.mailbox.recv_size);
+            ASSERT_EQ(0x0200,     slave.mailbox.send_size);
 
-        ASSERT_EQ(1, slave.sii.TxPDO.size());
-        ASSERT_EQ(1, slave.sii.RxPDO.size());
-        ASSERT_EQ(2, slave.sii.RxPDO[0].entries.size());
+            ASSERT_EQ(1, slave.sii.TxPDO.size());
+            ASSERT_EQ(1, slave.sii.RxPDO.size());
+            ASSERT_EQ(2, slave.sii.RxPDO[0].entries.size());
+        }
     }
 
     template<typename T>
@@ -199,7 +235,8 @@ public:
 
 protected:
     std::shared_ptr<MockLink> mock_link{ std::make_shared<MockLink>() };
-    Bus bus{ mock_link };
+    BusAccessor bus{ mock_link };
+    int nb_slaves_{1}; // set in a derived fixture constructor, before SetUp runs
 };
 
 TEST_F(BusTest, nop)
@@ -313,6 +350,28 @@ TEST_F(BusTest, logical_cmd)
 
     mock_link->handleProcess(Command::LRW, uint8_t{0}, 0);
     ASSERT_THROW(bus.processDataReadWrite([](DatagramState const&){ throw std::overflow_error(""); }), std::overflow_error);
+}
+
+
+TEST_F(BusTest, description_entries_built_at_mapping)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+
+    uint8_t iomap[256];
+    bus.createMapping(iomap, sizeof(iomap));
+
+    ASSERT_EQ(1u, bus.pi_frames_.size());
+    auto const& entries = bus.pi_frames_[0].description.entries;
+    ASSERT_EQ(1u, entries.size());
+    ASSERT_EQ(3, entries[0].contribution); // input + output
+    ASSERT_EQ(0, entries[0].input_offset);
+    ASSERT_EQ(slave.input.bsize, entries[0].input_size);
 }
 
 
@@ -1106,4 +1165,212 @@ TEST_F(BusTest, mailbox_sequencer_no_skip_without_fmmu)
 
     // Phase 3: sendWriteMessages -> nothing
     sequencer.step(noop);
+}
+
+
+// ---------- Two-slave bus fixture ----------
+
+// Same eeprom content as BusTest, replayed for two identical slaves:
+// TxPDO 32 bytes, RxPDO 48 bytes, CoE mailbox, two SyncManagers.
+class BusTest2Slaves : public BusTest
+{
+public:
+    BusTest2Slaves()
+    {
+        nb_slaves_ = 2;
+    }
+};
+
+
+TEST_F(BusTest2Slaves, description_entries_multi_slave_offsets)
+{
+    auto& slave0 = bus.slaves().at(0);
+    auto& slave1 = bus.slaves().at(1);
+    slave0.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+    slave1.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+
+    // configureFMMUs: SM+FMMU for input and output, per slave
+    for (int i = 0; i < 8; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+
+    uint8_t iomap[256];
+    bus.createMapping(iomap, sizeof(iomap));
+
+    ASSERT_EQ(32, slave0.input.bsize);
+    ASSERT_EQ(48, slave0.output.bsize);
+
+    ASSERT_EQ(1u, bus.pi_frames_.size());
+    auto const& entries = bus.pi_frames_[0].description.entries;
+    ASSERT_EQ(2u, entries.size());
+
+    ASSERT_EQ(3, entries[0].contribution);
+    ASSERT_EQ(0, entries[0].input_offset);
+    ASSERT_EQ(slave0.input.bsize, entries[0].input_size);
+
+    // overlapped layout: slave 1 blocks start after max(in, out) of slave 0
+    int32_t expected_offset = slave0.input.bsize;
+    if (slave0.output.bsize > expected_offset)
+    {
+        expected_offset = slave0.output.bsize;
+    }
+    ASSERT_EQ(3, entries[1].contribution);
+    ASSERT_EQ(expected_offset, entries[1].input_offset);
+    ASSERT_EQ(slave1.input.bsize, entries[1].input_size);
+}
+
+
+TEST_F(BusTest2Slaves, description_entries_mailbox_only_slave_contribution)
+{
+    auto& slave0 = bus.slaves().at(0);
+    auto& slave1 = bus.slaves().at(1);
+
+    // slave 0: mailbox but no PDO at all
+    slave0.is_static_mapping = true;
+    slave0.input.bsize = 0;
+    slave0.output.bsize = 0;
+
+    // slave 1: plain PDO slave, out of the mailbox status scope
+    slave1.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK | MailboxStatusFMMU::WRITE_CHECK);
+
+    // configureFMMUs: 4 FPWR for slave 1, then 2 FPWR for slave 0 mailbox status FMMUs
+    for (int i = 0; i < 6; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+
+    uint8_t iomap[256];
+    bus.createMapping(iomap, sizeof(iomap));
+
+    ASSERT_EQ(1u, bus.pi_frames_.size());
+    auto const& frame = bus.pi_frames_[0];
+    auto const& entries = frame.description.entries;
+    ASSERT_EQ(2u, entries.size());
+
+    // counted exactly once although both read and write status FMMUs reference it
+    ASSERT_EQ(1, entries[0].contribution);
+    ASSERT_EQ(-1, entries[0].input_offset);
+    ASSERT_EQ(0, entries[0].input_size);
+
+    ASSERT_EQ(3, entries[1].contribution);
+    ASSERT_EQ(0, entries[1].input_offset);
+    ASSERT_EQ(slave1.input.bsize, entries[1].input_size);
+
+    ASSERT_EQ(1, frame.mailbox_status_wkc_read_adjust);
+}
+
+
+TEST_F(BusTest, output_buffer_zeroed_between_blocks)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+    slave.is_static_mapping = true;
+    slave.input.bsize = 8;
+    slave.input.sync_manager = 1;
+    slave.output.bsize = 4;
+    slave.output.sync_manager = 0;
+
+    // configureFMMUs: 4 FPWR
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+
+    uint8_t iomap[256];
+    std::memset(iomap, 0xFF, sizeof(iomap)); // dirty client buffer: zeroes must come from the mapping
+    bus.createMapping(iomap, sizeof(iomap));
+
+    // logical size = max(in 8, out 4); bytes 4-7 are an input-only gap
+    auto const& frame = bus.pi_frames_[0];
+    ASSERT_EQ(8, frame.description.logical_size);
+    ASSERT_EQ(8u, frame.output_buffer.size());
+    for (uint8_t byte : frame.output_buffer)
+    {
+        ASSERT_EQ(0, byte);
+    }
+
+    // LRW payload: output block from the iomap, input-only gap still zeroed
+    std::memset(slave.output.data, 0xAB, 4);
+    bus.sendLogicalReadWrite([](DatagramState const&){});
+
+    ASSERT_EQ(1u, mock_link->pendingDatagrams().size());
+    auto const& sent = mock_link->pendingDatagrams()[0];
+    ASSERT_EQ(Command::LRW, sent.command);
+    ASSERT_EQ(8u, sent.data.size());
+    for (int i = 0; i < 4; ++i)
+    {
+        ASSERT_EQ(0xAB, sent.data[i]);
+    }
+    for (int i = 4; i < 8; ++i)
+    {
+        ASSERT_EQ(0, sent.data[i]);
+    }
+
+    // drain the awaiting datagram (wkc = 1 input + 2 * 1 output)
+    uint64_t reply = 0;
+    mock_link->handleProcess(Command::LRW, reply, 3);
+    bus.processAwaitingFrames();
+}
+
+
+TEST_F(BusTest, create_mapping_twice_does_not_duplicate_state)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+
+    uint8_t iomap[256];
+    for (int run = 0; run < 2; ++run)
+    {
+        // configureFMMUs: 4 FPWR per run
+        for (int i = 0; i < 4; ++i)
+        {
+            mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+        }
+        bus.createMapping(iomap, sizeof(iomap));
+
+        ASSERT_EQ(1u, bus.pi_frames_.size());
+        auto const& frame = bus.pi_frames_[0];
+        ASSERT_EQ(1u, frame.inputs.size());
+        ASSERT_EQ(1u, frame.outputs.size());
+        ASSERT_EQ(1u, frame.description.entries.size());
+        ASSERT_EQ(3, frame.description.entries[0].contribution);
+        ASSERT_EQ(0, frame.description.entries[0].input_offset);
+        ASSERT_EQ(slave.input.bsize, frame.description.entries[0].input_size);
+
+        // The link copy tracks the current mapping: replaced, not appended
+        auto const& mapping = mock_link->logicalMapping();
+        ASSERT_EQ(1u, mapping.size());
+        ASSERT_EQ(frame.description.address, mapping[0].address);
+        ASSERT_EQ(frame.description.logical_size, mapping[0].logical_size);
+        ASSERT_EQ(frame.description.entries.size(), mapping[0].entries.size());
+    }
+}
+
+
+TEST_F(BusTest, logical_mapping_shared_with_link_at_mapping)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    }
+
+    uint8_t iomap[256];
+    bus.createMapping(iomap, sizeof(iomap));
+
+    auto const& mapping = mock_link->logicalMapping();
+    ASSERT_EQ(1u, mapping.size());
+    auto const& desc = mapping[0];
+    ASSERT_EQ(bus.pi_frames_[0].description.address, desc.address);
+    ASSERT_EQ(48, desc.logical_size); // max(in 32, out 48)
+    ASSERT_EQ(48, desc.pdo_size);
+    ASSERT_EQ(1u, desc.entries.size());
+    ASSERT_EQ(3, desc.entries[0].contribution); // 1 input + 2 outputs
+    ASSERT_EQ(0, desc.entries[0].input_offset);
+    ASSERT_EQ(32, desc.entries[0].input_size);
 }

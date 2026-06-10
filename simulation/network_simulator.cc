@@ -354,7 +354,10 @@ int main(int argc, char* argv[])
         {
             return false;
         }
-        network.route(frame, redundant_path);
+        if (not network.route(frame, redundant_path))
+        {
+            return true; // frame destroyed by an ESC (circulating flag): nothing to send back
+        }
 
         AbstractSocket* out = in;            // broken segment: loop back to the same port
         if (network.ringIntact())

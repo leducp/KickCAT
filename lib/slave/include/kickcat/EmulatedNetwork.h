@@ -48,7 +48,9 @@ namespace kickcat
 
         // Route a received frame through the slaves in physical order. `redundancy`
         // selects the tail injection path (meaningful only when redundancy is set).
-        void route(Frame& frame, bool redundancy = false);
+        // Returns false when an ESC destroyed the frame (circulating flag already set
+        // at a closed port 0): the frame must not be delivered back to the master.
+        bool route(Frame& frame, bool redundancy = false);
 
         size_t size()          const { return slaves_.size(); }
         bool   hasRedundancy() const { return redundancy_node_ != NO_NODE; }
@@ -72,9 +74,27 @@ namespace kickcat
             std::array<Port, PORT_COUNT> ports{};
         };
 
+        // One EPU passage of the frame walk. A passage at a closed port 0 is where real
+        // ESCs handle the circulating flag: set it, or destroy an already-flagged frame.
+        struct Hop
+        {
+            size_t node;
+            bool   port0_closed;
+        };
+
         void buildLine();
         void rebuild();
-        void buildOrder(size_t node, uint8_t entry_port, std::vector<size_t>& order, std::vector<bool>& visited) const;
+        bool isValidInjection(size_t node, uint8_t port) const;
+
+        // Physical frame walk from a master injection point. The EtherCAT processing unit
+        // sits between port 0 and the forwarding chain, so a node processes the frame each
+        // time it proceeds from port 0: entry through port 0, return from the port-0 branch,
+        // or loopback at a closed port 0. Returns true when the frame left the segment
+        // through a master port (recorded in exit_node/exit_port), or when the walk budget
+        // is exhausted - exit_node then keeps its caller-provided value (NO_NODE after
+        // rebuild()).
+        bool walkFrame(size_t node, uint8_t entry_port, std::vector<Hop>& order,
+                       size_t& exit_node, uint8_t& exit_port, size_t& budget) const;
         nanoseconds buildReceiveTimes(size_t node, uint8_t entry_port, nanoseconds t_in, std::vector<bool>& visited);
         void computeDlStatus();
         void writeReceiveTimes(size_t node, nanoseconds base);
@@ -87,8 +107,8 @@ namespace kickcat
         size_t  redundancy_node_ = NO_NODE;
         uint8_t redundancy_port_ = 0;
 
-        std::vector<size_t> order_nominal_;      // node indices in physical processing order
-        std::vector<size_t> order_redundancy_;
+        std::vector<Hop> order_nominal_;         // EPU passages in physical processing order
+        std::vector<Hop> order_redundancy_;
 
         // Per-(node, port) DC receive-time offset and per-node EPU offset, relative
         // to frame entry; combined with a per-latch time base when a frame latches.

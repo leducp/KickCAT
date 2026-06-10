@@ -10,6 +10,15 @@ namespace kickcat
 {
     class AbstractSocket;
 
+    /// \brief Rebuild a spliced LRW payload in place in data_nominal from the two ring copies.
+    /// \details Slaves are attributed to a segment by accumulating their expected contributions
+    ///          against the prefix copy's wkc.
+    /// \warning On a split ring each copy loops back at the break: data_nominal holds the
+    ///          tail-injected copy (bus-order suffix) and data_redundancy the head-injected
+    ///          copy (bus-order prefix).
+    void mergeSplitLRW(LogicalFrameDescription const& desc, uint8_t* data_nominal, uint8_t const* data_redundancy,
+                       uint16_t wkc_nominal, uint16_t wkc_redundancy);
+
     class Link final : public AbstractLink
     {
         friend class LinkTest;
@@ -32,6 +41,8 @@ namespace kickcat
                          std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                          std::function<void(DatagramState const& state)> const& error) override;
 
+        void setLogicalMapping(std::vector<LogicalFrameDescription> const& mapping) override { logical_mapping_ = mapping; }
+
         void finalizeDatagrams() override;
         void processDatagrams() override;
 
@@ -46,6 +57,13 @@ namespace kickcat
         uint8_t index_head_{0};
         uint8_t sent_frame_{0};
 
+        // Index outside the [index_queue_, index_head_) window: previous-cycle leftover.
+        bool isStale(uint8_t index) const
+        {
+            uint8_t const in_flight = static_cast<uint8_t>(index_head_ - index_queue_);
+            return static_cast<uint8_t>(index - index_queue_) >= in_flight;
+        }
+
         struct Callbacks
         {
             DatagramState status{DatagramState::LOST};
@@ -53,6 +71,8 @@ namespace kickcat
             std::function<void(DatagramState const& state)> error; // May throw exception.
         };
         std::array<Callbacks, 256> callbacks_{};
+
+        std::vector<LogicalFrameDescription> logical_mapping_{}; // Empty: command-based default merge.
 
         struct IRQ
         {
@@ -65,7 +85,7 @@ namespace kickcat
         void read() ;
         void sendFrame() ;
         bool isDatagramAvailable() ;
-        std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram() ;
+        std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram(bool& dropped_pair) ;
         void addDatagramToFrame(uint8_t index, enum Command command, uint32_t address, void const* data, uint16_t data_size) ;
         void resetFrameContext() ;
         void checkEcatEvents(uint16_t irq);

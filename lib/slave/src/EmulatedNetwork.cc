@@ -121,26 +121,48 @@ namespace kickcat
         rebuild();
     }
 
-    void EmulatedNetwork::buildOrder(size_t node, uint8_t entry_port, std::vector<size_t>& order,
-                                     std::vector<bool>& visited) const
+    bool EmulatedNetwork::walkFrame(size_t node, uint8_t entry_port, std::vector<Hop>& order,
+                                    size_t& exit_node, uint8_t& exit_port, size_t& budget) const
     {
-        if (visited[node])
+        if (budget == 0)
         {
-            return;
+            return true; // malformed cyclic wiring: stop the walk instead of recursing forever
         }
-        visited[node] = true;
-        order.push_back(node);
+        --budget;
+
+        if (entry_port == 0)
+        {
+            order.push_back({node, false});
+        }
 
         uint8_t start = indexInOrder(entry_port);
         for (uint8_t k = 1; k < PORT_COUNT; ++k)
         {
             uint8_t p = PORT_ORDER[(start + k) % PORT_COUNT];
             Port const& port = nodes_[node].ports[p];
-            if (port.up and (port.peer_node != NO_NODE) and (not visited[port.peer_node]))
+            if (port.to_master)
             {
-                buildOrder(port.peer_node, port.peer_port, order, visited);
+                exit_node = node;
+                exit_port = p;
+                return true; // frame leaves the segment through the master port
+            }
+            if (port.up and (port.peer_node != NO_NODE))
+            {
+                if (walkFrame(port.peer_node, port.peer_port, order, exit_node, exit_port, budget))
+                {
+                    return true;
+                }
+                if (p == 0)
+                {
+                    order.push_back({node, false}); // frame came back into port 0: EPU passage
+                }
+            }
+            else if (p == 0)
+            {
+                order.push_back({node, true}); // closed port 0 loops back through the EPU
             }
         }
+        return false; // frame leaves back through its entry port
     }
 
     nanoseconds EmulatedNetwork::buildReceiveTimes(size_t node, uint8_t entry_port, nanoseconds t_in,
@@ -153,7 +175,10 @@ namespace kickcat
         visited[node] = true;
 
         recv_offset_[node][entry_port] = t_in;
-        epu_offset_[node]              = t_in;
+        if (entry_port == 0)
+        {
+            epu_offset_[node] = t_in; // EPU sits right behind port 0 reception
+        }
 
         nanoseconds const fwd = nodes_[node].esc->forwardingDelay();
         nanoseconds t = t_in + fwd;
@@ -163,13 +188,25 @@ namespace kickcat
         {
             uint8_t p = PORT_ORDER[(start + k) % PORT_COUNT];
             Port const& port = nodes_[node].ports[p];
+            if (port.to_master)
+            {
+                break; // frame leaves the segment: nothing downstream sees it
+            }
             if (port.up and (port.peer_node != NO_NODE) and (not visited[port.peer_node]))
             {
                 t += CABLE_DELAY;
                 nanoseconds t_child_out = buildReceiveTimes(port.peer_node, port.peer_port, t, visited);
                 t = t_child_out + CABLE_DELAY;
                 recv_offset_[node][p] = t;   // frame received back from the child branch
+                if (p == 0)
+                {
+                    epu_offset_[node] = t;   // EPU passage on the way back through port 0
+                }
                 t += fwd;
+            }
+            else if ((p == 0) and ((not port.up) or (port.peer_node == NO_NODE)))
+            {
+                epu_offset_[node] = t;       // closed port 0: loopback through the EPU
             }
         }
         return t;
@@ -198,8 +235,17 @@ namespace kickcat
         }
     }
 
+    bool EmulatedNetwork::isValidInjection(size_t node, uint8_t port) const
+    {
+        // NO_NODE is size_t(-1): the node bound also rejects "no injection".
+        return (node < nodes_.size()) and (port < PORT_COUNT);
+    }
+
     void EmulatedNetwork::rebuild()
     {
+        bool const has_nominal = isValidInjection(injection_node_, injection_port_);
+        bool const has_redundancy = isValidInjection(redundancy_node_, redundancy_port_);
+
         // Master injection points are derived here so connect() only manages wires.
         for (auto& node : nodes_)
         {
@@ -208,39 +254,53 @@ namespace kickcat
                 port.to_master = false;
             }
         }
-        if (injection_node_ != NO_NODE)
+        if (has_nominal)
         {
             nodes_[injection_node_].ports[injection_port_].to_master = true;
         }
-        if (redundancy_node_ != NO_NODE)
+        if (has_redundancy)
         {
             nodes_[redundancy_node_].ports[redundancy_port_].to_master = true;
         }
 
         size_t const n = nodes_.size();
+        // Worst case frame walk: both directions of every port of every node, plus the
+        // injection hop - anything longer means a wiring cycle.
+        size_t const walk_budget = 2 * PORT_COUNT * (n + 1);
 
         order_nominal_.clear();
-        std::vector<bool> visited_order(n, false);
-        buildOrder(injection_node_, injection_port_, order_nominal_, visited_order);
-
         order_redundancy_.clear();
         ring_intact_ = false;
-        if (redundancy_node_ != NO_NODE)
+
+        size_t exit_node = NO_NODE;
+        uint8_t exit_port = 0;
+        if (has_nominal)
         {
-            // Ring is closed when the head injection already reaches the tail port.
-            ring_intact_ = visited_order[redundancy_node_];
-            // The two paths PARTITION the slaves (shared visited set): the redundant
-            // path covers only what the nominal path could not reach. So each slave is
-            // processed by exactly one frame and the master's WKC sum stays correct -
-            // all slaves on the nominal frame when intact, head/tail split on a break.
-            buildOrder(redundancy_node_, redundancy_port_, order_redundancy_, visited_order);
+            size_t budget = walk_budget;
+            walkFrame(injection_node_, injection_port_, order_nominal_, exit_node, exit_port, budget);
+        }
+
+        if (has_redundancy)
+        {
+            // Ring closed <=> the head frame leaves the segment through the tail master port.
+            ring_intact_ = (exit_node == redundancy_node_) and (exit_port == redundancy_port_);
+
+            // With the ring closed the tail frame streams through every slave without an EPU
+            // passage and exits at the head: the walk yields an empty order. On a break each
+            // half is processed by exactly one frame, from the break outward - the partition
+            // keeps the master's summed WKC correct.
+            size_t budget = walk_budget;
+            walkFrame(redundancy_node_, redundancy_port_, order_redundancy_, exit_node, exit_port, budget);
         }
 
         recv_offset_.assign(n, std::array<nanoseconds, PORT_COUNT>{});
         epu_offset_.assign(n, 0ns);
         std::vector<bool> visited_time(n, false);
-        buildReceiveTimes(injection_node_, injection_port_, 0ns, visited_time);
-        if (redundancy_node_ != NO_NODE)
+        if (has_nominal)
+        {
+            buildReceiveTimes(injection_node_, injection_port_, 0ns, visited_time);
+        }
+        if (has_redundancy)
         {
             buildReceiveTimes(redundancy_node_, redundancy_port_, 0ns, visited_time);
         }
@@ -262,20 +322,21 @@ namespace kickcat
         nodes_[node].esc->write(reg::DC_ECAT_RECEIVED_TIME, &epu, sizeof(epu));
     }
 
-    void EmulatedNetwork::route(Frame& frame, bool redundancy)
+    bool EmulatedNetwork::route(Frame& frame, bool redundancy)
     {
         if (dirty_)
         {
             rebuild();
         }
 
-        std::vector<size_t> const* order = &order_nominal_;
+        std::vector<Hop> const* order = &order_nominal_;
         if (redundancy)
         {
             order = &order_redundancy_;
         }
 
         frame.resetContext();
+        bool destroyed = false;
         while (true)
         {
             auto [header, data, wkc] = frame.peekDatagram();
@@ -287,19 +348,36 @@ namespace kickcat
             uint16_t offset = static_cast<uint16_t>(header->address >> 16);
             bool latch = isPhysicalWrite(header->command) and (offset == reg::DC_RECEIVED_TIME);
 
-            for (size_t idx : *order)
+            for (auto const& hop : *order)
             {
-                nodes_[idx].esc->processDatagram(header, data, wkc);
+                if (hop.port0_closed)
+                {
+                    if (header->circulating)
+                    {
+                        // Already circulated once: this ESC destroys the frame. Cut-through
+                        // forwarding means upstream hops still process every datagram.
+                        destroyed = true;
+                        break;
+                    }
+                    header->circulating = 1;
+                }
+                nodes_[hop.node].esc->processDatagram(header, data, wkc);
+            }
+
+            if (destroyed)
+            {
+                continue;
             }
 
             if (latch)
             {
                 nanoseconds base = since_ecat_epoch();
-                for (size_t idx : *order)
+                for (auto const& hop : *order)
                 {
-                    writeReceiveTimes(idx, base);
+                    writeReceiveTimes(hop.node, base);
                 }
             }
         }
+        return not destroyed;
     }
 }

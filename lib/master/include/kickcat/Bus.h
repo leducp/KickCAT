@@ -227,9 +227,8 @@ namespace kickcat
 
         struct PIFrame
         {
-            uint32_t address;               // logical address
-            int32_t  logical_size;          // full logical address range (PDO + mailbox status bits)
-            int32_t  pdo_size;              // process data only (used by LWR)
+            LogicalFrameDescription description;
+
             std::vector<blockIO> inputs;    // slave to master
             std::vector<blockIO> outputs;
             std::vector<MailboxStatusEntry> mailbox_read_status;
@@ -237,6 +236,14 @@ namespace kickcat
 
             // Adjust wkc in case the slave do not have a PDO read but still answer because of the mbx check
             uint16_t mailbox_status_wkc_read_adjust{0};
+
+            // Sum of description entry contributions, so the cyclic LRW check and the
+            // segment attribution cannot drift apart
+            uint16_t expected_lrw_wkc{0};
+
+            // Outgoing payload, zeroed once at mapping time so the gaps between output
+            // blocks never carry residual bytes on the wire
+            std::vector<uint8_t> output_buffer;
         };
         std::vector<PIFrame> pi_frames_; // PI frame description
 
