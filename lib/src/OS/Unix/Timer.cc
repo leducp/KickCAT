@@ -9,8 +9,9 @@ namespace kickcat
 {
     std::error_code Timer::wait_next_tick()
     {
-        timespec const deadline = to_timespec(next_deadline_);
-        int rc = clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
+        // next_deadline_ is in since_epoch() base: shift it back to the monotonic base
+        timespec const deadline = to_timespec(next_deadline_ - epoch_offset());
+        int rc = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, NULL);
         if (rc != 0)
         {
             if (rc == EINTR)

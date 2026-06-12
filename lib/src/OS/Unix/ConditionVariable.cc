@@ -48,6 +48,12 @@ namespace kickcat
                 THROW_SYSTEM_ERROR_CODE("pthread_condattr_setpshared()", rc);
             }
         }
+
+        rc = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+        if (rc != 0)
+        {
+            THROW_SYSTEM_ERROR_CODE("pthread_condattr_setclock()", rc);
+        }
 #endif
 
         rc = pthread_cond_init(pcond_, &attr);
@@ -79,10 +85,13 @@ namespace kickcat
 
     int ConditionVariable::wait_until(Mutex& mutex, nanoseconds timeout, std::function<bool(void)> stopWaiting)
     {
+#ifndef __MINGW64__
+        // condvar clock is CLOCK_MONOTONIC (see init()): shift the deadline to the monotonic base
+        nanoseconds deadline = since_epoch() - epoch_offset() + timeout;
+#else
         nanoseconds deadline = since_epoch() + timeout;
-        seconds deadline_sec = duration_cast<seconds>(deadline);
-        deadline -= deadline_sec;
-        struct timespec abstime{deadline_sec.count(), deadline.count()};
+#endif
+        struct timespec abstime = to_timespec(deadline);
 
         while (not stopWaiting())
         {

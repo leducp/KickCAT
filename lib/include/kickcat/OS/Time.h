@@ -11,7 +11,15 @@ namespace kickcat
 
     void sleep(nanoseconds ns);
 
+    // return the time in ns since an arbitrary fixed point (typically boot) - monotonic source
+    nanoseconds clock_monotonic();
+
+    // Offset captured once at first use so that since_epoch() == clock_monotonic() + epoch_offset()
+    nanoseconds epoch_offset();
+
     // return the time in ns since epoch
+    // Backed by clock_monotonic(): wall-clock changes (NTP slew/step, RTC sync) after the
+    // epoch_offset() capture do not affect any kickcat timing.
     nanoseconds since_epoch();
 
     // return time in ns since the processus start

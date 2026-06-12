@@ -38,6 +38,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/masterOD-gateway-t.cc
                             src/slave/slave-t.cc
                             src/slave/PDO-t.cc
+                            src/time-t.cc
                             src/Time.cc
 )
 

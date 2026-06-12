@@ -3,6 +3,13 @@
 
 namespace kickcat
 {
+    nanoseconds clock_monotonic()
+    {
+        timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        return from_timespec(now);
+    }
+
     void sleep(nanoseconds ns)
     {
         // convert chrono to OS timespec
@@ -15,7 +22,7 @@ namespace kickcat
             timespec required_time = remaining_time;
 
             // remaining time
-            int32_t result = clock_nanosleep(CLOCK_REALTIME, 0, &required_time, &remaining_time);
+            int32_t result = clock_nanosleep(CLOCK_MONOTONIC, 0, &required_time, &remaining_time);
             if (result == 0)
             {
                 return;
