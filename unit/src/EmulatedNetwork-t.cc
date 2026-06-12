@@ -251,6 +251,40 @@ TEST(EmulatedNetwork, split_ring_lrw_master_merge_rebuilds_inputs)
 }
 
 
+TEST(EmulatedNetwork, brd_or_merges_data_and_increments_adp)
+{
+    auto slaves = makeSlaves(3);
+    EmulatedNetwork net(pointers(slaves));
+
+    // One distinct AL_STATUS bit per slave: the OR-merge must expose all of them.
+    uint16_t status = State::INIT;
+    slaves[0]->write(reg::AL_STATUS, &status, sizeof(status));
+    status = State::PRE_OP;
+    slaves[1]->write(reg::AL_STATUS, &status, sizeof(status));
+    status = State::SAFE_OP | AL_STATUS_ERR_IND;
+    slaves[2]->write(reg::AL_STATUS, &status, sizeof(status));
+
+    uint16_t payload = 0;
+    Frame frame;
+    frame.addDatagram(0, Command::BRD, createAddress(0, reg::AL_STATUS), &payload, sizeof(payload));
+    frame.finalize();
+    EXPECT_TRUE(net.route(frame, false));
+
+    frame.resetContext();
+    auto [header, data, wkc] = frame.peekDatagram();
+    EXPECT_EQ(3, *wkc);
+
+    // ETG.1000.4 Table 16: ADP incremented by one at each slave, DATA is the
+    // bitwise OR of the request data and every addressed slave's memory.
+    auto [position, offset] = extractAddress(header->address);
+    EXPECT_EQ(3, position);
+    EXPECT_EQ(reg::AL_STATUS, offset);
+
+    uint16_t merged = 0;
+    std::memcpy(&merged, data, sizeof(merged));
+    EXPECT_EQ(State::INIT | State::PRE_OP | State::SAFE_OP | AL_STATUS_ERR_IND, merged);
+}
+
 TEST(EmulatedNetwork, intact_ring_sets_no_circulating_flag)
 {
     auto slaves = makeSlaves(3);
