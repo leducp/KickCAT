@@ -413,9 +413,29 @@ namespace kickcat
             }
 
             //************* Broadcast *************//
-            case Command::BRD:  { processReadCommand     (header, data, wkc, offset); break; }
-            case Command::BWR:  { processWriteCommand    (header, data, wkc, offset); break; }
-            case Command::BRW:  { processReadWriteCommand(header, data, wkc, offset); break; }
+            // ETG.1000.4 5.4.x.4: every slave processes the datagram and increments ADP;
+            // read data is bitwise-ORed into the frame, not copied over it.
+            case Command::BRD:
+            {
+                processBroadcastReadCommand(header, data, wkc, offset);
+                ++position;
+                header->address = createAddress(position, offset);
+                break;
+            }
+            case Command::BWR:
+            {
+                processWriteCommand(header, data, wkc, offset);
+                ++position;
+                header->address = createAddress(position, offset);
+                break;
+            }
+            case Command::BRW:
+            {
+                processBroadcastReadWriteCommand(header, data, wkc, offset);
+                ++position;
+                header->address = createAddress(position, offset);
+                break;
+            }
 
             //************** Logical **************//
             case Command::LRD:  { processLRD(header, data, wkc); break; }
@@ -505,8 +525,9 @@ namespace kickcat
             memory_.al_status = memory_.al_control;
         }
 
-        // Handle eeprom access
-        uint16_t order = memory_.eeprom_control & 0x0701;
+        // Handle eeprom access. Command is in bits [10:8] only: a conformant master
+        // sets WR_EN (bit 0) alongside WRITE, so matching on bit 0 too drops writes.
+        uint16_t order = memory_.eeprom_control & eeprom::Control::COMMAND;
         switch (order)
         {
             case eeprom::Control::READ:
@@ -526,11 +547,20 @@ namespace kickcat
             }
             case eeprom::Control::WRITE:
             {
+                if (not (memory_.eeprom_control & eeprom::Control::WR_EN))
+                {
+                    // Datasheet 0x0502[14]: write command without write enable
+                    memory_.eeprom_control &= ~eeprom::Control::COMMAND;
+                    memory_.eeprom_control |= eeprom::Control::ERROR_WR_EN;
+                    break;
+                }
+
                 if (memory_.eeprom_address >= eeprom_.size())
                 {
                     // Increase eeprom size to let the write be done properly
                     // This is a shortcut for emulation, real device should handle the eeprom size.
-                    eeprom_.resize(memory_.eeprom_address);
+                    // One word past the address (word-addressed); fill mimics an unwritten eeprom.
+                    eeprom_.resize(std::size_t(memory_.eeprom_address) + 1, 0xFFFF);
                 }
 
                 memory_.eeprom_control &= ~0x0700; // clear order
@@ -548,13 +578,14 @@ namespace kickcat
                     last_write_eeprom_ = since_epoch();
                     std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 2);
                     memory_.eeprom_control &= ~0x0700; // clear order
+                    memory_.eeprom_control &= ~eeprom::Control::WR_EN; // self-clearing once the write is done
                 }
 
                 break;
             }
             case eeprom::Control::NOP:
             {
-                memory_.eeprom_control &= ~eeprom::Control::ERROR_CMD;
+                memory_.eeprom_control &= ~(eeprom::Control::ERROR_CMD | eeprom::Control::ERROR_WR_EN);
                 break;
             }
             case eeprom::Control::RELOAD:
@@ -587,6 +618,49 @@ namespace kickcat
         if (written > 0)
         {
             *wkc += 1;
+        }
+    }
+
+
+    int32_t EmulatedESC::readOrIntoFrame(uint16_t offset, void* data, uint16_t size)
+    {
+        uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
+        int32_t read = computeInternalMemoryAccess(offset, buffer, size, Access::ECAT_READ);
+        uint8_t* frame = static_cast<uint8_t*>(data);
+        for (int32_t i = 0; i < read; ++i)
+        {
+            frame[i] |= buffer[i];
+        }
+        return read;
+    }
+
+
+    void EmulatedESC::processBroadcastReadCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset)
+    {
+        if (readOrIntoFrame(offset, data, header->len) > 0)
+        {
+            *wkc += 1;
+        }
+    }
+
+
+    void EmulatedESC::processBroadcastReadWriteCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset)
+    {
+        // ETG.1000.4 5.4.3.4: the data as received is written, the memory content
+        // before the write is ORed into the frame.
+        uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
+        std::memcpy(swap, data, header->len);
+
+        int32_t read    = readOrIntoFrame(offset, data, header->len);
+        int32_t written = computeInternalMemoryAccess(offset, swap, header->len, Access::ECAT_WRITE);
+
+        if (read > 0)
+        {
+            *wkc += 1;
+        }
+        if (written > 0)
+        {
+            *wkc += 2;
         }
     }
 

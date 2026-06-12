@@ -198,6 +198,11 @@ namespace kickcat
         void processWriteCommand    (DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset);
         void processReadWriteCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset);
 
+        // Broadcast reads OR the memory into the frame instead of overwriting it (ETG.1000.4).
+        void processBroadcastReadCommand     (DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset);
+        void processBroadcastReadWriteCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset);
+        int32_t readOrIntoFrame(uint16_t offset, void* data, uint16_t size);
+
         // FPxx target: configured station address, or the station alias when set.
         bool matchesConfiguredAddress(uint16_t position) const;
 

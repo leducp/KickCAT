@@ -190,34 +190,74 @@ TEST(EmulatedESC, ecat_bxx_registers)
     uint64_t payload = 0xCAFE0000DECA0000;
     DatagramHeader header{Command::BRD, 0, 0, sizeof(uint64_t), 0, 0, 0, 0};
 
-    // Test that the ECAT Bxx can read/write any address below 0x1000
+    // Test that the ECAT Bxx can read/write any address below 0x1000.
+    // ETG.1000.4: broadcast reads OR the memory into the frame and every
+    // broadcast command increments ADP.
     for (uint16_t address = 0; address < 0x1000; address += sizeof(uint64_t))
     {
-        header.address = createAddress(0, address);
-
         uint64_t read_test = 0;
         uint16_t wkc = 0;
 
         header.command = Command::BRD;
+        header.address = createAddress(0, address);
         esc.processDatagram(&header, &read_test, &wkc);
         ASSERT_EQ(wkc, 1);
+        ASSERT_EQ(header.address, createAddress(1, address)); // +1 on address position for each ESC processing
         ASSERT_NE(read_test, payload);
 
         header.command = Command::BWR;
+        header.address = createAddress(0, address);
         esc.processDatagram(&header, &payload, &wkc);
         ASSERT_EQ(wkc, 2);
+        ASSERT_EQ(header.address, createAddress(1, address));
 
         read_test = 0xDEAD0000BEEF0000;
         header.command = Command::BRW;
+        header.address = createAddress(0, address);
         esc.processDatagram(&header, &read_test, &wkc);
         ASSERT_EQ(wkc, 5);
-        ASSERT_EQ(read_test, payload);
+        ASSERT_EQ(header.address, createAddress(1, address));
+        ASSERT_EQ(read_test, 0xDEAD0000BEEF0000 | payload);   // frame = request data OR memory
 
+        read_test = 0;
         header.command = Command::BRD;
+        header.address = createAddress(0, address);
         esc.processDatagram(&header, &read_test, &wkc);
         ASSERT_EQ(wkc, 6);
-        ASSERT_EQ(read_test, 0xDEAD0000BEEF0000);
+        ASSERT_EQ(header.address, createAddress(1, address));
+        ASSERT_EQ(read_test, 0xDEAD0000BEEF0000);             // BRW wrote the data as received
     }
+}
+
+TEST(EmulatedESC, ecat_brd_or_merges_across_slaves)
+{
+    // Two slaves answering the same BRD: the master must see the OR of both
+    // memories (a faulted slave's AL_STATUS bits cannot be masked by a healthy
+    // slave answering later), and each slave increments ADP.
+    EmulatedESC esc_faulted;
+    EmulatedESC esc_healthy;
+
+    uint16_t al_status = State::SAFE_OP | AL_STATUS_ERR_IND;
+    esc_faulted.write(reg::AL_STATUS, &al_status, sizeof(al_status));
+    al_status = State::OPERATIONAL;
+    esc_healthy.write(reg::AL_STATUS, &al_status, sizeof(al_status));
+
+    // Keep the device-emulation AL_STATUS mirror from overwriting the values above.
+    uint16_t al_control = State::SAFE_OP | AL_STATUS_ERR_IND;
+    esc_faulted.write(reg::AL_CONTROL, &al_control, sizeof(al_control));
+    al_control = State::OPERATIONAL;
+    esc_healthy.write(reg::AL_CONTROL, &al_control, sizeof(al_control));
+
+    DatagramHeader header{Command::BRD, 0, createAddress(0, reg::AL_STATUS), sizeof(uint16_t), 0, 0, 0, 0};
+    uint16_t read_test = 0;
+    uint16_t wkc = 0;
+    esc_faulted.processDatagram(&header, &read_test, &wkc);
+    esc_healthy.processDatagram(&header, &read_test, &wkc);
+
+    ASSERT_EQ(wkc, 2);
+    ASSERT_EQ(header.address, createAddress(2, reg::AL_STATUS));
+    ASSERT_EQ(read_test, State::SAFE_OP | State::OPERATIONAL | AL_STATUS_ERR_IND);
+    ASSERT_NE(read_test & AL_STATUS_ERR_IND, 0);
 }
 
 TEST(EmulatedESC, ecat_PDOs)
@@ -452,6 +492,124 @@ TEST(EmulatedESC, ecat_eeprom_reload_reapplies_config)
 
     esc.read(reg::STATION_ALIAS, &alias, sizeof(alias));
     ASSERT_EQ(alias, 0xBEEF);
+}
+
+namespace
+{
+    // Drive the exact Bus::writeEeprom sequence: FPWR data word, then FPWR the
+    // WRITE|WR_EN request until the control register no longer reports ERROR_CMD.
+    bool masterWriteEepromWord(EmulatedESC& esc, uint16_t station, uint16_t address, uint16_t word)
+    {
+        DatagramHeader header{Command::FPWR, 0, createAddress(station, reg::EEPROM_DATA), sizeof(word), 0, 0, 0, 0};
+        uint16_t wkc = 0;
+        esc.processDatagram(&header, &word, &wkc);
+        if (wkc != 1)
+        {
+            return false;
+        }
+
+        for (int retry = 0; retry < 20; ++retry)
+        {
+            eeprom::Request req{static_cast<uint16_t>(eeprom::Control::WRITE | eeprom::Control::WR_EN), address, 0};
+            header.command = Command::FPWR;
+            header.address = createAddress(station, reg::EEPROM_CONTROL);
+            header.len     = sizeof(req);
+            wkc = 0;
+            esc.processDatagram(&header, &req, &wkc);
+            if (wkc != 1)
+            {
+                return false;
+            }
+
+            uint16_t control = 0;
+            header.command = Command::FPRD;
+            header.address = createAddress(station, reg::EEPROM_CONTROL);
+            header.len     = sizeof(control);
+            wkc = 0;
+            esc.processDatagram(&header, &control, &wkc);
+            if (wkc != 1)
+            {
+                return false;
+            }
+            if (not (control & eeprom::Control::ERROR_CMD))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // READ command then fetch the data register (lower 32 bits = 2 words).
+    uint32_t masterReadEepromWords(EmulatedESC& esc, uint16_t station, uint16_t address)
+    {
+        eeprom::Request req{eeprom::Control::READ, address, 0};
+        DatagramHeader header{Command::FPWR, 0, createAddress(station, reg::EEPROM_CONTROL), sizeof(req), 0, 0, 0, 0};
+        uint16_t wkc = 0;
+        esc.processDatagram(&header, &req, &wkc);
+        EXPECT_EQ(wkc, 1);
+
+        uint32_t data = 0;
+        header.command = Command::FPRD;
+        header.address = createAddress(station, reg::EEPROM_DATA);
+        header.len     = sizeof(data);
+        wkc = 0;
+        esc.processDatagram(&header, &data, &wkc);
+        EXPECT_EQ(wkc, 1);
+        return data;
+    }
+}
+
+TEST(EmulatedESC, ecat_eeprom_master_write_sequence)
+{
+    EmulatedESC esc;
+    std::vector<uint16_t> image(8);
+    for (size_t i = 0; i < image.size(); ++i)
+    {
+        image[i] = static_cast<uint16_t>(0x1100 + i);
+    }
+    esc.loadEeprom(image);
+
+    uint16_t const station = 0x1234;
+    uint16_t wkc = 0;
+    DatagramHeader header{Command::APWR, 0, createAddress(0, reg::STATION_ADDR), sizeof(station), 0, 0, 0, 0};
+    uint16_t address_payload = station;
+    esc.processDatagram(&header, &address_payload, &wkc);
+    ASSERT_EQ(wkc, 1);
+
+    // Conformant master write (WRITE with WR_EN) must land in the EEPROM.
+    ASSERT_TRUE(masterWriteEepromWord(esc, station, 5, 0xCAFE));
+    ASSERT_TRUE(masterWriteEepromWord(esc, station, 6, 0xDECA));
+    ASSERT_EQ(masterReadEepromWords(esc, station, 5), 0xDECACAFEu);
+
+    // Writing past the loaded image must grow it (word-addressed) without
+    // corrupting the heap; the word at the new end of the EEPROM is reachable.
+    ASSERT_TRUE(masterWriteEepromWord(esc, station, 20, 0xBEEF));
+    ASSERT_TRUE(masterWriteEepromWord(esc, station, 21, 0xDEAD));
+    ASSERT_EQ(masterReadEepromWords(esc, station, 20), 0xDEADBEEFu);
+
+    // The gap created by the resize reads as an unwritten EEPROM, not as zeros.
+    ASSERT_EQ(masterReadEepromWords(esc, station, 10), 0xFFFFFFFFu);
+
+    // A WRITE command without WR_EN is refused: error bit 14 raised, data untouched.
+    uint16_t word = 0x5555;
+    header.command = Command::FPWR;
+    header.address = createAddress(station, reg::EEPROM_DATA);
+    header.len     = sizeof(word);
+    wkc = 0;
+    esc.processDatagram(&header, &word, &wkc);
+
+    eeprom::Request req{eeprom::Control::WRITE, 2, 0};
+    header.address = createAddress(station, reg::EEPROM_CONTROL);
+    header.len     = sizeof(req);
+    esc.processDatagram(&header, &req, &wkc);
+
+    uint16_t control = 0;
+    header.command = Command::FPRD;
+    header.address = createAddress(station, reg::EEPROM_CONTROL);
+    header.len     = sizeof(control);
+    esc.processDatagram(&header, &control, &wkc);
+    ASSERT_NE(control & eeprom::Control::ERROR_WR_EN, 0);
+    ASSERT_EQ(masterReadEepromWords(esc, station, 2), 0x11031102u); // image words 2 and 3 untouched
 }
 
 TEST(LoopbackSocket, runs_frame_through_slave_and_ticks)
