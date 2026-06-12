@@ -1,6 +1,7 @@
 add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/AbstractSPI-t.cc
                             src/bus-t.cc
+                            src/dc-t.cc
                             src/debughelpers-t.cc
                             src/diagnostics-t.cc
                             src/error-t.cc

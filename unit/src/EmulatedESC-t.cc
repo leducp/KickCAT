@@ -64,6 +64,11 @@ TEST(EmulatedESC, ecat_aprd_apwr_registers)
     // Test that the ECAT APxx can read/write any address below 0x1000
     for (uint16_t address = 0; address < 0x1000; address += sizeof(uint64_t))
     {
+        if (address == reg::DC_SYSTEM_TIME)
+        {
+            continue;   // live register: ECAT reads return the local copy of the system time
+        }
+
         uint64_t read_test = 0;
         uint16_t wkc = 0;
 
@@ -114,6 +119,11 @@ TEST(EmulatedESC, ecat_fprd_fpwr_registers)
     uint64_t payload = 0xCAFE0000DECA0000;
     for (uint16_t address = 0x0020; address < 0x1000; address += sizeof(uint64_t))
     {
+        if (address == reg::DC_SYSTEM_TIME)
+        {
+            continue;   // live register: ECAT reads return the local copy of the system time
+        }
+
         header.address = createAddress(slave_address, address);
         header.len = sizeof(uint64_t);
         uint64_t read_test = 0;
@@ -195,6 +205,11 @@ TEST(EmulatedESC, ecat_bxx_registers)
     // broadcast command increments ADP.
     for (uint16_t address = 0; address < 0x1000; address += sizeof(uint64_t))
     {
+        if (address == reg::DC_SYSTEM_TIME)
+        {
+            continue;   // live register: ECAT reads return the local copy of the system time
+        }
+
         uint64_t read_test = 0;
         uint16_t wkc = 0;
 
@@ -452,12 +467,15 @@ TEST(EmulatedESC, ecat_frmw_reads_reference_clock)
     header.address = createAddress(0, reg::STATION_ADDR);
     esc.processDatagram(&header, &station, &wkc);
 
-    uint64_t systime = 0x1122334455667788ull;
-    esc.write(reg::DC_SYSTEM_TIME, &systime, sizeof(systime));
-
     // FRMW addressed to the slave reads its DC system time (the reference clock)
     // and increments the working counter - this is what static drift compensation
-    // relies on.
+    // relies on. The register is live: the read returns the local copy of the
+    // system time (local clock + system time offset).
+    int64_t const offset = 0x1000000000ll;
+    esc.write(reg::DC_SYSTEM_TIME_OFFSET, &offset, sizeof(offset));
+
+    uint64_t before = static_cast<uint64_t>(esc.localSystemTime().count());
+
     header.command = Command::FRMW;
     header.address = createAddress(station, reg::DC_SYSTEM_TIME);
     header.len = sizeof(uint64_t);
@@ -465,7 +483,10 @@ TEST(EmulatedESC, ecat_frmw_reads_reference_clock)
     wkc = 0;
     esc.processDatagram(&header, &read_back, &wkc);
     ASSERT_EQ(wkc, 1);
-    ASSERT_EQ(read_back, systime);
+
+    uint64_t after = static_cast<uint64_t>(esc.localSystemTime().count());
+    ASSERT_LE(before, read_back);   // mocked since_epoch is strictly increasing
+    ASSERT_LE(read_back, after);
 }
 
 TEST(EmulatedESC, ecat_eeprom_reload_reapplies_config)
