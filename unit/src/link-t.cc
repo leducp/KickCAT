@@ -1190,6 +1190,14 @@ TEST_F(LinkTest, event_callback)
 }
 
 
+TEST_F(LinkTest, event_callback_empty_is_rejected)
+{
+    // checkEcatEvents() invokes callbacks unchecked from the cyclic path: an empty
+    // std::function is a caller bug, refused at configuration time.
+    ASSERT_THROW(link.attachEcatEventCallback(EcatEvent::DL_STATUS, {}), Error);
+}
+
+
 TEST_F(LinkTest, process_datagrams_stale_frame_on_nominal_socket_keeps_current_cycle)
 {
     InSequence s;

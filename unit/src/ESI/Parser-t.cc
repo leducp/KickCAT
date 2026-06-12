@@ -441,6 +441,86 @@ TEST(ESIParser, loadDevice_filter_no_match_throws)
                  std::invalid_argument);
 }
 
+TEST(ESIParser, object_without_flags_defaults_to_read_access)
+{
+    // A missing <Flags> element means default access like an empty <Flags/>,
+    // not access=0 (which would make the object unreadable).
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>UDINT</Name><BitSize>32</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1000</Index>
+                                <Name>NoFlags</Name>
+                                <Type>UDINT</Type>
+                                <BitSize>32</BitSize>
+                            </Object>
+                            <Object>
+                                <Index>#x1001</Index>
+                                <Name>EmptyFlags</Name>
+                                <Type>UDINT</Type>
+                                <BitSize>32</BitSize>
+                                <Flags/>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+
+    auto [object_no_flags, entry_no_flags] = findObject(dictionary, 0x1000, 0);
+    ASSERT_NE(entry_no_flags, nullptr);
+    ASSERT_EQ(entry_no_flags->access, CoE::Access::READ);
+
+    auto [object_empty_flags, entry_empty_flags] = findObject(dictionary, 0x1001, 0);
+    ASSERT_NE(entry_empty_flags, nullptr);
+    ASSERT_EQ(entry_empty_flags->access, CoE::Access::READ);
+}
+
+TEST(ESIParser, unsigned64_default_value_above_int64_max)
+{
+    // stoll alone rejects values in [2^63, 2^64) and the whole device with it.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes><DataType><Name>ULINT</Name><BitSize>64</BitSize></DataType></DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x1000</Index>
+                                <Name>Big</Name>
+                                <Type>ULINT</Type>
+                                <BitSize>64</BitSize>
+                                <Info><DefaultValue>#xFFFFFFFFFFFFFFFF</DefaultValue></Info>
+                            </Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+
+    auto [object, entry] = findObject(dictionary, 0x1000, 0);
+    ASSERT_NE(entry, nullptr);
+    ASSERT_NE(entry->data, nullptr);
+    uint64_t value;
+    std::memcpy(&value, entry->data, sizeof(value));
+    ASSERT_EQ(UINT64_MAX, value);
+}
+
 TEST(ESIParser, throws_with_context_when_object_missing_name)
 {
     char const* xml = R"(<?xml version="1.0"?>

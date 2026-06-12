@@ -58,40 +58,40 @@ namespace kickcat
 
         //-----------------------------------------------------------//
 
-        uint16_t address;
+        uint16_t address{0};
         uint8_t al_status{State::INVALID};
-        uint16_t al_status_code;
+        uint16_t al_status_code{0};
 
-        mailbox::request::Mailbox mailbox;
-        mailbox::request::Mailbox mailbox_bootstrap;
-        int32_t waiting_datagram;  // how many datagram to process for this slave
+        mailbox::request::Mailbox mailbox{};
+        mailbox::request::Mailbox mailbox_bootstrap{};
+        int32_t waiting_datagram{0};  // how many datagram to process for this slave
 
-        DLStatus dl_status;
+        DLStatus dl_status{};
 
         eeprom::SII sii{};
 
         struct PIMapping
         {
-            uint8_t* data;         // buffer client to read or write back
-            int32_t size;          // size fo the mapping (in bits)
-            int32_t bsize;         // size of the mapping (in bytes)
-            int32_t sync_manager;  // associated Sync manager
-            uint32_t address;      // logical address
+            uint8_t* data{nullptr};   // buffer client to read or write back
+            int32_t size{0};          // size fo the mapping (in bits)
+            int32_t bsize{0};         // size of the mapping (in bytes)
+            int32_t sync_manager{0};  // associated Sync manager
+            uint32_t address{0};      // logical address
         };
         // set it to true to let user define the mapping, false to autodetect it
         // If set to true, user shall set input and output mapping bsize and sync_manager members.
-        bool is_static_mapping;
-        PIMapping input;  // slave to master
-        PIMapping output;
+        bool is_static_mapping{false};
+        PIMapping input{};  // slave to master
+        PIMapping output{};
 
-        ErrorCounters error_counters;
+        ErrorCounters error_counters{};
         int previous_errors_sum{0};
 
-        ESC::Description esc;
+        ESC::Description esc{};
 
         // DC received time record - required to compute propagation delay
-        nanoseconds dc_received_time[4];
-        nanoseconds dc_ecat_received_time;
+        nanoseconds dc_received_time[4]{};
+        nanoseconds dc_ecat_received_time{0ns};
         nanoseconds delay = 0ns;
         nanoseconds dc_time_offset = 0ns;
     };

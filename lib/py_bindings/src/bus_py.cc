@@ -16,6 +16,18 @@ using namespace nb::literals;
 
 namespace kickcat
 {
+    namespace
+    {
+        // createMapping() keeps pointers into the io buffer, so it must live as long
+        // as the Bus instance (a function-local static would be shared by every Bus
+        // of the process and resized under the others' feet).
+        struct PyBus final : Bus
+        {
+            using Bus::Bus;
+            std::vector<uint8_t> io_buffer;
+        };
+    }
+
     void create_bus_python_bindings(nb::module_ &m)
     {
         nb::enum_<Bus::Access>(m, "Access")
@@ -36,19 +48,19 @@ namespace kickcat
                 });
             });
 
-        nb::class_<Bus>(m, "Bus")
+        nb::class_<PyBus>(m, "Bus")
             .def(nb::init<std::shared_ptr<Link>>())
             .def("init", &Bus::init)
             .def("detect_slaves", &Bus::detectSlaves)
             .def("slaves", &Bus::slaves, nb::rv_policy::reference_internal)
             .def("get_state", &Bus::getCurrentState)
             .def("request_state", &Bus::requestState)
-            .def("wait_for_state", [](Bus &self, State state, std::chrono::nanoseconds timeout)
+            .def("wait_for_state", [](PyBus &self, State state, std::chrono::nanoseconds timeout)
                 {
                     auto noop = [](){};
                     self.waitForState(state, timeout, noop);
                 })
-            .def("wait_for_state", [](Bus &self, State state, std::chrono::nanoseconds timeout, nb::callable callback)
+            .def("wait_for_state", [](PyBus &self, State state, std::chrono::nanoseconds timeout, nb::callable callback)
                 {
                     auto cpp_callback = [callback]()
                     {
@@ -56,7 +68,7 @@ namespace kickcat
                     };
                     self.waitForState(state, timeout, cpp_callback);
                 })
-            .def("process_data", [](Bus &self)
+            .def("process_data", [](PyBus &self)
                 {
                     auto read_error  = [](DatagramState const& state)
                     {
@@ -73,13 +85,13 @@ namespace kickcat
                     self.processDataRead(read_error);
                     self.processDataWrite(write_error);
                 })
-            .def("process_data_no_check", [](Bus &self)
+            .def("process_data_no_check", [](PyBus &self)
                 {
                     auto noop =[](DatagramState const&){};
                     self.processDataRead(noop);
                     self.processDataWrite(noop);
                 })
-            .def("process_mailboxes", [](Bus &self)
+            .def("process_mailboxes", [](PyBus &self)
                 {
                     auto check_error = [](DatagramState const& state)
                     {
@@ -97,7 +109,7 @@ namespace kickcat
                     };
                     self.processMessages(process_error);
                 })
-            .def("send_logical_read", [](Bus &self, nb::callable error_callback)
+            .def("send_logical_read", [](PyBus &self, nb::callable error_callback)
                 {
                     std::function<void(DatagramState const&)> cpp_callback =
                         [error_callback](DatagramState const& state)
@@ -107,7 +119,7 @@ namespace kickcat
                         };
                     self.sendLogicalRead(cpp_callback);
                 })
-            .def("send_logical_write", [](Bus &self, nb::callable error_callback)
+            .def("send_logical_write", [](PyBus &self, nb::callable error_callback)
                 {
                     std::function<void(DatagramState const&)> cpp_callback =
                         [error_callback](DatagramState const& state)
@@ -117,7 +129,7 @@ namespace kickcat
                         };
                     self.sendLogicalWrite(cpp_callback);
                 })
-            .def("send_refresh_error_counters", [](Bus &self, nb::callable error_callback)
+            .def("send_refresh_error_counters", [](PyBus &self, nb::callable error_callback)
                 {
                     std::function<void(DatagramState const&)> cpp_callback =
                         [error_callback](DatagramState const& state)
@@ -127,7 +139,7 @@ namespace kickcat
                         };
                     self.sendRefreshErrorCounters(cpp_callback);
                 })
-            .def("send_mailboxes_read_checks", [](Bus &self, nb::callable error_callback)
+            .def("send_mailboxes_read_checks", [](PyBus &self, nb::callable error_callback)
                 {
                     std::function<void(DatagramState const&)> cpp_callback =
                         [error_callback](DatagramState const& state)
@@ -137,7 +149,7 @@ namespace kickcat
                         };
                     self.sendMailboxesReadChecks(cpp_callback);
                 })
-            .def("send_mailboxes_write_checks", [](Bus &self, nb::callable error_callback)
+            .def("send_mailboxes_write_checks", [](PyBus &self, nb::callable error_callback)
                 {
                     std::function<void(DatagramState const&)> cpp_callback =
                         [error_callback](DatagramState const& state)
@@ -147,7 +159,7 @@ namespace kickcat
                         };
                     self.sendMailboxesWriteChecks(cpp_callback);
                 })
-            .def("send_read_messages", [](Bus &self, nb::callable error_callback)
+            .def("send_read_messages", [](PyBus &self, nb::callable error_callback)
                 {
                     std::function<void(DatagramState const&)> cpp_callback =
                         [error_callback](DatagramState const& state)
@@ -157,7 +169,7 @@ namespace kickcat
                         };
                     self.sendReadMessages(cpp_callback);
                 })
-            .def("send_write_messages", [](Bus &self, nb::callable error_callback)
+            .def("send_write_messages", [](PyBus &self, nb::callable error_callback)
                 {
                     std::function<void(DatagramState const&)> cpp_callback =
                         [error_callback](DatagramState const& state)
@@ -169,12 +181,12 @@ namespace kickcat
                 })
             .def("finalize_datagrams", &Bus::finalizeDatagrams)
             .def("process_awaiting_frames", &Bus::processAwaitingFrames)
-            .def("create_mapping", [](Bus &self, int size)
+            .def("create_mapping", [](PyBus &self, int size)
                 {
-                    static std::vector<uint8_t> io_buffer(size);
-                    self.createMapping(io_buffer.data(), io_buffer.size());
+                    self.io_buffer.assign(static_cast<std::size_t>(size), 0);
+                    self.createMapping(self.io_buffer.data(), self.io_buffer.size());
                 }, "size"_a = 4096)
-            .def("read_sdo", [](Bus &self, Slave& slave, uint16_t index, uint8_t subindex,
+            .def("read_sdo", [](PyBus &self, Slave& slave, uint16_t index, uint8_t subindex,
                                Bus::Access ca, uint32_t max_data_size = 4,
                                std::chrono::nanoseconds timeout = std::chrono::seconds(1))
                 {
@@ -187,7 +199,7 @@ namespace kickcat
                     buffer.resize(actual_size);
                     return nb::bytes(reinterpret_cast<const char*>(buffer.data()), actual_size);
                 })
-            .def("read_object_description", [](Bus &self, Slave& slave, uint16_t index) -> std::tuple<std::string, std::string>
+            .def("read_object_description", [](PyBus &self, Slave& slave, uint16_t index) -> std::tuple<std::string, std::string>
                 {
                     char buffer[4096];
                     uint32_t buffer_size = 4096; // in bytes
@@ -204,7 +216,7 @@ namespace kickcat
 
                     return {name, toString(*description)};
                 })
-            .def("read_entry_description",  [](Bus &self, Slave& slave, uint16_t index, uint8_t subindex) -> std::tuple<std::string, std::string>
+            .def("read_entry_description",  [](PyBus &self, Slave& slave, uint16_t index, uint8_t subindex) -> std::tuple<std::string, std::string>
                 {
                     char buffer[4096];
                     uint32_t buffer_size = 4096; // in bytes

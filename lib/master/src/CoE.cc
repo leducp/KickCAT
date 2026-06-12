@@ -50,11 +50,15 @@ namespace kickcat
         uint32_t size = sizeof(object_size);
         auto sdo = slave.mailbox.createSDO(index, 0, false, CoE::SDO::request::UPLOAD, &object_size, &size, timeout);
         waitForMessage(sdo);
+        if (sdo->status() != MessageStatus::SUCCESS)
+        {
+            THROW_ERROR_CODE("Error while reading SDO - emulated complete access", error::category::CoE, sdo->status());
+        }
 
         uint8_t* pos = reinterpret_cast<uint8_t*>(data);
         size = *data_size;
         uint32_t already_read = 0;
-        for (uint8_t i = 1; i <= object_size; ++i)
+        for (uint16_t i = 1; i <= object_size; ++i)
         {
             size = *data_size - already_read;
             if (size == 0)
@@ -62,7 +66,7 @@ namespace kickcat
                 THROW_ERROR("Error while reading SDO - client buffer too small");
             }
 
-            sdo = slave.mailbox.createSDO(index, i, false, CoE::SDO::request::UPLOAD, pos, &size, timeout);
+            sdo = slave.mailbox.createSDO(index, static_cast<uint8_t>(i), false, CoE::SDO::request::UPLOAD, pos, &size, timeout);
             waitForMessage(sdo);
 
             if (sdo->status() != MessageStatus::SUCCESS)

@@ -140,20 +140,23 @@ namespace
         {
             fail("empty numeric value");
         }
+
+        int base = 10;
+        if (text.rfind("#x", 0) == 0)
+        {
+            if (text.size() == 2) { fail("'#x' with no hex digits"); }
+            text[0] = '0';
+            base = 16;
+        }
+        else if (text.rfind("0x", 0) == 0 or text.rfind("0X", 0) == 0)
+        {
+            if (text.size() == 2) { fail("'0x' with no hex digits"); }
+            base = 16;
+        }
+
         try
         {
-            if (text.rfind("#x", 0) == 0)
-            {
-                if (text.size() == 2) { fail("'#x' with no hex digits"); }
-                text[0] = '0';
-                return std::stoll(text, nullptr, 16);
-            }
-            if (text.rfind("0x", 0) == 0 or text.rfind("0X", 0) == 0)
-            {
-                if (text.size() == 2) { fail("'0x' with no hex digits"); }
-                return std::stoll(text, nullptr, 16);
-            }
-            return std::stoll(text, nullptr, 10);
+            return std::stoll(text, nullptr, base);
         }
         catch (std::invalid_argument const&)
         {
@@ -161,7 +164,20 @@ namespace
         }
         catch (std::out_of_range const&)
         {
-            fail("numeric value exceeds int64 range");
+            // Unsigned values in [2^63, 2^64): keep the 64-bit pattern, consumers
+            // (DefaultValue copy, narrowChecked) work on raw bits.
+            if (text[0] != '-')
+            {
+                try
+                {
+                    return static_cast<int64_t>(std::stoull(text, nullptr, base));
+                }
+                catch (std::exception const&)
+                {
+                    // fall through to the range error
+                }
+            }
+            fail("numeric value exceeds 64-bit range");
         }
         return 0;  // unreachable; fail() always throws
     }
@@ -1756,7 +1772,9 @@ uint16_t Parser::loadAccess(XMLNode* node)
     auto node_flags = node->FirstChildElement("Flags");
     if (node_flags == nullptr)
     {
-        return flags;
+        // A missing <Flags> means default access, like an empty <Flags/> (access=0
+        // would make the object unreadable in the emulated-slave OD).
+        return CoE::Access::READ;
     }
 
     auto node_access = node_flags->FirstChildElement("Access");

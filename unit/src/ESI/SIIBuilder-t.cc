@@ -72,10 +72,10 @@ TEST(SIIBuilder, maps_parsed_device_to_sii_struct)
     ASSERT_EQ(sii.info.bootstrap_recv_mbx_size,   0x0080u);
     ASSERT_EQ(sii.info.bootstrap_send_mbx_offset, 0x1010u);
     ASSERT_EQ(sii.info.bootstrap_send_mbx_size,   0x0080u);
-    // CoE/EoE/AoE/FoE/SoE present in the fixture (VoE has no protocol bit)
+    // CoE/EoE/AoE/FoE/SoE/VoE present in the fixture (VoE bit per ETG.2010 Table 4 word 0x1C)
     ASSERT_EQ(sii.info.mailbox_protocol,
               eeprom::MailboxProtocol::AoE | eeprom::MailboxProtocol::EoE | eeprom::MailboxProtocol::CoE
-            | eeprom::MailboxProtocol::FoE | eeprom::MailboxProtocol::SoE);
+            | eeprom::MailboxProtocol::FoE | eeprom::MailboxProtocol::SoE | eeprom::MailboxProtocol::VoE);
 
     // SyncManagers
     ASSERT_EQ(sii.syncManagers.size(), 4u);
@@ -180,6 +180,21 @@ TEST(SIIBuilder, round_trips_through_serialize_and_parse)
 
     // serialize() recomputed the InfoEntry CRC; it must validate after parse.
     ASSERT_EQ(eeprom::computeInfoCRC(parsed.info), parsed.info.crc);
+}
+
+TEST(SIIBuilder, serialize_clamps_string_length_to_one_byte)
+{
+    eeprom::SII sii;
+    sii.strings.push_back("");                     // reserved index 0
+    sii.strings.push_back(std::string(300, 'a'));  // would wrap the 1-byte length prefix
+    sii.strings.push_back("next");
+    auto bytes = sii.serialize();
+
+    eeprom::SII parsed;
+    parsed.parse(bytes.data(), bytes.size());
+    ASSERT_EQ(3u, parsed.strings.size());
+    ASSERT_EQ(std::string(255, 'a'), parsed.strings[1]);
+    ASSERT_EQ("next", parsed.strings[2]);
 }
 
 TEST(SIIBuilder, maps_pdo_entry_data_types_and_padding)

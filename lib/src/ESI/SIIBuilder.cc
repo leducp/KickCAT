@@ -111,6 +111,7 @@ eeprom::SII buildSII(Device const& device)
         if (mb.coe) { protocol |= eeprom::MailboxProtocol::CoE; }
         if (mb.foe) { protocol |= eeprom::MailboxProtocol::FoE; }
         if (mb.soe) { protocol |= eeprom::MailboxProtocol::SoE; }
+        if (mb.voe) { protocol |= eeprom::MailboxProtocol::VoE; }
         sii.info.mailbox_protocol = protocol;
     }
 

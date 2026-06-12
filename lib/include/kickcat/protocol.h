@@ -507,7 +507,8 @@ namespace kickcat
             EoE  = 0x02,
             CoE  = 0x04,
             FoE  = 0x08,
-            SoE  = 0x10
+            SoE  = 0x10,
+            VoE  = 0x20
         };
 
         enum Control : uint16_t
