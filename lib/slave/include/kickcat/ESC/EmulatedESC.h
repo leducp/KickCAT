@@ -39,6 +39,19 @@ namespace kickcat
         nanoseconds forwardingDelay() const           { return forwarding_delay_; }
         void setForwardingDelay(nanoseconds delay)    { forwarding_delay_ = delay; }
 
+        // Injectable local oscillator deviation in parts-per-million; the local clock
+        // stays continuous across a change (accumulated drift is rebased, not dropped).
+        void setClockDrift(double ppm);
+
+        // Local free-running clock for a given reference instant: reference time plus
+        // the accumulated injected drift. No system time offset nor time-loop trim:
+        // receive times latch local time, not system time (datasheet sec1 9.1.3).
+        nanoseconds localClock(nanoseconds ref) const;
+
+        // Local copy of the system time: local clock + system time offset (0x920)
+        // + time-control-loop trim. This is the 0x910 view.
+        nanoseconds localSystemTime() const;
+
     private:
         struct Memory
         {
@@ -216,6 +229,12 @@ namespace kickcat
         void configureSMs();
         void configureFmmus();
 
+        // DC time machinery: both helpers self-filter on the accessed range, and are
+        // only called from physically-addressed command paths, so the logical
+        // (cyclic process data) path pays nothing.
+        void dcSystemTimeRead(uint16_t offset, uint16_t size);  // refresh 0x910 before an ECAT read
+        void dcTimeLoopWrite(uint16_t offset, uint16_t size);   // time control loop on ECAT writes
+
         int32_t computeInternalMemoryAccess(uint16_t address, void* buffer, uint16_t size, Access access);
 
         nanoseconds pdiWatchdog();  // Get configured PDI watchdog
@@ -231,6 +250,14 @@ namespace kickcat
         // registers read from. The DC phase measures and compensates it; it must stay
         // the single source of truth shared with SYNC0/SYNC1 timing, else sync drifts.
         nanoseconds forwarding_delay_{300ns};
+
+        // Local clock model: drift accumulates from drift_origin_ at clock_drift_ppm_;
+        // dc_correction_ is the time-control-loop trim of the local copy of system time.
+        double      clock_drift_ppm_{0.0};
+        nanoseconds drift_origin_{since_ecat_epoch()};
+        nanoseconds drift_accumulated_{0ns};
+        nanoseconds dc_correction_{0ns};
+        int64_t     dc_diff_filtered_{0};   // 0x92C mean-value filter state
     };
 }
 

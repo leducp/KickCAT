@@ -3,9 +3,13 @@
 
 #include <cstring>
 #include <memory>
+#include <queue>
 #include <vector>
 
+#include "kickcat/AbstractSocket.h"
+#include "kickcat/EmulatedNetwork.h"
 #include "kickcat/ESC/EmulatedESC.h"
+#include "kickcat/Frame.h"
 
 namespace kickcat
 {
@@ -60,6 +64,89 @@ namespace kickcat
 
         esc.write(0x1100, &input_value, sizeof(input_value));
     }
+
+
+    enum class NIC
+    {
+        NOMINAL,
+        REDUNDANCY,
+    };
+
+    // Physical model of one master cable: a written frame is routed through the segment
+    // and pops out on the other NIC when the ring is intact, or loops back at the break
+    // and returns on the NIC it was injected on.
+    class PhysicalSocket final : public AbstractSocket
+    {
+    public:
+        PhysicalSocket(EmulatedNetwork& net, NIC nic)
+            : net_(net)
+            , nic_(nic)
+        {
+        }
+
+        void setPeer(PhysicalSocket* peer) { peer_ = peer; }
+
+        void open(std::string const&) override {}
+        void setTimeout(nanoseconds) override {}
+        void close() noexcept override {}
+
+        int32_t read(void* frame, int32_t frame_size) override
+        {
+            if (rx_.empty())
+            {
+                return -1;
+            }
+            std::vector<uint8_t> const& raw = rx_.front();
+            int32_t size = static_cast<int32_t>(raw.size());
+            if (size > frame_size)
+            {
+                size = frame_size;
+            }
+            std::memcpy(frame, raw.data(), static_cast<size_t>(size));
+            rx_.pop();
+            return size;
+        }
+
+        int32_t write(void const* frame, int32_t frame_size) override
+        {
+            if (cut_to_master)
+            {
+                return frame_size; // severed master cable: the frame never reaches the segment
+            }
+
+            Frame routed(frame, frame_size);
+            if (not net_.route(routed, nic_ == NIC::REDUNDANCY))
+            {
+                return frame_size; // frame destroyed by an ESC (circulating flag)
+            }
+
+            PhysicalSocket* destination = this; // broken ring: loopback to the injection NIC
+            if (net_.ringIntact())
+            {
+                destination = peer_;
+            }
+            if (destination->cut_to_master)
+            {
+                return frame_size; // response lost on the severed cable
+            }
+            if (destination->drop_next_delivery)
+            {
+                destination->drop_next_delivery = false;
+                return frame_size;
+            }
+            destination->rx_.emplace(routed.data(), routed.data() + frame_size);
+            return frame_size;
+        }
+
+        bool cut_to_master{false};
+        bool drop_next_delivery{false};
+
+    private:
+        EmulatedNetwork& net_;
+        NIC nic_;
+        PhysicalSocket* peer_{nullptr};
+        std::queue<std::vector<uint8_t>> rx_;
+    };
 }
 
 #endif

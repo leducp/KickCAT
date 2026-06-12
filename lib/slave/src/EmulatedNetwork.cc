@@ -311,15 +311,18 @@ namespace kickcat
 
     void EmulatedNetwork::writeReceiveTimes(size_t node, nanoseconds base)
     {
+        // Receive times latch the slave's local clock: a drifting slave latches
+        // drifted timestamps, which is what the master's offset computation consumes.
+        EmulatedESC* esc = nodes_[node].esc;
         uint32_t ports_raw[PORT_COUNT];
         for (uint8_t p = 0; p < PORT_COUNT; ++p)
         {
-            ports_raw[p] = static_cast<uint32_t>((base + recv_offset_[node][p]).count());
+            ports_raw[p] = static_cast<uint32_t>(esc->localClock(base + recv_offset_[node][p]).count());
         }
-        nodes_[node].esc->write(reg::DC_RECEIVED_TIME, ports_raw, sizeof(ports_raw));
+        esc->write(reg::DC_RECEIVED_TIME, ports_raw, sizeof(ports_raw));
 
-        uint64_t epu = static_cast<uint64_t>((base + epu_offset_[node]).count());
-        nodes_[node].esc->write(reg::DC_ECAT_RECEIVED_TIME, &epu, sizeof(epu));
+        uint64_t epu = static_cast<uint64_t>(esc->localClock(base + epu_offset_[node]).count());
+        esc->write(reg::DC_ECAT_RECEIVED_TIME, &epu, sizeof(epu));
     }
 
     bool EmulatedNetwork::route(Frame& frame, bool redundancy)

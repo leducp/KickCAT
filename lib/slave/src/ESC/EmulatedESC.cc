@@ -30,6 +30,12 @@ namespace kickcat
         // eeprom never busy because the data are processed in sync with the request.
         memory_.eeprom_control &= ~0x8000;
 
+        // DC time loop control reset values (datasheet sec2 2.15.2.5/2.15.2.7/2.15.2.8)
+        uint16_t const speed_counter_start = 0x1000;
+        std::memcpy(memory_.DC + (reg::DC_SPEED_CNT_START - reg::DC_RECEIVED_TIME), &speed_counter_start, sizeof(speed_counter_start));
+        memory_.DC[reg::DC_TIME_FILTER            - reg::DC_RECEIVED_TIME] = 4;
+        memory_.DC[reg::DC_SPEED_CNT_FILTER_DEPTH - reg::DC_RECEIVED_TIME] = 12;
+
         // Disabled watchdog = OK at power-on
         memory_.watchdog_status_process_data = 1;
 
@@ -87,6 +93,124 @@ namespace kickcat
         memory_.esc_configuration = eeprom_[0] >> 8;
 
         memory_.station_alias = eeprom_[4]; // fourth word of eeprom, at first load
+    }
+
+
+    void EmulatedESC::setClockDrift(double ppm)
+    {
+        nanoseconds now = since_ecat_epoch();
+        drift_accumulated_ += nanoseconds(static_cast<int64_t>(
+            static_cast<double>((now - drift_origin_).count()) * clock_drift_ppm_ * 1e-6));
+        drift_origin_ = now;
+        clock_drift_ppm_ = ppm;
+    }
+
+
+    nanoseconds EmulatedESC::localClock(nanoseconds ref) const
+    {
+        int64_t drift = static_cast<int64_t>(
+            static_cast<double>((ref - drift_origin_).count()) * clock_drift_ppm_ * 1e-6);
+        return ref + drift_accumulated_ + nanoseconds(drift);
+    }
+
+
+    nanoseconds EmulatedESC::localSystemTime() const
+    {
+        int64_t offset;
+        std::memcpy(&offset, memory_.DC + (reg::DC_SYSTEM_TIME_OFFSET - reg::DC_RECEIVED_TIME), sizeof(offset));
+        return localClock(since_ecat_epoch()) + nanoseconds(offset) + dc_correction_;
+    }
+
+
+    void EmulatedESC::dcSystemTimeRead(uint16_t offset, uint16_t size)
+    {
+        if ((offset >= reg::DC_ECAT_RECEIVED_TIME) or ((offset + size) <= reg::DC_SYSTEM_TIME))
+        {
+            return;
+        }
+        uint64_t t = static_cast<uint64_t>(localSystemTime().count());
+        std::memcpy(memory_.DC + (reg::DC_SYSTEM_TIME - reg::DC_RECEIVED_TIME), &t, sizeof(t));
+    }
+
+
+    void EmulatedESC::dcTimeLoopWrite(uint16_t offset, uint16_t size)
+    {
+        if ((offset > reg::DC_SPEED_CNT_FILTER_DEPTH) or ((offset + size) <= reg::DC_SYSTEM_TIME))
+        {
+            return;
+        }
+
+        if ((offset < reg::DC_ECAT_RECEIVED_TIME) and ((offset + size) > reg::DC_SYSTEM_TIME))
+        {
+            uint64_t received;
+            std::memcpy(&received, memory_.DC + (reg::DC_SYSTEM_TIME - reg::DC_RECEIVED_TIME), sizeof(received));
+            uint32_t delay;
+            std::memcpy(&delay, memory_.DC + (reg::DC_SYSTEM_TIME_DELAY - reg::DC_RECEIVED_TIME), sizeof(delay));
+
+            // Datasheet sec1 9.1.3.3: dt = (local time + offset - propagation delay) - received.
+            // Simplifications vs a real ESC time control loop:
+            //  - local copy sampled at datagram processing time, not latched at frame SOF
+            //  - trim is a bounded slew of the local copy (at most one speed-counter-start
+            //    unit, taken as ns, per update) instead of an oscillator speed adjustment
+            //    that also acts between updates
+            //  - speed counter diff (0x932) and its filter (0x935) are not modeled
+            int64_t dt = (localSystemTime().count() - delay) - static_cast<int64_t>(received);
+
+            uint16_t speed_counter_start;
+            std::memcpy(&speed_counter_start, memory_.DC + (reg::DC_SPEED_CNT_START - reg::DC_RECEIVED_TIME), sizeof(speed_counter_start));
+            int64_t bound = speed_counter_start & 0x7FFF;
+            int64_t step = dt;
+            if (step > bound)
+            {
+                step = bound;
+            }
+            if (step < -bound)
+            {
+                step = -bound;
+            }
+            dc_correction_ -= nanoseconds(step);
+
+            uint8_t depth = memory_.DC[reg::DC_TIME_FILTER - reg::DC_RECEIVED_TIME] & 0x0F;
+            if (depth == 0)
+            {
+                dc_diff_filtered_ = dt;
+            }
+            else
+            {
+                dc_diff_filtered_ += (dt - dc_diff_filtered_) / (int64_t(1) << depth);
+            }
+
+            // 0x92C sign-magnitude: bit 31 set when the local copy is >= the received
+            // system time (datasheet sec2 2.15.2.4), bits 30:0 magnitude, saturated.
+            uint64_t magnitude;
+            if (dc_diff_filtered_ >= 0)
+            {
+                magnitude = static_cast<uint64_t>(dc_diff_filtered_);
+            }
+            else
+            {
+                magnitude = static_cast<uint64_t>(-dc_diff_filtered_);
+            }
+            if (magnitude > 0x7FFFFFFF)
+            {
+                magnitude = 0x7FFFFFFF;
+            }
+            uint32_t raw = static_cast<uint32_t>(magnitude);
+            if (dc_diff_filtered_ >= 0)
+            {
+                raw |= 0x80000000u;
+            }
+            std::memcpy(memory_.DC + (reg::DC_SYSTEM_TIME_DIFF - reg::DC_RECEIVED_TIME), &raw, sizeof(raw));
+        }
+
+        // Writing speed counter start or a filter depth resets the loop filters and
+        // the system time difference (datasheet sec2 2.15.2.5/2.15.2.7).
+        if ((offset + size) > reg::DC_SPEED_CNT_START)
+        {
+            dc_diff_filtered_ = 0;
+            uint32_t const zero = 0;
+            std::memcpy(memory_.DC + (reg::DC_SYSTEM_TIME_DIFF - reg::DC_RECEIVED_TIME), &zero, sizeof(zero));
+        }
     }
 
 
@@ -604,6 +728,7 @@ namespace kickcat
 
     void EmulatedESC::processReadCommand(DatagramHeader* header, void* data, uint16_t* wkc, uint16_t offset)
     {
+        dcSystemTimeRead(offset, header->len);
         int32_t read = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_READ);
         if (read > 0)
         {
@@ -618,6 +743,7 @@ namespace kickcat
         if (written > 0)
         {
             *wkc += 1;
+            dcTimeLoopWrite(offset, header->len);
         }
     }
 
@@ -625,6 +751,7 @@ namespace kickcat
     int32_t EmulatedESC::readOrIntoFrame(uint16_t offset, void* data, uint16_t size)
     {
         uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
+        dcSystemTimeRead(offset, size);
         int32_t read = computeInternalMemoryAccess(offset, buffer, size, Access::ECAT_READ);
         uint8_t* frame = static_cast<uint8_t*>(data);
         for (int32_t i = 0; i < read; ++i)
@@ -661,6 +788,7 @@ namespace kickcat
         if (written > 0)
         {
             *wkc += 2;
+            dcTimeLoopWrite(offset, header->len);
         }
     }
 
@@ -670,6 +798,7 @@ namespace kickcat
         uint8_t swap[MAX_ETHERCAT_PAYLOAD_SIZE];
         std::memcpy(swap, data, header->len);
 
+        dcSystemTimeRead(offset, header->len);
         int32_t read    = computeInternalMemoryAccess(offset, data, header->len, Access::ECAT_READ);    // read directly to the frame
         int32_t written = computeInternalMemoryAccess(offset, swap, header->len, Access::ECAT_WRITE);   // write from the swap
 
@@ -680,6 +809,7 @@ namespace kickcat
         if (written > 0)
         {
             *wkc += 2;
+            dcTimeLoopWrite(offset, header->len);
         }
     }
 

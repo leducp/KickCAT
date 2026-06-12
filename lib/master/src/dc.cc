@@ -25,25 +25,30 @@ namespace kickcat
         dc_info("DC reference slave is %d\n", dc_slave_->address);
 
         //-------- Apply propagation delay and system time offset -------//
-        // Trigger latch time on received registers whenever the frame pass by the port 0-3
+        // Trigger latch time on received registers whenever the frame pass by the port 0-3.
+        // Master time is sampled before sending the latch frame: the offsets are computed
+        // against the latched receive times, sampling after the round trip would inflate
+        // every offset by one full round trip.
         uint8_t dummy = 0;
-        broadcastWrite(reg::DC_RECEIVED_TIME, &dummy, 1);
         nanoseconds now = since_ecat_epoch();
+        broadcastWrite(reg::DC_RECEIVED_TIME, &dummy, 1);
 
         fetchReceivedTimes();
         computePropagationDelay(now);
         applyMasterTime();
 
         //------------------ Static drift compensation ------------------//
-        // 1. reset time control loop and set filter depth
+        // 1. set filter depths, then reset the time control loop
         //    - System Time Diff filter depth (0x0934) = 0x00 (no filtering on diff)
         //    - Speed Counter filter depth (0x0935)    = 0x0c (12 -> 2^12 IIR averaging)
         //    A higher speed counter filter depth damps the PLL, preventing oscillation
         //    when the initial system time difference is large (e.g. branch 2 in Y-topology).
-        uint16_t reset = 0x1000;
-        broadcastWrite(reg::DC_SPEED_CNT_START, &reset, sizeof(uint16_t));
+        //    Depths are written first: on several ESCs a depth change only takes effect
+        //    once the speed counter start (0x0930) is rewritten, which resets the filters.
         uint16_t filter_settings = 0x0c00;
         broadcastWrite(reg::DC_TIME_FILTER, &filter_settings, sizeof(filter_settings));
+        uint16_t reset = 0x1000;
+        broadcastWrite(reg::DC_SPEED_CNT_START, &reset, sizeof(uint16_t));
 
         // 2. Send multiple FRMW drift compensation frames (15000 from the doc)
         auto error = [](DatagramState const& state)
@@ -64,8 +69,8 @@ namespace kickcat
         //------------------------ Set start time -----------------------//
         // 1. Get current network time to compute start time (relative to absolute)
         uint64_t network_time = 0;
-        auto& slave = *dc_slave_;
-        auto process = [&slave, &network_time](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+        bool network_time_acquired = false;
+        auto process = [&network_time, &network_time_acquired](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
         {
             if (wkc != 1)
             {
@@ -73,11 +78,28 @@ namespace kickcat
             }
 
             std::memcpy(&network_time, data, 8);
+            network_time_acquired = true;
             return DatagramState::OK;
         };
 
-        link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::DC_SYSTEM_TIME), nullptr, 8, process, [](DatagramState const&){});
-        link_->processDatagrams();
+        // A lost frame here would silently yield a bogus SYNC0 start time: retry a
+        // bounded number of times before giving up loudly.
+        DatagramState last_state = DatagramState::LOST;
+        auto network_time_error = [&last_state](DatagramState const& state)
+        {
+            last_state = state;
+        };
+
+        constexpr int NETWORK_TIME_READ_ATTEMPTS = 3;
+        for (int attempt = 0; (attempt < NETWORK_TIME_READ_ATTEMPTS) and (not network_time_acquired); ++attempt)
+        {
+            link_->addDatagram(Command::FPRD, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), nullptr, 8, process, network_time_error);
+            link_->processDatagrams();
+        }
+        if (not network_time_acquired)
+        {
+            THROW_ERROR_DATAGRAM("Error while reading DC system time to compute the SYNC0 start time", last_state);
+        }
 
         // 2. Convert relative start time to absolute, round it to cycle time and apply a delay and shift in the cycle
         nanoseconds start_time = (nanoseconds(network_time) / cycle_time) * cycle_time + cycle_time + shift_cycle + start_delay;
@@ -87,10 +109,8 @@ namespace kickcat
         broadcastWrite(reg::DC_START_TIME, &start_time_raw, sizeof(start_time_raw));
 
         //---------------------- Apply SYNC config ----------------------//
-        // Pulse length in units of 10ns. Must be > 0 for cyclic generation mode.
-        // EEPROM word A2 may already have configured this; set a fallback.
-        uint16_t pulse_length = 100; // 1 µs
-        broadcastWrite(reg::DC_SYNC_PULSE_LENGTH, &pulse_length, sizeof(pulse_length));
+        // Pulse length (0x0982) is NOT written: it is r/- from ECAT on all ESCs
+        // (datasheet sec2 2.15.4.2), the EEPROM owns it.
 
         // TODO: use a config in the slave to select the sync method
         uint8_t enable_dc_sync0 = 0x3;
@@ -490,6 +510,11 @@ namespace kickcat
         // with master time: slaves cut from the reference by a ring split track master time instead
         // of being slammed to zero by the redundancy frame copy.
         link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
+
+        // Age of the drift timestamp when the caller flushes the datagrams: the payload
+        // is already this stale when it leaves the master (live ripple investigation).
+        // Compile-gated, argument not evaluated when DEBUG_DC_INFO is off.
+        dc_info("DC drift timestamp age: %" PRId64 " ns\n", (since_ecat_epoch() - now).count());
     }
 
 
