@@ -4,6 +4,12 @@
 // the EtherCAT state machine INIT -> PRE_OP -> SAFE_OP -> OPERATIONAL. Unlike
 // esi_validate (a static mapping-resolution check), this actually transitions
 // the slave, so reaching OPERATIONAL is the real proof of bootability.
+//
+// Known PRE_OP-ONLY: devices with runtime-dynamic PDOs cannot boot from their
+// static ESI. E.g. EP6228-0044 (IO-Link master): its channel mapping objects
+// reference 0x6nn0/0x7nn0 process-data objects that only exist once the
+// connected IO-Link stack populates the OD at runtime, so the slave correctly
+// refuses SAFE_OP with INVALID_INPUT_CONFIGURATION.
 #include <algorithm>
 #include <cstdio>
 #include <cstring>

@@ -212,6 +212,50 @@ TEST(SIIBuilder, maps_pdo_entry_data_types_and_padding)
     ASSERT_EQ(entries.at(3).name,      0u);   // padding: no name
 }
 
+TEST(SIIBuilder, parse_reads_all_pdos_of_one_category)
+{
+    // ETG.2010 Table 14: a TxPDO/RxPDO category holds one block per PDO,
+    // back to back (was: only the first PDO of the category was read).
+    std::vector<uint8_t> img(eeprom::START_CATEGORY * 2, 0);
+    auto w16 = [&](uint16_t v)
+    {
+        img.push_back(static_cast<uint8_t>(v & 0xFF));
+        img.push_back(static_cast<uint8_t>(v >> 8));
+    };
+    auto pdo = [&](uint16_t index, uint8_t name_idx, uint16_t entry_index)
+    {
+        w16(index);
+        img.push_back(1);         // nb entries
+        img.push_back(3);         // sync manager
+        img.push_back(0);         // synchronization
+        img.push_back(name_idx);
+        w16(0);                   // flags
+        w16(entry_index);
+        img.push_back(1);         // subindex
+        img.push_back(0);         // name
+        img.push_back(0x01);      // data type (BOOLEAN)
+        img.push_back(1);         // bitlen
+        w16(0);                   // entry flags
+    };
+
+    w16(eeprom::Category::TxPDO);
+    w16(16);                      // 2 * (8-byte header + one 8-byte entry), in words
+    pdo(0x1A00, 2, 0x6000);
+    pdo(0x1A01, 3, 0x6010);
+    w16(eeprom::Category::End);
+    w16(0);
+
+    eeprom::SII sii;
+    sii.parse(img.data(), img.size());
+    ASSERT_EQ(sii.TxPDO.size(), 2u);
+    ASSERT_EQ(sii.TxPDO[0].index, 0x1A00u);
+    ASSERT_EQ(sii.TxPDO[0].entries.size(), 1u);
+    ASSERT_EQ(sii.TxPDO[0].entries[0].index, 0x6000u);
+    ASSERT_EQ(sii.TxPDO[1].index, 0x1A01u);
+    ASSERT_EQ(sii.TxPDO[1].entries.size(), 1u);
+    ASSERT_EQ(sii.TxPDO[1].entries[0].index, 0x6010u);
+}
+
 TEST(SIIBuilder, sii_registerString_dedups_and_is_one_based)
 {
     eeprom::SII sii;

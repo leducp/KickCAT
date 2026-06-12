@@ -1805,30 +1805,184 @@ TEST(ESIParser, throws_on_array_bitsize_not_divisible_by_elements)
     }
 }
 
-TEST(ESIParser, throws_on_duplicate_rx_pdo_index)
+TEST(ESIParser, duplicate_rx_pdo_index_is_tolerated)
 {
+    // Shipped Beckhoff EL2252 declares RxPdo 0x1602 twice (once on Sm0, once
+    // as an empty "Reserved" PDO on Sm2): both declarations must be kept.
     char const* xml = R"(<?xml version="1.0"?>
         <EtherCATInfo>
             <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
             <Descriptions><Devices><Device>
                 <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
-                <RxPdo Sm="2"><Index>#x1600</Index><Name>A</Name></RxPdo>
-                <RxPdo Sm="2"><Index>#x1600</Index><Name>B</Name></RxPdo>
+                <RxPdo Sm="0" Fixed="1"><Index>#x1602</Index><Name>DC Sync Activate</Name>
+                    <Entry><Index>#x1d09</Index><SubIndex>#x81</SubIndex><BitLen>8</BitLen><Name>Activate</Name><DataType>USINT</DataType></Entry>
+                </RxPdo>
+                <RxPdo Sm="2" Fixed="1"><Index>#x1602</Index><Name>Reserved</Name></RxPdo>
             </Device></Devices></Descriptions>
         </EtherCATInfo>)";
 
     ESI::Parser parser;
-    try
+    ESI::Device device = parser.loadDeviceString(xml);
+    ASSERT_EQ(device.rx_pdos.size(), 2u);
+    ASSERT_EQ(device.rx_pdos[0].index, 0x1602u);
+    ASSERT_EQ(device.rx_pdos[1].index, 0x1602u);
+    ASSERT_EQ(device.rx_pdos[0].sm, 0);
+    ASSERT_EQ(device.rx_pdos[1].sm, 2);
+    ASSERT_EQ(device.rx_pdos[0].entries.size(), 1u);
+    ASSERT_EQ(device.rx_pdos[1].name, "Reserved");
+    ASSERT_TRUE(device.rx_pdos[1].entries.empty());
+
+    // The non-empty declaration provides the synthesized mapping object.
+    auto [obj, entry] = findObject(device.dictionary, 0x1602, 1);
+    ASSERT_NE(entry, nullptr);
+    uint32_t packed;
+    std::memcpy(&packed, entry->data, sizeof(uint32_t));
+    ASSERT_EQ(packed, 0x1d098108u);
+}
+
+TEST(ESIParser, record_subitem_with_enum_datatype_resolves_via_bitsize)
+{
+    // Shipped Beckhoff pattern (EL2521 0x8000, EL5101 0x1C32): a record
+    // SubItem typed by an <EnumInfo> DataType that carries no <BaseType>.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType>
+                                <Name>DT0801</Name><BitSize>2</BitSize>
+                                <EnumInfo><Text>Frequency modulation</Text><Enum>0</Enum></EnumInfo>
+                                <EnumInfo><Text>Pulse direction</Text><Enum>1</Enum></EnumInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT1C32EN</Name><BitSize>16</BitSize>
+                                <EnumInfo><Text>Free Run</Text><Enum>0</Enum></EnumInfo>
+                                <EnumInfo><Text>Synchron</Text><Enum>1</Enum></EnumInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT8000</Name><BitSize>48</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>n</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><SubIdx>1</SubIdx><Name>Sync mode</Name><Type>DT1C32EN</Type><BitSize>16</BitSize><BitOffs>16</BitOffs></SubItem>
+                                <SubItem><SubIdx>14</SubIdx><Name>Operating mode</Name><Type>DT0801</Type><BitSize>2</BitSize><BitOffs>32</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x8000</Index><Name>Cfg</Name><Type>DT8000</Type><BitSize>48</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+    auto [obj, sync_mode] = findObject(dictionary, 0x8000, 1);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->code, CoE::ObjectCode::RECORD);
+    ASSERT_NE(sync_mode, nullptr);
+    ASSERT_EQ(sync_mode->type,   CoE::DataType::UNSIGNED16);
+    ASSERT_EQ(sync_mode->bitlen, 16u);
+    ASSERT_EQ(sync_mode->bitoff, 16u);
+
+    auto [obj2, op_mode] = findObject(dictionary, 0x8000, 14);
+    ASSERT_NE(op_mode, nullptr);
+    ASSERT_EQ(op_mode->type,   CoE::DataType::BIT2);
+    ASSERT_EQ(op_mode->bitlen, 2u);
+    ASSERT_EQ(op_mode->bitoff, 32u);
+}
+
+TEST(ESIParser, array_subitem_narrower_than_shared_array_type_accepted)
+{
+    // Shipped Beckhoff pattern (EP6224-0092 0x1C12): the SubItem uses 64 bits
+    // of a shared 5-element UINT array type (80 bits) -> 4 elements of 16 bits.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType><Name>UINT</Name><BitSize>16</BitSize></DataType>
+                            <DataType>
+                                <Name>DT1C12ARR</Name><BaseType>UINT</BaseType><BitSize>80</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>5</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT1C12</Name><BitSize>80</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>n</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><Name>Elements</Name><Type>DT1C12ARR</Type><BitSize>64</BitSize><BitOffs>16</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x1C12</Index><Name>RxPdo assign</Name><Type>DT1C12</Type><BitSize>80</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+    auto [obj, _] = findObject(dictionary, 0x1C12, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->entries.size(), 5u);  // SubIndex 0 + 4 elements
+    for (uint8_t i = 1; i <= 4; ++i)
     {
-        (void) parser.loadString(xml);
-        FAIL() << "expected invalid_argument";
+        auto [o, e] = findObject(dictionary, 0x1C12, i);
+        ASSERT_NE(e, nullptr);
+        ASSERT_EQ(e->type,   CoE::DataType::UNSIGNED16);
+        ASSERT_EQ(e->bitlen, 16u);
+        ASSERT_EQ(e->bitoff, 16u * i);
     }
-    catch (std::invalid_argument const& e)
-    {
-        std::string msg = e.what();
-        ASSERT_NE(msg.find("duplicate"), std::string::npos) << msg;
-        ASSERT_NE(msg.find("0x1600"),    std::string::npos) << msg;
-    }
+}
+
+TEST(ESIParser, array_subitem_with_inconsistent_arrayinfo_uses_base_type_size)
+{
+    // Shipped Beckhoff pattern (EPP6224-0522 0x1C00): the array type itself is
+    // inconsistent (48-bit USINT array declaring 5 elements) -> the base type
+    // size is authoritative: 6 elements of 8 bits.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType><Name>USINT</Name><BitSize>8</BitSize></DataType>
+                            <DataType>
+                                <Name>DT1C00ARR</Name><BaseType>USINT</BaseType><BitSize>48</BitSize>
+                                <ArrayInfo><LBound>1</LBound><Elements>5</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>DT1C00</Name><BitSize>64</BitSize>
+                                <SubItem><SubIdx>0</SubIdx><Name>n</Name><Type>USINT</Type><BitSize>8</BitSize><BitOffs>0</BitOffs></SubItem>
+                                <SubItem><Name>Elements</Name><Type>DT1C00ARR</Type><BitSize>48</BitSize><BitOffs>16</BitOffs></SubItem>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object><Index>#x1C00</Index><Name>SM types</Name><Type>DT1C00</Type><BitSize>64</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+    auto [obj, _] = findObject(dictionary, 0x1C00, 0);
+    ASSERT_NE(obj, nullptr);
+    ASSERT_EQ(obj->entries.size(), 7u);  // SubIndex 0 + 6 elements
+    auto [o, last] = findObject(dictionary, 0x1C00, 6);
+    ASSERT_NE(last, nullptr);
+    ASSERT_EQ(last->bitlen, 8u);
+    ASSERT_EQ(last->bitoff, 16u + 5u * 8u);
 }
 
 TEST(ESIParser, throws_on_eeprom_data_and_byte_size_both_present)

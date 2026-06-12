@@ -826,9 +826,10 @@ void Parser::parsePdos(XMLElement* device, char const* element_name, std::vector
         {
             if (existing.index == pdo.index)
             {
-                char buf[64];
-                std::snprintf(buf, sizeof(buf), "ESI: duplicate %s <Index> 0x%04x", element_name, pdo.index);
-                throw std::invalid_argument(buf);
+                // Shipped devices re-declare an index on another SM (Beckhoff
+                // EL2252 RxPdo 0x1602): keep both, downstream groups per SM.
+                esi_warning("ESI: duplicate %s <Index> 0x%04x\n", element_name, pdo.index);
+                break;
             }
         }
         out.push_back(std::move(pdo));
@@ -1835,6 +1836,70 @@ uint16_t Parser::loadAccess(XMLNode* node)
     return flags;
 }
 
+namespace
+{
+    CoE::DataType enumTypeFromBitSize(uint16_t bitsize)
+    {
+        switch (bitsize)
+        {
+            case 1:  { return CoE::DataType::BOOLEAN;    }
+            case 2:  { return CoE::DataType::BIT2;       }
+            case 3:  { return CoE::DataType::BIT3;       }
+            case 4:  { return CoE::DataType::BIT4;       }
+            case 5:  { return CoE::DataType::BIT5;       }
+            case 6:  { return CoE::DataType::BIT6;       }
+            case 7:  { return CoE::DataType::BIT7;       }
+            case 8:  { return CoE::DataType::UNSIGNED8;  }
+            case 16: { return CoE::DataType::UNSIGNED16; }
+            case 24: { return CoE::DataType::UNSIGNED24; }
+            case 32: { return CoE::DataType::UNSIGNED32; }
+            case 40: { return CoE::DataType::UNSIGNED40; }
+            case 48: { return CoE::DataType::UNSIGNED48; }
+            case 56: { return CoE::DataType::UNSIGNED56; }
+            case 64: { return CoE::DataType::UNSIGNED64; }
+            default: { return CoE::DataType::UNKNOWN;    }
+        }
+    }
+
+    // 0 when the type has no fixed width (strings, complex, unknown).
+    uint16_t basicBitSize(CoE::DataType type)
+    {
+        switch (type)
+        {
+            case CoE::DataType::BOOLEAN:    { return 1;  }
+            case CoE::DataType::BIT2:       { return 2;  }
+            case CoE::DataType::BIT3:       { return 3;  }
+            case CoE::DataType::BIT4:       { return 4;  }
+            case CoE::DataType::BIT5:       { return 5;  }
+            case CoE::DataType::BIT6:       { return 6;  }
+            case CoE::DataType::BIT7:       { return 7;  }
+            case CoE::DataType::BIT8:       { return 8;  }
+            case CoE::DataType::BYTE:       { return 8;  }
+            case CoE::DataType::WORD:       { return 16; }
+            case CoE::DataType::DWORD:      { return 32; }
+            case CoE::DataType::INTEGER8:   { return 8;  }
+            case CoE::DataType::INTEGER16:  { return 16; }
+            case CoE::DataType::INTEGER24:  { return 24; }
+            case CoE::DataType::INTEGER32:  { return 32; }
+            case CoE::DataType::INTEGER40:  { return 40; }
+            case CoE::DataType::INTEGER48:  { return 48; }
+            case CoE::DataType::INTEGER56:  { return 56; }
+            case CoE::DataType::INTEGER64:  { return 64; }
+            case CoE::DataType::UNSIGNED8:  { return 8;  }
+            case CoE::DataType::UNSIGNED16: { return 16; }
+            case CoE::DataType::UNSIGNED24: { return 24; }
+            case CoE::DataType::UNSIGNED32: { return 32; }
+            case CoE::DataType::UNSIGNED40: { return 40; }
+            case CoE::DataType::UNSIGNED48: { return 48; }
+            case CoE::DataType::UNSIGNED56: { return 56; }
+            case CoE::DataType::UNSIGNED64: { return 64; }
+            case CoE::DataType::REAL32:     { return 32; }
+            case CoE::DataType::REAL64:     { return 64; }
+            default:                        { return 0;  }
+        }
+    }
+}
+
 CoE::DataType Parser::resolveType(std::string const& type_name, int depth)
 {
     if (depth > MAX_TYPE_DEPTH)
@@ -1890,6 +1955,14 @@ CoE::DataType Parser::resolveType(std::string const& type_name, int depth)
                     throw std::invalid_argument(what);
                 }
                 return resolveType(base_text, depth + 1);
+            }
+
+            // Enum DataType without <BaseType> (EtherCATBase.xsd: BaseType is
+            // minOccurs=0): the value width is its mandatory <BitSize>.
+            if (dtype->FirstChildElement("EnumInfo"))
+            {
+                uint16_t bitsize = requireNumber<uint16_t>(dtype, "BitSize", "DataType '" + type_name + "'");
+                return enumTypeFromBitSize(bitsize);
             }
 
             break;
@@ -2055,14 +2128,32 @@ CoE::Object Parser::createObject(XMLNode* node)
                 {
                     uint16_t total_bitlen   = requireNumber<uint16_t>(node_subitem, "BitSize", sub_where);
                     uint16_t element_bitoff = requireNumber<uint16_t>(node_subitem, "BitOffs", sub_where);
-                    if (total_bitlen % elements != 0)
+                    uint16_t count          = elements;
+                    uint16_t element_bitlen;
+                    uint16_t base_bitlen    = basicBitSize(array_type);
+                    if (total_bitlen % elements == 0)
+                    {
+                        element_bitlen = static_cast<uint16_t>(total_bitlen / elements);
+                    }
+                    else if ((base_bitlen != 0) and (total_bitlen % base_bitlen == 0))
+                    {
+                        // SubItem <BitSize> may disagree with <ArrayInfo> Elements
+                        // (Beckhoff EP6224: 64-bit SubItem on a 5-element UINT type):
+                        // the base type size and the SubItem size are authoritative.
+                        element_bitlen = base_bitlen;
+                        count          = static_cast<uint16_t>(total_bitlen / element_bitlen);
+                        if (count > 0xFF)
+                        {
+                            throw std::invalid_argument("ESI: array element count exceeds CoE SubIndex space in " + sub_where);
+                        }
+                    }
+                    else
                     {
                         throw std::invalid_argument("ESI: array <BitSize> " + std::to_string(total_bitlen)
                             + " not divisible by <Elements> " + std::to_string(elements) + " in " + sub_where);
                     }
-                    uint16_t element_bitlen = static_cast<uint16_t>(total_bitlen / elements);
 
-                    for (uint16_t i = 1; i <= elements; ++i)
+                    for (uint16_t i = 1; i <= count; ++i)
                     {
                         // Use uint32_t for the intermediate offset arithmetic to
                         // detect the (degenerate but reachable) case where the

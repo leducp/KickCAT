@@ -60,47 +60,52 @@ namespace kickcat::eeprom
 
     void parsePDO(uint8_t const* section_start, uint16_t section_size, std::vector<PDOMapping>& pdos)
     {
-        // Fixed PDO header: index(2) + nb_entries(1) + sm(1) + synchro(1) + name_idx(1) + flags(2)
-        if (section_size < 8)
-        {
-            return;
-        }
-
         uint8_t const* pos       = section_start;
         uint8_t const* const end = section_start + section_size;
 
-        PDOMapping mapping{};
-        std::memcpy(&mapping.index, pos, sizeof(uint16_t));
-        pos += 2;
-
-        uint8_t number_of_entries = *pos;
-        pos += 1;
-
-        mapping.sync_manager = *pos;
-        pos += 1;
-
-        mapping.synchronization = *pos;
-        pos += 1;
-
-        mapping.name_index = *pos;
-        pos += 1;
-
-        std::memcpy(&mapping.flags, pos, sizeof(uint16_t));
-        pos += 2;
-
-        for (int32_t i = 0; i < number_of_entries; ++i)
+        // ETG.2010 Table 14: a category holds one such block per PDO, back to back.
+        // Fixed PDO header: index(2) + nb_entries(1) + sm(1) + synchro(1) + name_idx(1) + flags(2)
+        while ((end - pos) >= 8)
         {
-            if ((end - pos) < static_cast<std::ptrdiff_t>(sizeof(PDOEntry)))
-            {
-                break;
-            }
-            PDOEntry entry;
-            std::memcpy(&entry, pos, sizeof(PDOEntry));
-            mapping.entries.push_back(entry);
-            pos += sizeof(PDOEntry);
-        }
+            PDOMapping mapping{};
+            std::memcpy(&mapping.index, pos, sizeof(uint16_t));
+            pos += 2;
 
-        pdos.push_back(std::move(mapping));
+            uint8_t number_of_entries = *pos;
+            pos += 1;
+
+            mapping.sync_manager = *pos;
+            pos += 1;
+
+            mapping.synchronization = *pos;
+            pos += 1;
+
+            mapping.name_index = *pos;
+            pos += 1;
+
+            std::memcpy(&mapping.flags, pos, sizeof(uint16_t));
+            pos += 2;
+
+            bool truncated = false;
+            for (int32_t i = 0; i < number_of_entries; ++i)
+            {
+                if ((end - pos) < static_cast<std::ptrdiff_t>(sizeof(PDOEntry)))
+                {
+                    truncated = true;
+                    break;
+                }
+                PDOEntry entry;
+                std::memcpy(&entry, pos, sizeof(PDOEntry));
+                mapping.entries.push_back(entry);
+                pos += sizeof(PDOEntry);
+            }
+
+            pdos.push_back(std::move(mapping));
+            if (truncated)
+            {
+                return;
+            }
+        }
     }
 
     void SII::parse(uint8_t const* data, std::size_t size)
