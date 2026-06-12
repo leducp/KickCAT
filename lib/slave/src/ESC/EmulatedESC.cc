@@ -467,6 +467,10 @@ namespace kickcat
         {
             return true;
         }
+        if ((memory_.dl_control & 0x01000000) == 0)
+        {
+            return false; // alias addressing only when DL control 0x100[24] is set (master-written)
+        }
         return (memory_.station_alias != 0) and (position == memory_.station_alias);
     }
 
@@ -646,7 +650,19 @@ namespace kickcat
         // Mirror AL_STATUS - Device Emulation
         if(memory_.esc_configuration & 0x01)
         {
-            memory_.al_status = memory_.al_control;
+            if (memory_.al_status & AL_STATUS_ERR_IND)
+            {
+                // Self-set error (watchdog drop): hold AL_STATUS until the master acks it,
+                // otherwise the mirror would clear the fallback on the next tick.
+                if (memory_.al_control & AL_CONTROL_ERR_ACK)
+                {
+                    memory_.al_status = memory_.al_control & static_cast<uint16_t>(~AL_CONTROL_ERR_ACK);
+                }
+            }
+            else
+            {
+                memory_.al_status = memory_.al_control;
+            }
         }
 
         // Handle eeprom access. Command is in bits [10:8] only: a conformant master
@@ -938,10 +954,14 @@ namespace kickcat
                 {
                     memory_.watchdog_counter_process_data++; // Counter of how many times the watchdog has expired
                 }
-                // If the watchdog expires in OP, we must tell the master and potentially drop the status ourselves
-                memory_.al_control = (memory_.al_status & 0xFFF0) | State::SAFE_OP;
-                memory_.al_status |= AL_STATUS_ERR_IND; // Set Error Bit
-                memory_.al_status_code = SYNC_MANAGER_WATCHDOG; // SM Watchdog code
+                // Real ESCs never write AL_CONTROL (0x120, master-owned). Without a PDI
+                // application (device emulation) the ESC drops AL_STATUS itself; otherwise
+                // the application observes WDOG_STATUS and performs the fallback.
+                if (memory_.esc_configuration & 0x01)
+                {
+                    memory_.al_status = (memory_.al_status & 0xFFF0) | State::SAFE_OP | AL_STATUS_ERR_IND;
+                    memory_.al_status_code = SYNC_MANAGER_WATCHDOG; // SM Watchdog code
+                }
             }
         }
     }

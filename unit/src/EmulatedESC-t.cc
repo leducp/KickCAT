@@ -353,11 +353,19 @@ TEST(EmulatedESC, ecat_fpxx_matches_station_alias)
     uint16_t alias = 0xABCD;
     esc.write(reg::STATION_ALIAS, &alias, sizeof(alias));
 
-    // FPRD addressed by the station alias is answered like the station address.
+    // Alias addressing is ignored until the master sets DL control 0x100[24].
     header.command = Command::FPRD;
     header.address = createAddress(alias, 0x0040);
     header.len = sizeof(uint64_t);
     uint64_t read_test = 0;
+    wkc = 0;
+    esc.processDatagram(&header, &read_test, &wkc);
+    ASSERT_EQ(wkc, 0);
+
+    // Once enabled, FPRD addressed by the station alias is answered like the station address.
+    uint8_t alias_enable = 0x01;
+    esc.write(reg::ESC_DL_ALIAS, &alias_enable, sizeof(alias_enable));
+    header.address = createAddress(alias, 0x0040);
     wkc = 0;
     esc.processDatagram(&header, &read_test, &wkc);
     ASSERT_EQ(wkc, 1);
@@ -714,6 +722,61 @@ TEST(EmulatedESC, watchdog)
     uint8_t counter = 0;
     esc.read(reg::WDOG_COUNTER_PDO, &counter, 1);
     EXPECT_GT(counter, 0);
+}
+
+TEST(EmulatedESC, watchdog_device_emulation_drops_to_safe_op_via_al_status)
+{
+    EmulatedESC esc;
+    // Word 0 high byte is the ESC configuration: bit 0 enables device emulation.
+    esc.loadEeprom(std::vector<uint16_t>{0x0104, 0, 0, 0, 0});
+
+    uint16_t wkc = 0;
+    DatagramHeader header{Command::NOP, 0, 0, 0, 0, 0, 0, 0};
+
+    configureOutputFmmuAndEnterSafeOP(esc, 2);
+
+    uint16_t divider = 2498;
+    esc.write(reg::WDG_DIVIDER, &divider, 2);
+    uint16_t wdg_time = 100;
+    esc.write(reg::WDG_TIME_PDO, &wdg_time, 2);
+
+    esc.processDatagram(&header, nullptr, &wkc);  // runs configureFmmus + arms the watchdog
+
+    uint8_t op = State::OPERATIONAL;
+    esc.write(reg::AL_CONTROL, &op, 1);
+    esc.processDatagram(&header, nullptr, &wkc);  // device emulation mirrors AL_CONTROL
+
+    uint8_t al_status = 0;
+    esc.read(reg::AL_STATUS, &al_status, 1);
+    ASSERT_EQ(State::OPERATIONAL, al_status);
+
+    // since_epoch() advances 1ms per call in unit tests; 30 cycles exceed the 10ms window.
+    for (int i = 0; i < 30; ++i)
+    {
+        esc.processDatagram(&header, nullptr, &wkc);
+    }
+
+    // The fallback is driven through AL_STATUS; AL_CONTROL (0x120) is master-owned
+    // and shall never be modified by the ESC.
+    esc.read(reg::AL_STATUS, &al_status, 1);
+    ASSERT_EQ(State::SAFE_OP | AL_STATUS_ERR_IND, al_status);
+    uint16_t al_status_code = 0;
+    esc.read(reg::AL_STATUS_CODE, &al_status_code, 2);
+    ASSERT_EQ(SYNC_MANAGER_WATCHDOG, al_status_code);
+    uint8_t al_control = 0;
+    esc.read(reg::AL_CONTROL, &al_control, 1);
+    ASSERT_EQ(State::OPERATIONAL, al_control);
+
+    // The error indication holds against the mirror until the master acks it.
+    esc.processDatagram(&header, nullptr, &wkc);
+    esc.read(reg::AL_STATUS, &al_status, 1);
+    ASSERT_EQ(State::SAFE_OP | AL_STATUS_ERR_IND, al_status);
+
+    uint8_t ack = State::SAFE_OP | AL_CONTROL_ERR_ACK;
+    esc.write(reg::AL_CONTROL, &ack, 1);
+    esc.processDatagram(&header, nullptr, &wkc);
+    esc.read(reg::AL_STATUS, &al_status, 1);
+    ASSERT_EQ(State::SAFE_OP, al_status);
 }
 
 TEST(EmulatedESC, watchdog_inactive_without_outputs)

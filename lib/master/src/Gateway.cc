@@ -67,15 +67,24 @@ namespace kickcat
         pendingRequests_.erase(std::remove_if(pendingRequests_.begin(), pendingRequests_.end(),
             [&](std::shared_ptr<GatewayMessage> msg)-> bool
             {
-                if (msg->status() != MessageStatus::SUCCESS)
+                uint32_t const status = msg->status();
+                if (status == MessageStatus::RUNNING)
                 {
                     return false;
                 }
 
+                if (status != MessageStatus::SUCCESS)
+                {
+                    // Failed requests would otherwise accumulate forever: drop them without a reply.
+                    gateway_error("Request %d failed with status 0x%" PRIx32 "\n", msg->gatewayIndex(), status);
+                    return true;
+                }
+
+                size_t const reply_size = std::min(msg->size(), sizeof(frame) - sizeof(EthercatHeader));
                 header->type = EthercatType::MAILBOX;
-                header->len  = msg->size() & 0x7ff;
-                std::memcpy(frame + sizeof(EthercatHeader), msg->data(), msg->size());
-                socket_->sendTo(frame, static_cast<int32_t>(msg->size() + sizeof(EthercatHeader)), msg->gatewayIndex());
+                header->len  = reply_size & 0x7ff;
+                std::memcpy(frame + sizeof(EthercatHeader), msg->data(), reply_size);
+                socket_->sendTo(frame, static_cast<int32_t>(reply_size + sizeof(EthercatHeader)), msg->gatewayIndex());
 
                 return true;
             }),

@@ -442,6 +442,12 @@ namespace kickcat
 
     void Link::attachEcatEventCallback(enum EcatEvent ecat_event, std::function<void()> callback)
     {
+        if (not callback)
+        {
+            // checkEcatEvents() invokes callbacks unchecked from the cyclic path
+            THROW_ERROR("attachEcatEventCallback: empty callback");
+        }
+
         int32_t index = 0;
         uint16_t mask = ecat_event;
         while (mask != 0)

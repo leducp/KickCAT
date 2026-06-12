@@ -167,7 +167,10 @@ namespace kickcat::eeprom
                 }
                 case Category::General:
                 {
-                    std::memcpy(&general, category_data, sizeof(GeneralEntry));
+                    // Partially-programmed EEPROMs declare truncated categories: never read
+                    // past the declared size, missing fields stay zero.
+                    general = GeneralEntry{};
+                    std::memcpy(&general, category_data, std::min<std::size_t>(category_size, sizeof(GeneralEntry)));
                     break;
                 }
                 case Category::FMMU:
@@ -251,8 +254,16 @@ namespace kickcat::eeprom
             strings_data.push_back(count);
             for (std::size_t i = 1; i < strings.size(); ++i)
             {
-                strings_data.push_back(static_cast<uint8_t>(strings[i].size()));
-                strings_data.insert(strings_data.end(), strings[i].begin(), strings[i].end());
+                std::size_t len = strings[i].size();
+                if (len > 0xFF)
+                {
+                    // The length prefix is one byte: a longer string would wrap it and
+                    // corrupt the category framing.
+                    esi_warning("SII: string %zu is %zu bytes long, truncated to 255\n", i, len);
+                    len = 0xFF;
+                }
+                strings_data.push_back(static_cast<uint8_t>(len));
+                strings_data.insert(strings_data.end(), strings[i].begin(), strings[i].begin() + len);
             }
             // Pad to word boundary
             if (strings_data.size() % 2 != 0)

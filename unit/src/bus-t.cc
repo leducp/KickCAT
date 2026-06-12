@@ -550,6 +550,41 @@ TEST_F(BusTest, read_SDO_emulated_complete_access_OK)
 }
 
 
+TEST_F(BusTest, read_SDO_emulated_complete_access_abort_on_size_read)
+{
+    auto& slave = bus.slaves().at(0);
+
+    // checkMailboxes: can write, nothing to read
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+
+    // write to mailbox
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    // checkMailboxes: can write, something to read
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
+
+    // The subindex 0 (object size) read is aborted by the slave: the error shall
+    // be propagated instead of silently returning an empty result.
+    SDOAnswer answer;
+    answer.header.len = 10;
+    answer.header.address = 0;
+    answer.header.type = mailbox::Type::CoE;
+    answer.coe.service = CoE::Service::SDO_RESPONSE;
+    answer.sdo.command = CoE::SDO::request::ABORT;
+    answer.sdo.index = 0x1018;
+    answer.sdo.subindex = 0;
+    *reinterpret_cast<uint32_t*>(answer.payload) = CoE::SDO::abort::UNSUPPORTED_ACCESS;
+
+    mock_link->handleProcess(Command::FPRD, answer, 1);
+
+    uint32_t data[3] = {0};
+    uint32_t data_size = sizeof(data);
+    ASSERT_THROW(bus.readSDO(slave, 0x1018, 1, Bus::Access::EMULATE_COMPLETE, &data, &data_size), Error);
+}
+
+
 TEST_F(BusTest, read_SDO_buffer_too_small)
 {
     addReadEmulatedSDO<uint32_t>(0x1018, { 3, 0xCAFE0000 });

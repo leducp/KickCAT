@@ -27,8 +27,12 @@ namespace kickcat
 
         /// \brief   Process pending requests
         /// \details A pending request is a request that was successfully transfered to the EtherCAT bus, waiting for its completion.
-        ///          All requests completed on the bus are sent back to their respective requestors
+        ///          All requests completed on the bus are sent back to their respective requestors.
+        ///          Failed requests (timeout, error) are dropped without a reply.
         void processPendingRequests();
+
+        /// \return Number of requests waiting for completion
+        std::size_t pendingRequests() const { return pendingRequests_.size(); }
 
     private:
         std::shared_ptr<AbstractDiagSocket> socket_;

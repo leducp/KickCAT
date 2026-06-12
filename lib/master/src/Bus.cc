@@ -78,7 +78,7 @@ namespace kickcat
 
     void Bus::disableIRQ(enum EcatEvent event)
     {
-        link_->attachEcatEventCallback(event, {});
+        link_->attachEcatEventCallback(event, [](){});
 
         irq_mask_ &= ~event;
         uint16_t wkc = broadcastWrite(reg::ECAT_EVENT_MASK, &irq_mask_, 2);
