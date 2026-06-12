@@ -20,4 +20,8 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     add_executable(check_network_stability check_network_stability.cc)
     target_link_libraries(check_network_stability kickcat argparse::argparse)
     set_kickcat_properties(check_network_stability)
+
+    add_executable(redundancy_bench redundancy_bench.cc)
+    target_link_libraries(redundancy_bench kickcat argparse::argparse)
+    set_kickcat_properties(redundancy_bench)
 endif()
