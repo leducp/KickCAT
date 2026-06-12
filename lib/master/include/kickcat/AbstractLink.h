@@ -1,13 +1,36 @@
 #ifndef KICKCAT_ABSTRACT_LINK_H
 #define KICKCAT_ABSTRACT_LINK_H
 
+#include <cstdint>
 #include <cstring>
 #include <functional>
+#include <vector>
 
 #include "kickcat/Frame.h"
 
 namespace kickcat
 {
+    /// \brief Payload layout of a mapped logical frame, keyed by its logical address.
+    /// \details Required to splice the two redundancy copies of an LRW datagram: inputs and
+    ///          outputs share logical addresses, so the copies cannot be merged from the
+    ///          command alone.
+    struct LogicalFrameDescription
+    {
+        uint32_t address{0};        // logical address
+        int32_t  logical_size{0};   // full logical address range (PDO + mailbox status bits)
+        int32_t  pdo_size{0};       // process data only
+
+        // Per-slave LRW expectations in bus position order, to attribute each slave to a
+        // ring segment from the per-copy working counters when redundancy splices a frame
+        struct Entry
+        {
+            uint16_t contribution{0};  // expected wkc contribution of this slave on LRW
+            int32_t  input_offset{-1}; // frame offset of its input block, -1 when none
+            int32_t  input_size{0};
+        };
+        std::vector<Entry> entries;
+    };
+
     /// \brief Abstract interface for the EtherCAT link layer.
     /// \details The link layer is responsible for sending and receiving EtherCAT frames on the wire.
     ///          It provides two communication modes:
@@ -33,6 +56,10 @@ namespace kickcat
         virtual void addDatagram(enum Command command, uint32_t address, void const* data, uint16_t data_size,
                                  std::function<DatagramState(DatagramHeader const*, uint8_t const* data, uint16_t wkc)> const& process,
                                  std::function<void(DatagramState const& state)> const& error) = 0;
+
+        /// \brief Provide the layout of the mapped logical frames, replacing any previous one.
+        /// \details Links without redundancy support ignore it.
+        virtual void setLogicalMapping(std::vector<LogicalFrameDescription> const&) {}
 
         /// \brief Convenience overload: queue a datagram with a typed payload.
         template<typename T>

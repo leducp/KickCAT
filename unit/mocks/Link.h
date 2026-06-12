@@ -128,6 +128,9 @@ namespace kickcat
 
         void finalizeDatagrams() override {}
 
+        void setLogicalMapping(std::vector<LogicalFrameDescription> const& mapping) override { logical_mapping_ = mapping; }
+        std::vector<LogicalFrameDescription> const& logicalMapping() const { return logical_mapping_; }
+
         void setTimeout(nanoseconds const&) override {}
 
         void checkRedundancyNeeded() override {}
@@ -146,6 +149,7 @@ namespace kickcat
 
         std::vector<PendingDatagram> pending_datagrams_;
         std::queue<QueuedResponse> queued_responses_;
+        std::vector<LogicalFrameDescription> logical_mapping_;
         struct WtrResponse // wtr: writeThenRead
         {
             Command expected_command{};

@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstring>
 #include <inttypes.h>
 #include <algorithm>
@@ -524,8 +525,10 @@ namespace kickcat
         // Second step: create 'block I/O' lists for read and write op
         // Note A: offset computing will overlap input and output in the frame (better density and compatibility, more works for master)
         // Note B: a frame cannot handle more than 1486 bytes
-        pi_frames_.resize(1);
-        pi_frames_[0].address = 0;
+        // Full reset: a previous mapping would otherwise leak its block IO lists into this one.
+        pi_frames_.clear();
+        pi_frames_.push_back(PIFrame{});
+        pi_frames_[0].description.address = 0;
         std::vector<std::vector<Slave*>> frame_mbx_slaves(1);
         uint32_t address = 0;
         for (auto& slave : slaves_)
@@ -534,23 +537,27 @@ namespace kickcat
             int32_t size = std::max(slave.input.bsize, slave.output.bsize);
             if ((address + size) > (pi_frames_.size() * MAX_ETHERCAT_PAYLOAD_SIZE)) // do we overflow current frame ?
             {
-                pi_frames_.back().logical_size = address - pi_frames_.back().address; // frame size = current address - frame address
+                auto& desc = pi_frames_.back().description;
+                desc.logical_size = address - desc.address; // frame size = current address - frame address
 
                 // current size will overflow the frame at the current offset: set in on the next frame
                 address = static_cast<uint32_t>(pi_frames_.size()) * MAX_ETHERCAT_PAYLOAD_SIZE;
-                pi_frames_.push_back({address, 0, 0, {}, {}, {}, {}, 0});
+                PIFrame new_frame{};
+                new_frame.description.address = address;
+                pi_frames_.push_back(std::move(new_frame));
                 frame_mbx_slaves.push_back({});
             }
 
             // create block IO entries
+            PIFrame& current_frame = pi_frames_.back();
             if (slave.input.bsize > 0)
             {
-                pi_frames_.back().inputs.push_back ({nullptr, address - pi_frames_.back().address, slave.input.bsize,  &slave});
+                current_frame.inputs.push_back ({nullptr, address - current_frame.description.address, slave.input.bsize,  &slave});
             }
 
             if (slave.output.bsize > 0)
             {
-                pi_frames_.back().outputs.push_back({nullptr, address - pi_frames_.back().address, slave.output.bsize, &slave});
+                current_frame.outputs.push_back({nullptr, address - current_frame.description.address, slave.output.bsize, &slave});
             }
 
             // save mapping offset (need to configure slave FMMU)
@@ -567,12 +574,13 @@ namespace kickcat
         }
 
         // update last frame size
-        pi_frames_.back().logical_size = address - pi_frames_.back().address;
+        auto& last_desc = pi_frames_.back().description;
+        last_desc.logical_size = address - last_desc.address;
 
         // Set pdo_size for all frames (equals logical_size before mailbox status extension)
         for (auto& frame : pi_frames_)
         {
-            frame.pdo_size = frame.logical_size;
+            frame.description.pdo_size = frame.description.logical_size;
         }
 
         // Extend frames with bit-wise mailbox status mappings
@@ -593,7 +601,7 @@ namespace kickcat
                 // PDO input FMMU (FMMU1) is read-direction, and so are mailbox status FMMUs,
                 // so we insert a 3-byte gap between the PDO region and the status region,
                 // and between the read-check and write-check regions when both are active.
-                uint32_t status_offset = static_cast<uint32_t>(frame.pdo_size);
+                uint32_t status_offset = static_cast<uint32_t>(frame.description.pdo_size);
                 constexpr uint32_t FMMU_BYTE_SEPARATION = 3;
 
                 if (mailbox_status_fmmu_ & MailboxStatusFMMU::READ_CHECK)
@@ -626,7 +634,7 @@ namespace kickcat
                     status_offset += write_bytes;
                 }
 
-                frame.logical_size = static_cast<int32_t>(status_offset);
+                frame.description.logical_size = static_cast<int32_t>(status_offset);
 
                 // WKC adjustment: only count slaves that gain a read-direction FMMU
                 // but have no TxPDO (input). Slaves with TxPDO already increment WKC
@@ -642,6 +650,64 @@ namespace kickcat
                 frame.mailbox_status_wkc_read_adjust = adjust;
             }
         }
+
+        for (auto& frame : pi_frames_)
+        {
+            frame.output_buffer.assign(static_cast<size_t>(frame.description.logical_size), 0);
+
+            // Per-slave LRW expectations, indexed by bus position (= position in slaves_)
+            std::vector<LogicalFrameDescription::Entry> by_position(slaves_.size());
+            for (auto const& bio : frame.inputs)
+            {
+                std::ptrdiff_t position = bio.slave - slaves_.data();
+                auto& entry = by_position[position];
+                entry.contribution += 1;
+                entry.input_offset = static_cast<int32_t>(bio.offset);
+                entry.input_size = bio.size;
+            }
+            for (auto const& bio : frame.outputs)
+            {
+                std::ptrdiff_t position = bio.slave - slaves_.data();
+                by_position[position].contribution += 2;
+            }
+
+            // Mailbox status FMMUs add one read increment for slaves without input PDO,
+            // once per slave whichever check directions are enabled
+            std::vector<bool> counted(slaves_.size(), false);
+            auto countMailboxStatus = [&](std::vector<MailboxStatusEntry> const& status_entries)
+            {
+                for (auto const& ms : status_entries)
+                {
+                    std::ptrdiff_t position = ms.slave - slaves_.data();
+                    if ((ms.slave->input.bsize == 0) and (not counted[position]))
+                    {
+                        counted[position] = true;
+                        by_position[position].contribution += 1;
+                    }
+                }
+            };
+            countMailboxStatus(frame.mailbox_read_status);
+            countMailboxStatus(frame.mailbox_write_status);
+
+            frame.description.entries.clear();
+            frame.expected_lrw_wkc = 0;
+            for (auto const& entry : by_position)
+            {
+                if (entry.contribution > 0)
+                {
+                    frame.description.entries.push_back(entry);
+                    frame.expected_lrw_wkc += entry.contribution;
+                }
+            }
+        }
+
+        std::vector<LogicalFrameDescription> descriptions;
+        descriptions.reserve(pi_frames_.size());
+        for (auto const& frame : pi_frames_)
+        {
+            descriptions.push_back(frame.description);
+        }
+        link_->setLogicalMapping(descriptions);
 
         // Validate the client buffer can hold the process image before writing into it.
         std::size_t required = 0;
@@ -718,7 +784,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            link_->addDatagram(Command::LRD, pi_frame.address, nullptr, static_cast<uint16_t>(pi_frame.logical_size), process, error);
+            link_->addDatagram(Command::LRD, pi_frame.description.address, nullptr, static_cast<uint16_t>(pi_frame.description.logical_size), process, error);
         }
     }
 
@@ -732,9 +798,9 @@ namespace kickcat
 
     void Bus::sendLogicalWrite(std::function<void(DatagramState const&)> const& error)
     {
-        for (auto const& pi_frame : pi_frames_)
+        for (auto& pi_frame : pi_frames_)
         {
-            uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
+            uint8_t* buffer = pi_frame.output_buffer.data();
             for (auto const& output : pi_frame.outputs)
             {
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
@@ -749,7 +815,7 @@ namespace kickcat
                 }
                 return DatagramState::OK;
             };
-            link_->addDatagram(Command::LWR, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.pdo_size), process, error);
+            link_->addDatagram(Command::LWR, pi_frame.description.address, buffer, static_cast<uint16_t>(pi_frame.description.pdo_size), process, error);
         }
 
         if (dc_slave_ != nullptr)
@@ -768,9 +834,9 @@ namespace kickcat
 
     void Bus::sendLogicalReadWrite(std::function<void(DatagramState const&)> const& error)
     {
-        for (auto const& pi_frame : pi_frames_)
+        for (auto& pi_frame : pi_frames_)
         {
-            uint8_t buffer[MAX_ETHERCAT_PAYLOAD_SIZE];
+            uint8_t* buffer = pi_frame.output_buffer.data();
             for (auto const& output : pi_frame.outputs)
             {
                 std::memcpy(buffer + output.offset, output.iomap, output.size);
@@ -778,11 +844,9 @@ namespace kickcat
 
             auto process = [&pi_frame](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
             {
-                uint16_t expected_wkc = static_cast<uint16_t>(pi_frame.inputs.size() + pi_frame.outputs.size() * 2
-                    + pi_frame.mailbox_status_wkc_read_adjust);
-                if (wkc != expected_wkc)
+                if (wkc != pi_frame.expected_lrw_wkc)
                 {
-                    bus_error("Invalid working counter: expected %d, got %d\n", expected_wkc, wkc);
+                    bus_error("Invalid working counter: expected %d, got %d\n", pi_frame.expected_lrw_wkc, wkc);
                     return DatagramState::INVALID_WKC;
                 }
 
@@ -803,7 +867,7 @@ namespace kickcat
                 return DatagramState::OK;
             };
 
-            link_->addDatagram(Command::LRW, pi_frame.address, buffer, static_cast<uint16_t>(pi_frame.logical_size), process, error);
+            link_->addDatagram(Command::LRW, pi_frame.description.address, buffer, static_cast<uint16_t>(pi_frame.description.logical_size), process, error);
         }
 
         if (dc_slave_ != nullptr)
@@ -918,7 +982,7 @@ namespace kickcat
                 {
                     fmmu::Register fmmu;
                     std::memset(&fmmu, 0, sizeof(fmmu::Register));
-                    fmmu.logical_address    = frame.address + entry.byte_offset;
+                    fmmu.logical_address    = frame.description.address + entry.byte_offset;
                     fmmu.length             = 1;
                     fmmu.logical_start_bit  = entry.bit_position;
                     fmmu.logical_stop_bit   = entry.bit_position;

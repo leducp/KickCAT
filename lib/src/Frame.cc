@@ -184,9 +184,9 @@ namespace kickcat
     }
 
 
-    std::tuple<DatagramHeader const*, uint8_t*, uint16_t> Frame::nextDatagram()
+    std::tuple<DatagramHeader*, uint8_t*, uint16_t> Frame::nextDatagram()
     {
-        DatagramHeader const* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
+        DatagramHeader* header = reinterpret_cast<DatagramHeader*>(next_datagram_);
         uint8_t* data = next_datagram_ + sizeof(DatagramHeader);
         uint8_t* wkc_addr = data + header->len;
         uint16_t wkc;

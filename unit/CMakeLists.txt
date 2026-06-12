@@ -10,6 +10,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/link-t.cc
                             src/prints-t.cc
                             src/protocol-t.cc
+                            src/redundancy-t.cc
                             src/Ring-t.cc
                             src/SBufQueue-t.cc
                             src/slave-t.cc

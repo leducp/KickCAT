@@ -39,8 +39,13 @@ namespace kickcat
         {
             Frame frame;
             std::memcpy(frame.data(), data, static_cast<size_t>(size));
-            network_.route(frame);
+            bool delivered = network_.route(frame);
             tick_();
+            if (not delivered)
+            {
+                pending_ = false; // frame destroyed by an ESC (circulating flag)
+                return size;
+            }
             std::memcpy(buffer_, frame.data(), static_cast<size_t>(size));
             size_ = size;
             pending_ = true;

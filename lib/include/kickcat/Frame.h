@@ -41,7 +41,7 @@ namespace kickcat
 
         /// \brief helper to get access on next datagram
         /// \return a tuple with a pointer on the datagram header, a pointer on the datagram data, the working counter
-        std::tuple<DatagramHeader const*, uint8_t*, uint16_t> nextDatagram();
+        std::tuple<DatagramHeader*, uint8_t*, uint16_t> nextDatagram();
 
         /// \brief helper to peek on a datagram while advancing internal pointer to the next one.
         /// \details This API is designed for network simulation.
