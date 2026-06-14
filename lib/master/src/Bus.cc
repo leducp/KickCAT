@@ -8,6 +8,7 @@
 #include "Prints.h"
 
 #include "CoE/mailbox/request.h"
+#include "EoE/mailbox/request.h"
 
 namespace kickcat
 {
@@ -124,9 +125,12 @@ namespace kickcat
                 slave.mailbox.to_process.push_back(emg);
             }
 
-            if ((slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::EoE) or
-                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::FoE) or
-                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::SoE) or
+            if (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::EoE)
+            {
+                slave.mailbox.createEoEFrameListener();
+            }
+
+            if ((slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::SoE) or
                 (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE) or
                 (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::AoE))
             {

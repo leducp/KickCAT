@@ -6,6 +6,9 @@
 #include "debug.h"
 #include "CoE/mailbox/request.h"
 #include "CoE/mailbox/response.h"
+#include "EoE/mailbox/response.h"
+#include "EoE/protocol.h"
+#include "FoE/mailbox/response.h"
 #include "Error.h"
 #include "Mailbox.h"
 #include "protocol.h"
@@ -560,6 +563,67 @@ namespace kickcat::mailbox::response
     {
         dictionary_ = &dictionary;
         factories_.push_back(&createSDOMessage);
+    }
+
+    void Mailbox::enableEoE(EoE::IpParameters& params)
+    {
+        eoe_params_ = &params;
+        factories_.push_back(&createEoEMessage);
+    }
+
+    void Mailbox::setEoEFrameHandler(std::function<void(Mailbox&, uint8_t const*, size_t, uint8_t)> handler)
+    {
+        eoe_frame_handler_ = std::move(handler);
+    }
+
+    void Mailbox::enableFoE(AbstractFileSystem& fs)
+    {
+        foe_fs_ = &fs;
+        factories_.push_back(&createFoEMessage);
+    }
+
+    void Mailbox::deliverEoEFrame(uint8_t const* frame, size_t size, uint8_t port)
+    {
+        if (eoe_frames.size() >= MAX_BUFFERED_MESSAGES)
+        {
+            eoe_frames.erase(eoe_frames.begin());
+        }
+        eoe_frames.emplace_back(frame, frame + size);
+        if (eoe_frame_handler_)
+        {
+            eoe_frame_handler_(*this, frame, size, port);
+        }
+    }
+
+    void Mailbox::sendEoEFrame(uint8_t const* frame, size_t size, uint8_t port)
+    {
+        constexpr size_t overhead = sizeof(mailbox::Header) + sizeof(EoE::Header);
+        if ((max_allocated_ram_by_msg_ < (overhead + EoE::FRAGMENT_GRANULARITY))
+         or (size > EoE::MAX_FRAGMENTED_FRAME))
+        {
+            return;
+        }
+
+        uint8_t frame_number = eoe_frame_number_ & 0xf;
+        eoe_frame_number_++;
+
+        EoE::Fragmenter fragmenter(frame, size, port, frame_number, max_allocated_ram_by_msg_ - overhead);
+        while (not fragmenter.done())
+        {
+            EoE::Header eoe_header{};
+            uint8_t const* data = nullptr;
+            size_t len = fragmenter.next(eoe_header, data);
+
+            std::vector<uint8_t> fragment(overhead + len, 0);
+            auto* header = pointData<mailbox::Header>(fragment.data());
+            auto* eoe    = pointData<EoE::Header>(header);
+            header->type = mailbox::Type::EoE;
+            header->len  = static_cast<uint16_t>(sizeof(EoE::Header) + len);
+            *eoe = eoe_header;
+            std::memcpy(pointData<uint8_t>(eoe), data, len);
+
+            to_send_.push(std::move(fragment));
+        }
     }
 
     void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)

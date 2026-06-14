@@ -36,6 +36,10 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/mailbox/response-t.cc
                             src/mailbox/CoE/request-t.cc
                             src/mailbox/CoE/response-t.cc
+                            src/mailbox/EoE/request-t.cc
+                            src/mailbox/EoE/response-t.cc
+                            src/mailbox/FoE/request-t.cc
+                            src/mailbox/FoE/response-t.cc
                             src/masterOD-t.cc
                             src/masterOD-gateway-t.cc
                             src/slave/slave-t.cc

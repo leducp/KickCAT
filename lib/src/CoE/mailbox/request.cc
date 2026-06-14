@@ -469,6 +469,10 @@ namespace kickcat::mailbox::request
         }
 
         auto const* emg = pointData<CoE::Emergency>(coe);
+        if (mailbox_.emergencies.size() >= MAX_BUFFERED_MESSAGES)
+        {
+            mailbox_.emergencies.erase(mailbox_.emergencies.begin());
+        }
         mailbox_.emergencies.push_back(*emg);
         return ProcessingResult::FINALIZE_AND_KEEP;
     }

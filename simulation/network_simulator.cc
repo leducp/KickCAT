@@ -13,6 +13,8 @@
 #include "kickcat/ESI/Parser.h"
 #include "kickcat/ESI/SIIBuilder.h"
 #include "kickcat/CoE/mailbox/response.h"
+#include "kickcat/EoE/mailbox/response.h"
+#include "kickcat/FoE/mailbox/response.h"
 #include "kickcat/EmulatedNetwork.h"
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/Frame.h"
@@ -135,8 +137,12 @@ int main(int argc, char* argv[])
     std::vector<std::unique_ptr<EmulatedESC>> escs;
     std::vector<std::unique_ptr<PDO>> pdos;
     std::vector<std::unique_ptr<Slave>> slaves;
-    std::vector<std::unique_ptr<mailbox::response::Mailbox>> mailboxes;
+    // The application-owned protocol state must outlive the mailboxes that borrow it: declare the
+    // mailboxes last so they are destroyed first.
     std::vector<std::unique_ptr<CoE::Dictionary>> dictionaries;  // application owns the ODs
+    std::vector<std::unique_ptr<EoE::IpParameters>> eoe_params;  // application owns the EoE state
+    std::vector<std::unique_ptr<mailbox::response::InMemoryFileSystem>> foe_fs;  // application owns the FoE files
+    std::vector<std::unique_ptr<mailbox::response::Mailbox>> mailboxes;
     std::vector<std::vector<uint8_t>> input_pdo;
     std::vector<std::vector<uint8_t>> output_pdo;
 
@@ -180,6 +186,8 @@ int main(int argc, char* argv[])
         std::unique_ptr<EmulatedESC> esc;
         std::optional<CoE::Dictionary> esi_coe;  // CoE dictionary derived from the ESI device, if any
         bool esi_coe_advertised = false;         // true => device declares a CoE mailbox (SDO on the wire)
+        bool esi_eoe_advertised = false;         // true => device declares an EoE mailbox
+        bool esi_foe_advertised = false;         // true => device declares an FoE mailbox
 
         if (config.contains("esi"))
         {
@@ -202,6 +210,9 @@ int main(int argc, char* argv[])
 
                 esc = std::make_unique<EmulatedESC>();
                 esc->loadEeprom(ESI::buildEepromImage(dev));
+
+                esi_eoe_advertised = (dev.mailbox and dev.mailbox->eoe.has_value());
+                esi_foe_advertised = (dev.mailbox and dev.mailbox->foe.has_value());
 
                 if (not dev.dictionary.empty())
                 {
@@ -237,16 +248,38 @@ int main(int argc, char* argv[])
         auto slave = std::make_unique<Slave>(esc.get(), pdo.get());
 
         // The OD (owned here in `dictionaries`) is injected into the slave always, and into a
-        // mailbox only if the device advertises CoE - so a mailboxless terminal still maps PDOs.
-        if (esi_coe)
+        // mailbox only if the device advertises a mailbox protocol - so a mailboxless terminal
+        // still maps PDOs.
+        if (esi_coe or esi_eoe_advertised or esi_foe_advertised)
         {
-            dictionaries.push_back(std::make_unique<CoE::Dictionary>(std::move(*esi_coe)));
-            CoE::Dictionary* dictionary = dictionaries.back().get();
-            slave->setDictionary(dictionary);
-            if (esi_coe_advertised)
+            CoE::Dictionary* dictionary = nullptr;
+            if (esi_coe)
+            {
+                dictionaries.push_back(std::make_unique<CoE::Dictionary>(std::move(*esi_coe)));
+                dictionary = dictionaries.back().get();
+                slave->setDictionary(dictionary);
+            }
+
+            if (esi_coe_advertised or esi_eoe_advertised or esi_foe_advertised)
             {
                 auto mbx = std::make_unique<mailbox::response::Mailbox>(esc.get(), 1024);
-                mbx->enableCoE(*dictionary);
+                if (esi_coe_advertised and dictionary != nullptr)
+                {
+                    mbx->enableCoE(*dictionary);
+                }
+                if (esi_eoe_advertised)
+                {
+                    eoe_params.push_back(std::make_unique<EoE::IpParameters>());
+                    mbx->enableEoE(*eoe_params.back());
+                    mbx->setEoEFrameHandler([](mailbox::response::Mailbox& eoe_mbx, uint8_t const* frame_data,
+                                               size_t frame_size, uint8_t frame_port)
+                                            { eoe_mbx.sendEoEFrame(frame_data, frame_size, frame_port); });
+                }
+                if (esi_foe_advertised)
+                {
+                    foe_fs.push_back(std::make_unique<mailbox::response::InMemoryFileSystem>());
+                    mbx->enableFoE(*foe_fs.back());
+                }
                 slave->setMailbox(mbx.get());
                 mailboxes.push_back(std::move(mbx));
             }

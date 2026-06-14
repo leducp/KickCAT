@@ -15,7 +15,7 @@ namespace kickcat::FoE
     {
         struct Header   // ETG1000.6 chapter 5.8.1
         {
-            uint16_t password;  // 0 == password unused
+            uint32_t password;  // 0 == password unused
         } __attribute__((__packed__));
         // Followed by the file name in the data section
     }
@@ -24,7 +24,7 @@ namespace kickcat::FoE
     {
         struct Header   // ETG1000.6 chapter 5.8.2
         {
-            uint16_t password;  // 0 == password unused
+            uint32_t password;  // 0 == password unused
         } __attribute__((__packed__));
         // Followed by the file name in the data section
     }
@@ -33,7 +33,7 @@ namespace kickcat::FoE
     {
         struct Header   // ETG1000.6 chapter 5.8.3
         {
-            uint16_t packet_number;  // 1 - 0xFFFFFFFF
+            uint32_t packet_number;  // 1 - 0xFFFFFFFF
         } __attribute__((__packed__));
         // Followed by a file chunk in the data section
     }
@@ -42,7 +42,7 @@ namespace kickcat::FoE
     {
         struct Header   // ETG1000.6 chapter 5.8.4
         {
-            uint16_t packet_number;  // 1 - 0xFFFFFFFF
+            uint32_t packet_number;  // 0 acks a Write Request, 1 - 0xFFFFFFFF acks a Data Request
         } __attribute__((__packed__));
     }
 
@@ -50,12 +50,12 @@ namespace kickcat::FoE
     {
         struct Header   // ETG1000.6 chapter 5.8.5
         {
-            uint16_t error_code;
+            uint32_t error_code;
         } __attribute__((__packed__));
         // Followed by an optional error string in the data section
     }
 
-    namespace buys
+    namespace busy
     {
         struct Header   // ETG1000.6 chapter 5.8.6
         {
@@ -92,6 +92,12 @@ namespace kickcat::FoE
 
         char const* toString(uint16_t result);
     }
+
+    static_assert(sizeof(Header)        == 2, "FoE::Header must be 2 octets");
+    static_assert(sizeof(read::Header)  == 4, "FoE::read::Header must be 4 octets");
+    static_assert(sizeof(data::Header)  == 4, "FoE::data::Header must be 4 octets");
+    static_assert(sizeof(ack::Header)   == 4, "FoE::ack::Header must be 4 octets");
+    static_assert(sizeof(error::Header) == 4, "FoE::error::Header must be 4 octets");
 }
 
 #endif
