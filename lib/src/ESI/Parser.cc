@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "kickcat/CoE/protocol.h"
 #include "kickcat/debug.h"
 #include "kickcat/ESI/Parser.h"
 
@@ -930,9 +931,7 @@ CoE::Object Parser::buildMappingObject(Pdo const& pdo, bool is_rx)
             entry.description = "Entry " + std::to_string(i + 1);
         }
         entry.data        = std::malloc(sizeof(uint32_t));
-        uint32_t packed = (static_cast<uint32_t>(e.index) << 16)
-                        | (static_cast<uint32_t>(e.subindex) << 8)
-                        | static_cast<uint32_t>(e.bit_len);
+        uint32_t packed = CoE::toMappingWord({e.index, e.subindex, static_cast<uint8_t>(e.bit_len)});
         std::memcpy(entry.data, &packed, sizeof(uint32_t));
         obj.entries.push_back(std::move(entry));
         bitoff = static_cast<uint16_t>(bitoff + 32);
@@ -1287,9 +1286,10 @@ void Parser::synthesizePdoMappingObjects(Device& device)
             }
             uint32_t mapping;
             std::memcpy(&mapping, entry.data, sizeof(uint32_t));
-            uint16_t index = static_cast<uint16_t>(mapping >> 16);
-            uint8_t  sub   = static_cast<uint8_t>(mapping >> 8);
-            uint8_t  bits  = static_cast<uint8_t>(mapping);
+            CoE::PdoMappingEntry me = CoE::fromMappingWord(mapping);
+            uint16_t index = me.index;
+            uint8_t  sub   = me.subindex;
+            uint8_t  bits  = me.bitlen;
             if (index == 0)
             {
                 continue;  // padding gap
@@ -1317,9 +1317,7 @@ void Parser::synthesizePdoMappingObjects(Device& device)
                 continue;
             }
 
-            uint32_t fixed = (static_cast<uint32_t>(index) << 16)
-                           | (static_cast<uint32_t>(found_sub) << 8)
-                           | bits;
+            uint32_t fixed = CoE::toMappingWord({index, static_cast<uint8_t>(found_sub), bits});
             std::memcpy(entry.data, &fixed, sizeof(uint32_t));
             esi_warning("PDO 0x%04x: retargeted mapping 0x%04x:%u -> 0x%04x:%d (object declares data there)\n",
                 obj.index, index, sub, index, found_sub);

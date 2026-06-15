@@ -25,6 +25,7 @@ option(ENABLE_CODE_COVERAGE    "Enable code coverage (requires gcovr)" OFF)
 option(ENABLE_ASAN             "Build with AddressSanitizer" OFF)
 option(ENABLE_UBSAN            "Build with UndefinedBehaviorSanitizer" OFF)
 option(BUILD_EEPROM_EDITOR     "Build EEPROM editor GUI (requires imgui, glfw)" OFF)
+option(BUILD_KICKUI            "Build KickUI, the KickCAT GUI (requires imgui, glfw)" OFF)
 option(KICKCAT_INSTALL         "Install KickCAT targets, headers, CMake config and pkg-config files" ${KICKCAT_INSTALL_DEFAULT})
 
 include(Install)
@@ -104,9 +105,16 @@ if (BUILD_TOOLS)
   add_subdirectory(tools)
 endif()
 
-if (BUILD_EEPROM_EDITOR)
+if (BUILD_EEPROM_EDITOR OR BUILD_KICKUI)
   add_subdirectory(tools/common)
+endif()
+
+if (BUILD_EEPROM_EDITOR)
   add_subdirectory(tools/eeprom_editor)
+endif()
+
+if (BUILD_KICKUI)
+  add_subdirectory(tools/kickui)
 endif()
 
 add_subdirectory(py_bindings)

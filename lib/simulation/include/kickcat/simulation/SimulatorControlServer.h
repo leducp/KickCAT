@@ -18,8 +18,12 @@ namespace kickcat::sim
         void attach(std::string const& name);
         void drain();   // no-op until attached
 
+        // Publish the latest frame-timing window for the host to display.
+        // No-op until attached.
+        void publishStats(SimStats const& s);
+
     private:
-        ControlResponse apply(ControlCommand const& cmd);
+        ControlEvent apply(ControlCommand const& cmd);
 
         ControlChannel   channel_;
         EmulatedNetwork& network_;

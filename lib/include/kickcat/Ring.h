@@ -2,6 +2,7 @@
 #define KICKCAT_RING_H
 
 #include <cstddef>
+#include <cstdint>
 
 namespace kickcat
 {

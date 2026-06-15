@@ -1,6 +1,7 @@
 #ifndef KICKCAT_COE_OD_H
 #define KICKCAT_COE_OD_H
 
+#include <array>
 #include <vector>
 #include <string>
 #include <cstring>
@@ -106,6 +107,32 @@ namespace kickcat::CoE
         DEFTYPE_FSOECOMMPAR    = 0x0286
     };
     char const* toString(enum DataType type);
+
+    // Wire properties of a basic CoE data type, for code that interprets raw entry
+    // bytes (the name is already available via toString). size 0 = string.
+    struct DataTypeInfo
+    {
+        DataType type;
+        uint16_t size;       // fixed size in bytes; 0 for variable-length strings
+        bool     is_signed;
+        bool     is_real;
+        bool     is_string;
+    };
+
+    // The fixed-width scalar + string data types, in a stable order.
+    constexpr std::array<DataTypeInfo, 11> BASIC_DATA_TYPES = {{
+        {DataType::UNSIGNED8,      1, false, false, false},
+        {DataType::UNSIGNED16,     2, false, false, false},
+        {DataType::UNSIGNED32,     4, false, false, false},
+        {DataType::UNSIGNED64,     8, false, false, false},
+        {DataType::INTEGER8,       1, true,  false, false},
+        {DataType::INTEGER16,      2, true,  false, false},
+        {DataType::INTEGER32,      4, true,  false, false},
+        {DataType::INTEGER64,      8, true,  false, false},
+        {DataType::REAL32,         4, false, true,  false},
+        {DataType::REAL64,         8, false, true,  false},
+        {DataType::VISIBLE_STRING, 0, false, false, true },
+    }};
 
 
     constexpr bool isBasic(DataType type)
@@ -213,6 +240,9 @@ namespace kickcat::CoE
         std::string  description;
 
         void* data{nullptr};
+        // Internal ownership flag: true once PDO mapping redirects `data` into the
+        // process image (dtor must not free it). Set only on the data object a PDO
+        // maps; NOT a per-field "ready" API and never set on a 0x16xx/0x1Axx mapping object.
         bool is_mapped{false};
 
         /// Called before access

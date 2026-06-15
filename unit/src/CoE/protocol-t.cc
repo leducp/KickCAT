@@ -129,3 +129,18 @@ TEST(CoE, SDO_Information_EntryDescription_to_string)
 
     ASSERT_EQ(toString(desc), EXPECTED);
 }
+
+TEST(CoE, pdo_mapping_word_pack_unpack)
+{
+    // Packed subindex value of a PDO mapping entry: index<<16 | sub<<8 | bitlen.
+    EXPECT_EQ(toMappingWord({0x607A, 0x00, 0x20}), 0x607A0020u);
+    EXPECT_EQ(toMappingWord({0x6041, 0x00, 0x10}), 0x60410010u);
+
+    PdoMappingEntry e = fromMappingWord(0x60410010);
+    EXPECT_EQ(e.index, 0x6041);
+    EXPECT_EQ(e.subindex, 0x00);
+    EXPECT_EQ(e.bitlen, 0x10);
+
+    // A padding gap (index 0) round-trips its bit length.
+    EXPECT_EQ(fromMappingWord(toMappingWord({0x0000, 0x00, 0x08})).bitlen, 0x08);
+}

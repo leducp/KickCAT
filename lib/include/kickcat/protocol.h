@@ -138,6 +138,7 @@ namespace kickcat
         ERROR_ACK   = 0x10  // Acknowledge flag request - check AL_STATUS
     };
     char const* toString(State state);
+    char const* toShortString(State state);
 
     char const* ALStatus_to_string(int32_t code);
 

@@ -115,4 +115,20 @@ namespace kickcat
     {
         mutex_.unlock();
     }
+
+
+    TryLockGuard::TryLockGuard(Mutex& mutex)
+        : mutex_(mutex)
+        , owned_(mutex.tryLock())
+    {
+    }
+
+
+    TryLockGuard::~TryLockGuard()
+    {
+        if (owned_)
+        {
+            mutex_.unlock();
+        }
+    }
 }

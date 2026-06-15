@@ -47,6 +47,21 @@ namespace kickcat
     private:
         Mutex& mutex_;  ///< Reference to the mutex managed by the guard
     };
+
+    /// RAII manager for a non-blocking lock attempt. owns() reports whether the
+    /// lock was taken; the mutex is released on destruction only if owned.
+    class TryLockGuard
+    {
+    public:
+        TryLockGuard(Mutex& mutex);
+        ~TryLockGuard();
+
+        bool owns() const { return owned_; }
+
+    private:
+        Mutex& mutex_;
+        bool   owned_;
+    };
 }
 
 #endif

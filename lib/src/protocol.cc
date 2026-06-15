@@ -114,6 +114,20 @@ namespace kickcat
         }
     }
 
+    char const* toShortString(State state)
+    {
+        uint8_t raw_state = state & 0xF;
+        switch (raw_state)
+        {
+            case INIT:        { return "INIT";    }
+            case PRE_OP:      { return "PRE-OP";  }
+            case BOOT:        { return "BOOT";    }
+            case SAFE_OP:     { return "SAFE-OP"; }
+            case OPERATIONAL: { return "OP";      }
+            default:          { return "?";       }
+        }
+    }
+
 
     char const* toString(Command cmd)
     {
