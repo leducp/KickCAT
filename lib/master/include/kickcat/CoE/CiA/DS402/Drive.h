@@ -43,8 +43,8 @@ namespace kickcat::CoE::CiA::DS402
     public:
         // Padding bytes after the int8 mode fields keep all multi-byte
         // members at even offsets, avoiding unaligned access traps on
-        // strict-alignment targets. The PDO mapping arrays include matching
-        // dummy entries (CiA 301 index 0x0000) so the wire layout agrees.
+        // strict-alignment targets. Either PaddingStyle produces the same
+        // 2-byte-per-mode wire layout, so it matches these structs.
         struct Input
         {
             uint16_t status_word;                // 0x6041, off 0
@@ -74,13 +74,24 @@ namespace kickcat::CoE::CiA::DS402
         // bus, so cycling must continue at least once after destruction.
         ~Drive();
 
+        // How the 8-bit mode-of-operation entries are aligned to 16 bits in the
+        // PDO. 0x6060/0x6061 are INT8; the process image needs a 2-byte slot.
+        enum class PaddingStyle
+        {
+            DummyEntry,   // map a CiA-301 dummy pad entry (0x0000) -- spec-conformant
+            WidenObject,  // map the u8 object as a 16-bit word     -- broad drive compatibility
+            Auto,         // try DummyEntry, fall back to WidenObject if the slave aborts it
+        };
+
         // PRE_OP: write mode via SDO and map canonical PDOs. rx_pdo_map /
         // tx_pdo_map default to standard CiA 402 indices; override for vendors
         // that use different PDO mapping objects (e.g. marvin uses 0x1601/0x1A01).
+        // padding selects the INT8-entry alignment (see PaddingStyle).
         // The mode is stored and re-applied to the RxPDO buffer in attach().
         void configure(control::ControlMode mode,
                        uint16_t rx_pdo_map = 0x1600,
-                       uint16_t tx_pdo_map = 0x1A00);
+                       uint16_t tx_pdo_map = 0x1A00,
+                       PaddingStyle padding = PaddingStyle::DummyEntry);
 
         // Optional SDO writes, between configure() and bus.createMapping().
         void setInterpolationTimePeriod(uint8_t value, int8_t index);
