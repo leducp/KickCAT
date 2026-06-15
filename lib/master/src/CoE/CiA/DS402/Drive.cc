@@ -104,13 +104,13 @@ namespace kickcat::CoE::CiA::DS402
         {
             apply(RX_MAPPING_DUMMY, std::size(RX_MAPPING_DUMMY), TX_MAPPING_DUMMY, std::size(TX_MAPPING_DUMMY));
         }
-        else   // Auto: the dummy entry is spec-conformant; on a slave that rejects
-        {      // it the mapping write aborts (mapPDO throws), so retry widened.
+        else   // Auto: spec-conformant dummy entry first; only a CoE abort means the
+        {      // slave rejects it, so retry widened. Other errors (timeout) propagate.
             try
             {
                 apply(RX_MAPPING_DUMMY, std::size(RX_MAPPING_DUMMY), TX_MAPPING_DUMMY, std::size(TX_MAPPING_DUMMY));
             }
-            catch (std::exception const&)
+            catch (ErrorCoE const&)
             {
                 apply(RX_MAPPING_WIDE, std::size(RX_MAPPING_WIDE), TX_MAPPING_WIDE, std::size(TX_MAPPING_WIDE));
             }
