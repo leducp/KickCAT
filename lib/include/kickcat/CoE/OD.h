@@ -213,6 +213,9 @@ namespace kickcat::CoE
         std::string  description;
 
         void* data{nullptr};
+        // Internal ownership flag: true once PDO mapping redirects `data` into the
+        // process image (dtor must not free it). Set only on the data object a PDO
+        // maps; NOT a per-field "ready" API and never set on a 0x16xx/0x1Axx mapping object.
         bool is_mapped{false};
 
         /// Called before access
