@@ -1,16 +1,18 @@
 #ifndef KICKCAT_SBUF_QUEUE_H
 #define KICKCAT_SBUF_QUEUE_H
 
-#include "Ring.h"
+#include "LockedRing.h"
 #include "kickcat/types.h"
-#include "kickcat/OS/Mutex.h"
-#include "kickcat/OS/ConditionVariable.h"
 
 
 namespace kickcat
 {
     constexpr uint32_t SBUF_INVALID_INDEX = UINT32_MAX;
 
+    // Zero-copy buffer-pool queue over shared memory: allocate() a free buffer,
+    // fill it in place, ready() it; the consumer get()s, reads in place, free()s.
+    // A buffer-pool over two LockedRings (free + ready) -- for small messages that
+    // don't need the pool, use LockedRing directly.
     template<typename T, uint32_t N>
     class SBufQueue
     {
@@ -22,57 +24,36 @@ namespace kickcat
             T* address;
         };
 
-        struct Queue
-        {
-            Mutex lock;
-            ConditionVariable cond;
-            Ring<Item, N> ring;
-        };
-
         struct Context
         {
-            struct Descriptors
-            {
-                os_mutex lock;
-                os_cond cond;
-                typename Ring<Item, N>::Context ring;
-            };
-
-            Descriptors free;
-            Descriptors ready;
+            typename LockedRing<Item, N>::Context free;
+            typename LockedRing<Item, N>::Context ready;
             T buffers[N];
         };
 
         SBufQueue(Context& location)
             : SBufQueue(&location)
         {
-
         }
 
         SBufQueue(Context* location)
-            : ctx_      { location }
-            , free_     { ctx_->free.lock,  ctx_->free.cond,  ctx_->free.ring    }
-            , ready_    { ctx_->ready.lock, ctx_->ready.cond, ctx_->ready.ring   }
+            : ctx_   { location }
+            , free_  { ctx_->free }
+            , ready_ { ctx_->ready }
         {
-
         }
 
         ~SBufQueue() = default;
 
         void initContext()
         {
-            free_.lock.init();
-            free_.cond.init();
-            ready_.lock.init();
-            ready_.cond.init();
-
-            free_.ring.reset();
-            ready_.ring.reset();
+            free_.init();
+            ready_.init();
 
             for (uint32_t i = 0; i < N; ++i)
             {
                 // Fill free buffer ring
-                (void) free_.ring.push({i, 0, nullptr});
+                (void) free_.push({i, 0, nullptr});
             }
         }
 
@@ -84,7 +65,7 @@ namespace kickcat
 
         void ready(Item const& item)
         {
-            push(ready_, item);
+            (void) ready_.push(item);
         }
 
 
@@ -96,17 +77,17 @@ namespace kickcat
 
         void free(Item const& item)
         {
-            push(free_, item);
+            (void) free_.push(item);
         }
 
         uint32_t freed()
         {
-            return free_.ring.size();
+            return free_.size();
         }
 
         uint32_t readied()
         {
-            return ready_.ring.size();
+            return ready_.size();
         }
 
         constexpr static std::size_t item_size() { return sizeof(T); }
@@ -114,44 +95,19 @@ namespace kickcat
 
 
     private:
-        void push(Queue& queue, Item const& item)
-        {
-            // signal under the lock: signalling after unlock can race a waiter into an empty ring
-            LockGuard guard(queue.lock);
-            (void) queue.ring.push(item);
-            queue.cond.signal();
-        }
-
-
-        Item pop(Queue& queue, nanoseconds timeout)
+        Item pop(LockedRing<Item, N>& queue, nanoseconds timeout)
         {
             Item item{ SBUF_INVALID_INDEX, 0, nullptr };
-            auto stop_waiting = [&queue](){ return not queue.ring.isEmpty(); };
-
-            LockGuard guard(queue.lock);
-            if (timeout < 0ns)
+            if (queue.popWait(item, timeout))
             {
-                queue.cond.wait(queue.lock, stop_waiting);
+                item.address = &ctx_->buffers[item.index];   // process-dependent
             }
-            else
-            {
-                int rc = queue.cond.wait_until(queue.lock, timeout+1ms, stop_waiting);
-                if (rc != 0)
-                {
-                    return item;
-                }
-            }
-
-            (void) queue.ring.pop(item);
-
-            // Determine item address (process dependent)
-            item.address = &ctx_->buffers[item.index];
             return item;
         }
 
         Context* ctx_;
-        Queue free_;
-        Queue ready_;
+        LockedRing<Item, N> free_;
+        LockedRing<Item, N> ready_;
     };
 }
 
