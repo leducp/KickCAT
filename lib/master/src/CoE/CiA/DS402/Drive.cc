@@ -13,13 +13,22 @@ namespace kickcat::CoE::CiA::DS402
 {
     namespace
     {
-        // 0x00000008 entries are alignment padding (CiA 301 dummy mapping).
-        constexpr uint32_t TX_MAPPING[] = {
+        // Two tables per Drive::PaddingStyle: _DUMMY pads the INT8 mode entry with
+        // a CiA-301 dummy (0x00000008), _WIDE maps the object as a 16-bit word.
+        constexpr uint32_t TX_MAPPING_DUMMY[] = {
             0x60410010, 0x60610008, 0x00000008,
             0x60640020, 0x606C0020, 0x60770010, 0x603F0010
         };
-        constexpr uint32_t RX_MAPPING[] = {
+        constexpr uint32_t RX_MAPPING_DUMMY[] = {
             0x60400010, 0x60600008, 0x00000008,
+            0x607A0020, 0x60FF0020, 0x60710010
+        };
+        constexpr uint32_t TX_MAPPING_WIDE[] = {
+            0x60410010, 0x60610010,
+            0x60640020, 0x606C0020, 0x60770010, 0x603F0010
+        };
+        constexpr uint32_t RX_MAPPING_WIDE[] = {
+            0x60400010, 0x60600010,
             0x607A0020, 0x60FF0020, 0x60710010
         };
 
@@ -45,8 +54,10 @@ namespace kickcat::CoE::CiA::DS402
             return bits / 8;
         }
     }
-    static_assert(mappingBytes(TX_MAPPING, std::size(TX_MAPPING)) == sizeof(Drive::Input));
-    static_assert(mappingBytes(RX_MAPPING, std::size(RX_MAPPING)) == sizeof(Drive::Output));
+    static_assert(mappingBytes(TX_MAPPING_DUMMY, std::size(TX_MAPPING_DUMMY)) == sizeof(Drive::Input));
+    static_assert(mappingBytes(RX_MAPPING_DUMMY, std::size(RX_MAPPING_DUMMY)) == sizeof(Drive::Output));
+    static_assert(mappingBytes(TX_MAPPING_WIDE,  std::size(TX_MAPPING_WIDE))  == sizeof(Drive::Input));
+    static_assert(mappingBytes(RX_MAPPING_WIDE,  std::size(RX_MAPPING_WIDE))  == sizeof(Drive::Output));
 
     Drive::Drive(Bus& bus, Slave& slave)
         : bus_(&bus)
@@ -71,15 +82,39 @@ namespace kickcat::CoE::CiA::DS402
 
     void Drive::configure(control::ControlMode mode,
                           uint16_t rx_pdo_map,
-                          uint16_t tx_pdo_map)
+                          uint16_t tx_pdo_map,
+                          PaddingStyle padding)
     {
         mode_ = mode;
 
         int8_t mode_byte = static_cast<int8_t>(mode);
         bus_->writeSDO(*slave_, 0x6060, 0, Bus::Access::PARTIAL, &mode_byte, sizeof(mode_byte));
 
-        mapPDO(*bus_, *slave_, rx_pdo_map, RX_MAPPING, std::size(RX_MAPPING), 0x1C12);
-        mapPDO(*bus_, *slave_, tx_pdo_map, TX_MAPPING, std::size(TX_MAPPING), 0x1C13);
+        auto apply = [&](uint32_t const* rx, size_t rxn, uint32_t const* tx, size_t txn)
+        {
+            mapPDO(*bus_, *slave_, rx_pdo_map, rx, static_cast<uint8_t>(rxn), 0x1C12);
+            mapPDO(*bus_, *slave_, tx_pdo_map, tx, static_cast<uint8_t>(txn), 0x1C13);
+        };
+
+        if (padding == PaddingStyle::WidenObject)
+        {
+            apply(RX_MAPPING_WIDE, std::size(RX_MAPPING_WIDE), TX_MAPPING_WIDE, std::size(TX_MAPPING_WIDE));
+        }
+        else if (padding == PaddingStyle::DummyEntry)
+        {
+            apply(RX_MAPPING_DUMMY, std::size(RX_MAPPING_DUMMY), TX_MAPPING_DUMMY, std::size(TX_MAPPING_DUMMY));
+        }
+        else   // Auto: the dummy entry is spec-conformant; on a slave that rejects
+        {      // it the mapping write aborts (mapPDO throws), so retry widened.
+            try
+            {
+                apply(RX_MAPPING_DUMMY, std::size(RX_MAPPING_DUMMY), TX_MAPPING_DUMMY, std::size(TX_MAPPING_DUMMY));
+            }
+            catch (std::exception const&)
+            {
+                apply(RX_MAPPING_WIDE, std::size(RX_MAPPING_WIDE), TX_MAPPING_WIDE, std::size(TX_MAPPING_WIDE));
+            }
+        }
     }
 
     void Drive::setInterpolationTimePeriod(uint8_t value, int8_t index)
