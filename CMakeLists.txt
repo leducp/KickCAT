@@ -105,6 +105,7 @@ if (BUILD_TOOLS)
 endif()
 
 if (BUILD_EEPROM_EDITOR)
+  add_subdirectory(tools/common)
   add_subdirectory(tools/eeprom_editor)
 endif()
 
