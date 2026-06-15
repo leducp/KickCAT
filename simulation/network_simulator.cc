@@ -12,6 +12,7 @@
 #include "kickcat/OS/Time.h"
 #include "kickcat/helpers.h"
 #include "kickcat/simulation/SimulatedSlave.h"
+#include "kickcat/simulation/SimulatorControlServer.h"
 #include "kickcat/simulation/Topology.h"
 
 using namespace kickcat;
@@ -20,26 +21,13 @@ using json = nlohmann::json;
 static volatile std::sig_atomic_t running = 1;
 static void signalHandler(int) { running = 0; }
 
-// Example fault injection: SIGUSR1 breaks a configured wire, SIGUSR2 heals it.
-// The handler only flags the request; it is applied from the main loop where the
-// network object is in scope (setLinkState is not async-signal-safe). SIGUSR1/2 are
-// POSIX-only; on platforms without them the break/heal API is still usable directly.
-static volatile std::sig_atomic_t link_event = 0;  // 0: none, 1: break, 2: heal
-#ifdef SIGUSR1
-static void linkSignalHandler(int sig)
-{
-    if (sig == SIGUSR1) { link_event = 1; }
-    if (sig == SIGUSR2) { link_event = 2; }
-}
-#endif
-
 namespace
 {
     struct Options
     {
         std::string              interface;
         std::string              redundancy_interface;
-        std::vector<int>         break_link;
+        std::string              control_shm;       // break/heal control channel, if any
         std::string              topology_file;
         std::vector<std::string> slave_configs;   // already expanded (see --count)
     };
@@ -55,9 +43,9 @@ namespace
         program.add_argument("-r", "--redundancy")
             .help("redundancy network interface (enables cable-redundancy routing)")
             .default_value(std::string{}).store_into(opts.redundancy_interface);
-        program.add_argument("--break-link")
-            .help("two slave indices A B; SIGUSR1 breaks / SIGUSR2 heals the wire between them")
-            .nargs(2).scan<'i', int>().store_into(opts.break_link);
+        program.add_argument("--control")
+            .help("shared-memory name of a break/heal control channel (see SimulatorControl.h)")
+            .default_value(std::string{}).store_into(opts.control_shm);
         program.add_argument("--topology")
             .help("JSON topology file: master injection + slave-to-slave links (branching tree)")
             .default_value(std::string{}).store_into(opts.topology_file);
@@ -112,7 +100,7 @@ namespace
     // code (non-zero on a fatal frame-write error).
     int runSimulation(EmulatedNetwork& network, std::vector<sim::SimulatedSlave>& slaves,
                       AbstractSocket* socket, AbstractSocket* socket_redundancy,
-                      bool redundancy, size_t break_a, size_t break_b)
+                      bool redundancy, sim::SimulatorControlServer& control)
     {
         int exit_code = 0;
 
@@ -155,15 +143,7 @@ namespace
 
         while (running)
         {
-            if (link_event != 0)
-            {
-                bool up = (link_event == 2);
-                link_event = 0;
-                network.setLinkState(break_a, break_b, up);
-                char const* action = "broken";
-                if (up) { action = "healed"; }
-                printf("Link %zu-%zu %s\n", break_a, break_b, action);
-            }
+            control.drain();
 
             auto t1 = since_epoch();
 
@@ -234,10 +214,6 @@ int main(int argc, char* argv[])
 {
     std::signal(SIGINT,  signalHandler);
     std::signal(SIGTERM, signalHandler);
-#ifdef SIGUSR1
-    std::signal(SIGUSR1, linkSignalHandler);
-    std::signal(SIGUSR2, linkSignalHandler);
-#endif
 
     Options opts;
     if (not parseOptions(argc, argv, opts))
@@ -290,20 +266,25 @@ int main(int argc, char* argv[])
         network.setRedundancyInjection(slaves.size() - 1, 1);
     }
 
-    // Wire to break/heal on SIGUSR1/SIGUSR2 (defaults to the first downstream link).
-    size_t break_a = 0;
-    size_t break_b = 1;
-    if (opts.break_link.size() == 2)
+    // Optional control bus: the host creates the segment, the sim attaches.
+    sim::SimulatorControlServer control(network, slaves.size());
+    if (not opts.control_shm.empty())
     {
-        break_a = static_cast<size_t>(opts.break_link[0]);
-        break_b = static_cast<size_t>(opts.break_link[1]);
+        try
+        {
+            control.attach(opts.control_shm);
+        }
+        catch (std::exception const& e)
+        {
+            std::cerr << "Failed to attach control channel " << opts.control_shm << ": " << e.what() << std::endl;
+            return 1;
+        }
     }
 
     printf("Start EtherCAT network simulator on %s with %zu slaves\n", opts.interface.c_str(), slaves.size());
     if (redundancy)
     {
-        printf("Cable redundancy enabled on %s (SIGUSR1 breaks / SIGUSR2 heals link %zu-%zu)\n",
-               opts.redundancy_interface.c_str(), break_a, break_b);
+        printf("Cable redundancy enabled on %s\n", opts.redundancy_interface.c_str());
     }
 
     auto [socket, socket_redundancy] = createSockets(opts.interface, opts.redundancy_interface);
@@ -327,5 +308,5 @@ int main(int argc, char* argv[])
     }
 
     return runSimulation(network, slaves, socket.get(), socket_redundancy.get(),
-                         redundancy, break_a, break_b);
+                         redundancy, control);
 }

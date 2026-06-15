@@ -24,6 +24,9 @@ namespace kickcat
         /// \return The address of the shm in this process.
         void* address() { return address_; }
 
+        /// Remove a named segment (no-op if absent, and on Windows).
+        static void unlink(std::string const& name);
+
     private:
         std::size_t size_{};    ///< Size in bytes of the shared memory.
         void* address_{};       ///< Address of the shared memory in this processus.
