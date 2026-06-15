@@ -43,6 +43,7 @@ elseif (UNIX)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/SharedMemory.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/ConditionVariable.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Thread.cc
   )
   set(OS_LIBRARIES pthread rt)
 elseif (WIN32)
