@@ -149,6 +149,47 @@ namespace kickcat
     }
 
 
+    void Bus::requestState(Slave& slave, State request)
+    {
+        uint16_t param = request | State::ERROR_ACK;
+        uint16_t wkc = 0;
+        auto error = [](DatagramState const& state)
+        {
+            bus_error("Error while requesting slave state (%s).\n", toString(state));
+        };
+        auto process = [&wkc](DatagramHeader const*, uint8_t const*, uint16_t w)
+        {
+            wkc = w;
+            return DatagramState::OK;
+        };
+        link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::AL_CONTROL),
+                           &param, sizeof(param), process, error);
+        link_->processDatagrams();
+        if (wkc != 1)
+        {
+            THROW_ERROR("Invalid working counter");
+        }
+    }
+
+
+    void Bus::waitForState(Slave& slave, State request, nanoseconds timeout, std::function<void()> background_task)
+    {
+        nanoseconds now = since_epoch();
+        while (true)
+        {
+            background_task();
+            if (getCurrentState(slave) == request)
+            {
+                return;
+            }
+            if (elapsed_time(now) > timeout)
+            {
+                THROW_ERROR("Timeout");
+            }
+        }
+    }
+
+
     void Bus::sendGetALStatus(Slave& slave, std::function<void(DatagramState const&)> const& error)
     {
         slave.al_status = State::INVALID;
