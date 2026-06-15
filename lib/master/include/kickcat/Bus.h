@@ -62,12 +62,19 @@ namespace kickcat
         // request a state for all slaves
         void requestState(State request);
 
+        // request a state for a single slave (FPWR AL_CONTROL at its address),
+        // so one slave can be transitioned without commanding the whole bus.
+        void requestState(Slave& slave, State request);
+
         // Get the state a specific slave
         State getCurrentState(Slave& slave);
 
         // wait for all slaves to reached a state
         // background_task may be used to keep updated PDO while waiting for a particular state.
         void waitForState(State request, nanoseconds timeout, std::function<void()> background_task = [](){});
+
+        // wait for a single slave to reach a state
+        void waitForState(Slave& slave, State request, nanoseconds timeout, std::function<void()> background_task = [](){});
 
         /// \brief Select and validate the preferred mailbox status check mode.
         /// \details Must be called during PRE_OP, before createMapping(). Validates that all

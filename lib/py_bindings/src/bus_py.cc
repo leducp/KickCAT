@@ -54,7 +54,8 @@ namespace kickcat
             .def("detect_slaves", &Bus::detectSlaves)
             .def("slaves", &Bus::slaves, nb::rv_policy::reference_internal)
             .def("get_state", &Bus::getCurrentState)
-            .def("request_state", &Bus::requestState)
+            // disambiguate: requestState is overloaded (whole-bus vs per-slave)
+            .def("request_state", static_cast<void (Bus::*)(State)>(&Bus::requestState))
             .def("wait_for_state", [](PyBus &self, State state, std::chrono::nanoseconds timeout)
                 {
                     auto noop = [](){};
