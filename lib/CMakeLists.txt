@@ -143,4 +143,10 @@ set_kickcat_properties(kickcat)
 add_subdirectory(master)
 add_subdirectory(slave)
 
+# Host-only simulation support; needs the ESI parser + JSON. Built with the
+# simulator (the tests link it too, gated on this target existing).
+if (ENABLE_ESI_PARSER AND BUILD_SIMULATION)
+  add_subdirectory(simulation)
+endif()
+
 kickcat_install_package("${OS_LIBRARIES}")

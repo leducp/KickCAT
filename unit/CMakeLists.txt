@@ -68,6 +68,14 @@ add_custom_target(kickcat_unit_fixtures DEPENDS ${KICKCAT_ESI_FIXTURES_COPIED})
 add_dependencies(kickcat_unit kickcat_unit_fixtures)
 
 target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
+
+# Simulation-support tests. lib/simulation is processed after unit/, so gate on
+# the build condition (not TARGET); the link resolves at generation time.
+if (ENABLE_ESI_PARSER AND BUILD_SIMULATION)
+    target_sources(kickcat_unit PRIVATE src/simulation-t.cc)
+    target_link_libraries(kickcat_unit kickcat_simulation)
+endif()
+
 target_include_directories(kickcat_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_kickcat_properties(kickcat_unit)
 set_target_properties(kickcat_unit
