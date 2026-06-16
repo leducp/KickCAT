@@ -154,6 +154,42 @@ namespace kickcat
     }
 
 
+    bool DLStatus::physicalLink(int port) const
+    {
+        switch (port)
+        {
+            case 0:  { return PL_port0; }
+            case 1:  { return PL_port1; }
+            case 2:  { return PL_port2; }
+            case 3:  { return PL_port3; }
+            default: { return false; }
+        }
+    }
+
+    bool DLStatus::communication(int port) const
+    {
+        switch (port)
+        {
+            case 0:  { return COM_port0; }
+            case 1:  { return COM_port1; }
+            case 2:  { return COM_port2; }
+            case 3:  { return COM_port3; }
+            default: { return false; }
+        }
+    }
+
+    bool DLStatus::loop(int port) const
+    {
+        switch (port)
+        {
+            case 0:  { return LOOP_port0; }
+            case 1:  { return LOOP_port1; }
+            case 2:  { return LOOP_port2; }
+            case 3:  { return LOOP_port3; }
+            default: { return false; }
+        }
+    }
+
     std::string toString(DLStatus const& dl_status)
     {
         std::stringstream os;
@@ -163,16 +199,12 @@ namespace kickcat
         os << "Enhanced Link Detection :  " << std::to_string(dl_status.EL_detection) << " \n";
         os << "Reserved :  "                << std::to_string(dl_status.reserved) << " \n";
 
-        uint16_t pl[4]   = { dl_status.PL_port0,   dl_status.PL_port1,   dl_status.PL_port2,   dl_status.PL_port3   };
-        uint16_t com[4]  = { dl_status.COM_port0,  dl_status.COM_port1,  dl_status.COM_port2,  dl_status.COM_port3  };
-        uint16_t loop[4] = { dl_status.LOOP_port0, dl_status.LOOP_port1, dl_status.LOOP_port2, dl_status.LOOP_port3 };
-
         for (int i = 0; i < 4; ++i)
         {
             os << "Port " << i << ": \n";
-            os << "  Physical Link :  " << std::to_string(pl[i]) << " \n";
-            os << "  Communications : " << std::to_string(com[i]) << " \n";
-            os << "  Loop Function :  " << std::to_string(loop[i]) << " \n";
+            os << "  Physical Link :  " << std::to_string(dl_status.physicalLink(i)) << " \n";
+            os << "  Communications : " << std::to_string(dl_status.communication(i)) << " \n";
+            os << "  Loop Function :  " << std::to_string(dl_status.loop(i)) << " \n";
         }
 
         return os.str();

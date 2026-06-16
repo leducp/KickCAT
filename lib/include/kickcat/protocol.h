@@ -360,6 +360,11 @@ namespace kickcat
             COM_port2 : 1,
             LOOP_port3 : 1,
             COM_port3 : 1;
+
+        // Per-port accessors (port 0..3); false for an out-of-range port.
+        bool physicalLink(int port) const;
+        bool communication(int port) const;
+        bool loop(int port) const;
     }__attribute__((__packed__));
 
     std::string toString(DLStatus const& counters);
