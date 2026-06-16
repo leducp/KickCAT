@@ -58,4 +58,9 @@ namespace kickcat
             THROW_SYSTEM_ERROR("mmap()");
         }
     }
+
+    void SharedMemory::unlink(std::string const& name)
+    {
+        shm_unlink(name.c_str());
+    }
 }

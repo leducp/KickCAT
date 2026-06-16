@@ -6,6 +6,7 @@ add_library(kickcat_simulation
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SimulatedSlave.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Topology.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DeviceApp.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SimulatorControlServer.cc
 )
 
 target_link_libraries(kickcat_simulation PUBLIC kickcat nlohmann_json::nlohmann_json)

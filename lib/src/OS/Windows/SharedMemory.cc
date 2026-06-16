@@ -60,4 +60,9 @@ namespace kickcat
             THROW_LAST_ERROR("MapViewOfFileEx() failed");
         }
     }
+
+    void SharedMemory::unlink(std::string const&)
+    {
+        // Reclaimed when the last handle closes; no persistent name to remove.
+    }
 }
