@@ -80,7 +80,15 @@ namespace kickcat
 
     int Slave::countOpenPorts() const
     {
-        return dl_status.COM_port0 + dl_status.COM_port1 + dl_status.COM_port2 + dl_status.COM_port3;
+        int open = 0;
+        for (int port = 0; port < 4; ++port)
+        {
+            if (dl_status.communication(port))
+            {
+                ++open;
+            }
+        }
+        return open;
     }
 
     bool Slave::isDCSupport() const
