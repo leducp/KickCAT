@@ -1,5 +1,4 @@
 // Tool to dump and flash the eeprom of a slave on the bus.
-// Current state: POC, can only dump eeprom file.
 
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
