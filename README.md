@@ -1,847 +1,176 @@
 <p align="center">
     <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="doc/kickCAT_logo_dark_mode.png">
-    <source media="(prefers-color-scheme: light)" srcset="doc/kickCAT_logo_light_mode.png">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/kickCAT_logo_dark_mode.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/kickCAT_logo_light_mode.png">
     <img alt="KickCAT" width="300">
     </picture><br>
 </p>
 
 <p align="center">
-  <strong>A lightweight, efficient EtherCAT master/slave stack for embedded systems</strong>
-</p>
-
-<p align="center">
-  <em>Kick-start your slaves! ⚡</em>
+  <strong>A lightweight, efficient EtherCAT master/slave stack for embedded and real-time systems</strong>
 </p>
 
 ---
 
 ## Overview
 
-KickCAT is a thin EtherCAT stack designed to be embedded in complex software with efficiency in mind. It provides both **master** and **slave** implementations, supporting multiple operating systems and hardware platforms.
+KickCAT is a thin EtherCAT stack designed to be embedded in larger software with
+efficiency in mind. It provides **both master and slave** implementations in one
+codebase and runs on Linux (including RT-PREEMPT), Windows, PikeOS, and NuttX.
 
-**Key Features:**
-- Works with Linux (including RT-PREEMPT), Windows, and PikeOS
-- Full state machine support (INIT → PRE-OP → SAFE-OP → OP)
-- CoE (CANopen over EtherCAT) support with SDO read/write
-- CoE: SDO Information
-- Interface redundancy
-- Bus diagnostics and error handling
-- Master side python bindings
-- Built-in ESC emulator for testing without hardware
+CoE (CANopen over EtherCAT) is fully supported on both sides. Beyond the stack
+itself, KickCAT ships a complete **software ESC and network emulator**, GUIs, and
+CLI tooling, so a bus can be developed, configured, and tested without physical
+hardware.
 
----
+For exactly what is and isn't supported, see the
+[feature support matrix](docs/FEATURES.md).
 
-## Quick Start
+## Capabilities
 
-### Prerequisites
+### Master stack
 
-- **Linux**: gcc, cmake, conan (for dependencies)
-- **Python bindings**: uv or pip
-- **Hardware**: Network interface with raw socket access capabilities
-
-### Build and Install
-
-#### Linux (Recommended)
-
-```bash
-# 1. Configure build options (optional — defaults are sensible)
-./scripts/configure.sh build --with=unit_tests
-
-# 2. Setup build environment (installs Conan deps + runs CMake)
-./scripts/setup_build.sh build
-
-# 3. Build
-cd build && make
-
-# 4. Grant network capabilities (required for raw socket access)
-sudo setcap 'cap_net_raw,cap_net_admin=+ep' ./tools/your_binary
-```
-
-#### Python Bindings
-
-```bash
-# Install with uv (recommended)
-uv pip install .
-
-# Or for development (faster rebuilds)
-uv pip install --no-build-isolation -Cbuild-dir=/tmp/build -v .
-```
-
-The wheel build enables the EEPROM-editor GUI (`BUILD_EEPROM_EDITOR=ON` in
-`pyproject.toml`), which needs `imgui` and `glfw`. The cibuildwheel images provide
-them; on a bare environment that lacks them, either install them (via conan) or
-disable the GUI for the build:
-
-```bash
-uv pip install --config-setting=cmake.define.BUILD_EEPROM_EDITOR=OFF .
-```
-
-#### Multi wheel (CI)
-This project use cibuildwheel to generate multiples wheel to support all configurations. To use it locally, call:
-```bash
-uvx cibuildwheel
-```
-
-<details>
-<summary><b>Manual Build Setup</b></summary>
-
-```bash
-# 1. Create build directory
-mkdir -p build
-
-# 2. Install dependencies with conan
-python3 -m venv kickcat_venv
-source kickcat_venv/bin/activate
-pip install conan
-
-conan install conan/conanfile.py -of=build/ \
-  -pr:h conan/your_profile_host.txt \
-  -pr:b conan/your_profile_target.txt \
-  --build=missing -s build_type=Release
-
-# Or create the conan package directly
-conan create conan/all --build=missing --version 2.5 -pr build/profile.txt
-
-# 3. Configure and build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make
-```
-
-</details>
-
-<details>
-<summary><b>Windows Build</b></summary>
-
-**Note:** Windows is NOT suitable for real-time use but useful for tools and testing.
-
-Requirements:
-- Conan for Windows (tested with 2.9.1)
-- gcc for Windows (tested with w64devkit 2.0.0)
-- npcap (driver 1.80 + SDK 1.70)
-
-Follow the manual setup instructions above, using appropriate Windows paths.
-
-</details>
-
-<details>
-<summary><b>PikeOS Build</b></summary>
-
-Tested on PikeOS 5.1 for native personality (p4ext).
-
-Provide a CMake cross-toolchain file that defines the `PIKEOS` variable. Example process/thread configurations are in `examples/PikeOS/p4ext_config.c`.
-
-</details>
-
----
-
-## Getting Started: Complete Walkthrough
-
-This section provides a complete end-to-end example using the **Freedom K64F board** with LAN9252 EtherCAT slave controller.
-
-### Hardware Requirements
-
-- **NXP Freedom K64F** development board
-- **LAN9252** EtherCAT slave controller (SPI connection)
-- **Ethernet cable** (connects slave to your PC)
-- **USB cable** (for programming the board)
-- **Linux PC** with EtherCAT master
-
-See the [NuttX Prerequisite section](#nuttx-prerequisite) before starting.
-
-### Step 1: Build the Slave Firmware
-
-```bash
-# Build firmware for Freedom K64F
-./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
-
-# Output will be in: build_freedom-k64f/easycat_frdm_k64f.bin
-# We have deployment scripts that are available here is an example:
-./examples/slave/nuttx/lan9252/freedom-k64f/deploy.sh build_freedom-k64f/easycat_frdm_k64f.bin
-```
-
-### Step 2: Flash the Firmware
-
-```bash
-# Deploy to the board (connects via USB)
-./examples/slave/nuttx/lan9252/freedom-k64f/board/deploy.sh \
-    build_freedom-k64f/easycat_frdm_k64f.bin
-```
-
-### Step 3: Program the EEPROM
-
-The EtherCAT slave requires EEPROM configuration with device information:
-
-```bash
-# Connect slave to your PC via Ethernet
-# Write EEPROM (interface ? will be auto-detected)
-sudo ./tools/eeprom -s 0 -c write -f examples/slave/nuttx/lan9252/freedom-k64f/eeprom.bin -i "?"
-```
-
-**Note:** The `?` tells the tool to auto-detect the interface where the slave is connected.
-
-### Step 4: Run the Master
-
-Now you can control your slave using either C++ or Python:
-
-**Option A - C++ Master:**
-```bash
-# Run master example and follow terminal instructions
-sudo ./build/examples/master/freedom-k64f/freedom_k64f_example -i "?"
-```
-
-**Option B - Python Master:**
-```bash
-# Install KickCAT Python bindings
-pip install kickcat
-
-# Grant raw access to Python interpreter
-./py_bindings/enable_raw_access.sh
-
-# Run Python example
-python py_bindings/examples/freedom-k64f.py -i enp8s0
-```
-
-### Expected Output
-
-![Freedom K64F Master-Slave Communication](doc/freedom-demo.gif)
-
-The master will:
-1. Discover the slave on the network
-2. Transition through states: INIT → PRE-OP → SAFE-OP → OP
-3. Begin exchanging process data (PDOs)
-4. Display diagnostic information
-
-<details>
-<summary><b>Troubleshooting</b></summary>
-
-**Slave not detected:**
-- Check Ethernet cable connection
-- Verify EEPROM was written successfully
-- Check that slave firmware is running (LED indicators)
-
-**Permission denied:**
-- Ensure you're running master with `sudo` or proper capabilities
-- For Python: run `./py_bindings/enable_raw_access.sh`
-
-**Interface not found:**
-- List available interfaces: `ip link show`
-- Use the correct interface name (e.g., `eth0`, `enp8s0`, `eno1`)
-
-</details>
-
----
-
-## Getting Started with Examples
-
-KickCAT includes working master and slave examples that work together out of the box.
-
-### Master Examples
-
-Located in `examples/master/`:
-
-- **easycat**: Basic example for EasyCAT shield
-- **elmo**: Motor control example (Elmo drives)
-- **ingenia**: Motor control example (Ingenia drives)
-- **freedom-k64f**: Example for Kinetis Freedom board
-- **gateway**: EtherCAT mailbox gateway implementation
-- **load_esi**: ESI file loading utility
-
-#### Running a Master Example
-
-**C++ Examples:**
-```bash
-cd build
-./examples/master/easycat/easycat_example -i eth0
-```
-
-**Python Examples:**
-
-KickCAT is available on PyPI for easy installation:
-
-```bash
-# Install from PyPI
-pip install kickcat
-
-# Run Python examples
-python py_bindings/examples/freedom-k64f.py --interface eth0
-
-# With redundancy
-python py_bindings/examples/easycat.py -i eth0 -r eth1
-```
-
-<details>
-<summary><b>Python Examples Help</b></summary>
-
-```bash
-$ python py_bindings/examples/freedom-k64f.py --help
-usage: freedom-k64f.py [-h] -i INTERFACE [-r REDUNDANCY]
-
-EtherCAT master for Freedom K64F using EasyCAT
-
-options:
-  -h, --help            show this help message and exit
-  -i INTERFACE, --interface INTERFACE
-                        Primary network interface (e.g., eth0)
-  -r REDUNDANCY, --redundancy REDUNDANCY
-                        Redundancy network interface (e.g., eth1)
-```
-
-**Important:** Python interpreter needs raw socket capabilities:
-```bash
-# Use the helper script to grant permissions
-./py_bindings/enable_raw_access.sh
-```
-
-</details>
-
-Replace `eth0` with your network interface name.
-
-### Slave Examples
-
-Located in `examples/slave/nuttx/`:
-
-**Supported Boards:**
-- **XMC4800** (Infineon XMC4800 Relax Kit)
-- **Arduino Due** (with EasyCAT shield + LAN9252)
-- **Freedom K64F** (NXP Kinetis with LAN9252)
-
-#### NuttX Prerequisite:
-<details>
-<summary><b>NuttX Setup Instructions</b></summary>
-
-1. Install NuttX dependencies: https://nuttx.apache.org/docs/latest/quickstart/install.html
-2. Download ARM GCC toolchain (>= 12.0): https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
-
-#### Board-Specific Setup
-
-**Arduino Due:**
-- Requires `bossac-1.6.1-arduino` for flashing (available from Arduino IDE installation)
-- Connect USB to the port closest to power jack
-- If flashing fails with "No device found on ttyACM0":
-  - Press ERASE button for a few seconds, release
-  - Press RESET button
-  - Try flashing again
-
-**Freedom K64F:**
-- Standard OpenOCD flashing supported
-
-**XMC4800:**
-- Use provided flashing scripts in board directory
-
-</details>
-
-
-#### Building Slave Examples
-
-All slave examples use NuttX RTOS. Use the automated build script:
-
-```bash
-./scripts/build_slave_bin.sh <board-name> <nuttx-src-path> [build-name]
-```
-
-**Example:**
-```bash
-# Build for XMC4800
-./scripts/build_slave_bin.sh xmc4800-relax ~/nuttxspace/nuttx
-
-# Deploy for XMC4800
-./examples/slave/nuttx/xmc4800/deploy.sh build_xmc4800-relax/xmc4800_relax.bin
-
-# Build for Arduino Due
-./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
-
-# Deploy for Arduino Due
-./examples/slave/nuttx/lan9252/arduino-due/deploy.sh build_arduino-due/easycat_arduino_due.bin
-
-# Build for Freedom K64F
-./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
-
-# Deploy for Freedom K64F
-/examples/slave/nuttx/lan9252/freedom-k64f/deploy.sh build_freedom-k64f/easycat_frdm_k64f.bin
-```
-
-<details>
-<summary><b>Testing Master-Slave Communication</b></summary>
-
-1. **Start the simulator or flash a slave:**
-   ```bash
-   # Option A: Use simulator with TAP socket (preferred, same machine)
-   ./build/simulation/network_simulator -i "?" -s simulation/slave_configs/freedom-k64f.json
-   # Then select "tap:server"
-
-   # Option B: Flash real hardware (e.g., Arduino Due)
-   ./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
-   # Flash the resulting binary to your board
-   ```
-
-2. **Run a master example:**
-   ```bash
-   # With TAP socket (select "tap:client"):
-   sudo ./build/examples/master/easycat/easycat_example -i "?"
-
-   # Or with the interface connected to your slave:
-   sudo ./build/examples/master/easycat/easycat_example -i eth0
-   ```
-
-3. **Expected behavior:**
-   - Master transitions slave through states: INIT → PRE-OP → SAFE-OP → OP
-   - PDO data exchange begins in OP state
-   - Check console output for diagnostics
-
-</details>
-
----
-
-## Multi-Slave Example
-
-This example demonstrates how to run **multiple EtherCAT slaves** (Freedom and XMC4800) on the same bus and read their data using the EasyCAT Python master.
-
-### 1. Build and deploy the slave firmware
-
-Follow the [Building Slave Examples section](#building-slave-examples) section to build and flash the firmware on both boards:
-- **Freedom board**
-- **XMC4800 board**
-
-Make sure both slaves are running before continuing.
-
-### 2. Connect the hardware
-
-Wire the boards according to the setup below:
-
-![Multi Slave Example Setup](doc/multi-slave-example.png)
-
-Ensure that:
-- All slaves are connected in the correct EtherCAT order
-- The master interface is connected to the first slave
-
-### 3. Run the Python EasyCAT master
-
-Start the EasyCAT Python master to read and display data from each detected slave:
-
-```bash
-python ./py_bindings/examples/easycat.py -i eth0
-```
-Replace eth0 with the network interface connected to your EtherCAT bus if needed
-
-### 3. Expected output
-The master will enumerate all slaves on the bus and continuously print their input/output data.
-
-Expected output:
-![Multi Slave EasyCAT Example Output](doc/multi-slave-easycat-output.gif)
----
-
-## Simulator
-
-Test your EtherCAT applications without physical hardware using the built-in network simulator.
-See [`simulation/README.md`](simulation/README.md) for the full guide (architecture, config schema, named TAP segments).
-
-The quickest way to drive an emulated slave is the **in-process** example — master and slave in one process, no network setup:
-
-```bash
-./build/examples/master/simulated_bus/simulated_bus -f "Beckhoff EL1xxx.xml" -t EL1008
-```
-
-The two-process `network_simulator` (below) is closer to a real setup and lets an unmodified master example connect over a TAP socket.
-
-### Transport Options
-
-When the master and the simulator run on the **same machine**, prefer using **TAP sockets** (shared-memory IPC) instead of a virtual Ethernet pair. TAP sockets are faster and simpler to set up — no kernel `veth` configuration is needed.
-
-When using the `?` interactive selector for the network interface, two TAP entries are available:
-- `tap:server` — to be used by the simulator
-- `tap:client` — to be used by the master
-
-If you need to run the master and simulator on **different machines**, use real network interfaces or a virtual Ethernet pair:
-
-```bash
-# Create a virtual ethernet pair (Linux, same machine, alternative to TAP)
-sudo ./simulation/create_virtual_ethernet.sh create veth
-```
-
-### Running the Simulator
-
-```bash
-# Start the simulator (must be started before the master)
-# Using TAP socket (preferred, same machine):
-./build/simulation/network_simulator -i "?" -s simulation/slave_configs/freedom-k64f.json
-# Then select "tap:server"
-
-# Using a specific interface:
-./build/simulation/network_simulator -i eth1 -s simulation/slave_configs/freedom-k64f.json
-
-# Multiple slaves:
-./build/simulation/network_simulator -i "?" -s simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
-```
-
-Then start the master on the matching transport:
-```bash
-# Using TAP socket (select "tap:client"):
-sudo ./build/examples/master/easycat/easycat_example -i "?"
-
-# Or with a specific interface:
-sudo ./build/examples/master/easycat/easycat_example -i eth0
-```
-
-**Current Capabilities:**
-- Load EEPROM configurations
-- Emulate basic sync manager behavior
-- Emulate basic FMMU (Fieldbus Memory Management Unit) behavior
-- CoE mailbox with SDO support (via ESI XML)
-- DL status / network topology emulation
-
-**Limitations:**
-- No interrupt emulation
-- No redundancy support yet
-
----
-
-## Tools
-
-KickCAT includes several utility tools in the `tools/` directory:
-
-- **eeprom**: Read/write/dump EEPROM from ESC
-- **scan_topology**: Scan the bus and display the network topology as an ASCII tree
-- **check_network_stability**: Monitor packet loss and corruption over time (Linux only)
-- **od_generator**: Generate Object Dictionary code from ESI files
-- **EtherCAT GUI**: PySide6-based graphical interface for bus monitoring
-
-Build tools with the main project:
-```bash
-cd build
-make
-ls tools/  # Your built tools will be here
-```
-
-<details>
-<summary><b>EtherCAT GUI Tool Usage</b></summary>
-
-The KickCAT EtherCAT GUI is a PySide6-based application for monitoring and controlling the EtherCAT bus.
-
-#### Requirements
-- Python 3
-- PySide6
-- `kickcat` package (installed via `pip install -e .` in project root)
-
-#### Usage
-Run the application as a module from the project root:
-```bash
-python -m tools.ethercat_gui -i enp8s0
-```
-</details>
-
-### EEPROM Tool Usage
-
-Read, write, or dump EEPROM content from your EtherCAT Slave Controller:
-
-```bash
-# Write EEPROM to slave at position 0
-sudo ./tools/eeprom -s 0 -c write -f path/to/eeprom.bin -i <interface>
-
-# Auto-detect interface
-sudo ./tools/eeprom -s 0 -c write -f path/to/eeprom.bin -i "?"
-
-# Read EEPROM from slave
-sudo ./tools/eeprom -s 0 -c read -f output.bin -i <interface>
-```
-
-### Object Dictionary Generator
-
-If your application uses CoE mailbox with SDO, you can generate Object Dictionary code from ESI files.
-
-#### Generate OD from ESI File
-
-```bash
-# Generate od_populator.cc from your ESI file
-./tools/od_generator -f your_device.esi
-
-# This creates: od_populator.cc
-```
-
-#### Using Generated OD Code
-
-Include the generated file in your slave application:
-
-```cpp
-#include "od_populator.h"
-
-int main() {
-    // Initialize your slave
-    // ...
-
-    // Populate Object Dictionary
-    auto dictionary = CoE::createOD();
-
-    // Continue with slave operation
-    // ...
-}
-```
-
-#### Custom OD Population
-
-You can also manually create `od_populator.cc` by implementing the `CoE::createOD()` function.
-
-**Examples:** See `examples/slave/nuttx/xmc4800/od_populator.cc` and `examples/slave/nuttx/lan9252/freedom-k64f/od_populator.cc` for reference implementations.
-
----
-
-## Architecture
-
-### Master Stack Status
-
-✅ **Implemented:**
-- Full EtherCAT state machine (INIT, PRE-OP, SAFE-OP, OP)
-- Process data (PI) read/write
-- CoE: SDO read/write (blocking and async)
-- CoE: Emergency messages
-- CoE: SDO Information service
+- Full EtherCAT State Machine (INIT, PRE-OP, SAFE-OP, OP)
+- Process data (PDO) read/write
+- CoE: SDO read/write (expedited, normal, segmented), SDO Information, Emergency
 - Bus diagnostics with error counters
 - Cable redundancy
-- Hook system for non-compliant slaves
 - Consecutive writes (up to 255 datagrams in flight)
-- EtherCAT mailbox gateway (ETG.8200)
-- Distributed Clock (DC) support - experimental
-- AF_XDP Linux socket for improved performance *(available, opt-in)*
+- Mailbox gateway (ETG.8200)
+- Distributed Clock (experimental)
+- AF_XDP socket backend on Linux (opt-in, lower latency)
+- Python bindings
 
-📋 **Planned:**
-- CoE: Segmented transfer (partial)
-- CoE: Diagnosis message (0x10F3)
-- FoE, EoE, AoE, SoE profiles
-- Auto-discovery of broken wires
-- Addressing groups (multi-PDO)
+### Slave stack
 
-### Slave Stack Status
-
-✅ **Implemented:**
-- State machine: INIT → PRE-OP → SAFE-OP → OP
+- Full EtherCAT State Machine
 - Process data read/write
+- CoE: Object Dictionary, SDO (including segmented and SDO Information)
 - ESC support: LAN9252 (SPI), XMC4800
-- CoE: Object dictionary
-- CoE: SDO support
-- EEPROM flash/dump tools
-- CTT (Conformance Test Tool) validated (WDC_FOOT)
+- EEPROM provisioning tooling
+- Conformance Test Tool (CTT) validated (WDC_FOOT)
 
-📋 **Planned:**
-- Extended mailbox protocols (SDO Information, FoE, EoE)
-- Multi-PDO support (>2 sync managers)
-- Distributed clock
-- Enhanced error reporting via AL_STATUS
+### Mailbox protocols
 
----
+CoE is fully supported on master and slave. FoE and EoE are planned. SoE, AoE,
+and VoE are not currently on the roadmap (no maintainer hardware to test
+against) -- contributions are welcome. See the
+[feature support matrix](docs/FEATURES.md) for the full breakdown.
 
-## Performance Optimization (Linux)
+### Tooling and GUIs
 
-For real-time performance on Linux:
+- **KickUI** -- ImGui bus dashboard: topology view, SDO/PDO panels, DS402 motor bench
+- **EEPROM editor** -- ImGui structured SII/EEPROM editor
+- **eeprom** -- CLI to read/write slave EEPROM
+- **scan_topology** -- enumerate slaves and per-port link status
+- **check_network_stability** -- monitor packet loss/corruption over time (Linux)
+- **od_generator** -- generate CoE Object Dictionary code from ESI files
+- **ethercat_gui** -- PySide6 bus monitoring application
 
-1. **Use RT-PREEMPT kernel**
-   ```bash
-   # Check if RT patches are applied
-   uname -a | grep PREEMPT
-   ```
+See [docs/TOOLS.md](docs/TOOLS.md) for usage.
 
-2. **Set real-time scheduler**
-   ```bash
-   sudo chrt -f 80 ./your_ethercat_app
-   ```
+### Simulation and emulation
 
-3. **Disable NIC interrupt coalescing**
-   ```bash
-   sudo ethtool -C eth0 rx-usecs 0 tx-usecs 0
-   ```
+KickCAT includes a software EtherCAT Slave Controller (`EmulatedESC`: registers,
+SyncManagers, FMMUs, DC clock, EEPROM) and a network fabric (`EmulatedNetwork`:
+topology routing, redundancy, runtime wire break/heal). Run a master against it
+either in-process (the `simulated_bus` example) or as a separate process
+(`network_simulator` over a shared-memory TAP socket).
 
-4. **Disable RT throttling**
-   ```bash
-   echo -1 | sudo tee /proc/sys/kernel/sched_rt_runtime_us
-   ```
+See [docs/SIMULATION.md](docs/SIMULATION.md).
 
-5. **Isolate CPU cores**
-   ```bash
-   # Add to kernel boot parameters
-   isolcpus=2,3 nohz_full=2,3 rcu_nocbs=2,3
-   ```
+## Getting started
 
-6. **Adjust network IRQ priority**
-   ```bash
-   # Find IRQ number
-   cat /proc/interrupts | grep eth0
-   # Set priority
-   sudo chrt -f 90 -p <IRQ_thread_PID>
-   ```
-
-7. **Use AF_XDP socket (optional, Linux only)**
-
-   AF_XDP bypasses most of the kernel networking stack by using shared memory
-   ring buffers between user space and the NIC driver. This can reduce latency
-   significantly compared to the default `AF_PACKET` raw socket.
-
-   **Build requirements:** `libxdp-dev`, `libbpf-dev`, `clang` (for BPF compilation).
-
-   ```bash
-   # Install dependencies (Debian/Ubuntu)
-   sudo apt install libxdp-dev libbpf-dev clang
-
-   # Build with AF_XDP support
-   cmake .. -DENABLE_AF_XDP=ON
-   make
-   ```
-
-   **Usage:** prefix your interface name with `xdp:` to select the AF_XDP backend:
-
-   ```bash
-   # AF_XDP socket (requires CAP_NET_ADMIN + CAP_BPF, or root)
-   sudo ./examples/master/easycat/easycat_example -i xdp:eth0
-
-   # Regular AF_PACKET socket (default, unchanged)
-   sudo ./examples/master/easycat/easycat_example -i eth0
-   ```
-
-   **Requirements:**
-   - Linux kernel >= 5.4 with `CONFIG_XDP_SOCKETS=y` (see check below)
-   - `CAP_NET_ADMIN` + `CAP_BPF` capabilities (or root)
-   - NIC driver with XDP support (most modern drivers: `i40e`, `ixgbe`, `mlx5`, `igc`, `e1000e`, etc.)
-
-   **Verify kernel support:**
-   ```bash
-   grep CONFIG_XDP_SOCKETS /boot/config-$(uname -r)
-   # Expected: CONFIG_XDP_SOCKETS=y
-   ```
-
-   If `CONFIG_XDP_SOCKETS` is not set or missing, add the following to your kernel
-   configuration and rebuild:
-   ```
-   CONFIG_BPF_SYSCALL=y
-   CONFIG_XDP_SOCKETS=y
-   CONFIG_XDP_SOCKETS_DIAG=y
-   ```
-
----
-
-### EtherCAT Specifications
-- [ETG Official Documentation](https://www.ethercat.org/en/downloads.html)
-- [Beckhoff EtherCAT Documentation](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html)
-- [ESC Datasheets](https://download.beckhoff.com/download/document/io/ethercat-development-products/)
-
-### Learning Resources
-- [EtherCAT Device Protocol Poster](https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf)
-- [EtherCAT Diagnostics Guide](https://www.automation.com/en-us/articles/2014-2/diagnostics-with-ethercat-part-4)
-- [ESC Comparison](https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf)
-
----
-
-## Testing
-
-### Unit Tests
+Build the stack and tools (Linux):
 
 ```bash
-# Enable unit tests and set up
 ./scripts/configure.sh build --with=unit_tests
 ./scripts/setup_build.sh build
-
-# Build and run tests
-cd build && make
-make test
+cd build && make -j
 ```
 
-### Code Coverage
+Then run a master against an emulated slave -- no hardware, single process:
 
-Install gcovr and build with coverage:
 ```bash
-# Install gcovr
-uv pip install gcovr
-
-# Enable tests + coverage
-./scripts/configure.sh build --with=unit_tests --with=code_coverage
-./scripts/setup_build.sh build
-
-# Build and generate coverage
-cd build && make
-make coverage
+./build/examples/master/simulated_bus/simulated_bus \
+    -f examples/slave/nuttx/lan9252/freedom-k64f/freedom-k64f.xml -t Board
 ```
 
----
+Point `-f` at any vendor ESI XML and `-t` at the device `<Type>` to emulate a
+different slave. Beckhoff publish ESI files for their devices at
+<https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description>.
 
-## Release Process
+Where to go next:
 
-KickCAT follows [Semantic Versioning](https://semver.org/).
+- Build, install, Python bindings, Windows/PikeOS -- [docs/BUILDING.md](docs/BUILDING.md)
+- Real hardware: slave firmware, flashing, end-to-end walkthrough -- [docs/HARDWARE.md](docs/HARDWARE.md)
+- Simulator and emulator -- [docs/SIMULATION.md](docs/SIMULATION.md)
+- Tools and GUIs -- [docs/TOOLS.md](docs/TOOLS.md)
+- Real-time performance tuning -- [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
 
-### Release Requirements
+## Platform support
 
-Before a version leaves release candidate status:
-- ✅ 5+ continuous days of testing without bugs (no realtime loss, crashes, or memory leaks)
-- ✅ 80% line coverage and 50% branch coverage for master/slave stack
+The master runs as a host OS process; the slave runs the stack on an RTOS
+against an EtherCAT Slave Controller (ESC).
 
-Note: integration test is done with the master running on Linux (x86-64) and the slave is the Freedom-K64F
+**Master (host OS):**
 
----
+| OS         | Architecture | Status                                       |
+|------------|--------------|----------------------------------------------|
+| Linux      | x86-64       | Production; RT-PREEMPT recommended for real-time |
+| PikeOS 5.1 | ARMv8        | Production                                   |
+| Windows    | x86-64       | Tools and testing only (not real-time)       |
+
+**Slave (NuttX RTOS + ESC):**
+
+| ESC      | Interface  | Status                   |
+|----------|------------|--------------------------|
+| LAN9252  | SPI        | Production               |
+| XMC4800  | Integrated | Production; CTT validated |
+
+Reference boards: NXP Freedom K64F (LAN9252), Arduino Due with EasyCAT shield
+(LAN9252), Infineon XMC4800 Relax Kit (XMC4800). See the
+[hardware guide](docs/HARDWARE.md).
+
+## Documentation
+
+- [Feature support matrix](docs/FEATURES.md)
+- [Building and installing](docs/BUILDING.md)
+- [Hardware guide](docs/HARDWARE.md)
+- [Simulation and emulation](docs/SIMULATION.md)
+- [Tools and GUIs](docs/TOOLS.md)
+- [Real-time performance tuning](docs/PERFORMANCE.md)
+- [Architecture overview](docs/architecture.md)
+- [Release procedure](release/RELEASE_PROCEDURE.md)
+
+### EtherCAT references
+
+- [ETG official documentation](https://www.ethercat.org/en/downloads.html)
+- [Beckhoff EtherCAT documentation](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html)
+- [Beckhoff ESI (XML device description) files](https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description)
+- [ESC datasheets](https://download.beckhoff.com/download/document/io/ethercat-development-products/)
+- [EtherCAT Device Protocol Poster](https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf)
+- [ESC comparison](https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf)
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for code-style
+and PR conventions, and [docs/BUILDING.md](docs/BUILDING.md) for the development
+build (unit tests and coverage).
 
-### Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/leducp/KickCAT.git
-cd KickCAT
-
-# Configure and setup build environment
-./scripts/configure.sh build --with=unit_tests
-./scripts/setup_build.sh build
-
-# Build
-cd build && make
-```
-
----
-
-## Platform Support
-
-| Platform | Type | Status |
-|----------|--------|-------|
-| Linux (x86_64) | Master | Production - RT_PREEMPT  Recommended for real-time |
-| Windows | Master | ⚠️ Testing/tools only |
-| PikeOS 5.1 (ARMv8) | Master | Production |
-| NuttX RTOS | Slave | Production |
-| Arduino Due | Slave | via NuttX |
-| Infineon XMC4800 | Slave | via NuttX, CTT validated |
-| NXP Freedom K64F | Slave | via NuttX |
-
----
-
-## Known Limitations
-
-### Master Stack
-- **Little-endian only**: Current implementation supports little-endian hosts only
-- **Windows**: Not suitable for real-time applications
-- **Mailbox protocols**: Limited to CoE SDO (FoE, EoE planned)
-
-### Slave Stack
-- **PDO limitation**: Currently supports up to 2 sync managers (working on multi-PDO)
-- **Distributed Clock**: Not yet implemented
-- **Mailbox protocols**: Limited to CoE SDO (FoE, EoE planned)
-
----
+KickCAT follows [Semantic Versioning](https://semver.org/). The release workflow
+is documented in [release/RELEASE_PROCEDURE.md](release/RELEASE_PROCEDURE.md).
 
 ## License
 
 [CeCILL-C](LICENSE)
 
----
+## Support
 
-## Support & Community
+- Issues: [GitHub Issues](https://github.com/leducp/KickCAT/issues)
+- Discussions: [GitHub Discussions](https://github.com/leducp/KickCAT/discussions)
+- Conan package: [conan-center-index](https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat)
 
-- **Issues**: [GitHub Issues](https://github.com/leducp/KickCAT/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/leducp/KickCAT/discussions)
-- **Conan Package**: [conan-center-index](https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat)
-
----
-
-## Project Status
-
-🟢 **Active Development** - KickCAT is actively maintained and used in production systems.
-
-**Current Version**: Check [Releases](https://github.com/leducp/KickCAT/releases) for the latest stable version.
-
-**Release Cycle**: Following semantic versioning with thorough testing before each major release.
+Status: actively maintained and used in production systems. See
+[Releases](https://github.com/leducp/KickCAT/releases) for the latest stable
+version.
