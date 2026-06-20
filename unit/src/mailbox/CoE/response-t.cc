@@ -109,12 +109,12 @@ class CoE_Response : public ::testing::Test
 public:
     void SetUp() override
     {
-        dict = createTestDictionary();
-        mbx.enableCoE(dict);
+        default_dict = createTestDictionary();
+        mbx.enableCoE(default_dict);
     }
 
     MockESC esc;
-    CoE::Dictionary dict{};  // declared before mbx so it outlives the reference
+    CoE::Dictionary default_dict{};  // declared before mbx so it outlives the reference
     Mailbox mbx{&esc, TEST_MAILBOX_SIZE, 1};
 };
 

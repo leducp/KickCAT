@@ -143,8 +143,6 @@ namespace
 
         while (running)
         {
-            control.drain();
-
             auto t1 = since_epoch();
 
             bool serviced = serviceFrame(socket, socket_redundancy, false);
@@ -156,6 +154,8 @@ namespace
             {
                 continue;  // both ports idle: re-check `running` (shutdown) and retry
             }
+
+            control.drain();
 
             for (auto& sim_slave : slaves)
             {
@@ -199,10 +199,22 @@ namespace
             if (stats.size() >= 1000)
             {
                 std::sort(stats.begin(), stats.end());
-                printf("[%f] frame processing time: \n\t min: %f\n\t max: %f\n\t avg: %f\n", seconds_f(since_start()).count(),
-                       stats.front().count() / 1000.0,
-                       stats.back().count() / 1000.0,
-                       (std::reduce(stats.begin(), stats.end()) / stats.size()).count() / 1000.0);
+                sim::SimStats s{};
+                s.window = stats.size();
+                s.min_ns = static_cast<uint64_t>(stats.front().count());
+                s.max_ns = static_cast<uint64_t>(stats.back().count());
+                s.avg_ns = static_cast<uint64_t>((std::reduce(stats.begin(), stats.end()) / stats.size()).count());
+
+                control.publishStats(s);
+
+                // One overwriting line (\r + trailing pad) instead of a scrolling
+                // log; the GUI shows the live history when launched through KickUI.
+                printf("\rframe proc: min %4llu  max %5llu  avg %4llu \xc2\xb5s  (n=%zu, t=%.0fs)   ",
+                       static_cast<unsigned long long>(s.min_ns / 1000),
+                       static_cast<unsigned long long>(s.max_ns / 1000),
+                       static_cast<unsigned long long>(s.avg_ns / 1000),
+                       s.window, seconds_f(since_start()).count());
+                fflush(stdout);
                 stats.clear();
             }
         }

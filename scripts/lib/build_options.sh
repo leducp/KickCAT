@@ -10,6 +10,7 @@ declare -A OPT_DEFAULTS=(
     [simulation]=ON
     [tools]=ON
     [eeprom_editor]=OFF
+    [kickui]=OFF
     [code_coverage]=OFF
     [af_xdp]=OFF
     [asan]=OFF
@@ -24,6 +25,7 @@ declare -A OPT_DESCRIPTIONS=(
     [simulation]="Build simulation"
     [tools]="Build tools"
     [eeprom_editor]="Build EEPROM editor GUI"
+    [kickui]="Build KickUI GUI"
     [code_coverage]="Enable code coverage"
     [af_xdp]="Enable AF_XDP socket"
     [asan]="Build with AddressSanitizer"
@@ -38,6 +40,7 @@ declare -A OPT_CMAKE_FLAGS=(
     [simulation]="BUILD_SIMULATION"
     [tools]="BUILD_TOOLS"
     [eeprom_editor]="BUILD_EEPROM_EDITOR"
+    [kickui]="BUILD_KICKUI"
     [code_coverage]="ENABLE_CODE_COVERAGE"
     [af_xdp]="ENABLE_AF_XDP"
     [asan]="ENABLE_ASAN"
@@ -52,6 +55,7 @@ declare -A OPT_CONAN_FLAGS=(
     [simulation]="simulation"
     [tools]="tools"
     [eeprom_editor]="eeprom_editor"
+    [kickui]="kickui"
 )
 
 # Load .buildconfig into the CONFIG associative array.

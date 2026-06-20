@@ -8,6 +8,32 @@ namespace kickcat::CoE
     constexpr uint16_t SM_COM_TYPE       = 0x1C00; // each sub-entry described SM[x] com type (mailbox in/out, PDO in/out, not used)
     constexpr uint16_t SM_CHANNEL        = 0x1C10; // each entry is associated with the mapped PDOs (if in used)
 
+    // One entry of a PDO mapping object (0x1600.../0x1A00...): the 32-bit subindex
+    // value packs the mapped object's index, subindex and bit length (ETG.1000.6 /
+    // CiA-301). A padding gap has index 0.
+    struct PdoMappingEntry
+    {
+        uint16_t index;
+        uint8_t  subindex;
+        uint8_t  bitlen;
+    };
+
+    constexpr uint32_t toMappingWord(PdoMappingEntry entry)
+    {
+        return (static_cast<uint32_t>(entry.index) << 16)
+             | (static_cast<uint32_t>(entry.subindex) << 8)
+             |  static_cast<uint32_t>(entry.bitlen);
+    }
+
+    constexpr PdoMappingEntry fromMappingWord(uint32_t word)
+    {
+        return PdoMappingEntry{
+            static_cast<uint16_t>(word >> 16),
+            static_cast<uint8_t>(word >> 8),
+            static_cast<uint8_t>(word),
+        };
+    }
+
     struct Header
     {
         uint16_t number : 9,

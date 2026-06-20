@@ -41,16 +41,49 @@ namespace kickcat::sim
         ControlPayload payload;
     };
 
-    struct ControlResponse
+    // Acknowledgement of a command: the echoed argument plus the outcome.
+    struct SetLinkAck
     {
-        ControlCommand::Type type;
-        uint8_t              ok;        // 0: command rejected (bad arguments / unknown type)
-        ControlPayload       payload;   // result, valid only when ok == 1
+        SetLink link;
+        uint8_t ok;    // 0: command rejected (bad arguments / unknown type)
+    };
+
+    // Frame-timing window the simulator emits unsolicited (one per N frames).
+    // Times are nanoseconds over the last `window` frames.
+    struct SimStats
+    {
+        uint64_t window;
+        uint64_t min_ns;
+        uint64_t max_ns;
+        uint64_t avg_ns;
+    };
+
+    union EventPayload
+    {
+        SetLinkAck set_link_ack;
+        SimStats   stats;
+    };
+
+    // Everything the simulator sends back to the host travels on one return stream:
+    // command acks AND unsolicited events (frame stats today; more later). The host
+    // drains the stream and dispatches on `type`. Adding an event kind means a new
+    // Type tag and an EventPayload member -- no new channel.
+    struct ControlEvent
+    {
+        enum class Type : uint16_t
+        {
+            SetLinkAck,
+            FrameStats,
+        };
+
+        Type         type;
+        EventPayload payload;
     };
 
     // The messages are byte-copied through a shared-memory ring.
     static_assert(std::is_trivially_copyable_v<ControlCommand>);
-    static_assert(std::is_trivially_copyable_v<ControlResponse>);
+    static_assert(std::is_trivially_copyable_v<ControlEvent>);
+    static_assert(std::is_trivially_copyable_v<SimStats>);
 
     // Shared-memory transport: the segment holds a small header plus the POD ring
     // Contexts; each side wraps them with its own LockedRing whose pointers are
@@ -62,8 +95,8 @@ namespace kickcat::sim
     {
     public:
         static constexpr uint32_t RING_SIZE = 64;   // power of two
-        using CommandRing  = LockedRing<ControlCommand,  RING_SIZE>;
-        using ResponseRing = LockedRing<ControlResponse, RING_SIZE>;
+        using CommandRing = LockedRing<ControlCommand, RING_SIZE>;
+        using EventRing   = LockedRing<ControlEvent,   RING_SIZE>;
 
         ControlChannel()                                 = default;
         ControlChannel(ControlChannel const&)            = delete;
@@ -76,22 +109,20 @@ namespace kickcat::sim
 
         bool sendCommand(ControlCommand const& cmd) { return commands_->push(cmd); }
         bool nextCommand(ControlCommand& out)       { return commands_->tryPop(out); }
-        bool sendResponse(ControlResponse const& r) { return responses_->push(r); }
-        bool nextResponse(ControlResponse& out)     { return responses_->tryPop(out); }
+        bool sendEvent(ControlEvent const& e)       { return events_->push(e); }
+        bool nextEvent(ControlEvent& out)           { return events_->tryPop(out); }
 
-        // Command and response rings are the same size and used 1:1, so room for a
-        // response guarantees the matching command's ack will fit.
-        bool responseSpaceAvailable() { return responses_->size() < RING_SIZE; }
+        bool eventSpaceAvailable() { return events_->size() < RING_SIZE; }
 
     private:
         static constexpr uint32_t MAGIC = 0x53494d43;   // 'SIMC'
 
         struct Storage
         {
-            uint32_t              magic;
-            uint32_t              layout_size;
-            CommandRing::Context  commands;
-            ResponseRing::Context responses;
+            uint32_t             magic;
+            uint32_t             layout_size;
+            CommandRing::Context commands;
+            EventRing::Context   events;
         };
 
         void open(std::string const& name, bool init)
@@ -106,12 +137,12 @@ namespace kickcat::sim
             {
                 std::memset(storage, 0, sizeof(Storage));
             }
-            commands_  = std::make_unique<CommandRing>(storage->commands);
-            responses_ = std::make_unique<ResponseRing>(storage->responses);
+            commands_ = std::make_unique<CommandRing>(storage->commands);
+            events_   = std::make_unique<EventRing>(storage->events);
             if (init)
             {
                 commands_->init();
-                responses_->init();
+                events_->init();
                 storage->layout_size = sizeof(Storage);
                 storage->magic       = MAGIC;   // stamp last: a peer only sees it once ready
             }
@@ -121,9 +152,9 @@ namespace kickcat::sim
             }
         }
 
-        SharedMemory                  shm_{};
-        std::unique_ptr<CommandRing>  commands_;
-        std::unique_ptr<ResponseRing> responses_;
+        SharedMemory                 shm_{};
+        std::unique_ptr<CommandRing> commands_;
+        std::unique_ptr<EventRing>   events_;
     };
 
     // Master-side producer: creates and owns the channel.
@@ -135,8 +166,8 @@ namespace kickcat::sim
         bool breakLink(uint16_t a, uint16_t b) { return setLink(a, b, 0); }
         bool healLink(uint16_t a, uint16_t b)  { return setLink(a, b, 1); }
 
-        bool send(ControlCommand const& cmd)     { return channel_.sendCommand(cmd); }
-        bool nextResponse(ControlResponse& out)  { return channel_.nextResponse(out); }
+        bool send(ControlCommand const& cmd) { return channel_.sendCommand(cmd); }
+        bool nextEvent(ControlEvent& out)    { return channel_.nextEvent(out); }
 
     private:
         bool setLink(uint16_t a, uint16_t b, uint8_t up)
