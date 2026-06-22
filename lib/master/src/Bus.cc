@@ -124,6 +124,13 @@ namespace kickcat
                 slave.mailbox.to_process.push_back(emg);
             }
 
+            if (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::EoE)
+            {
+                // Must precede the CheckMessage below, which would otherwise drop EoE frames.
+                slave.eoe_receiver = std::make_shared<mailbox::request::EoEReceiveMessage>(slave.mailbox.recv_size);
+                slave.mailbox.to_process.push_back(slave.eoe_receiver);
+            }
+
             if ((slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::EoE) or
                 (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::FoE) or
                 (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::SoE) or

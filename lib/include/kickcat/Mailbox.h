@@ -10,6 +10,7 @@
 #include "kickcat/AbstractESC.h"
 #include "CoE/OD.h"
 #include "CoE/protocol.h"
+#include "EoE/FrameReassembler.h"
 
 
 namespace kickcat
@@ -44,6 +45,13 @@ namespace kickcat::mailbox::request
         constexpr uint32_t COE_UNKNOWN_SERVICE          = 0x102;
         constexpr uint32_t COE_CLIENT_BUFFER_TOO_SMALL  = 0x103;
         constexpr uint32_t COE_SEGMENT_BAD_TOGGLE_BIT   = 0x104;
+
+        constexpr uint32_t EOE_WRONG_SERVICE            = 0x201;
+        constexpr uint32_t EOE_UNSPECIFIED_ERROR        = 0x202;
+        constexpr uint32_t EOE_UNSUPPORTED_FRAME_TYPE   = 0x203;
+        constexpr uint32_t EOE_NO_IP_SUPPORT            = 0x204;
+        constexpr uint32_t EOE_DHCP_NOT_SUPPORTED       = 0x205;
+        constexpr uint32_t EOE_NO_FILTER_SUPPORT        = 0x206;
     }
 
     class AbstractMessage
@@ -119,6 +127,7 @@ namespace kickcat::mailbox::request
         bool can_write;     // free space for a new message on the slave
         uint8_t counter{0}; // session handle, from 1 to 7
         bool toggle;        // for SDO segmented transfer
+        uint8_t eoe_frame_number{0}; // rolling EoE frame number (0..15) for outbound frames
 
         //
         void generateSMConfig(SyncManager::Register SM[2]);
@@ -133,6 +142,14 @@ namespace kickcat::mailbox::request
                                                             nanoseconds timeout = 20ms);
         std::shared_ptr<AbstractMessage> createSDOInfoGetED(uint16_t index, uint8_t subindex, uint8_t value_info,
                                                             void* data, uint32_t* data_size, nanoseconds timeout = 20ms);
+
+        // EoE parameter services (ETG.1000.6 §5.7.4/5.7.5)
+        std::shared_ptr<AbstractMessage> createEoESetIP(EoE::IpParameters const& params, nanoseconds timeout = 1s);
+        std::shared_ptr<AbstractMessage> createEoEGetIP(EoE::IpParameters* params, nanoseconds timeout = 1s);
+        std::shared_ptr<AbstractMessage> createEoESetAddressFilter(EoE::AddressFilter const& filter, nanoseconds timeout = 1s);
+
+        // Fire-and-forget: fragmented and enqueued, not tracked in to_process (no reply expected).
+        void sendEoEFrame(uint8_t const* frame, size_t len, uint8_t port = 0);
 
         // helper to get next message to send and transfer it to reception callbacks if required
         std::shared_ptr<AbstractMessage> send();
@@ -195,6 +212,15 @@ namespace kickcat::mailbox::response
         void enableCoE(CoE::Dictionary& dictionary);
         CoE::Dictionary& getDictionary(){return *dictionary_;}
 
+        // Non-owning: 'config' and the sink's captures must outlive the mailbox.
+        void enableEoE(EoE::SlaveConfig& config, EoE::FrameSink sink);
+        EoE::SlaveConfig* eoeConfig() { return eoe_config_; }
+
+        void onEoEFrame(uint8_t const* raw_message, size_t len);   // feed one inbound fragment
+
+        // Enqueue an unsolicited slave -> master frame (fragmented).
+        void sendEoEFrame(uint8_t const* frame, size_t len, uint8_t port = 0);
+
         // --- ESC-coupled methods (requires to pass the ESC to the constructor) ---
         int32_t configure();
         bool isConfigOk();
@@ -240,6 +266,12 @@ namespace kickcat::mailbox::response
 
         std::vector<std::function<std::shared_ptr<AbstractMessage>(Mailbox*, std::vector<uint8_t>&&)>> factories_;
         CoE::Dictionary* dictionary_{nullptr};         // application-owned, set by enableCoE
+
+        EoE::SlaveConfig* eoe_config_{nullptr};        // application-owned, set by enableEoE
+        EoE::FrameSink eoe_sink_{};
+        EoE::FrameReassembler eoe_rx_{};
+        uint8_t eoe_counter_{0};                       // session handle for unsolicited frames
+        uint8_t eoe_frame_number_{0};                  // rolling EoE frame number for unsolicited frames
 
         std::list<std::shared_ptr<AbstractMessage>> to_process_;    /// Received messages, waiting to be processed
         std::queue<std::vector<uint8_t>> to_send_;                  /// Messages to send (replies from a received messages)

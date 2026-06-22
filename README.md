@@ -33,6 +33,7 @@ For exactly what is and isn't supported, see the
 - Full EtherCAT State Machine (INIT, PRE-OP, SAFE-OP, OP)
 - Process data (PDO) read/write
 - CoE: SDO read/write (expedited, normal, segmented), SDO Information, Emergency
+- EoE: frame tunneling, Set/Get IP parameter, address filter
 - Bus diagnostics with error counters
 - Cable redundancy
 - Consecutive writes (up to 255 datagrams in flight)
@@ -46,15 +47,17 @@ For exactly what is and isn't supported, see the
 - Full EtherCAT State Machine
 - Process data read/write
 - CoE: Object Dictionary, SDO (including segmented and SDO Information)
+- EoE: frame tunneling and IP/address-filter parameter services
 - ESC support: LAN9252 (SPI), XMC4800
 - EEPROM provisioning tooling
 - Conformance Test Tool (CTT) validated (WDC_FOOT)
 
 ### Mailbox protocols
 
-CoE is fully supported on master and slave. FoE and EoE are planned. SoE, AoE,
-and VoE are not currently on the roadmap (no maintainer hardware to test
-against) -- contributions are welcome. See the
+CoE and EoE are supported on master and slave (EoE at the protocol layer:
+fragment/reassemble, Set/Get IP, address filter; no host TUN/TAP bridge). FoE is
+planned. SoE, AoE, and VoE are not currently on the roadmap (no maintainer
+hardware to test against) -- contributions are welcome. See the
 [feature support matrix](docs/FEATURES.md) for the full breakdown.
 
 ### Tooling and GUIs

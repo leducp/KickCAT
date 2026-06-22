@@ -153,6 +153,17 @@ namespace kickcat
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void const* data, uint32_t data_size, nanoseconds timeout = 1s);
 
+        // EoE services (ETG.1000.6 §5.7); the parameter calls block and throw on a non-success result.
+        void setIpParameter (Slave& slave, EoE::IpParameters const& params, nanoseconds timeout = 1s);
+        void getIpParameter (Slave& slave, EoE::IpParameters& params, nanoseconds timeout = 1s);
+        void setAddressFilter(Slave& slave, EoE::AddressFilter const& filter, nanoseconds timeout = 1s);
+
+        // Non-blocking: fragmented and drained by the regular mailbox pump.
+        void sendEoEFrame(Slave& slave, uint8_t const* frame, size_t len, uint8_t port = 0);
+
+        // The receiver exists only if the slave advertises EoE; it is created by init(). Throws otherwise.
+        void setEoEFrameHandler(Slave& slave, EoE::FrameSink sink);
+
         /// \brief  Add a gateway message to the bus
         /// \param  raw_message         A raw EtherCAT mailbox message
         /// \param  raw_message_size    Size of the mailbox message (shall be less or equal of the actual storage size)

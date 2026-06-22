@@ -33,7 +33,7 @@ authoritative source for "what works today"; the README only summarizes it.
 |----------|------------|------------|-------|
 | CoE (CANopen over EtherCAT) | Supported | Supported | See CoE breakdown below. |
 | FoE (File over EtherCAT)    | Planned    | Planned    | Protocol header only; no mailbox handlers yet. |
-| EoE (Ethernet over EtherCAT)| Planned    | Planned    | Protocol header only; no mailbox handlers yet. |
+| EoE (Ethernet over EtherCAT)| Supported | Supported | Protocol layer only; see EoE breakdown below. |
 | SoE (Servo over EtherCAT)   | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
 | AoE (ADS over EtherCAT)     | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
 | VoE (Vendor over EtherCAT)  | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
@@ -49,6 +49,28 @@ authoritative source for "what works today"; the README only summarizes it.
 | Emergency messages                  | Supported | Not applicable |
 | Object Dictionary                   | Not applicable | Supported |
 | PDO mapping / assignment            | Supported | Supported |
+
+### EoE breakdown
+
+| EoE feature                         | Master    | Slave     |
+|-------------------------------------|-----------|-----------|
+| Frame tunneling (fragment/reassemble) | Supported | Supported |
+| Interleaved frames (per port/frame number) | Supported | Supported |
+| Set / Get IP Parameter              | Supported | Supported |
+| Set Address (MAC) Filter            | Supported | Supported |
+| Timestamp trailer                   | Discarded on receive | Discarded on receive |
+
+EoE is implemented at the protocol layer: the stack fragments, reassembles, and
+delivers each completed Ethernet frame to an application callback the instant it
+is ready — it keeps no frame queue and does no buffering (the application buffers
+if it needs to). Several frames may be in flight at once on a port and their
+fragments may be interleaved; reassembly tracks each frame independently by
+(port, frame number). Bridging the EoE endpoint to a host network interface
+(TUN/TAP) is out of scope and left to the application. The slave owns its IP
+stack: the parameter services are delegated to an application `EoE::SlaveConfig`.
+The stack does not generate the optional send/receive timestamp, but it is
+compliant on receive: a timestamp appended to the last fragment is discarded so
+it does not corrupt the frame (the value is not surfaced).
 
 ## Distributed Clocks (DC)
 

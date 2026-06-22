@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "kickcat/EoE/mailbox/request.h"
 #include "kickcat/Mailbox.h"
 #include "kickcat/SIIParser.h"
 #include "kickcat/protocol.h"
@@ -64,6 +65,7 @@ namespace kickcat
 
         mailbox::request::Mailbox mailbox{};
         mailbox::request::Mailbox mailbox_bootstrap{};
+        std::shared_ptr<mailbox::request::EoEReceiveMessage> eoe_receiver{};  // resident inbound EoE handler
         int32_t waiting_datagram{0};  // how many datagram to process for this slave
 
         DLStatus dl_status{};

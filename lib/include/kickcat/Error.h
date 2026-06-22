@@ -39,6 +39,7 @@ namespace kickcat
     {
         constexpr int32_t AL  = 1;
         constexpr int32_t CoE = 2;
+        constexpr int32_t EoE = 3;
     }
 
     struct Error : public std::exception

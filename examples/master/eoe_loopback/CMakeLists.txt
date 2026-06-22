@@ -1,0 +1,3 @@
+add_executable(eoe_loopback eoe_loopback.cc)
+target_link_libraries(eoe_loopback kickcat)
+set_kickcat_properties(eoe_loopback)

@@ -1,7 +1,20 @@
+#include <cinttypes>
+#include <cstdio>
+
 #include "EoE/protocol.h"
 
 namespace kickcat::EoE
 {
+    std::string toString(Header const* header)
+    {
+        char buffer[256];
+        std::snprintf(buffer, sizeof(buffer),
+            "EoE type %u port %u last_fragment %u frame %u fragment %u offset/size %u (%u bytes)",
+            header->type, header->port, header->last_fragment, header->frame_number,
+            header->fragment_number, header->offset, bytesFromBlocks32(header->offset));
+        return std::string(buffer);
+    }
+
     namespace result
     {
         char const* toString(uint16_t result)

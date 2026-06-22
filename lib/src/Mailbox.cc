@@ -6,6 +6,7 @@
 #include "debug.h"
 #include "CoE/mailbox/request.h"
 #include "CoE/mailbox/response.h"
+#include "EoE/mailbox/response.h"
 #include "Error.h"
 #include "Mailbox.h"
 #include "protocol.h"
@@ -560,6 +561,46 @@ namespace kickcat::mailbox::response
     {
         dictionary_ = &dictionary;
         factories_.push_back(&createSDOMessage);
+    }
+
+    void Mailbox::enableEoE(EoE::SlaveConfig& config, EoE::FrameSink sink)
+    {
+        eoe_config_ = &config;
+        eoe_sink_   = std::move(sink);
+        factories_.push_back(&createEoEMessage);
+    }
+
+    void Mailbox::onEoEFrame(uint8_t const* raw_message, size_t len)
+    {
+        auto const* header = pointData<mailbox::Header>(raw_message);
+        auto const* eoe    = pointData<EoE::Header>(header);
+        uint8_t port = eoe->port;
+
+        auto frame = eoe_rx_.push(raw_message, len);
+        if (frame.has_value() and eoe_sink_)
+        {
+            eoe_sink_(frame->data(), frame->size(), port);
+        }
+    }
+
+    void Mailbox::sendEoEFrame(uint8_t const* frame, size_t len, uint8_t port)
+    {
+        uint16_t mbx_size = max_allocated_ram_by_msg_;
+        if ((mbx_in_.length > 0) and (mbx_in_.length < mbx_size))
+        {
+            mbx_size = mbx_in_.length;
+        }
+
+        uint8_t frame_number = eoe_frame_number_ & 0xF;
+        eoe_frame_number_ = (eoe_frame_number_ + 1) & 0xF;
+
+        auto fragments = EoE::fragmentFrame(frame, len, mbx_size, frame_number, port);
+        for (auto& fragment : fragments)
+        {
+            auto* header = pointData<mailbox::Header>(fragment.data());
+            header->count = mailbox::nextCounter(eoe_counter_);
+            to_send_.push(std::move(fragment));
+        }
     }
 
     void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
