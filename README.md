@@ -61,7 +61,7 @@ against) -- contributions are welcome. See the
 
 - **KickUI** -- ImGui bus dashboard: topology view, SDO/PDO panels, DS402 motor bench
 - **EEPROM editor** -- ImGui structured SII/EEPROM editor
-- **eeprom** -- CLI to read/write/dump slave EEPROM
+- **eeprom** -- CLI to read/write slave EEPROM
 - **scan_topology** -- enumerate slaves and per-port link status
 - **check_network_stability** -- monitor packet loss/corruption over time (Linux)
 - **od_generator** -- generate CoE Object Dictionary code from ESI files
@@ -92,8 +92,13 @@ cd build && make -j
 Then run a master against an emulated slave -- no hardware, single process:
 
 ```bash
-./build/examples/master/simulated_bus/simulated_bus -f "Beckhoff EL1xxx.xml" -t EL1008
+./build/examples/master/simulated_bus/simulated_bus \
+    -f examples/slave/nuttx/lan9252/freedom-k64f/freedom-k64f.xml -t Board
 ```
+
+Point `-f` at any vendor ESI XML and `-t` at the device `<Type>` to emulate a
+different slave. Beckhoff publish ESI files for their devices at
+<https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description>.
 
 Where to go next:
 
@@ -142,6 +147,7 @@ Reference boards: NXP Freedom K64F (LAN9252), Arduino Due with EasyCAT shield
 
 - [ETG official documentation](https://www.ethercat.org/en/downloads.html)
 - [Beckhoff EtherCAT documentation](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html)
+- [Beckhoff ESI (XML device description) files](https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description)
 - [ESC datasheets](https://download.beckhoff.com/download/document/io/ethercat-development-products/)
 - [EtherCAT Device Protocol Poster](https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf)
 - [ESC comparison](https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf)

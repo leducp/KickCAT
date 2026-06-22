@@ -53,7 +53,7 @@ sudo ./tools/eeprom -s 0 -c write -f examples/slave/nuttx/lan9252/freedom-k64f/e
 C++ master:
 
 ```bash
-sudo ./build/examples/master/freedom-k64f/freedom_k64f_example -i "?"
+sudo ./build/examples/master/freedom-k64f/freedom_k64f_static_map_example -i "?"
 ```
 
 Python master:

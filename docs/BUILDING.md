@@ -135,7 +135,7 @@ and the `conan/profile_windows_x86_64.txt` profile.
 Tested on PikeOS 5.1 for the native personality (p4ext).
 
 Provide a CMake cross-toolchain file that defines the `PIKEOS` variable. Example
-process/thread configurations are in `examples/PikeOS/p4ext_config.c`.
+process/thread configurations are in `lib/src/OS/PikeOS/p4ext_config.c`.
 
 ## Slave firmware
 

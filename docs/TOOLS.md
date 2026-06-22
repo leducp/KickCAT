@@ -25,7 +25,7 @@ Off by default; build it with:
 ./scripts/configure.sh build --with=kickui
 ./scripts/setup_build.sh build
 cd build && make -j
-./kickui
+./tools/kickui/kickui
 ```
 
 ## EEPROM editor (GUI)
@@ -38,12 +38,12 @@ FMMUs, and PDO mappings. Off by default:
 ./scripts/configure.sh build --with=eeprom_editor
 ./scripts/setup_build.sh build
 cd build && make -j
-./kickcat_eeprom_editor
+./tools/eeprom_editor/kickcat_eeprom_editor
 ```
 
 ## eeprom (CLI)
 
-Read, write, or dump EEPROM content from an EtherCAT Slave Controller
+Read or write EEPROM content from an EtherCAT Slave Controller
 (`tools/eeprom.cc`):
 
 ```bash
@@ -53,7 +53,7 @@ sudo ./tools/eeprom -s 0 -c write -f path/to/eeprom.bin -i <interface>
 # Auto-detect the interface
 sudo ./tools/eeprom -s 0 -c write -f path/to/eeprom.bin -i "?"
 
-# Read EEPROM from the slave
+# Read EEPROM from the slave (serializes the SII image to the output file)
 sudo ./tools/eeprom -s 0 -c read -f output.bin -i <interface>
 ```
 
@@ -77,10 +77,11 @@ Generate Object Dictionary code from an ESI file (requires
 ./tools/od_generator -f your_device.esi
 ```
 
-Include the generated file in your slave application:
+The generated `od_populator.cc` defines `CoE::createOD()` (declared in
+`kickcat/CoE/OD.h`). Add it to your slave application's build and call it:
 
 ```cpp
-#include "od_populator.h"
+#include "kickcat/CoE/OD.h"
 
 int main()
 {

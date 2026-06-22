@@ -68,11 +68,18 @@ and the easiest to debug (single process, single thread).
 Canonical example -- `examples/master/simulated_bus`:
 
 ```bash
-./build/examples/master/simulated_bus/simulated_bus -f "Beckhoff EL1xxx.xml" -t EL1008
+./build/examples/master/simulated_bus/simulated_bus \
+    -f examples/slave/nuttx/lan9252/freedom-k64f/freedom-k64f.xml -t Board
 ```
 
-It builds the selected device, drives INIT -> PRE_OP -> SAFE_OP -> OPERATIONAL,
-and exchanges process data -- all in about 150 lines you can read top to bottom.
+`-f` takes any vendor ESI XML and `-t` selects the device by its `<Type>`
+(omit `-t` to use the first device in the file). It builds the selected device,
+drives INIT -> PRE_OP -> SAFE_OP -> OPERATIONAL, and exchanges process data --
+all in a short example you can read top to bottom.
+
+Beckhoff publish ESI files for their devices at
+<https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description>;
+most vendors ship the matching ESI XML with their hardware.
 
 `test/integration/bench/esi_boot` uses the same loopback to boot an entire ESI
 catalog in parallel (a good template for batch/regression use).
@@ -95,7 +102,7 @@ sudo ./build/examples/master/easycat/easycat_example -i tap:client
 To boot from an ESI device instead, point a config's `esi` key at your vendor's
 ESI XML (see the schema below).
 
-Chain several slaves by passing multiple configs, or repeat one with `-n N`:
+Chain several slaves by passing multiple configs:
 
 ```bash
 ./build/simulation/network_simulator -i tap:server \
