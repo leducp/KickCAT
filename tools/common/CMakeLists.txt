@@ -1,6 +1,11 @@
 find_package(imgui REQUIRED CONFIG)
 find_package(OpenGL REQUIRED)
 
+find_package(glfw3)
+if (glfw3_FOUND)
+message(STATUS "Using glfw found installed on system")
+else()
+message(STATUS "Downloading glfw using FetchContent")
 # GLFW via FetchContent — the Conan glfw recipe pulls xorg/system which
 # demands dozens of X11 -dev packages that are not actually needed.
 include(FetchContent)
@@ -14,11 +19,7 @@ FetchContent_Declare(glfw
     GIT_TAG        3.4
 )
 FetchContent_MakeAvailable(glfw)
-
-# ImGui backend + helper sources shipped in the Conan package under res/
-get_filename_component(_IMGUI_PKG_DIR "${imgui_INCLUDE_DIR}" DIRECTORY)
-set(IMGUI_RES_DIR "${_IMGUI_PKG_DIR}/res")
-set(IMGUI_BACKENDS_DIR "${IMGUI_RES_DIR}/bindings")
+endif()
 
 # Embed the bundled fonts (assets/fonts/*.ttf) into a generated source file.
 file(GLOB KICKCAT_BUNDLED_FONTS CONFIGURE_DEPENDS
@@ -41,15 +42,15 @@ add_custom_command(
 add_library(kickcat_imgui STATIC
     GuiApp.cc
     ${KICKCAT_BUNDLED_FONTS_CC}
-    ${IMGUI_BACKENDS_DIR}/imgui_impl_glfw.cpp
-    ${IMGUI_BACKENDS_DIR}/imgui_impl_opengl3.cpp
-    ${IMGUI_RES_DIR}/misc/cpp/imgui_stdlib.cpp
+    backend/imgui_impl_glfw.cpp
+    backend/imgui_impl_opengl3.cpp
+    vendor/imgui_stdlib.cpp
 )
 
 target_include_directories(kickcat_imgui PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${IMGUI_BACKENDS_DIR}
-    ${IMGUI_RES_DIR}
+    backend
+    vendor
 )
 
 target_link_libraries(kickcat_imgui PUBLIC

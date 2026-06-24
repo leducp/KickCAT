@@ -11,7 +11,7 @@
 #endif
 
 #include <imgui.h>
-#include <portable-file-dialogs.h>
+#include "vendor/portable-file-dialogs.h"
 
 #include "kickcat/EEPROM/EEPROM_factory.h"
 #include "kickcat/Bus.h"

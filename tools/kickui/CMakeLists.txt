@@ -1,4 +1,3 @@
-find_package(portable-file-dialogs REQUIRED CONFIG)
 
 add_executable(kickui
     main.cc
@@ -18,7 +17,6 @@ add_executable(kickui
 target_link_libraries(kickui PRIVATE
     kickcat
     kickcat_imgui
-    portable-file-dialogs::portable-file-dialogs
 )
 
 set_kickcat_properties(kickui)

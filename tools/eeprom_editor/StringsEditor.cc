@@ -1,6 +1,6 @@
 #include "Editors.h"
 
-#include <misc/cpp/imgui_stdlib.h>
+#include <imgui_stdlib.h>
 
 namespace kickcat::eeprom_editor::strings
 {
