@@ -25,6 +25,34 @@ namespace kickcat::kickui
 {
     namespace
     {
+        // A mailboxless terminal's PDO assignment is fixed and fully described by
+        // the SII PDO categories, so build the read-back view straight from them
+        // (no SDO, nothing to poll on the wire).
+        PdoMapping siiPdoMapping(int slave_index, eeprom::SII const& sii)
+        {
+            auto fromSII = [](std::vector<eeprom::PDOMapping> const& pdos, std::vector<PdoEntry>& out)
+            {
+                for (auto const& pdo : pdos)
+                {
+                    for (auto const& e : pdo.entries)
+                    {
+                        PdoEntry pe;
+                        pe.pdo   = pdo.index;
+                        pe.index = e.index;
+                        pe.sub   = e.subindex;
+                        pe.bits  = e.bitlen;
+                        out.push_back(pe);
+                    }
+                }
+            };
+            PdoMapping m;
+            m.slave = slave_index;
+            fromSII(sii.RxPDO, m.rx);
+            fromSII(sii.TxPDO, m.tx);
+            m.valid = true;
+            return m;
+        }
+
         // what() plus the decoded AL status when the failure is an AL error.
         std::string describeError(std::exception const& e)
         {
@@ -582,6 +610,11 @@ namespace kickcat::kickui
                     dev.has_eoe = (mbx & eeprom::MailboxProtocol::EoE) != 0;
                     dev.is_emulated = (emulated[i] != 0);
 
+                    // Process data comes from the SII PDO categories (parsed during
+                    // init), independent of any mailbox: a mailboxless I/O terminal
+                    // (e.g. EL1004) is still mappable via its fixed SII PDO.
+                    dev.sii_pdo = (not slave.sii.TxPDO.empty()) or (not slave.sii.RxPDO.empty());
+
                     // The CiA profile is the low word of the device-type object (0x1000).
                     if (dev.has_coe)
                     {
@@ -679,6 +712,20 @@ namespace kickcat::kickui
                 bus_       = std::move(staged_bus_);
                 devices_   = std::move(staged_devices_);
                 for (auto& dev : devices_) { dev.session = this; }  // wire the forwarding handle
+
+                // Seed the static SII mapping for mailboxless slaves now (bus_ is
+                // set, the bus thread is not started yet): they have no SDO to read,
+                // so the panel shows their fixed assignment without any action.
+                // (CoE slaves instead get theirs on demand via executeReadMapping
+                // -> Event::MappingResult.)
+                pdo_scans_.clear();
+                auto const& bus_slaves = bus_->slaves();
+                for (int i = 0; i < static_cast<int>(devices_.size()); ++i)
+                {
+                    if (devices_[i].has_coe or not devices_[i].sii_pdo) { continue; }
+                    if (i >= static_cast<int>(bus_slaves.size()))       { continue; }
+                    pdo_scans_[i].mapping = siiPdoMapping(i, bus_slaves[i].sii);
+                }
                 {
                     LockGuard tlock(topo_mtx_);
                     topology_ = std::move(staged_topology_);
