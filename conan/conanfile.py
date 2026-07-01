@@ -45,7 +45,6 @@ class KickCATDev(ConanFile):
 
         if self.options.eeprom_editor or self.options.kickui:
             self.requires("imgui/1.92.6")
-            self.requires("portable-file-dialogs/0.1.0")
 
         if self.settings.os == "Windows":
             self.requires("npcap/1.70")

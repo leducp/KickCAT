@@ -118,3 +118,7 @@ if (BUILD_KICKUI)
 endif()
 
 add_subdirectory(py_bindings)
+
+if (BUILD_EEPROM_EDITOR OR BUILD_KICKUI)
+add_subdirectory(vendor)
+endif()

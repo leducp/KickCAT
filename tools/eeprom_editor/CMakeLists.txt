@@ -1,4 +1,3 @@
-find_package(portable-file-dialogs REQUIRED CONFIG)
 
 add_executable(eeprom_editor
     main.cc
@@ -15,7 +14,7 @@ add_executable(eeprom_editor
 target_link_libraries(eeprom_editor PRIVATE
     kickcat
     kickcat_imgui
-    portable-file-dialogs::portable-file-dialogs
+    portable-file-dialogs
 )
 
 set_kickcat_properties(eeprom_editor)
