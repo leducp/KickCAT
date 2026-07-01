@@ -44,16 +44,15 @@ add_library(kickcat_imgui STATIC
     ${KICKCAT_BUNDLED_FONTS_CC}
     backend/imgui_impl_glfw.cpp
     backend/imgui_impl_opengl3.cpp
-    vendor/imgui_stdlib.cpp
 )
 
 target_include_directories(kickcat_imgui PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     backend
-    vendor
 )
 
 target_link_libraries(kickcat_imgui PUBLIC
+    imgui_stdlib
     imgui::imgui
     glfw
     OpenGL::GL

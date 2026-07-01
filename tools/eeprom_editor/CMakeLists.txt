@@ -14,6 +14,7 @@ add_executable(eeprom_editor
 target_link_libraries(eeprom_editor PRIVATE
     kickcat
     kickcat_imgui
+    portable-file-dialogs
 )
 
 set_kickcat_properties(eeprom_editor)
