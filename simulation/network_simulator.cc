@@ -7,7 +7,6 @@
 #include <numeric>
 
 #include "kickcat/EmulatedNetwork.h"
-#include "kickcat/ESI/Parser.h"
 #include "kickcat/Frame.h"
 #include "kickcat/OS/Time.h"
 #include "kickcat/helpers.h"
@@ -237,11 +236,10 @@ int main(int argc, char* argv[])
     std::vector<sim::SimulatedSlave> slaves;
     try
     {
-        ESI::Parser parser;
         slaves.reserve(opts.slave_configs.size());
         for (auto const& config_path : opts.slave_configs)
         {
-            slaves.push_back(sim::buildSlave(config_path, parser));
+            slaves.push_back(sim::buildSlave(config_path));
         }
     }
     catch (std::exception const& e)

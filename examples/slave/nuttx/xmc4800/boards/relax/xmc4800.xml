@@ -2,7 +2,7 @@
 <EtherCATInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="EtherCATInfo.xsd" Version="1.6">
 
   <Vendor>
-    <Id>#x000006a5</Id>
+    <Id>#x00001337</Id>
     <Name>XMC4800 Example</Name>
   </Vendor>
 
@@ -15,7 +15,7 @@
     </Groups>
     <Devices>
       <Device Physics="YY">
-        <Type ProductCode="#x00B0CAD0" RevisionNo="#x00000001">Relax</Type>
+        <Type ProductCode="#x00004800" RevisionNo="#x00000000">Relax</Type>
         <Name LcId="1033">Relax</Name>
         <Info>
           <StateMachine>
