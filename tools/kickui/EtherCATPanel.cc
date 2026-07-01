@@ -154,7 +154,9 @@ namespace kickcat::kickui
 
     bool EtherCATPanel::appliesTo(Device const& device) const
     {
-        return device.has_coe;
+        // CoE gives SDO/OD + manual remap; process data alone (mailboxless I/O
+        // terminal) is still worth the panel for SII-based mapping.
+        return device.has_coe or device.sii_pdo;
     }
 
     void EtherCATPanel::render(BusSession& session, Device& device)
@@ -175,8 +177,14 @@ namespace kickcat::kickui
             else
             {
                 ImGui::BeginDisabled(session.isOperatingAny());
-                ImGui::Checkbox("Define PDO mapping manually", &manual_map_);
-                if (manual_map_)
+                // Manual remap rewrites 0x1C12/0x1C13 over SDO, so it needs CoE; a
+                // mailboxless terminal can only be mapped via its fixed SII PDO.
+                bool manual = device.has_coe and manual_map_;
+                if (device.has_coe)
+                {
+                    ImGui::Checkbox("Define PDO mapping manually", &manual_map_);
+                }
+                if (manual)
                 {
                     renderMappingEditor(device);
                 }
@@ -193,19 +201,28 @@ namespace kickcat::kickui
             }
         }
 
-        ImGui::SeparatorText("PDO mapping (read-back)");
         PdoScan const scan = device.pdoScan();
-        bool can_read = device.sdoAvailable() and not scan.running;
-        ImGui::BeginDisabled(not can_read);
-        if (ImGui::Button("Read PDO mapping"))
+        // CoE: read the live assignment over SDO (button). Mailboxless: the fixed
+        // SII assignment is seeded at connect, so just show it -- no button.
+        if (device.has_coe)
         {
-            device.readPdoMapping();
+            ImGui::SeparatorText("PDO mapping (read-back)");
+            bool can_read = device.sdoAvailable() and not scan.running;
+            ImGui::BeginDisabled(not can_read);
+            if (ImGui::Button("Read PDO mapping"))
+            {
+                device.readPdoMapping();
+            }
+            ImGui::EndDisabled();
+            if (scan.running)
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("reading...");
+            }
         }
-        ImGui::EndDisabled();
-        if (scan.running)
+        else
         {
-            ImGui::SameLine();
-            ImGui::TextDisabled("reading...");
+            ImGui::SeparatorText("PDO mapping (from SII)");
         }
 
         PdoMapping const& mapping = scan.mapping;
@@ -217,8 +234,17 @@ namespace kickcat::kickui
             }
             else if (mapping.valid)
             {
-                pdoTable("RxPDO (outputs / 0x1C12)", mapping.rx);
-                pdoTable("TxPDO (inputs / 0x1C13)", mapping.tx);
+                // CoE reads the SM-assignment objects; the SII case has no such
+                // objects (fixed PDO), so name the direction only.
+                char const* rx_title = "RxPDO (outputs)";
+                char const* tx_title = "TxPDO (inputs)";
+                if (device.has_coe)
+                {
+                    rx_title = "RxPDO (outputs / 0x1C12)";
+                    tx_title = "TxPDO (inputs / 0x1C13)";
+                }
+                pdoTable(rx_title, mapping.rx);
+                pdoTable(tx_title, mapping.tx);
             }
         }
     }

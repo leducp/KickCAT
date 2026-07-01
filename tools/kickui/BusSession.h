@@ -134,6 +134,7 @@ namespace kickcat::kickui
         bool            has_coe      = false;  // CoE mailbox (SDO/OD)
         bool            has_foe      = false;  // FoE mailbox (file transfer)
         bool            has_eoe      = false;  // EoE mailbox (Ethernet over EtherCAT)
+        bool            sii_pdo      = false;  // SII declares process data (TxPDO/RxPDO); mappable without CoE
         Profile         detected_profile = Profile::Unknown;  // discovered (see profileFromCoeDeviceType)
         // ESC_CONFIG (0x141) bit 0: device emulation, AL status mirrors AL control.
         // The master's ERROR_ACK request bit echoes back as a phantom error

@@ -42,7 +42,9 @@ namespace kickcat::kickui
 
     bool PdoValuesPanel::appliesTo(Device const& device) const
     {
-        return device.has_coe;
+        // Raw process-image bytes, no SDO involved: show for any slave that
+        // carries process data, mailbox or not (e.g. a digital I/O terminal).
+        return device.has_coe or device.sii_pdo;
     }
 
     void PdoValuesPanel::render(BusSession& session, Device& device)

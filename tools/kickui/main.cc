@@ -1,6 +1,7 @@
 #include <cfloat>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -9,6 +10,8 @@
 #ifdef __linux__
 #include <unistd.h>
 #endif
+
+#include <portable-file-dialogs.h>
 
 #include "imgui.h"
 
@@ -43,6 +46,49 @@ namespace kickcat::kickui
             c.units.gear_ratio            = 1.0;
             c.units.rated_torque_Nm       = 1.0;
             return c;
+        }
+
+        // pfd needs an existing directory to open in; a relative path or a bare
+        // filename in a text field otherwise lands the dialog in an arbitrary
+        // place. Resolve the field to the absolute folder that contains it.
+        std::string dialogStartDir(char const* path)
+        {
+            namespace fs = std::filesystem;
+            std::error_code ec;
+            if ((path == nullptr) or (path[0] == '\0'))
+            {
+                return fs::current_path(ec).string();
+            }
+            fs::path p = fs::absolute(path, ec);
+            if (ec)
+            {
+                return fs::current_path(ec).string();
+            }
+            if (not fs::is_directory(p, ec))
+            {
+                p = p.parent_path();
+            }
+            if (p.empty() or not fs::exists(p, ec))
+            {
+                return fs::current_path(ec).string();
+            }
+            return p.string();
+        }
+
+        // A dialog returns an absolute path; store it relative to the working
+        // directory so it matches the defaults and stays portable in saved scenes.
+        // A path outside the working dir just grows "../" -- the user's problem if
+        // they move things. Fall back to the absolute path only if relative fails.
+        std::string relativeToCwd(std::string const& absolute)
+        {
+            namespace fs = std::filesystem;
+            std::error_code ec;
+            fs::path rel = fs::relative(absolute, fs::current_path(ec), ec);
+            if (ec or rel.empty())
+            {
+                return absolute;
+            }
+            return rel.generic_string();
         }
     }
 
@@ -321,6 +367,17 @@ namespace kickcat::kickui
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(px(150.0f));
                 ImGui::InputText("##cfg", s.config, sizeof(s.config));
+                ImGui::SameLine();
+                if (ImGui::Button("..."))
+                {
+                    auto sel = pfd::open_file("Select slave config", dialogStartDir(s.config),
+                                              {"Slave config", "*.json", "All files", "*"}).result();
+                    if (not sel.empty())
+                    {
+                        std::string chosen = relativeToCwd(sel[0]);
+                        std::snprintf(s.config, sizeof(s.config), "%s", chosen.c_str());
+                    }
+                }
 
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(px(80.0f));
@@ -381,8 +438,21 @@ namespace kickcat::kickui
             // Save/load the editor scene. Save is read-only, so it stays enabled
             // while the sim runs (snapshot the live config); Load would desync the
             // editor from the running sim, so it is gated like the rest.
+            // The text field holds the path; "Browse..." fills it via a dialog,
+            // and Save/Load act on whatever it holds.
             ImGui::SetNextItemWidth(px(170.0f));
             ImGui::InputText("scene", sim_scene_path_, sizeof(sim_scene_path_));
+            ImGui::SameLine();
+            if (ImGui::Button("...##scene"))
+            {
+                auto sel = pfd::open_file("Select simulator scene", dialogStartDir(sim_scene_path_),
+                                          {"Scene files", "*.txt", "All files", "*"}).result();
+                if (not sel.empty())
+                {
+                    std::string chosen = relativeToCwd(sel[0]);
+                    std::snprintf(sim_scene_path_, sizeof(sim_scene_path_), "%s", chosen.c_str());
+                }
+            }
             ImGui::SameLine();
             if (ImGui::Button("Save")) { scene_.save(sim_scene_path_, sim_scene_msg_); }
             ImGui::SameLine();
@@ -701,7 +771,7 @@ namespace kickcat::kickui
                 ImGui::PushID(i);
 
                 ImGui::TableSetColumnIndex(0);
-                if (slave.has_coe)
+                if (slave.has_coe or slave.sii_pdo)
                 {
                     bool mapped = slave.isConfigured();
                     ImGui::BeginDisabled(operating);
