@@ -1,6 +1,7 @@
 #ifndef KICKCAT_SIMULATION_SIMULATED_SLAVE_H
 #define KICKCAT_SIMULATION_SIMULATED_SLAVE_H
 
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -8,13 +9,14 @@
 #include "kickcat/CoE/OD.h"
 #include "kickcat/CoE/mailbox/response.h"
 #include "kickcat/ESC/EmulatedESC.h"
-#include "kickcat/ESI/Parser.h"
 #include "kickcat/PDO.h"
 #include "kickcat/simulation/DeviceApp.h"
 #include "kickcat/slave/Slave.h"
 
 namespace kickcat::sim
 {
+    namespace fs = std::filesystem;
+
     // One emulated slave. unique_ptr members (PDO/Slave/Mailbox hold raw pointers
     // into the ESC) and vectors (whose data() survives a move) make the aggregate
     // safe to hold in a std::vector.
@@ -35,7 +37,7 @@ namespace kickcat::sim
 
     // Build one slave from its JSON config (ESI device or raw eeprom, optional CoE).
     // Throws std::runtime_error on any failure.
-    SimulatedSlave buildSlave(std::string const& config_path, ESI::Parser& parser);
+    SimulatedSlave buildSlave(fs::path const& config_path);
 }
 
 #endif

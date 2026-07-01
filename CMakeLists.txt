@@ -43,6 +43,8 @@ if (NUTTX)
   set(BUILD_EEPROM_EDITOR   OFF CACHE BOOL "" FORCE)
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if (ENABLE_ASAN)
   add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
   add_link_options(-fsanitize=address)
