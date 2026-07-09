@@ -1,6 +1,7 @@
 add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/AbstractSPI-t.cc
                             src/bus-t.cc
+                            src/SoftPll-t.cc
                             src/dc-t.cc
                             src/debughelpers-t.cc
                             src/diagnostics-t.cc
@@ -26,6 +27,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/ESMStatePreOP-t.cc
                             src/ESMStateSafeOP-t.cc
                             src/Units-t.cc
+                            src/Timer-t.cc
                             src/CoE/protocol-t.cc
                             src/CoE/OD-t.cc
                             src/ESI/Parser-t.cc

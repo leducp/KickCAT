@@ -208,6 +208,13 @@ namespace kickcat::kickui
         // Bus-wide distributed-clock setting; applied during connect (PRE-OP).
         void setDcConfig(bool enable, int cycle_ms);
 
+        // Inject master-side timing jitter: each cyclic tick the RT thread busy-waits
+        // a pseudo-random delay in [0, amplitude] before sending the frame, perturbing
+        // the sampled DC phase so the soft PLL has to correct it. 0 disables. Bounded
+        // to a quarter cycle by the loop. UI thread; effective on the next tick.
+        void setMasterJitter(int64_t amplitude_ns) { master_jitter_ns_ = amplitude_ns; }
+        int64_t masterJitter() const { return master_jitter_ns_; }
+
         // Cable redundancy: a non-empty redundant interface makes connect open a
         // second socket and probe the ring (Link::checkRedundancyNeeded). Set on
         // the UI thread before connect(). redundancyActive() reflects the live
@@ -371,6 +378,17 @@ namespace kickcat::kickui
 
         std::atomic<bool>    dc_enabled_{false};
         std::atomic<int>     cycle_ms_{1};
+
+        // Soft-PLL telemetry, written by the RT thread each tick, copied into the
+        // snapshot by publishSnapshot. master_jitter_ns_ is UI-set (see setMasterJitter).
+        std::atomic<bool>     dc_active_{false};
+        std::atomic<bool>     dc_locked_{false};
+        std::atomic<int64_t>  dc_phase_error_ns_{0};
+        std::atomic<int64_t>  dc_phase_peak_ns_{0};
+        std::atomic<int64_t>  dc_filtered_error_ns_{0};
+        std::atomic<uint64_t> dc_pll_samples_{0};
+        std::atomic<bool>     dc_overran_{false};
+        std::atomic<int64_t>  master_jitter_ns_{0};
 
         std::string          redundancy_interface_;   // UI-thread; read at connect()
         std::atomic<bool>    redundancy_active_{false};

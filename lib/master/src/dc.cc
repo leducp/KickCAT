@@ -5,9 +5,27 @@
 #include "debug.h"
 #include "Diagnostics.h"
 #include "helpers.h"
+#include "kickcat/OS/Timer.h"
 
 namespace kickcat
 {
+    void Bus::sync(Timer& timer) const
+    {
+        if (last_ref_time_valid_)
+        {
+            timer.sync_to(last_ref_system_time_);
+
+            // Consume it: a lost cyclic FRMW leaves this false, so a frame-less cycle coasts
+            // rather than re-feed a frozen value (which would wind the integrator through the outage).
+            last_ref_time_valid_ = false;
+        }
+        else
+        {
+            timer.coast();
+        }
+    }
+
+
     nanoseconds Bus::enableDC(nanoseconds cycle_time, nanoseconds shift_cycle, nanoseconds start_delay)
     {
         for (auto& slave : slaves_)
@@ -115,6 +133,10 @@ namespace kickcat
         // TODO: use a config in the slave to select the sync method
         uint8_t enable_dc_sync0 = 0x3;
         broadcastWrite(reg::DC_SYNC_ACTIVATION, &enable_dc_sync0, 1);
+
+        // Drop the init-frame reference: it is seconds stale, so the first sync() waits for a fresh
+        // cyclic sample rather than learn its target phase from it.
+        last_ref_time_valid_ = false;
 
         return to_unix_epoch(start_time - start_delay - shift_cycle);
     }
@@ -492,24 +514,26 @@ namespace kickcat
 
     void Bus::sendDriftCompensation(std::function<void(DatagramState const&)> const& error)
     {
-        auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
-        {
-            if (wkc == 0)
-            {
-                dc_error("Invalid working counter:  %" PRIu16 "\n", wkc);
-                return DatagramState::INVALID_WKC;
-            }
-            return DatagramState::OK;
-        };
-
         nanoseconds now = since_ecat_epoch();
         uint64_t raw_now = now.count();
-        link_->addDatagram(Command::FPWR, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
 
         // Slaves not matching the FRMW address write the payload to their own clock. Pre-fill it
         // with master time: slaves cut from the reference by a ring split track master time instead
-        // of being slammed to zero by the redundancy frame copy.
-        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), process, error);
+        // of being slammed to zero by the redundancy frame copy. The FRMW return payload is the
+        // reference slave's live 0x0910 that the master can use to phase-lock its cycle loop.
+        auto capture_ref = [this](DatagramHeader const*, uint8_t const* data, uint16_t wkc)
+        {
+            if (wkc == 0)
+            {
+                last_ref_time_valid_ = false;
+                dc_error("Invalid working counter:  %" PRIu16 "\n", wkc);
+                return DatagramState::INVALID_WKC;
+            }
+            std::memcpy(&last_ref_system_time_, data, sizeof(uint64_t));
+            last_ref_time_valid_ = true;
+            return DatagramState::OK;
+        };
+        link_->addDatagram(Command::FRMW, createAddress(dc_slave_->address, reg::DC_SYSTEM_TIME), &raw_now, sizeof(uint64_t), capture_ref, error);
 
         // Age of the drift timestamp when the caller flushes the datagrams: the payload
         // is already this stale when it leaves the master (live ripple investigation).

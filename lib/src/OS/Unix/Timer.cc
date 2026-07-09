@@ -28,10 +28,12 @@ namespace kickcat
         next_deadline_ += period_;
 
         std::error_code ret{};
+        last_overran_ = false;
         if (next_deadline_ < last_wakeup_)
         {
             dc_error("!!! LATE !!!\n");
             ret = std::error_code{ETIME, std::system_category()};
+            last_overran_ = true;
         }
         while (next_deadline_ < last_wakeup_)
         {

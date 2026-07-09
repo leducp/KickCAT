@@ -22,9 +22,18 @@ namespace kickcat::sim
         uint8_t  up;      // 1: heal, 0: break
     };
 
+    // Inject zero-mean jitter on a node's reported DC system time (EmulatedESC::
+    // setClockJitter). Lets the host stress the master's soft PLL. 0 disables.
+    struct SetClockJitter
+    {
+        uint16_t node;
+        int64_t  amplitude_ns;
+    };
+
     union ControlPayload
     {
-        SetLink set_link;
+        SetLink        set_link;
+        SetClockJitter set_clock_jitter;
     };
 
     // Out-of-band control bus for network_simulator, off the EtherCAT wire so frame
@@ -35,6 +44,7 @@ namespace kickcat::sim
         enum class Type : uint16_t
         {
             SetLink,
+            SetClockJitter,
         };
 
         Type           type;
@@ -46,6 +56,12 @@ namespace kickcat::sim
     {
         SetLink link;
         uint8_t ok;    // 0: command rejected (bad arguments / unknown type)
+    };
+
+    struct SetClockJitterAck
+    {
+        SetClockJitter cmd;
+        uint8_t        ok;
     };
 
     // Frame-timing window the simulator emits unsolicited (one per N frames).
@@ -60,8 +76,9 @@ namespace kickcat::sim
 
     union EventPayload
     {
-        SetLinkAck set_link_ack;
-        SimStats   stats;
+        SetLinkAck        set_link_ack;
+        SetClockJitterAck set_clock_jitter_ack;
+        SimStats          stats;
     };
 
     // Everything the simulator sends back to the host travels on one return stream:
@@ -73,6 +90,7 @@ namespace kickcat::sim
         enum class Type : uint16_t
         {
             SetLinkAck,
+            SetClockJitterAck,
             FrameStats,
         };
 
@@ -165,6 +183,15 @@ namespace kickcat::sim
 
         bool breakLink(uint16_t a, uint16_t b) { return setLink(a, b, 0); }
         bool healLink(uint16_t a, uint16_t b)  { return setLink(a, b, 1); }
+
+        // Inject zero-mean DC-clock jitter on a node (0 disables).
+        bool setClockJitter(uint16_t node, int64_t amplitude_ns)
+        {
+            ControlCommand cmd{};
+            cmd.type = ControlCommand::Type::SetClockJitter;
+            cmd.payload.set_clock_jitter = {node, amplitude_ns};
+            return send(cmd);
+        }
 
         bool send(ControlCommand const& cmd) { return channel_.sendCommand(cmd); }
         bool nextEvent(ControlEvent& out)    { return channel_.nextEvent(out); }

@@ -94,7 +94,6 @@ int main(int argc, char *argv[])
         for (int i = 0; i < MOTOR_COUNT; ++i)
         {
             Slave& slave = bus.slaves().at(i + 1); // slave 0 is the port junction
-            printf("yay %s\n", slave.name().c_str());
 
             auto drive = std::make_unique<Drive>(bus, slave);
             // This drive uses PDO objects 0x1601/0x1A01 and only accepts the INT8
@@ -163,12 +162,12 @@ int main(int argc, char *argv[])
         bus.processDataRead(false_alarm);
         bus.processDataWrite(false_alarm);
 
+        // Phase-lock the cadence to the DC reference captured by the cyclic drift datagram.
+        bus.sync(timer);
         timer.wait_next_tick();
     }
 
-    // Input image is valid now: capture typed PDO pointers and seed the setpoints.
-    // Force mode 0 until enabling at i==500 (attach() seeds the configured mode 8);
-    // the RxPDO mode byte overrides the SDO-set mode every cycle.
+    // attach() seeds mode 8; force 0 until enable at i==500 (the RxPDO mode byte overrides the SDO).
     for (auto& motor : motors)
     {
         motor.drive->attach();
@@ -207,6 +206,8 @@ int main(int argc, char *argv[])
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     //constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
     int64_t last_error = 0;
+    double drift_ema_ppm = 0.0;   // smoothed drift trend for the 1 Hz readout
+    bool drift_ema_init = false;
     for (int64_t i = 0; i < LOOP_NUMBER; ++i)
     {
         try
@@ -260,7 +261,29 @@ int main(int argc, char *argv[])
 
             if ((i % 1000) == 0)
             {
-                bus.isDCSynchronized(10us);
+                // ~1 Hz PLL/DC telemetry. ema is the lock metric; slavesDC is the slave-side
+                // hardware SYNC, distinct from the master soft PLL.
+                bool const dc_synced = bus.isDCSynchronized(10us);
+
+                char const* pll_state = "acquiring";
+                if (timer.locked())
+                {
+                    pll_state = "locked";
+                }
+                char const* dc_state = "no";
+                if (dc_synced)
+                {
+                    dc_state = "yes";
+                }
+                printf("PLL %-9s  phaseErr=%+8lld ns  ema=%+9.1f ns  drift=%+7.2f ppm (avg %+6.2f)  corr=%+6lld ns  samples=%9llu  slavesDC=%s\n",
+                    pll_state,
+                    static_cast<long long>(timer.pll().phase_error().count()),
+                    timer.pll().filtered_error(),
+                    timer.pll().frequency_offset_ppm(),
+                    drift_ema_ppm,
+                    static_cast<long long>(timer.pll().correction().count()),
+                    static_cast<unsigned long long>(timer.pll().samples()),
+                    dc_state);
             }
         }
         catch (kickcat::ErrorDatagram const& e)
@@ -313,6 +336,20 @@ int main(int argc, char *argv[])
                         m, sw, motors[m].drive->errorCode());
                 }
             }
+        }
+
+        bus.sync(timer);
+
+        // ~200 ms EMA so the 1 Hz readout shows the drift trend, not per-cycle jitter.
+        double const ppm_now = timer.pll().frequency_offset_ppm();
+        if (drift_ema_init)
+        {
+            drift_ema_ppm = 0.005 * ppm_now + 0.995 * drift_ema_ppm;
+        }
+        else
+        {
+            drift_ema_ppm = ppm_now;
+            drift_ema_init = true;
         }
 
         timer.wait_next_tick();

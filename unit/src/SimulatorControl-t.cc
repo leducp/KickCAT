@@ -202,3 +202,40 @@ TEST_F(SimulatorControlTest, client_drives_server_against_network)
     EXPECT_EQ(response.payload.set_link_ack.ok, 0);
     EXPECT_TRUE(reachesNode1(0x4004));
 }
+
+
+TEST_F(SimulatorControlTest, set_clock_jitter_command_round_trip)
+{
+    std::vector<std::unique_ptr<EmulatedESC>> escs;
+    std::vector<EmulatedESC*> esc_ptrs;
+    for (int i = 0; i < 3; ++i)
+    {
+        escs.push_back(std::make_unique<EmulatedESC>());
+        esc_ptrs.push_back(escs.back().get());
+    }
+    EmulatedNetwork network(std::move(esc_ptrs));
+
+    SimulatorControlClient client;
+    client.open(SHM_NAME);
+    SimulatorControlServer server(network, network.size());
+    server.attach(SHM_NAME);
+
+    // Valid node: acked ok with the echoed amplitude.
+    ASSERT_TRUE(client.setClockJitter(0, 50000));
+    server.drain();
+    ControlEvent response;
+    ASSERT_TRUE(client.nextEvent(response));
+    EXPECT_EQ(response.type, ControlEvent::Type::SetClockJitterAck);
+    EXPECT_EQ(response.payload.set_clock_jitter_ack.ok, 1);
+    EXPECT_EQ(response.payload.set_clock_jitter_ack.cmd.node, 0);
+    EXPECT_EQ(response.payload.set_clock_jitter_ack.cmd.amplitude_ns, 50000);
+
+    // Out-of-range node and a negative amplitude are rejected.
+    ASSERT_TRUE(client.setClockJitter(9, 1000));
+    ASSERT_TRUE(client.setClockJitter(1, -1));
+    server.drain();
+    ASSERT_TRUE(client.nextEvent(response));
+    EXPECT_EQ(response.payload.set_clock_jitter_ack.ok, 0);
+    ASSERT_TRUE(client.nextEvent(response));
+    EXPECT_EQ(response.payload.set_clock_jitter_ack.ok, 0);
+}

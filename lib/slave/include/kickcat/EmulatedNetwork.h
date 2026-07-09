@@ -55,6 +55,10 @@ namespace kickcat
         size_t size()          const { return slaves_.size(); }
         bool   hasRedundancy() const { return redundancy_node_ != NO_NODE; }
 
+        // ESC at a node index, or nullptr if out of range. For runtime injection
+        // (clock drift/jitter) driven from the out-of-band control bus.
+        EmulatedESC* esc(size_t node) { if (node >= slaves_.size()) { return nullptr; } return slaves_[node]; }
+
         // True when a frame injected at the head reaches the tail injection point, so
         // the ring is closed: a frame entering one master port leaves the other. When
         // a wire is broken each half loops back to the port it came from instead.

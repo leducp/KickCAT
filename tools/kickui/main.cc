@@ -440,6 +440,7 @@ namespace kickcat::kickui
             // editor from the running sim, so it is gated like the rest.
             // The text field holds the path; "Browse..." fills it via a dialog,
             // and Save/Load act on whatever it holds.
+            bool const load_gated = (running or session_.isConnected() or session_.isConnecting());
             ImGui::SetNextItemWidth(px(170.0f));
             ImGui::InputText("scene", sim_scene_path_, sizeof(sim_scene_path_));
             ImGui::SameLine();
@@ -451,17 +452,27 @@ namespace kickcat::kickui
                 {
                     std::string chosen = relativeToCwd(sel[0]);
                     std::snprintf(sim_scene_path_, sizeof(sim_scene_path_), "%s", chosen.c_str());
+                    // Picking a scene means you want it loaded -- do it now (unless a live
+                    // sim/session would desync). The Load button stays for a typed/edited path.
+                    if (not load_gated) { sim_scene_ok_ = scene_.load(sim_scene_path_, sim_scene_msg_); }
                 }
             }
             ImGui::SameLine();
-            if (ImGui::Button("Save")) { scene_.save(sim_scene_path_, sim_scene_msg_); }
+            if (ImGui::Button("Save")) { sim_scene_ok_ = scene_.save(sim_scene_path_, sim_scene_msg_); }
             ImGui::SameLine();
-            ImGui::BeginDisabled(running or session_.isConnected() or session_.isConnecting());
-            if (ImGui::Button("Load")) { scene_.load(sim_scene_path_, sim_scene_msg_); }
+            ImGui::BeginDisabled(load_gated);
+            if (ImGui::Button("Load")) { sim_scene_ok_ = scene_.load(sim_scene_path_, sim_scene_msg_); }
             ImGui::EndDisabled();
+            if (load_gated and ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::SetTooltip("Load is disabled while a simulator is running or a bus is\n"
+                                  "connected (it would desync the editor). Stop/disconnect first.");
+            }
             if (not sim_scene_msg_.empty())
             {
-                ImGui::TextDisabled("%s", sim_scene_msg_.c_str());
+                ImVec4 col = COLOR_GREEN;
+                if (not sim_scene_ok_) { col = COLOR_RED; }
+                ImGui::TextColored(col, "%s", sim_scene_msg_.c_str());
             }
 
             if (running)
@@ -878,6 +889,11 @@ namespace kickcat::kickui
                     renderDeviceDetail();
                     ImGui::EndTabItem();
                 }
+                if (ImGui::BeginTabItem("Distributed Clocks"))
+                {
+                    renderDcPanel();
+                    ImGui::EndTabItem();
+                }
                 // The "###diag" suffix fixes the tab's ImGui ID, so the visible count
                 // can change (or the banner ack fire) WITHOUT the tab losing selection.
                 char diag_label[40] = "Diagnostics###diag";
@@ -893,6 +909,136 @@ namespace kickcat::kickui
                 }
                 ImGui::EndTabBar();
             }
+        }
+
+        // Distributed-clock discipline: shows the master soft-PLL locking the RT
+        // cadence to the DC reference, with a live phase-error plot, plus jitter
+        // injection knobs (master-side and simulator reference clock) to exercise it.
+        void renderDcPanel()
+        {
+            auto snap = session_.snapshot();
+            if ((not snap) or (not snap->dc.active))
+            {
+                ImGui::TextDisabled("Distributed clocks are not disciplining.");
+                ImGui::TextWrapped("Enable DC before connecting and operate the bus: the master "
+                                   "phase-locks its cycle to the reference clock (soft PLL).");
+                dc_phase_history_.clear();
+                dc_filt_history_.clear();
+                return;
+            }
+
+            DcStats const& dc = snap->dc;
+
+            if (dc.locked) { ImGui::TextColored(COLOR_GREEN, "\xe2\x97\x8f PLL LOCKED"); }
+            else           { ImGui::TextColored(COLOR_YELLOW, "\xe2\x97\x8f PLL acquiring..."); }
+            if (dc.overran)
+            {
+                ImGui::SameLine();
+                ImGui::TextColored(COLOR_RED, "  cycle overrun");
+            }
+
+            ImGui::TextWrapped("The master's cycle is phase-locked to the DC reference clock. "
+                               "Phase error is how far each wake-up lands from the target instant; "
+                               "the PLL drives it to zero and reports LOCKED once it stays small.");
+
+            // The RT loop updates far faster than we render, so downsample to a fixed cadence:
+            // the numbers and the plot advance ~10x/s, slow enough to read and stable to compare.
+            constexpr size_t MAX_SAMPLES = 480;   // ~48 s of history at 10 Hz
+            double const t = ImGui::GetTime();
+            if (t >= dc_next_sample_t_)
+            {
+                dc_next_sample_t_ = t + 0.1;   // 10 Hz
+                dc_disp_phase_ns_ = dc.phase_error_ns;
+                dc_disp_filt_ns_  = dc.filtered_error_ns;
+                dc_phase_history_.push_back(static_cast<float>(dc.phase_error_ns) / 1000.0f);
+                dc_filt_history_.push_back(static_cast<float>(dc.filtered_error_ns) / 1000.0f);
+                if (dc_phase_history_.size() > MAX_SAMPLES)
+                {
+                    dc_phase_history_.erase(dc_phase_history_.begin(), dc_phase_history_.end() - MAX_SAMPLES);
+                }
+                if (dc_filt_history_.size() > MAX_SAMPLES)
+                {
+                    dc_filt_history_.erase(dc_filt_history_.begin(), dc_filt_history_.end() - MAX_SAMPLES);
+                }
+            }
+
+            ImGui::Separator();
+            // Explanation first, value last: the label stays put while only the trailing number
+            // changes width (a value-first layout makes the text jump around as the digits change).
+            ImGui::Text("phase error, raw this cycle: %+lld ns", static_cast<long long>(dc_disp_phase_ns_));
+            ImGui::Text("filtered error, EMA the lock test watches: %+lld ns",
+                        static_cast<long long>(dc_disp_filt_ns_));
+            ImGui::Text("peak |phase|, recent spikes (~1s fade): %lld ns",
+                        static_cast<long long>(dc.phase_peak_ns));
+            ImGui::Text("samples since bring-up: %llu", static_cast<unsigned long long>(dc.samples));
+
+            // Live plot: raw phase error (noisy) and the filtered EMA overlaid on one graph,
+            // sharing a scale so the smoothing is visible against the raw jitter. Units: µs.
+            ImVec4 const raw_col = ImGui::GetStyleColorVec4(ImGuiCol_PlotLines);
+            ImGui::TextColored(raw_col, "raw"); ImGui::SameLine();
+            ImGui::TextColored(COLOR_GREEN, "filtered (EMA)"); ImGui::SameLine();
+            ImGui::TextDisabled("\xc2\xb5s");
+
+            float lo = 0.0f, hi = 0.0f;   // include zero so the target line is always on screen
+            for (float v : dc_phase_history_) { if (v < lo) { lo = v; } if (v > hi) { hi = v; } }
+            for (float v : dc_filt_history_)  { if (v < lo) { lo = v; } if (v > hi) { hi = v; } }
+            float span = hi - lo;
+            if (span < 0.001f) { span = 1.0f; }
+            lo -= span * 0.1f;
+            hi += span * 0.1f;
+
+            ImVec2 const plot_size(px(360.0f), px(90.0f));
+            ImGui::PlotLines("##dc_phase", dc_phase_history_.data(),
+                             static_cast<int>(dc_phase_history_.size()),
+                             0, nullptr, lo, hi, plot_size);
+            // Overlay the filtered series on the exact graph area PlotLines just used.
+            if (dc_filt_history_.size() >= 2)
+            {
+                ImVec2 const rmin = ImGui::GetItemRectMin();
+                ImVec2 const rmax = ImGui::GetItemRectMax();
+                ImGuiStyle const& style = ImGui::GetStyle();
+                float const gx0 = rmin.x + style.FramePadding.x;
+                float const gy0 = rmin.y + style.FramePadding.y;
+                float const gw  = (rmax.x - style.FramePadding.x) - gx0;
+                float const gh  = (rmax.y - style.FramePadding.y) - gy0;
+                ImDrawList* dl = ImGui::GetWindowDrawList();
+                ImU32 const col = ImGui::GetColorU32(COLOR_GREEN);
+                size_t const m = dc_filt_history_.size();
+                float const dx = gw / static_cast<float>(m - 1);
+                for (size_t i = 1; i < m; ++i)
+                {
+                    float const ya = gy0 + gh * (1.0f - (dc_filt_history_[i - 1] - lo) / (hi - lo));
+                    float const yb = gy0 + gh * (1.0f - (dc_filt_history_[i]     - lo) / (hi - lo));
+                    dl->AddLine(ImVec2(gx0 + dx * (i - 1), ya), ImVec2(gx0 + dx * i, yb), col, 1.4f);
+                }
+            }
+
+            ImGui::Separator();
+            ImGui::TextDisabled("Jitter injection (to exercise the PLL)");
+
+            if (ImGui::SliderInt("master jitter (\xc2\xb5s)", &dc_master_jitter_us_, 0, 200))
+            {
+                session_.setMasterJitter(static_cast<int64_t>(dc_master_jitter_us_) * 1000);
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Delays each cyclic frame by a random 0..N \xc2\xb5s so the sampled\n"
+                                  "DC phase is perturbed and the PLL must correct it.");
+            }
+
+#ifdef __linux__
+            ImGui::BeginDisabled(not sim_proc_.running());
+            if (ImGui::SliderInt("sim ref-clock jitter (\xc2\xb5s)", &dc_sim_jitter_us_, 0, 200))
+            {
+                sim_proc_.setClockJitter(0, static_cast<int64_t>(dc_sim_jitter_us_) * 1000);
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Adds zero-mean noise to the simulated reference slave's\n"
+                                  "reported DC system time (node 0).");
+            }
+#endif
         }
 
         void renderDeviceDetail()
@@ -1258,12 +1404,23 @@ namespace kickcat::kickui
         std::string sim_error_;
         char        sim_scene_path_[256] = "sim_scene.txt";  // save/load the editor scene
         std::string sim_scene_msg_;
+        bool        sim_scene_ok_ = true;   // last save/load outcome (colors the message)
 #ifdef __linux__
         SimulatorProcess sim_proc_;
         sim::SimStats      sim_last_stats_{};       // most recent window drained
         bool               sim_has_stats_ = false;
         std::vector<float> sim_avg_history_;        // per-window avg (µs), for the sparkline
 #endif
+
+        // DC / soft-PLL panel state (UI thread only). Displayed values are downsampled
+        // (~10 Hz) off the RT loop so they are readable; histories feed the overlaid plot.
+        std::vector<float> dc_phase_history_;      // recent raw phase error (µs)
+        std::vector<float> dc_filt_history_;       // recent filtered (EMA) error (µs)
+        double             dc_next_sample_t_ = 0.0;  // next ImGui::GetTime() to sample at
+        int64_t            dc_disp_phase_ns_ = 0;   // held raw value shown as text
+        int64_t            dc_disp_filt_ns_  = 0;   // held filtered value shown as text
+        int                dc_master_jitter_us_ = 0;  // injected master-side jitter slider
+        int                dc_sim_jitter_us_    = 0;  // injected simulator ref-clock jitter slider
 
         EventLog     event_log_;
         TopologyView topo_view_;
