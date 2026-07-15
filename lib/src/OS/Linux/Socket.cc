@@ -112,7 +112,7 @@ namespace kickcat
         // apply coalescing if asked
         if (coalescing_ >= 0us)
         {
-            struct ethtool_coalesce ecoal;
+            struct ethtool_coalesce ecoal{};
             ecoal.cmd = ETHTOOL_GCOALESCE;
             ifr.ifr_data = (char*)&ecoal;
             rc = ioctl(fd_, SIOCETHTOOL, &ifr);
@@ -122,13 +122,15 @@ namespace kickcat
             }
             socket_info("old rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
 
+            // coalescing_ is a nanoseconds duration; the ethtool fields are microseconds.
+            auto const usecs = static_cast<unsigned int>(duration_cast<microseconds>(coalescing_).count());
             ecoal.cmd = ETHTOOL_SCOALESCE;
-            ecoal.rx_coalesce_usecs = static_cast<unsigned int>(coalescing_.count());
-            ecoal.tx_coalesce_usecs = static_cast<unsigned int>(coalescing_.count());
+            ecoal.rx_coalesce_usecs = usecs;
+            ecoal.tx_coalesce_usecs = usecs;
             rc = ioctl(fd_, SIOCETHTOOL, &ifr);
             if (rc < 0)
             {
-                THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_GCOALESCE)");
+                THROW_SYSTEM_ERROR("ioctl(SIOCETHTOOL - ETHTOOL_SCOALESCE)");
             }
             socket_info("applied tx-usecs rx-usecs value %u\n", ecoal.rx_coalesce_usecs);
         }
