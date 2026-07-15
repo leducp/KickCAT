@@ -275,6 +275,10 @@ namespace kickcat::kickui
         void backToPreOp();
         bool isConfigured(int slave_index) const { return findControl(slave_index) != nullptr; }
 
+        // Stored bring-up config for a configured slave (default if none). PRE-OP
+        // UI read-back so a panel can reflect what was included.
+        OperateConfig configOf(int slave_index) const;
+
         bool isOperatingAny() const { return rt_running_; }
         bool isOperating(int slave_index) const;   // configured AND the loop is running
 

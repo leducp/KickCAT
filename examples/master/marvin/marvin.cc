@@ -1,33 +1,31 @@
 #include <iostream>
-#include <cstring>
+#include <memory>
 #define _USE_MATH_DEFINES // needed for M_PI on Windows
 #include <cmath>
+#include <vector>
 
 #include "kickcat/Bus.h"
 #include "kickcat/Link.h"
 #include "kickcat/Prints.h"
 #include "kickcat/helpers.h"
 #include "kickcat/OS/Timer.h"
-#include "kickcat/CoE/CiA/DS402/StateMachine.h"
+#include "kickcat/CoE/CiA/DS402/Drive.h"
 
-#include "kickcat/Diagnostics.h"
-
-#include "CanOpenErrors.h"
-#include "MarvinProtocol.h"
+using namespace kickcat;
+using CoE::CiA::DS402::Drive;
 
 constexpr double REDUCTION_RATIO[] = {120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0,
                                         120.0, 120.0, 100.0, 100.0, 100.0, 100.0, 100.0};
 constexpr double ENCODER_TICKS_PER_TURN[] = {1<<20, 1<<20, 1<<19, 1<<19, 1<<19, 1<<19, 1<<19,
                                             1<<20, 1<<20, 1<<19, 1<<19, 1<<19, 1<<19, 1<<19};
-
-using namespace kickcat;
+constexpr int MOTOR_COUNT = 14;
 
 int main(int argc, char *argv[])
 {
     if (argc != 3 and argc != 2)
     {
-        printf("usage redundancy mode : ./test NIC_nominal NIC_redundancy\n");
-        printf("usage no redundancy mode : ./test NIC_nominal\n");
+        printf("usage redundancy mode : ./marvin NIC_nominal NIC_redundancy\n");
+        printf("usage no redundancy mode : ./marvin NIC_nominal\n");
         return 1;
     }
 
@@ -66,18 +64,15 @@ int main(int argc, char *argv[])
 
     struct Motor
     {
-        Slave* slave{};
-        pdo::Output* output{};
-        pdo::Input*  input{};
-        CoE::CiA::DS402::StateMachine state_machine{};
-        int32_t initial_position{};
-        double reduction_ratio;
-        double encoder_ticks_per_turn;
+        std::unique_ptr<Drive> drive;
+        int32_t  initial_position{};
+        double   reduction_ratio{};
+        double   encoder_ticks_per_turn{};
         uint16_t prev_status_word{0xFFFF};
         uint16_t prev_control_word{0xFFFF};
     };
     std::vector<Motor> motors;
-    motors.resize(14);
+    motors.reserve(MOTOR_COUNT);
 
     uint8_t io_buffer[2048] = {};
     try
@@ -96,50 +91,51 @@ int main(int argc, char *argv[])
         bus.requestState(State::PRE_OP);
         bus.waitForState(State::PRE_OP, 3000ms);
 
-        for (int i = 0; i < 7; ++i)
+        for (int i = 0; i < MOTOR_COUNT; ++i)
         {
-            motors[i].slave = &bus.slaves().at(i + 1);
-            motors[i].encoder_ticks_per_turn = ENCODER_TICKS_PER_TURN[i];
-            motors[i].reduction_ratio = REDUCTION_RATIO[i];
-        }
-        for (int i = 7; i < 14; ++i)
-        {
-            motors[i].slave = &bus.slaves().at(i + 2); // skip first and last of first arm
-            motors[i].encoder_ticks_per_turn = ENCODER_TICKS_PER_TURN[i];
-            motors[i].reduction_ratio = REDUCTION_RATIO[i];
-        }
+            Slave& slave = bus.slaves().at(i + 1); // slave 0 is the port junction
+            printf("yay %s\n", slave.name().c_str());
 
-        for (auto& motor : motors)
-        {
-            mapPDO(bus, *motor.slave, 0x1A01, pdo::tx_mapping, pdo::tx_mapping_count, 0x1C13);
-            mapPDO(bus, *motor.slave, 0x1601, pdo::rx_mapping, pdo::rx_mapping_count, 0x1C12);
+            auto drive = std::make_unique<Drive>(bus, slave);
+            // This drive uses PDO objects 0x1601/0x1A01 and only accepts the INT8
+            // mode entry mapped as a 16-bit word (WidenObject), not a dummy pad.
+            drive->configure(CoE::CiA::DS402::control::POSITION_CYCLIC,
+                             0x1601, 0x1A01, Drive::PaddingStyle::WidenObject);
+
+            motors.push_back(Motor{std::move(drive), 0, REDUCTION_RATIO[i], ENCODER_TICKS_PER_TURN[i],
+                                   0xFFFF, 0xFFFF});
         }
 
         printf("mapping\n");
         bus.createMapping(io_buffer, sizeof(io_buffer));
 
-        for (auto& motor : motors)
-        {
-            motor.output = reinterpret_cast<pdo::Output *>(motor.slave->output.data);
-            motor.input  = reinterpret_cast<pdo::Input *> (motor.slave->input.data);
-            motor.state_machine.disable();
-
-            uint8_t mode = 8;   //CSP
-            uint32_t mode_size = 1;
-            bus.writeSDO(*motor.slave, 0x6060, 0, Bus::Access::PARTIAL, &mode, mode_size);
-
-            uint8_t interpolation_value = 1;
-            uint32_t interpolation_value_size = 1;
-            bus.writeSDO(*motor.slave, 0x60C2, 1, Bus::Access::PARTIAL, &interpolation_value, interpolation_value_size);
-
-            int8_t interpolation_index = -3; // 10^(-3) = milliseconds
-            uint32_t interpolation_index_size = 1;
-            bus.writeSDO(*motor.slave, 0x60C2, 2, Bus::Access::PARTIAL, &interpolation_index, interpolation_index_size);
-        }
-
         printf("Request SAFE OP\n");
         bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 100ms);
+        try
+        {
+            bus.waitForState(State::SAFE_OP, 100ms);
+        }
+        catch (std::exception const& e)
+        {
+            fprintf(stderr, "SAFE_OP refused: %s\n", e.what());
+            fprintf(stderr, "Per-slave state after SAFE_OP request:\n");
+            for (auto& slave : bus.slaves())
+            {
+                try
+                {
+                    State state = bus.getCurrentState(slave);
+                    fprintf(stderr, "  %-20s @0x%04x: %s\n",
+                        slave.name().c_str(), slave.address, toString(state));
+                }
+                catch (ErrorAL const& slave_error)
+                {
+                    fprintf(stderr, "  %-20s @0x%04x: REFUSED, AL status 0x%04x (%s)\n",
+                        slave.name().c_str(), slave.address,
+                        slave_error.code(), ALStatus_to_string(slave_error.code()));
+                }
+            }
+            throw;
+        }
     }
     catch (ErrorAL const &e)
     {
@@ -157,14 +153,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    auto callback_error = [](DatagramState const & ds)
-    {
-        THROW_ERROR_DATAGRAM("something bad happened", ds);
-    };
-    auto false_alarm = [](DatagramState const &)
-    {
-        //printf("- previous error was a false alarm - ");
-    };
+    auto false_alarm = [](DatagramState const &) {};
 
     Timer timer{1ms};
     timer.start(sync_point);
@@ -175,6 +164,16 @@ int main(int argc, char *argv[])
         bus.processDataWrite(false_alarm);
 
         timer.wait_next_tick();
+    }
+
+    // Input image is valid now: capture typed PDO pointers and seed the setpoints.
+    // Force mode 0 until enabling at i==500 (attach() seeds the configured mode 8);
+    // the RxPDO mode byte overrides the SDO-set mode every cycle.
+    for (auto& motor : motors)
+    {
+        motor.drive->attach();
+        motor.drive->setModeOfOperationRaw(0);
+        motor.drive->disable();
     }
 
     while (true)
@@ -212,12 +211,20 @@ int main(int argc, char *argv[])
     {
         try
         {
+            if (i < 500)
+            {
+                for (auto& motor : motors)
+                {
+                    motor.drive->setTargetPositionRaw(motor.drive->actualPositionRaw());
+                }
+            }
+
             if (i == 500)
             {
                 for (auto& motor : motors)
                 {
-                    motor.output->target_position = motor.input->actual_position;
-                    motor.state_machine.enable();
+                    motor.drive->setModeOfOperationRaw(8); // CSP
+                    motor.drive->enable();
                 }
             }
 
@@ -225,7 +232,7 @@ int main(int argc, char *argv[])
             {
                 for (auto& motor : motors)
                 {
-                    motor.initial_position = motor.input->actual_position;
+                    motor.initial_position = motor.drive->actualPositionRaw();
                 }
                 start_time = kickcat::since_epoch();
             }
@@ -241,8 +248,7 @@ int main(int argc, char *argv[])
                 // Set target
                 for (auto& motor : motors)
                 {
-                    //double measureSI = (input_pdo[j]->actual_position - initial_position[j]) / ENCODER_TICKS_PER_TURN[j] / REDUCTION_RATIO[j] * 2.0 * M_PI;
-                    motor.output->target_position = motor.initial_position - static_cast<int32_t>(motor.reduction_ratio * targetSI / 2.0 / M_PI * motor.encoder_ticks_per_turn);
+                    motor.drive->setTargetPositionRaw(motor.initial_position - static_cast<int32_t>(motor.reduction_ratio * targetSI / 2.0 / M_PI * motor.encoder_ticks_per_turn));
                 }
             }
 
@@ -254,7 +260,7 @@ int main(int argc, char *argv[])
 
             if ((i % 1000) == 0)
             {
-                bus.isDCSynchronized(1000ns);
+                bus.isDCSynchronized(10us);
             }
         }
         catch (kickcat::ErrorDatagram const& e)
@@ -270,33 +276,41 @@ int main(int argc, char *argv[])
             std::cerr << e.what() << " at " << i << " delta: " << delta << std::endl;
         }
 
+        // State (0x6F) + warning (0x80). Ignore the bits that toggle every cycle
+        // during motion (bit10 target-reached, bit12/13 mode-specific) so they
+        // don't spam the trace while the drive is operating normally.
+        constexpr uint16_t STATUS_SIGNIFICANT = 0x6f | 0x80;
         bool changed = false;
         for (auto& motor : motors)
         {
-            auto x = motor.input->status_word;
-            motor.state_machine.update(x);
-            motor.output->control_word = motor.state_machine.controlWord();
-            if (x != motor.prev_status_word or motor.state_machine.controlWord() != motor.prev_control_word)
+            uint16_t status = motor.drive->statusWord();
+            motor.drive->update();
+            uint16_t control_word = motor.drive->controlWord();
+            if (((status ^ motor.prev_status_word) & STATUS_SIGNIFICANT) != 0
+                or control_word != motor.prev_control_word)
             {
                 changed = true;
             }
-            motor.prev_status_word = x;
-            motor.prev_control_word = motor.state_machine.controlWord();
+            motor.prev_status_word = status;
+            motor.prev_control_word = control_word;
         }
         if (changed)
         {
-            for (auto const& motor : motors)
-            {
-                printf("%x (%x) - ", motor.prev_status_word, motor.prev_control_word);
-            }
-            printf("\n");
+            //for (auto const& motor : motors)
+            //{
+            //    printf("%x (%x) - ", motor.prev_status_word, motor.prev_control_word);
+            //}
+            //printf("\n");
 
             for (size_t m = 0; m < motors.size(); ++m)
             {
+                // DS402 Fault state: (statusword & 0x4F) == 0x08. Masking bit3
+                // alone false-triggers when bit3 rides on an enabled statusword.
                 uint16_t sw = motors[m].prev_status_word;
-                if ((sw & 0x08) == 0x08 && motors[m].input->error_code != 0)
+                if ((sw & 0x4f) == 0x08)
                 {
-                    printf("  Motor %zu fault: error_code=0x%04x\n", m, motors[m].input->error_code);
+                    printf("  Motor %zu FAULT: status=0x%04x error_code=0x%04x\n",
+                        m, sw, motors[m].drive->errorCode());
                 }
             }
         }

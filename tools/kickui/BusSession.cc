@@ -902,6 +902,16 @@ namespace kickcat::kickui
         control->cmd_.target_state = static_cast<int>(State::SAFE_OP);  // UI mirror; generic slave has no Drive
     }
 
+    OperateConfig BusSession::configOf(int slave_index) const
+    {
+        auto control = findControl(slave_index);
+        if (control != nullptr)
+        {
+            return control->config_;
+        }
+        return OperateConfig{};
+    }
+
     void BusSession::unconfigureSlave(int slave_index)
     {
         if (rt_running_ or operate_requested_)
@@ -1137,10 +1147,8 @@ namespace kickcat::kickui
                 {
                     r.drive = std::make_unique<Drive>(*bus, slave);
                     r.drive->setUnits(r.config.units);
-                    // Auto: try the spec dummy-entry padding, fall back to a widened
-                    // object for motors that lack dummy support (most real drives).
                     r.drive->configure(r.config.mode, r.config.rx_pdo_map, r.config.tx_pdo_map,
-                                       Drive::PaddingStyle::Auto);
+                                       r.config.padding);
                     int ip_ms = cycle_ms;
                     if (ip_ms > 255) { ip_ms = 255; }   // 0x60C2/sub1 is uint8_t (ms)
                     r.drive->setInterpolationTimePeriod(static_cast<uint8_t>(ip_ms), -3);

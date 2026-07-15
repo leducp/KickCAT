@@ -58,6 +58,12 @@ namespace kickcat::kickui
         uint16_t rx_pdo_map  = 0x1600;
         uint16_t tx_pdo_map  = 0x1A00;
 
+        // How the INT8 mode entry is aligned to 16 bits in the PDO. Auto tries the
+        // spec dummy pad then widens on a CoE abort; some drives (e.g. marvin's
+        // CoolDrive) reject the dummy only at the SAFE_OP transition, which Auto
+        // cannot catch, so they need WidenObject pinned explicitly.
+        CoE::CiA::DS402::Drive::PaddingStyle padding = CoE::CiA::DS402::Drive::PaddingStyle::Auto;
+
         // Manual PDO mapping: when set, the bring-up writes these entries to the
         // rx_pdo_map/tx_pdo_map objects (CoE remap sequence) before createMapping
         // instead of relying on the slave's SII default. Each entry's pdo field is
