@@ -17,6 +17,7 @@ add_executable(kickui
 target_link_libraries(kickui PRIVATE
     kickcat
     kickcat_imgui
+    portable-file-dialogs
 )
 
 set_kickcat_properties(kickui)

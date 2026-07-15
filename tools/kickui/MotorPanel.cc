@@ -1,6 +1,7 @@
 #include "MotorPanel.h"
 
 #include <cstdlib>
+#include <cstring>
 
 #include "imgui.h"
 
@@ -24,6 +25,13 @@ namespace kickcat::kickui
         ctrl::ControlMode const MODE_VALUES[] = {ctrl::POSITION_CYCLIC,
                                                  ctrl::VELOCITY_CYCLIC,
                                                  ctrl::TORQUE_CYCLIC};
+        char const* const PADDING_LABELS[] = {"Auto (dummy, widen on abort)",
+                                              "Dummy entry (spec)",
+                                              "Widen object (broad compat)"};
+        CoE::CiA::DS402::Drive::PaddingStyle const PADDING_VALUES[] = {
+            CoE::CiA::DS402::Drive::PaddingStyle::Auto,
+            CoE::CiA::DS402::Drive::PaddingStyle::DummyEntry,
+            CoE::CiA::DS402::Drive::PaddingStyle::WidenObject};
         char const* const WAVE_LABELS[] = {"Sine", "Step", "Triangle"};
 
         // Unit of the active setpoint quantity, by mode index.
@@ -94,6 +102,43 @@ namespace kickcat::kickui
                                 "mapped set, then re-configure and Apply mapping.");
         }
 
+        // Reflect the stored config in the fields the first time we see this drive
+        // included (by any path: this panel, the slave-list checkbox), and reset
+        // when it is removed. Edits below then sync back to the stored config, so
+        // Apply mapping / SAFE-OP always consumes exactly what the fields show.
+        if (not device.isConfigured())
+        {
+            applied_ = false;
+        }
+        else if (not applied_)
+        {
+            {
+                OperateConfig const c = session.configOf(device.index);
+                for (int k = 0; k < IM_ARRAYSIZE(MODE_VALUES); ++k)
+                {
+                    if (MODE_VALUES[k] == c.mode) { mode_index_ = k; }
+                }
+                for (int k = 0; k < IM_ARRAYSIZE(PADDING_VALUES); ++k)
+                {
+                    if (PADDING_VALUES[k] == c.padding) { padding_index_ = k; }
+                }
+                ticks_per_rev_ = static_cast<float>(c.units.encoder_ticks_per_rev);
+                gear_ratio_    = static_cast<float>(c.units.gear_ratio);
+                rated_torque_  = static_cast<float>(c.units.rated_torque_Nm);
+                std::snprintf(rx_pdo_buf_, sizeof(rx_pdo_buf_), "0x%04X", c.rx_pdo_map);
+                std::snprintf(tx_pdo_buf_, sizeof(tx_pdo_buf_), "0x%04X", c.tx_pdo_map);
+
+                applied_               = true;
+                applied_mode_index_    = mode_index_;
+                applied_padding_index_ = padding_index_;
+                applied_ticks_per_rev_ = ticks_per_rev_;
+                applied_gear_ratio_    = gear_ratio_;
+                applied_rated_torque_  = rated_torque_;
+                std::snprintf(applied_rx_pdo_, sizeof(applied_rx_pdo_), "%s", rx_pdo_buf_);
+                std::snprintf(applied_tx_pdo_, sizeof(applied_tx_pdo_), "%s", tx_pdo_buf_);
+            }
+        }
+
         ImGui::SeparatorText("Bring-up");
         ImGui::Combo("Initial mode", &mode_index_, MODE_LABELS, IM_ARRAYSIZE(MODE_LABELS));
         ImGui::SetNextItemWidth(px(110.0f));
@@ -101,6 +146,7 @@ namespace kickcat::kickui
         ImGui::SameLine();
         ImGui::SetNextItemWidth(px(110.0f));
         ImGui::InputText("TxPDO map", tx_pdo_buf_, sizeof(tx_pdo_buf_));
+        ImGui::Combo("Mode padding", &padding_index_, PADDING_LABELS, IM_ARRAYSIZE(PADDING_LABELS));
 
         // Validate the PDO assignment indices up front (RxPDO 0x1600-0x17FF,
         // TxPDO 0x1A00-0x1BFF per CiA-301) instead of letting a stray 0x0000
@@ -115,11 +161,7 @@ namespace kickcat::kickui
             ImGui::TextColored(COLOR_RED, "PDO map index out of range (RxPDO 0x1600-0x17FF, TxPDO 0x1A00-0x1BFF)");
         }
 
-        // Record this drive's config into the operated set. The mapping is applied
-        // bus-wide later via "Apply mapping" (the strip above); this button only
-        // marks the drive to participate. Disabled while the bus is operating.
-        ImGui::BeginDisabled(not units_ok or not pdo_ok or session.isOperatingAny());
-        if (ImGui::Button("Include in mapping"))
+        auto buildConfig = [&]()
         {
             OperateConfig cfg;
             cfg.units.encoder_ticks_per_rev = ticks_per_rev_;
@@ -128,16 +170,57 @@ namespace kickcat::kickui
             cfg.mode        = MODE_VALUES[mode_index_];
             cfg.rx_pdo_map  = static_cast<uint16_t>(rx_pdo);
             cfg.tx_pdo_map  = static_cast<uint16_t>(tx_pdo);
-            device.configureSlave(cfg);
+            cfg.padding     = PADDING_VALUES[padding_index_];
+            return cfg;
+        };
+        auto snapshotFields = [&]()
+        {
+            applied_               = true;
+            applied_mode_index_    = mode_index_;
+            applied_padding_index_ = padding_index_;
+            applied_ticks_per_rev_ = ticks_per_rev_;
+            applied_gear_ratio_    = gear_ratio_;
+            applied_rated_torque_  = rated_torque_;
+            std::snprintf(applied_rx_pdo_, sizeof(applied_rx_pdo_), "%s", rx_pdo_buf_);
+            std::snprintf(applied_tx_pdo_, sizeof(applied_tx_pdo_), "%s", tx_pdo_buf_);
+        };
+        bool const fields_changed =
+            mode_index_    != applied_mode_index_    or
+            padding_index_ != applied_padding_index_ or
+            ticks_per_rev_ != applied_ticks_per_rev_ or
+            gear_ratio_    != applied_gear_ratio_    or
+            rated_torque_  != applied_rated_torque_  or
+            std::strcmp(rx_pdo_buf_, applied_rx_pdo_) != 0 or
+            std::strcmp(tx_pdo_buf_, applied_tx_pdo_) != 0;
+
+        // "Include in mapping" only marks the drive to participate. The config is
+        // read from the live fields here and kept in sync while included (below),
+        // so the values consumed at Apply mapping / SAFE-OP are always the ones on
+        // screen -- editing after including does not require re-clicking.
+        bool synced_now = false;
+        ImGui::BeginDisabled(not units_ok or not pdo_ok or session.isOperatingAny());
+        if (ImGui::Button("Include in mapping"))
+        {
+            device.configureSlave(buildConfig());
+            snapshotFields();
+            synced_now = true;
         }
         ImGui::EndDisabled();
+
+        if (device.isConfigured() and applied_ and fields_changed and not synced_now
+            and units_ok and pdo_ok and not session.isOperatingAny())
+        {
+            device.configureSlave(buildConfig());
+            snapshotFields();
+        }
+
         if (device.isConfigured())
         {
             ImGui::SameLine();
             ImGui::TextColored(COLOR_GREEN, "included \xe2\x80\x94 Apply mapping to operate");
             ImGui::SameLine();
             ImGui::BeginDisabled(session.isOperatingAny());
-            if (ImGui::Button("Remove")) { device.unconfigureSlave(); }
+            if (ImGui::Button("Remove")) { device.unconfigureSlave(); applied_ = false; }
             ImGui::EndDisabled();
         }
 

@@ -503,6 +503,16 @@ namespace kickcat::kickui
 
         void renderSidebar()
         {
+            // Reserve a fixed footer so the operation controls (Apply mapping /
+            // Back to PRE-OP) stay reachable no matter how long the slave list
+            // grows on a short window.
+            float footer_h = 0.0f;
+            if (session_.isConnected())
+            {
+                footer_h = ImGui::GetFrameHeightWithSpacing() * 3.0f;
+            }
+            ImGui::BeginChild("##sidebar_scroll", ImVec2(0.0f, -footer_h), false);
+
             ImGui::SeparatorText("Connection");
 #ifdef __linux__
             renderSimulator();
@@ -701,6 +711,9 @@ namespace kickcat::kickui
             }
             renderSlaveList();
 
+            ImGui::EndChild();
+
+            // Pinned footer: always visible, outside the scrolling region above.
             if (session_.isConnected())
             {
                 renderOperationControls();

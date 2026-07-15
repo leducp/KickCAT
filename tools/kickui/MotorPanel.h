@@ -28,8 +28,21 @@ namespace kickcat::kickui
         float gear_ratio_    = 1.0f;
         float rated_torque_  = 1.0f;
         int   mode_index_    = 0;   // 0=CSP, 1=CSV, 2=CST
+        int   padding_index_ = 0;   // 0=Auto, 1=Dummy entry, 2=Widen object
         char  rx_pdo_buf_[12] = "0x1600";
         char  tx_pdo_buf_[12] = "0x1A00";
+
+        // Snapshot of the fields at the last "Include in mapping" click, to warn
+        // when the shown values have drifted from what was actually included
+        // (editing a field does nothing until it is re-included).
+        bool  applied_               = false;
+        int   applied_mode_index_    = 0;
+        int   applied_padding_index_ = 0;
+        float applied_ticks_per_rev_ = 0.0f;
+        float applied_gear_ratio_    = 0.0f;
+        float applied_rated_torque_  = 0.0f;
+        char  applied_rx_pdo_[12]    = "";
+        char  applied_tx_pdo_[12]    = "";
 
         // Setpoint controls.
         int   source_index_ = 0;    // 0=Manual, 1=Jog, 2=Generator
