@@ -16,9 +16,11 @@ namespace kickcat
         last_wakeup_ = since_epoch();
 
         next_deadline_ += period_;
+        last_overran_ = false;
         if (next_deadline_ < last_wakeup_)
         {
             printf("!!! LATE !!!\n");
+            last_overran_ = true;
         }
         while (next_deadline_ < last_wakeup_)
         {

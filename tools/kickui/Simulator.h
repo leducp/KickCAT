@@ -32,9 +32,9 @@ namespace kickcat::kickui
         std::vector<int> assignedPorts() const;
 
         // Save/load the editor scene as a small text file, so a topology is easy
-        // to reproduce and share.
-        void save(char const* path, std::string& message) const;
-        void load(char const* path, std::string& message);
+        // to reproduce and share. Return false (and set message) on failure.
+        bool save(char const* path, std::string& message) const;
+        bool load(char const* path, std::string& message);
 
         // Serialize into a network_simulator --topology file: a master injection
         // point on the root + one connect() edge per non-root slave. False (and
@@ -68,6 +68,10 @@ namespace kickcat::kickui
         // the link draws broken until healed. No-op without a running simulator.
         void setLinkBroken(int a, int b, bool broken);
         std::set<std::pair<int, int>> const& brokenLinks() const { return broken_links_; }
+
+        // Inject zero-mean DC-clock jitter (ns amplitude) on a SIM slave index; 0 disables.
+        // No-op without a running simulator.
+        void setClockJitter(int node, int64_t amplitude_ns);
 
         // Pop one message from the simulator's return stream (acks + events).
         // False when nothing is pending (or when not running). The caller drains

@@ -63,6 +63,19 @@ namespace kickcat::sim
                 response.payload.set_link_ack.link = link;
             }
         }
+        else if (cmd.type == ControlCommand::Type::SetClockJitter)
+        {
+            response.type                            = ControlEvent::Type::SetClockJitterAck;
+            response.payload.set_clock_jitter_ack.ok = 0;
+            SetClockJitter const& j = cmd.payload.set_clock_jitter;
+            EmulatedESC* esc = network_.esc(j.node);
+            if ((j.node < node_count_) and (esc != nullptr) and (j.amplitude_ns >= 0))
+            {
+                esc->setClockJitter(nanoseconds{j.amplitude_ns});
+                response.payload.set_clock_jitter_ack.ok  = 1;
+                response.payload.set_clock_jitter_ack.cmd = j;
+            }
+        }
 
         return response;
     }

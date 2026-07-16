@@ -7,7 +7,8 @@
 namespace kickcat
 {
     using namespace std::chrono;
-    using seconds_f = std::chrono::duration<float>;
+    // double, not float despite the name: a float second count loses sub-ms resolution after ~30 min.
+    using seconds_f = std::chrono::duration<double>;
 
     void sleep(nanoseconds ns);
 

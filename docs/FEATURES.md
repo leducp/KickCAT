@@ -60,6 +60,13 @@ authoritative source for "what works today"; the README only summarizes it.
 The ESC emulator models a DC clock with configurable drift; see
 [SIMULATION.md](SIMULATION.md). Slave-side DC is not implemented on real ESCs yet.
 
+`Bus::enableDC` lets the reference (first DC) slave clock free-run: the cyclic drift
+datagram only relays it to the other slaves (ETG-standard FRMW/ARMW relay). The master
+phase-locks its own cycle loop to that clock with a soft PLL owned by `Timer`
+(`Timer::sync_to`, driven each cycle by `Bus::sync`), rather than writing its
+software-sampled time back into the reference — doing so would inject the master's
+RT-loop jitter into the DC domain and can unlock the slaves' SYNC PLL.
+
 ## Networking and reliability
 
 | Feature                                   | Master    | Slave     |

@@ -10,6 +10,8 @@
 
 namespace kickcat
 {
+    class Timer;
+
     enum MailboxStatusFMMU : uint8_t
     {
         NONE        = 0,
@@ -170,6 +172,14 @@ namespace kickcat
         /// \return working counter
         uint16_t broadcastRead(uint16_t ADO, uint16_t data_size);
 
+        /// \brief Phase-lock a cyclic Timer to the DC reference clock. Call once per cycle after the
+        ///        process-data exchange (which captures the reference slave's 0x0910 via the FRMW
+        ///        drift datagram) and before Timer::wait_next_tick. A no-op until a valid reference
+        ///        has been captured (DC enabled and the drift datagram answered), so it is safe to
+        ///        call unconditionally. This is the canonical way to discipline the master cadence
+        ///        to DC.
+        void sync(Timer& timer) const;
+
         /// \return working counter
         uint16_t broadcastWrite(uint16_t ADO, void const* data, uint16_t data_size);
         void setAddresses();
@@ -260,6 +270,8 @@ namespace kickcat
         uint16_t irq_mask_{0};
 
         Slave* dc_slave_{nullptr};
+        uint64_t last_ref_system_time_{0};     // reference 0x0910 from the last cyclic FRMW
+        mutable bool last_ref_time_valid_{false};  // mutable: sync() consumes it (one sample, one use)
 
         MailboxStatusFMMU mailbox_status_fmmu_{MailboxStatusFMMU::NONE};
 

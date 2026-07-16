@@ -200,6 +200,21 @@ namespace kickcat::kickui
         SlaveErrorStats stats;
     };
 
+    // Distributed-clock discipline telemetry: the state of the master's soft PLL
+    // (Timer::sync_to) locking the RT cadence to the DC reference clock, plus the
+    // currently injected master-side jitter. Published only while cyclic + DC on.
+    struct DcStats
+    {
+        bool     active          = false;  // DC on and the loop is disciplining
+        bool     locked          = false;  // PLL has held phase lock
+        int64_t  phase_error_ns  = 0;      // last raw wrapped phase error
+        int64_t  phase_peak_ns   = 0;      // decaying peak |phase error| (RT-tracked, ~1s fade)
+        int64_t  filtered_error_ns = 0;    // EMA-filtered phase error
+        uint64_t samples         = 0;      // PLL samples since bring-up
+        bool     overran         = false;  // last cycle woke late
+        int64_t  master_jitter_ns = 0;     // injected master-side jitter amplitude
+    };
+
     struct BusSnapshot
     {
         bool        redundancy_active = false;
@@ -207,6 +222,7 @@ namespace kickcat::kickui
         std::string error;
         TopologyInfo topology;
         std::vector<SlaveSnapshot> slaves;   // index-aligned with the device list
+        DcStats     dc;
     };
 }
 

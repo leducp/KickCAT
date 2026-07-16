@@ -3,8 +3,10 @@
 
 namespace kickcat
 {
-    Timer::Timer(nanoseconds period)
+    Timer::Timer(nanoseconds period, SoftPll::Config const& pll_config)
         : period_{period}
+        , pll_config_{pll_config}
+        , pll_{period, pll_config}
     {
     }
 
@@ -29,5 +31,7 @@ namespace kickcat
     void Timer::update_period(nanoseconds period)
     {
         period_ = period;
+        // The grid changed, so the PLL's learned target phase is stale: rebuild on the new cycle.
+        pll_ = SoftPll{period, pll_config_};
     }
 }

@@ -41,10 +41,10 @@ namespace kickcat::kickui
         return ports;
     }
 
-    void SimScene::save(char const* path, std::string& message) const
+    bool SimScene::save(char const* path, std::string& message) const
     {
         std::ofstream f(path);
-        if (not f) { message = std::string("cannot write ") + path; return; }
+        if (not f) { message = std::string("cannot write ") + path; return false; }
         int red = 0;
         if (redundancy) { red = 1; }
         f << "# kickui sim scene\n";
@@ -56,15 +56,16 @@ namespace kickcat::kickui
         if (not f)
         {
             message = std::string("write error on ") + path;
-            return;
+            return false;
         }
         message = std::string("saved ") + path;
+        return true;
     }
 
-    void SimScene::load(char const* path, std::string& message)
+    bool SimScene::load(char const* path, std::string& message)
     {
         std::ifstream f(path);
-        if (not f) { message = std::string("cannot open ") + path; return; }
+        if (not f) { message = std::string("cannot open ") + path; return false; }
         std::vector<SimSlave> loaded;
         bool red = false;
         std::string tok;
@@ -92,7 +93,7 @@ namespace kickcat::kickui
                 std::getline(f, rest);
             }
         }
-        if (loaded.empty()) { message = std::string("no slaves in ") + path; return; }
+        if (loaded.empty()) { message = std::string("no slaves in ") + path; return false; }
         // Keep the tree acyclic: a parent must reference an earlier slave.
         for (int i = 0; i < static_cast<int>(loaded.size()); ++i)
         {
@@ -101,6 +102,7 @@ namespace kickcat::kickui
         slaves     = std::move(loaded);
         redundancy = red;
         message    = std::string("loaded ") + path;
+        return true;
     }
 
     bool SimScene::writeTopologyFile(std::string const& path, std::string& error) const
@@ -382,6 +384,12 @@ namespace kickcat::kickui
         auto key = std::make_pair(std::min(a, b), std::max(a, b));
         if (broken) { broken_links_.insert(key); }
         else        { broken_links_.erase(key); }
+    }
+
+    void SimulatorProcess::setClockJitter(int node, int64_t amplitude_ns)
+    {
+        if ((not control_) or (node < 0) or (amplitude_ns < 0)) { return; }
+        control_->setClockJitter(static_cast<uint16_t>(node), amplitude_ns);
     }
 #endif
 }

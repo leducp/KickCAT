@@ -129,6 +129,19 @@ namespace kickcat
             return;
         }
         uint64_t t = static_cast<uint64_t>(localSystemTime().count());
+
+        // Zero-mean read jitter: perturb the reported system time by a uniform offset in
+        // [-amplitude, +amplitude]. Lets the host exercise the master's soft-PLL rejection.
+        if (clock_jitter_ > 0ns)
+        {
+            jitter_rng_ ^= jitter_rng_ << 13;
+            jitter_rng_ ^= jitter_rng_ >> 7;
+            jitter_rng_ ^= jitter_rng_ << 17;
+            int64_t const span  = 2 * clock_jitter_.count() + 1;
+            int64_t const noise = static_cast<int64_t>(jitter_rng_ % static_cast<uint64_t>(span)) - clock_jitter_.count();
+            t = static_cast<uint64_t>(static_cast<int64_t>(t) + noise);
+        }
+
         std::memcpy(memory_.DC + (reg::DC_SYSTEM_TIME - reg::DC_RECEIVED_TIME), &t, sizeof(t));
     }
 

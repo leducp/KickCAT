@@ -420,6 +420,14 @@ namespace kickcat::kickui
                 }
             }
         }
+        snap->dc.active            = dc_active_;
+        snap->dc.locked            = dc_locked_;
+        snap->dc.phase_error_ns    = dc_phase_error_ns_;
+        snap->dc.phase_peak_ns     = dc_phase_peak_ns_;
+        snap->dc.filtered_error_ns = dc_filtered_error_ns_;
+        snap->dc.samples           = dc_pll_samples_;
+        snap->dc.overran           = dc_overran_;
+        snap->dc.master_jitter_ns  = master_jitter_ns_;
         {
             LockGuard lock(snap_mtx_);
             snapshot_ = snap;
@@ -1214,7 +1222,23 @@ namespace kickcat::kickui
                 setSlaveState(r.control->slave_index_, static_cast<uint8_t>(State::PRE_OP));
             }
 
-            Timer timer{milliseconds(cycle_ms)};
+            // Soft-PLL tuning for KickUI. The bus loop runs on a kickcat Thread at SCHED_FIFO 80
+            // when the process has cap_sys_nice, else it falls back to SCHED_OTHER (see
+            // startBusThread). Either way its residual jitter is larger than a lean hardware
+            // master's: it does more per cycle (GUI actor, mailbox stepping, snapshot publish,
+            // multi-slave) over the tap transport, and an unprivileged run is not real-time at all.
+            // Loosen the lock criteria and outlier reject so a lock can actually accumulate;
+            // Marvin keeps the tight SoftPll defaults.
+            SoftPll::Config pll_cfg;
+            pll_cfg.ema_alpha        = 0.05;    // heavier smoothing -> lower filtered-error noise floor
+            pll_cfg.slew_limit       = 30us;
+            pll_cfg.integrator_clamp = 500us;
+            pll_cfg.outlier_reject   = 500us;   // soft-RT stalls spike well past the hardware 150us
+            pll_cfg.lock_threshold   = 30us;
+            pll_cfg.unlock_threshold = 80us;
+            pll_cfg.lock_samples     = 200;
+            pll_cfg.unlock_samples   = 100;
+            Timer timer{milliseconds(cycle_ms), pll_cfg};
             timer.start();
             double const dt = cycle_ms * 1.0e-3;
 
@@ -1237,11 +1261,32 @@ namespace kickcat::kickui
             // unmapped slave's mailbox actually advances. Reset right after the command.
             bool service_unmapped = false;
 
+            uint64_t jitter_rng = 0x9e3779b97f4a7c15ull ^ static_cast<uint64_t>(cycle_ms);  // xorshift64 state
+
             // One full cyclic tick: compute + apply each drive's setpoint, exchange
             // all PDOs together, advance one mailbox step, publish per-drive feedback.
             auto rt_cyclic = [&]
             {
+                // Phase-lock the RT cadence to the DC reference captured by the previous cycle's
+                // drift datagram. No-op until a valid reference exists; the timer remembers its own
+                // overrun, so a late wake rejects its own suspect sample.
+                bus->sync(timer);
                 timer.wait_next_tick();
+
+                // Optional master-side jitter: busy-wait a bounded pseudo-random delay before
+                // sending the frame so the sampled DC phase is perturbed -- exercises the PLL.
+                int64_t jitter = master_jitter_ns_.load();
+                if (jitter > 0)
+                {
+                    int64_t const cap = milliseconds(cycle_ms).count() / 4;
+                    if (jitter > cap) { jitter = cap; }
+                    jitter_rng ^= jitter_rng << 13;
+                    jitter_rng ^= jitter_rng >> 7;
+                    jitter_rng ^= jitter_rng << 17;
+                    nanoseconds const until = since_epoch()
+                        + nanoseconds{static_cast<int64_t>(jitter_rng % static_cast<uint64_t>(jitter + 1))};
+                    while (since_epoch() < until) { /* burn the injected jitter */ }
+                }
 
                 for (auto& r : rts)
                 {
@@ -1453,6 +1498,27 @@ namespace kickcat::kickui
                     r.control->fb_.faulted           = drive.isFaulted();
                     r.control->fb_.operational       = (r.current_state == static_cast<int>(State::OPERATIONAL));
                 }
+
+                // Publish soft-PLL telemetry for the UI (DC lock panel).
+                dc_active_.store(dc_enabled_.load());
+                if (dc_enabled_)
+                {
+                    int64_t const pe = timer.pll().phase_error().count();
+                    dc_locked_.store(timer.locked());
+                    dc_phase_error_ns_.store(pe);
+                    dc_filtered_error_ns_.store(static_cast<int64_t>(std::llround(timer.pll().filtered_error())));
+                    dc_pll_samples_.store(timer.pll().samples());
+                    dc_overran_.store(timer.overran());
+
+                    // Decaying peak-hold of |phase error|, tracked on the RT thread so it catches
+                    // every cycle's spike (the UI samples far slower). Fades over ~1 s so a spike
+                    // stays visible long enough to read, then relaxes back toward the live error.
+                    int64_t peak = dc_phase_peak_ns_.load();
+                    int64_t const abs_pe = std::llabs(pe);
+                    peak -= peak / 1024;
+                    if (abs_pe > peak) { peak = abs_pe; }
+                    dc_phase_peak_ns_.store(peak);
+                }
             };
 
             // Apply one queued motor/units command to its DriveRuntime (latest-wins).
@@ -1635,6 +1701,9 @@ namespace kickcat::kickui
                     service_unmapped = false;
                 }
             }
+
+            dc_active_.store(false);   // left the cyclic phase: PLL no longer disciplining
+            dc_phase_peak_ns_.store(0);
 
             try { bus->disableIRQ(EcatEvent::AL_STATUS); } catch (std::exception const&) {}
 

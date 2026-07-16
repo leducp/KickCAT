@@ -43,6 +43,11 @@ namespace kickcat
         // stays continuous across a change (accumulated drift is rebased, not dropped).
         void setClockDrift(double ppm);
 
+        // Injectable zero-mean jitter on the reported 0x910 system time: each ECAT read
+        // perturbs the value by a uniform pseudo-random offset in [-amplitude, +amplitude].
+        // Models sampling/readout jitter distinct from the steady drift above; 0 disables.
+        void setClockJitter(nanoseconds amplitude) { clock_jitter_ = amplitude; }
+
         // Local free-running clock for a given reference instant: reference time plus
         // the accumulated injected drift. No system time offset nor time-loop trim:
         // receive times latch local time, not system time (datasheet sec1 9.1.3).
@@ -258,6 +263,11 @@ namespace kickcat
         nanoseconds drift_accumulated_{0ns};
         nanoseconds dc_correction_{0ns};
         int64_t     dc_diff_filtered_{0};   // 0x92C mean-value filter state
+
+        // Injected read-time jitter (setClockJitter) and its xorshift64 state. Mutable:
+        // the RNG advances on every 0x910 read, which happens from a const-ish read path.
+        nanoseconds      clock_jitter_{0ns};
+        mutable uint64_t jitter_rng_{0x2545f4914f6cdd1dull};
     };
 }
 
