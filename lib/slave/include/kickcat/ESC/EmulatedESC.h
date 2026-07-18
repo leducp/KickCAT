@@ -1,11 +1,15 @@
 #ifndef KICKCAT_SLAVE_ESC_EMULATED_ESC_H
 #define KICKCAT_SLAVE_ESC_EMULATED_ESC_H
 
+#include <filesystem>
+
 #include "kickcat/protocol.h"
 #include "kickcat/AbstractESC.h"
 
 namespace kickcat
 {
+    namespace fs = std::filesystem;
+
     class EmulatedESC final : public AbstractESC
     {
         // ESC access type
@@ -19,11 +23,11 @@ namespace kickcat
 
     public:
         EmulatedESC();
-        EmulatedESC(std::string const& eeprom_path);
+        EmulatedESC(fs::path const& eeprom_path);
         virtual ~EmulatedESC() = default;
 
         // Helpers to load the eeprom
-        void loadEeprom(std::string const& eeprom_path);
+        void loadEeprom(fs::path const& eeprom_path);
         void loadEeprom(std::vector<uint16_t> const& eeprom_data);
         void loadEeprom(std::vector<uint8_t> const& image);  // word-addressed; odd trailing byte zero-filled
 
@@ -269,6 +273,8 @@ namespace kickcat
         nanoseconds      clock_jitter_{0ns};
         mutable uint64_t jitter_rng_{0x2545f4914f6cdd1dull};
     };
+
+    std::vector<uint8_t> loadBinaryFile(fs::path const& path);
 }
 
 #endif

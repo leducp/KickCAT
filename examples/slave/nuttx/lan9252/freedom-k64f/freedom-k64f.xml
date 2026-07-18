@@ -16,7 +16,7 @@
     </Groups>
     <Devices>
       <Device Physics="YY">
-        <Type ProductCode="#x00000001" RevisionNo="#x00000001">Board</Type>
+        <Type ProductCode="#x00DEFEDE" RevisionNo="#x00005A01">Board</Type>
         <Name LcId="1033">Board</Name>
         <Info>
           <StateMachine>

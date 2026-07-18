@@ -9,21 +9,43 @@
 #include <nlohmann/json.hpp>
 
 #include "kickcat/CoE/OD.h"
+#include "kickcat/ESC/EmulatedESC.h"
+#include "kickcat/ESI/Parser.h"
 #include "kickcat/ESI/SIIBuilder.h"
+#include "kickcat/SIIParser.h"
 
 namespace kickcat::sim
 {
     using json = nlohmann::json;
     namespace fs = std::filesystem;
 
-    SimulatedSlave buildSlave(std::string const& config_path, ESI::Parser& parser)
+    void configureDeviceDictionary(SimulatedSlave& sim, ESI::Device& device)
     {
-        fs::path config_dir = fs::path(config_path).parent_path();
+        if (not device.dictionary.empty())
+        {
+            sim.dictionary = std::make_unique<CoE::Dictionary>(std::move(device.dictionary));
+            sim.slave->setDictionary(sim.dictionary.get());
+
+            // A mailboxless terminal (e.g. a digital I/O like EL1004) still gets its OD,
+            // but only a device that declares a CoE mailbox is reachable by SDO.
+            const bool esi_coe_advertised = (device.mailbox and device.mailbox->coe);
+            if (esi_coe_advertised)
+            {
+                sim.mailbox = std::make_unique<mailbox::response::Mailbox>(sim.esc.get(), 1024);
+                sim.mailbox->enableCoE(*sim.dictionary);
+                sim.slave->setMailbox(sim.mailbox.get());
+            }
+        }
+    }
+
+    SimulatedSlave buildSlave(fs::path const& config_path)
+    {
+        fs::path config_dir = config_path.parent_path();
 
         std::ifstream f(config_path);
         if (not f.is_open())
         {
-            throw std::runtime_error("Failed to open config file: " + config_path);
+            throw std::runtime_error("Failed to open config file: " + config_path.string());
         }
         json config;
         try
@@ -32,12 +54,13 @@ namespace kickcat::sim
         }
         catch (const json::parse_error& e)
         {
-            throw std::runtime_error("Failed to parse JSON in " + config_path + ": " + e.what());
+            throw std::runtime_error("Failed to parse JSON in " + config_path.string() + ": " + e.what());
         }
 
         SimulatedSlave sim;
-        std::optional<CoE::Dictionary> esi_coe;  // CoE dictionary derived from the ESI device, if any
-        bool esi_coe_advertised = false;         // true => device declares a CoE mailbox (SDO on the wire)
+        sim.esc = std::make_unique<EmulatedESC>();
+        sim.pdo   = std::make_unique<PDO>(sim.esc.get());
+        sim.slave = std::make_unique<slave::Slave>(sim.esc.get(), sim.pdo.get());
 
         if (config.contains("esi"))
         {
@@ -54,19 +77,11 @@ namespace kickcat::sim
 
             try
             {
-                ESI::Device dev = parser.loadDevice(esi_full_path.string(), filter);
-                CoE::materializeStorage(dev.dictionary);
-
-                sim.esc = std::make_unique<EmulatedESC>();
-                sim.esc->loadEeprom(ESI::buildEepromImage(dev));
-
-                if (not dev.dictionary.empty())
-                {
-                    esi_coe = std::move(dev.dictionary);
-                    // A mailboxless terminal (e.g. a digital I/O like EL1004) still gets its OD,
-                    // but only a device that declares a CoE mailbox is reachable by SDO.
-                    esi_coe_advertised = (dev.mailbox and dev.mailbox->coe);
-                }
+                ESI::Parser parser;
+                ESI::Device device = parser.loadDevice(esi_full_path.string(), filter);
+                CoE::materializeStorage(device.dictionary);
+                sim.esc->loadEeprom(ESI::buildEepromImage(device));
+                configureDeviceDictionary(sim, device);
             }
             catch (std::exception const& e)
             {
@@ -80,41 +95,33 @@ namespace kickcat::sim
             {
                 throw std::runtime_error("EEPROM file not found: " + eeprom_full_path.string());
             }
-            sim.esc = std::make_unique<EmulatedESC>(eeprom_full_path.string().c_str());
+            std::vector<uint8_t> eeprom_image = loadBinaryFile(eeprom_full_path);
+            sim.esc->loadEeprom(eeprom_image);
+
+            if (config.contains("coe_xml"))
+            {
+                fs::path coe_xml_full_path = config_dir / config["coe_xml"].get<std::string>();
+                if (not fs::exists(coe_xml_full_path))
+                {
+                    throw std::runtime_error("CoE XML file not found: " + coe_xml_full_path.string());
+                }
+                eeprom::SII sii;
+                sii.parse(eeprom_image);
+                uint32_t revision_no = sii.info.revision_number;
+                uint32_t product_code = sii.info.product_code;
+
+                ESI::DeviceFilter filter;
+                filter.revision_no = revision_no;
+                filter.product_code = product_code;
+                ESI::Parser parser;
+                ESI::Device device = parser.loadDevice(coe_xml_full_path.string(), filter);
+                CoE::materializeStorage(device.dictionary);
+                configureDeviceDictionary(sim, device);
+            }
         }
         else
         {
-            throw std::runtime_error("Config file " + config_path + " missing 'eeprom' or 'esi' field");
-        }
-
-        sim.pdo   = std::make_unique<PDO>(sim.esc.get());
-        sim.slave = std::make_unique<slave::Slave>(sim.esc.get(), sim.pdo.get());
-
-        // The OD is injected into the slave always, and into a mailbox only if the
-        // device advertises CoE - so a mailboxless terminal still maps PDOs.
-        if (esi_coe)
-        {
-            sim.dictionary = std::make_unique<CoE::Dictionary>(std::move(*esi_coe));
-            sim.slave->setDictionary(sim.dictionary.get());
-            if (esi_coe_advertised)
-            {
-                sim.mailbox = std::make_unique<mailbox::response::Mailbox>(sim.esc.get(), 1024);
-                sim.mailbox->enableCoE(*sim.dictionary);
-                sim.slave->setMailbox(sim.mailbox.get());
-            }
-        }
-        else if (config.contains("coe_xml"))
-        {
-            fs::path coe_xml_full_path = config_dir / config["coe_xml"].get<std::string>();
-            if (not fs::exists(coe_xml_full_path))
-            {
-                throw std::runtime_error("CoE XML file not found: " + coe_xml_full_path.string());
-            }
-            sim.dictionary = std::make_unique<CoE::Dictionary>(parser.loadFile(coe_xml_full_path.string()));
-            sim.mailbox = std::make_unique<mailbox::response::Mailbox>(sim.esc.get(), 1024);
-            sim.mailbox->enableCoE(*sim.dictionary);
-            sim.slave->setDictionary(sim.dictionary.get());
-            sim.slave->setMailbox(sim.mailbox.get());
+            throw std::runtime_error("Config file " + config_path.string() + " missing 'eeprom' or 'esi' field");
         }
 
         sim.input.resize(PDO_MAX_SIZE);
