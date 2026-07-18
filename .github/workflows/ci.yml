@@ -22,9 +22,18 @@ jobs:
       - name: Check Python formatting and linting
         run: scripts/format_py.sh check
 
+  cpp_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uncrustify
+        run: sudo apt-get update && sudo apt-get install -y uncrustify
+      - name: Check C++ formatting
+        run: scripts/format_cpp.sh check examples/slave
+
   # Build C++ and Build Wheels
   build_x86:
-    needs: py_lint
+    needs: [py_lint, cpp_lint]
     name: Build C++ (${{ matrix.os }}${{ matrix.preset && format(' - {0}', matrix.preset) || '' }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -107,7 +116,7 @@ jobs:
   # Sanitizer build + unit tests: ASan + LSan + UBSan (catches overflows, use-after-free, leaks,
   # and undefined behaviour; alignment is excluded for the packed EtherCAT frame layer).
   build_sanitizers:
-    needs: py_lint
+    needs: [py_lint, cpp_lint]
     name: Build C++ (ASan + UBSan)
     runs-on: ubuntu-latest
     env:
@@ -134,7 +143,7 @@ jobs:
         shell: bash
 
   build_arm64:
-    needs: py_lint
+    needs: [py_lint, cpp_lint]
     name: Build C++ (ARM64 - ${{ matrix.preset }})
     runs-on: ubuntu-24.04-arm
     strategy:
@@ -170,7 +179,7 @@ jobs:
           retention-days: 1
 
   build-wheels:
-    needs: py_lint
+    needs: [py_lint, cpp_lint]
     name: Build Python Wheels (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -332,7 +341,7 @@ jobs:
 
   # NuttX Builds
   build_NuttX:
-    needs: py_lint
+    needs: [py_lint, cpp_lint]
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.nuttx.label == 'master' }}
     strategy:

@@ -17,7 +17,7 @@
 
 using namespace kickcat;
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     (void)argc;
     (void)argv;
@@ -94,16 +94,16 @@ int main(int argc, char *argv[])
 
     bool pdo_configured = false;
 
-    int16_t *ax = nullptr;
-    int16_t *ay = nullptr;
-    int16_t *az = nullptr;
-    int16_t *mx = nullptr;
-    int16_t *my = nullptr;
-    int16_t *mz = nullptr;
+    int16_t* ax = nullptr;
+    int16_t* ay = nullptr;
+    int16_t* az = nullptr;
+    int16_t* mx = nullptr;
+    int16_t* my = nullptr;
+    int16_t* mz = nullptr;
 
-    uint8_t *led_r = nullptr;
-    uint8_t *led_g = nullptr;
-    uint8_t *led_b = nullptr;
+    uint8_t* led_r = nullptr;
+    uint8_t* led_g = nullptr;
+    uint8_t* led_b = nullptr;
 
     while (true)
     {
@@ -132,7 +132,6 @@ int main(int argc, char *argv[])
         }
         else if (state == State::OPERATIONAL)
         {
-
             if (read(sensor_fd, &sensor_data, sizeof(sensor_data)) == sizeof(sensor_data))
             {
                 *ax = sensor_data.accel.x;
