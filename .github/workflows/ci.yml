@@ -16,7 +16,7 @@ jobs:
   py_lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install ruff
         run: pip install ruff
       - name: Check Python formatting and linting
@@ -45,7 +45,7 @@ jobs:
             coverage: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
 
       - name: Install system dependencies
@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload Build Artifact
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-linux-${{ matrix.preset }}
           path: build/
@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: build/coverage_xml.xml
@@ -113,7 +113,7 @@ jobs:
     env:
       UBSAN_OPTIONS: print_stacktrace=1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
 
       - name: Install system dependencies
@@ -146,7 +146,7 @@ jobs:
           - preset: bare
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
 
       - name: Install system dependencies
@@ -163,7 +163,7 @@ jobs:
         run: cmake --build build --config ${{env.BUILD_TYPE}}
 
       - name: Upload Build Artifacts (ARM64)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-arm64-${{ matrix.preset }}
           path: build/
@@ -179,14 +179,14 @@ jobs:
     env:
       CIBW_ARCHS: native
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.1.0
         with:
           output-dir: wheelhouse
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheelhouse-kickcat-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -197,10 +197,10 @@ jobs:
     name: Build Conan Package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-linux-full
           path: build/
@@ -218,7 +218,7 @@ jobs:
         run: |
           conan cache save "kickcat/${{ env.PKG_VERSION }}:*" --file kickcat-${{ env.PKG_VERSION }}-linux-x86_64.tgz
       - name: Upload Conan package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: conan-package
           path: kickcat-${{ env.PKG_VERSION }}-linux-x86_64.tgz
@@ -249,9 +249,9 @@ jobs:
             slave_config: simulation/slave_configs/xmc4800.json
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -259,13 +259,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libxdp1 libbpf1
 
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-linux-full
           path: build/
 
       - name: Download Wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: wheelhouse-kickcat-*
           path: wheelhouse
@@ -322,7 +322,7 @@ jobs:
           echo "Test passed!"
 
       - name: Upload Simulation Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: simulation-logs-${{ matrix.test_case.name }}
@@ -352,31 +352,31 @@ jobs:
 
     steps:
       - name: Checkout KickCAT
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: "KickCAT"
       - name: Cache NuttX
         id: cache-nuttx
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/nuttxspace/nuttx
           key: nuttx_${{ matrix.nuttx.ref }}
       - if: ${{ steps.cache-nuttx.outputs.cache-hit != 'true' }}
         name: Checkout NuttX (${{ matrix.nuttx.label }})
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: apache/nuttx
           path: "nuttxspace/nuttx"
           ref: "${{ matrix.nuttx.ref }}"
       - name: Cache NuttX Apps
         id: cache-nuttx-apps
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/nuttxspace/apps
           key: nuttx-apps_${{ matrix.nuttx.ref }}
       - if: ${{ steps.cache-nuttx-apps.outputs.cache-hit != 'true' }}
         name: Checkout NuttX Apps (${{ matrix.nuttx.label }})
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: apache/nuttx-apps
           path: "nuttxspace/apps"
@@ -385,7 +385,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y kconfig-frontends
       - name: Cache ARM GCC Toolchain
         id: cache-arm-none-eabi
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/gcc-arm-none-eabi
           key: ${{ env.arm_none_eabi_version }}
@@ -402,7 +402,7 @@ jobs:
             ${{ matrix.board }} \
             ${{ github.workspace }}/nuttxspace/nuttx
       - name: Upload firmware binary for ${{ matrix.board }} (nuttx ${{ matrix.nuttx.label }})
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: firmware-${{ matrix.board }}-nuttx-${{ matrix.nuttx.label }}
           path: KickCAT/build_${{ matrix.board }}/*.bin
@@ -420,17 +420,17 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download wheels artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: wheelhouse-kickcat-*
           path: wheelhouse
           merge-multiple: true
 
       - name: Download Conan package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: conan-package
           path: conan-package
