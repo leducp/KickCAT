@@ -139,7 +139,7 @@ int main(int argc, char* argv[])
         if (drive.isEnabled() and not initial_captured)
         {
             initial_rad      = drive.actualPosition();
-            motion_start     = since_epoch();
+            motion_start     = now();
             initial_captured = true;
             printf("Motor enabled at %.4f rad; running %.2f Hz sinus, +/- %.2f deg, for %.1f s\n",
                    initial_rad, frequency_hz, amplitude_deg, duration_s);

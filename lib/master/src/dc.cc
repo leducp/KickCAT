@@ -138,7 +138,13 @@ namespace kickcat
         // cyclic sample rather than learn its target phase from it.
         last_ref_time_valid_ = false;
 
-        return to_unix_epoch(start_time - start_delay - shift_cycle);
+        // Project the DC cycle grid into the Timer's monotonic now() domain through a one-shot
+        // wall<->monotonic offset sampled here (since_ecat_epoch() is wall-derived, now() is not):
+        // this is the wall->monotonic conversion of the DC start boundary, so the anchor is truly
+        // phase-aligned to the bus and the soft PLL only trims sub-cycle residual.
+        nanoseconds monotonic = kickcat::now();
+        nanoseconds ecat = since_ecat_epoch();
+        return monotonic + (start_time - start_delay - shift_cycle - ecat);
     }
 
 

@@ -249,9 +249,9 @@ namespace kickcat
         nanoseconds pdiWatchdog();  // Get configured PDI watchdog
         nanoseconds pdoWatchdog();  // Get configured PDO watchdog
         void checkWatchdog();
-        nanoseconds lastLogicalWrite_{since_epoch()};
+        nanoseconds lastLogicalWrite_{now()};
 
-        nanoseconds last_write_eeprom_{since_epoch()};
+        nanoseconds last_write_eeprom_{now()};
 
         // Store-and-forward propagation delay: the time for a frame to pass from this
         // ESC to the next. Real (and, being a buffer model rather than cut-through,

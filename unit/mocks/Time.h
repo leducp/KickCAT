@@ -3,8 +3,8 @@
 
 namespace kickcat
 {
-    // Reset since_epoch() mocked starting point to now
-    void resetSinceEpoch();
+    // Reset the mocked clock (now() / since_unix_epoch()) starting point to now.
+    void resetMockClock();
 }
 
 #endif

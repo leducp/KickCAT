@@ -69,7 +69,7 @@ namespace kickcat::mailbox::request
         /// \brief Message status
         /// \param current_time     Considered time to compute message status (enable injection for tests)
         /// \return current message status. Value may depend on underlying service.
-        uint32_t status(nanoseconds current_time = since_epoch());
+        uint32_t status(nanoseconds current_time = now());
 
         uint8_t const* data() const { return data_.data(); }
         size_t size() const         { return data_.size(); }
@@ -140,7 +140,7 @@ namespace kickcat::mailbox::request
         /// \brief Receive a message
         /// \param raw_message      Raw message read on the bus
         /// \param current_time     Considered time to process message timeout (enable injection for tests)
-        bool receive(uint8_t const* raw_message, nanoseconds current_time = since_epoch());
+        bool receive(uint8_t const* raw_message, nanoseconds current_time = now());
 
 
         std::queue<std::shared_ptr<AbstractMessage>> to_send;     // message waiting to be sent

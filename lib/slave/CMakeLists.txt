@@ -40,3 +40,13 @@ if (RPI)
   kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/driver/include)
   target_link_libraries(kickcat bcm2835)
 endif()
+
+if (KICKOS)
+  # AbstractSPI over the KickOS K64F/DSPI0 unprivileged transport. Forwards to the
+  # extern "C" spi_transfer/spi_enable_cs/spi_disable_cs symbols provided by the
+  # KickOS app (user/apps/k64dspi) at final link -- no KickOS build dependency here.
+  target_sources(kickcat PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/driver/src/kickos/SPI.cc
+  )
+  kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/driver/include)
+endif()

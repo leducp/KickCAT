@@ -87,7 +87,7 @@ namespace kickcat
                 std::memcpy(ecatAddress<uint16_t>(reg::EEPROM_CONTROL), &write, sizeof(control_status_reg));
 
                 shall_write_ = true;
-                last_write_ = duration_cast<milliseconds>(since_epoch());
+                last_write_ = duration_cast<milliseconds>(now());
                 break;
             }
 

@@ -26,7 +26,7 @@ protected:
 
     void SetUp() override
     {
-        resetSinceEpoch();
+        resetMockClock();
 
         slave.output.data = reinterpret_cast<uint8_t*>(&rx);
         slave.input.data  = reinterpret_cast<uint8_t*>(&tx);
@@ -37,7 +37,7 @@ protected:
     {
         for (int i = 0; i < duration.count(); ++i)
         {
-            since_epoch();
+            now();
         }
     }
 };

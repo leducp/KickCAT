@@ -24,19 +24,19 @@ case "$BOARD" in
 
 "xmc4800-relax")
     BOARD_PATH="arm/xmc4/xmc4800-relax"
-    DEFCONFIG_SRC="${kickcat_src}/examples/slave/nuttx/xmc4800/boards/relax/defconfig"
+    DEFCONFIG_SRC="${kickcat_src}/examples/slave/xmc4800/xmc4800-relax/nuttx/board/defconfig"
     CONFIG_NAME="kickcat"
     ;;
 
 "arduino-due")
     BOARD_PATH="arm/sam34/arduino-due"
-    DEFCONFIG_SRC="${kickcat_src}/examples/slave/nuttx/lan9252/arduino-due/board/defconfig"
+    DEFCONFIG_SRC="${kickcat_src}/examples/slave/lan9252/arduino-due/nuttx/board/defconfig"
     CONFIG_NAME="kickcat"
     ;;
 
 "freedom-k64f")
     BOARD_PATH="arm/kinetis/freedom-k64f"
-    DEFCONFIG_SRC="${kickcat_src}/examples/slave/nuttx/lan9252/freedom-k64f/board/defconfig"
+    DEFCONFIG_SRC="${kickcat_src}/examples/slave/lan9252/freedom-k64f/nuttx/board/defconfig"
     CONFIG_NAME="kickcat"
     ;;
 

@@ -7,6 +7,6 @@ Name: KickCAT
 Description: EtherCAT master/slave stack
 Version: @PROJECT_VERSION@
 Requires.private:@PC_REQUIRES_PRIVATE@
-Libs: -L${libdir} -lkickcat -lkickcat_time
+Libs: -L${libdir} -lkickcat
 Libs.private:@PC_LIBS_PRIVATE@
 Cflags: -I${includedir}@PC_CFLAGS_EXTRA@

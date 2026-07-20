@@ -389,7 +389,7 @@ namespace kickcat
             else
             {
                 std::memcpy(phys_p, frame_p, to_copy);
-                lastLogicalWrite_ = since_epoch();   // update watchdog
+                lastLogicalWrite_ = now();   // update watchdog
             }
             return true;
         }
@@ -424,7 +424,7 @@ namespace kickcat
         }
         if (wrote)
         {
-            lastLogicalWrite_ = since_epoch();   // update watchdog
+            lastLogicalWrite_ = now();   // update watchdog
         }
         return hit;
     }
@@ -625,14 +625,14 @@ namespace kickcat
 
     void EmulatedESC::processInternalLogic()
     {
-        static nanoseconds const start = since_epoch();
+        static nanoseconds const start = now();
 
         // ESM state change
         if (memory_.al_control != memory_.al_status)
         {
             State before  = static_cast<State>(memory_.al_status  & 0xf);
             State current = static_cast<State>(memory_.al_control & 0xf);
-            simu_info("%f  %s -> %s  \n", seconds_f(since_epoch() - start).count(), toString(before), toString(current));
+            simu_info("%f  %s -> %s  \n", seconds_f(now() - start).count(), toString(before), toString(current));
 
             switch (current)
             {
@@ -732,7 +732,7 @@ namespace kickcat
                 }
                 else
                 {
-                    last_write_eeprom_ = since_epoch();
+                    last_write_eeprom_ = now();
                     std::memcpy(eeprom_.data() + memory_.eeprom_address, &memory_.eeprom_data, 2);
                     memory_.eeprom_control &= ~0x0700; // clear order
                     memory_.eeprom_control &= ~eeprom::Control::WR_EN; // self-clearing once the write is done
@@ -927,7 +927,7 @@ namespace kickcat
             }
             fmmus_.push_back(f);
         }
-        lastLogicalWrite_ = since_epoch();  // restart the output watchdog window at PDO (re)config
+        lastLogicalWrite_ = now();  // restart the output watchdog window at PDO (re)config
     }
 
 
@@ -957,8 +957,8 @@ namespace kickcat
             return; // watchdog deactivated
         }
         
-        auto now = since_epoch(); // Create the current time
-        if (now < (lastLogicalWrite_ + delay)) // If the current time is before the last valid PDO write plus the delay
+        auto current = now(); // Create the current time
+        if (current < (lastLogicalWrite_ + delay)) // If the current time is before the last valid PDO write plus the delay
         {
             memory_.watchdog_status_process_data = 1; // Watchdog is healthy
         } 

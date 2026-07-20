@@ -3,6 +3,24 @@
 
 namespace kickcat
 {
+    // clock_gettime(), not std::chrono::steady_clock: on some toolchains
+    // (e.g. arm-none-eabi) libstdc++ maps steady_clock to the same wall-clock
+    // syscall as system_clock, silently losing monotonicity.
+    // Also serves NuttX, which requires CONFIG_CLOCK_MONOTONIC=y (off by default).
+    nanoseconds now()
+    {
+        timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return from_timespec(ts);
+    }
+
+    nanoseconds since_unix_epoch()
+    {
+        timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        return from_timespec(ts);
+    }
+
     void sleep(nanoseconds ns)
     {
         // convert chrono to OS timespec
@@ -15,7 +33,7 @@ namespace kickcat
             timespec required_time = remaining_time;
 
             // remaining time
-            int32_t result = clock_nanosleep(CLOCK_REALTIME, 0, &required_time, &remaining_time);
+            int32_t result = clock_nanosleep(CLOCK_MONOTONIC, 0, &required_time, &remaining_time);
             if (result == 0)
             {
                 return;

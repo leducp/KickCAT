@@ -493,7 +493,7 @@ TEST(EmulatedESC, ecat_frmw_reads_reference_clock)
     ASSERT_EQ(wkc, 1);
 
     uint64_t after = static_cast<uint64_t>(esc.localSystemTime().count());
-    ASSERT_LE(before, read_back);   // mocked since_epoch is strictly increasing
+    ASSERT_LE(before, read_back);   // mocked clock is strictly increasing
     ASSERT_LE(read_back, after);
 }
 
@@ -710,7 +710,7 @@ TEST(EmulatedESC, watchdog)
     esc.read(reg::WDOG_STATUS, &status, 2);
     EXPECT_EQ(status & 0x01, 1);  // SPEC: bit 0 of 0x0440 is 1 if OK, 0 if expired
 
-    // since_epoch() advances 1ms per call in unit tests; 20 cycles exceeds the 10ms window.
+    // the mocked clock advances 1ms per call in unit tests; 20 cycles exceeds the 10ms window.
     for (int i = 0; i < 20; ++i)
     {
         esc.processDatagram(&header, nullptr, &wkc);
@@ -750,7 +750,7 @@ TEST(EmulatedESC, watchdog_device_emulation_drops_to_safe_op_via_al_status)
     esc.read(reg::AL_STATUS, &al_status, 1);
     ASSERT_EQ(State::OPERATIONAL, al_status);
 
-    // since_epoch() advances 1ms per call in unit tests; 30 cycles exceed the 10ms window.
+    // the mocked clock advances 1ms per call in unit tests; 30 cycles exceed the 10ms window.
     for (int i = 0; i < 30; ++i)
     {
         esc.processDatagram(&header, nullptr, &wkc);

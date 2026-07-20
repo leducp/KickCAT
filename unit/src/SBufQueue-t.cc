@@ -18,7 +18,7 @@ public:
         ASSERT_EQ(TapSocket::QUEUE::item_size(), 1522);
         ASSERT_EQ(0, queue_.readied());
 
-        resetSinceEpoch(); // reset since_epoch() mocked starting point
+        resetMockClock(); // reset the mocked clock starting point
     }
 
     TapSocket::QUEUE::Context context_;

@@ -114,7 +114,7 @@ namespace kickcat
         struct pcap_pkthdr* header;
         unsigned char const* data;
 
-        nanoseconds deadline = since_epoch() + timeout_;
+        nanoseconds deadline = now() + timeout_;
         do
         {
             int r = pcap_next_ex(static_cast<pcap_t*>(fd_), &header, &data);
@@ -128,7 +128,7 @@ namespace kickcat
             std::memcpy(frame, data, to_copy);
             return to_copy;
 
-        } while (since_epoch() < deadline);
+        } while (now() < deadline);
 
         return -ETIMEDOUT;
     }

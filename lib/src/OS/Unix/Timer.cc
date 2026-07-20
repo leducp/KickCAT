@@ -10,7 +10,8 @@ namespace kickcat
     std::error_code Timer::wait_next_tick()
     {
         timespec const deadline = to_timespec(next_deadline_);
-        int rc = clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, NULL);
+        // Absolute deadline is on now()'s timebase (CLOCK_MONOTONIC); the sleep clock must match.
+        int rc = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, NULL);
         if (rc != 0)
         {
             if (rc == EINTR)
@@ -22,7 +23,7 @@ namespace kickcat
             // no recoverable errors (wrong clock, bad deadline, bad deadline **address**)
             throw std::system_error(rc, std::system_category(), "clock_nanosleep()");
         }
-        last_wakeup_ = since_epoch();
+        last_wakeup_ = now();
 
         // Calculate next deadline.
         next_deadline_ += period_;

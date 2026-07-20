@@ -1119,7 +1119,7 @@ TEST_F(LinkTest, process_datagram_check_timeout_split)
     link.setTimeout(timeout);
     EXPECT_CALL(*io_redundancy, setTimeout(timeout));
     io_redundancy->handleReply<int64_t>({logical_read}, 2);
-    EXPECT_CALL(*io_nominal, setTimeout(timeout - 1ms)); // Diff is due to since_epoch weak symbol override.
+    EXPECT_CALL(*io_nominal, setTimeout(timeout - 1ms)); // Diff is due to the mocked clock override.
     io_nominal->handleReply<int64_t>({skip}, 0);
     link.processDatagrams();
 }

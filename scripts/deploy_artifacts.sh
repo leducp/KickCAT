@@ -29,15 +29,15 @@ fi
 # Board-to-deploy-script and binary name mapping
 case "$BOARD" in
     "xmc4800-relax")
-        DEPLOY_SCRIPT="${kickcat_src}/examples/slave/nuttx/xmc4800/deploy.sh"
+        DEPLOY_SCRIPT="${kickcat_src}/examples/slave/xmc4800/xmc4800-relax/nuttx/deploy.sh"
         BINARY_NAME="xmc4800_relax.bin" # Find a better way to identify the binary
         ;;
     "arduino-due")
-        DEPLOY_SCRIPT="${kickcat_src}/examples/slave/nuttx/lan9252/arduino-due/deploy.sh"
+        DEPLOY_SCRIPT="${kickcat_src}/examples/slave/lan9252/arduino-due/nuttx/deploy.sh"
         BINARY_NAME="easycat_arduino_due.bin" # Find a better way to identify the binary
         ;;
     "freedom-k64f")
-        DEPLOY_SCRIPT="${kickcat_src}/examples/slave/nuttx/lan9252/freedom-k64f/deploy.sh"
+        DEPLOY_SCRIPT="${kickcat_src}/examples/slave/lan9252/freedom-k64f/nuttx/deploy.sh"
         BINARY_NAME="easycat_frdm_k64f.bin" # Find a better way to identify the binary
         ;;
     *)

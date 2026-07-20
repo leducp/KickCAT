@@ -27,9 +27,9 @@ int main(int argc, char const* argv[])
 
     ESI::Parser parser;
 
-    nanoseconds t1 = since_epoch();
+    nanoseconds t1 = now();
     CoE::Dictionary coe_dict = parser.loadFile(esi_file);
-    nanoseconds t2 = since_epoch();
+    nanoseconds t2 = now();
 
     // dangerous lack of error checking.
     printf("Name of vendor: %s\n", parser.vendor());

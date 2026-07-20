@@ -1,26 +1,20 @@
 // \brief OS agnostic time API implementation
+//
+// OS-agnostic pieces only (compiled for every backend, KickOS included): they
+// build on now(), which each backend provides. now() and since_unix_epoch()
+// live in the per-OS backend TUs selected by lib/CMakeLists.txt.
 #include "OS/Time.h"
 
 namespace kickcat
 {
-    extern "C"
-    {
-        static nanoseconds __since_epoch()
-        {
-            auto now = time_point_cast<nanoseconds>(system_clock::now());
-            return now.time_since_epoch();
-        }
-    }
-    __attribute__((weak,alias("__since_epoch"))) nanoseconds since_epoch();
-
     nanoseconds elapsed_time(nanoseconds start)
     {
-        return since_epoch() - start;
+        return now() - start;
     }
 
-    static nanoseconds start_time = since_epoch();
+    static nanoseconds start_time = now();
     nanoseconds since_start()
     {
-        return since_epoch() - start_time;
+        return now() - start_time;
     }
 }

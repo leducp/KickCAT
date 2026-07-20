@@ -84,7 +84,9 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link= std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
-    link->setTimeout(2ms);
+    // Bring-up datagram timeout: the LAN9252 ECAT port yields to a busy SPI PDI, so
+    // createMapping SDO/mailbox frames need slack. 2 ms is too tight; the RT loop resets it.
+    link->setTimeout(20ms);
     link->checkRedundancyNeeded();
 
     Bus bus(link);

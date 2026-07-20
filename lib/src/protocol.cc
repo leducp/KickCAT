@@ -1,6 +1,8 @@
 #include "protocol.h"
 #include "Error.h"
-#include <sstream>
+#include "kickcat/string_conversion.h"
+#include <cstdio>
+#include <string>
 #include <stdexcept>
 
 namespace kickcat
@@ -9,7 +11,7 @@ namespace kickcat
 
     nanoseconds since_ecat_epoch()
     {
-        return since_epoch() - ECAT_EPOCH_OFFSET;
+        return since_unix_epoch() - ECAT_EPOCH_OFFSET;
     }
 
     nanoseconds to_unix_epoch(nanoseconds ecat_epoch)
@@ -154,17 +156,17 @@ namespace kickcat
 
     std::string toString(ErrorCounters const& error_counters)
     {
-        std::stringstream os;
+        std::string os;
         for (int32_t i = 0; i < 4; ++i)
         {
-            os << "Port " << std::to_string(i) << " \n";
-            os << "  invalid frame:  " << std::to_string(error_counters.rx[i].invalid_frame) << " \n";
-            os << "  physical layer: " << std::to_string(error_counters.rx[i].physical_layer) << " \n";
-            os << "  forwarded:      " << std::to_string(error_counters.forwarded[i]) << " \n";
-            os << "  lost link:      " << std::to_string(error_counters.lost_link[i]) << " \n";
+            os += "Port " + toDec(i) + " \n";
+            os += "  invalid frame:  " + toDec(error_counters.rx[i].invalid_frame) + " \n";
+            os += "  physical layer: " + toDec(error_counters.rx[i].physical_layer) + " \n";
+            os += "  forwarded:      " + toDec(error_counters.forwarded[i]) + " \n";
+            os += "  lost link:      " + toDec(error_counters.lost_link[i]) + " \n";
         }
-        os << " \n";
-        return os.str();
+        os += " \n";
+        return os;
     }
 
 
@@ -206,62 +208,64 @@ namespace kickcat
 
     std::string toString(DLStatus const& dl_status)
     {
-        std::stringstream os;
+        std::string os;
 
-        os << "PDI Operational:  "          << std::to_string(dl_status.PDI_op) << " \n";
-        os << "PDI Watchdog Status : "      << std::to_string(dl_status.PDI_watchdog) << " \n";
-        os << "Enhanced Link Detection :  " << std::to_string(dl_status.EL_detection) << " \n";
-        os << "Reserved :  "                << std::to_string(dl_status.reserved) << " \n";
+        os += "PDI Operational:  "          + toDec(dl_status.PDI_op) + " \n";
+        os += "PDI Watchdog Status : "      + toDec(dl_status.PDI_watchdog) + " \n";
+        os += "Enhanced Link Detection :  " + toDec(dl_status.EL_detection) + " \n";
+        os += "Reserved :  "                + toDec(dl_status.reserved) + " \n";
 
         for (int i = 0; i < 4; ++i)
         {
-            os << "Port " << i << ": \n";
-            os << "  Physical Link :  " << std::to_string(dl_status.physicalLink(i)) << " \n";
-            os << "  Communications : " << std::to_string(dl_status.communication(i)) << " \n";
-            os << "  Loop Function :  " << std::to_string(dl_status.loop(i)) << " \n";
+            os += "Port " + toDec(i) + ": \n";
+            os += "  Physical Link :  " + toDec(dl_status.physicalLink(i)) + " \n";
+            os += "  Communications : " + toDec(dl_status.communication(i)) + " \n";
+            os += "  Loop Function :  " + toDec(dl_status.loop(i)) + " \n";
         }
 
-        return os.str();
+        return os;
     }
 
 
     std::string toString(eeprom::GeneralEntry const& general_entry)
     {
-        std::stringstream os;
-        os << "group_info_id: "           << std::to_string(general_entry.group_info_id) << " \n";
-        os << "image_name_id: "           << std::to_string(general_entry.image_name_id) << " \n";
-        os << "device_order_id: "         << std::to_string(general_entry.device_order_id) << " \n";
-        os << "device_name_id: "          << std::to_string(general_entry.device_name_id) << " \n";
-        os << "reserved_A: "              << std::to_string(general_entry.reserved_A) << " \n";
-        os << "FoE_details: "             << std::to_string(general_entry.FoE_details) << " \n";
-        os << "EoE_details: "             << std::to_string(general_entry.EoE_details) << " \n";
-        os << "SoE_channels: "            << std::to_string(general_entry.SoE_channels) << " \n";
-        os << "DS402_channels: "          << std::to_string(general_entry.DS402_channels) << " \n";
-        os << "SysmanClass: "             << std::to_string(general_entry.SysmanClass) << " \n";
-        os << "flags: "                   << std::to_string(general_entry.flags) << " \n";
-        os << "current_on_ebus: "         << std::to_string(general_entry.current_on_ebus) << " \n"; // mA, negative means feeding current
-        os << "group_info_id_dup: "       << std::to_string(general_entry.group_info_id_dup) << " \n";
-        os << "reserved_B: "              << std::to_string(general_entry.reserved_B) << " \n";
-        os << "physical_memory_address: " << std::to_string(general_entry.physical_memory_address) << " \n";
-        os << "port_0: %04x "             << std::to_string(general_entry.port_0) << " \n";
-        os << "port_1: %04x "             << std::to_string(general_entry.port_1) << " \n";
-        os << "port_2: %04x "             << std::to_string(general_entry.port_2) << " \n";
-        os << "port_3: %04x "             << std::to_string(general_entry.port_3) << " \n";
-        return os.str();
+        std::string os;
+        os += "group_info_id: "           + toDec(general_entry.group_info_id) + " \n";
+        os += "image_name_id: "           + toDec(general_entry.image_name_id) + " \n";
+        os += "device_order_id: "         + toDec(general_entry.device_order_id) + " \n";
+        os += "device_name_id: "          + toDec(general_entry.device_name_id) + " \n";
+        os += "reserved_A: "              + toDec(general_entry.reserved_A) + " \n";
+        os += "FoE_details: "             + toDec(general_entry.FoE_details) + " \n";
+        os += "EoE_details: "             + toDec(general_entry.EoE_details) + " \n";
+        os += "SoE_channels: "            + toDec(general_entry.SoE_channels) + " \n";
+        os += "DS402_channels: "          + toDec(general_entry.DS402_channels) + " \n";
+        os += "SysmanClass: "             + toDec(general_entry.SysmanClass) + " \n";
+        os += "flags: "                   + toDec(general_entry.flags) + " \n";
+        os += "current_on_ebus: "         + toDec(general_entry.current_on_ebus) + " \n"; // mA, negative means feeding current
+        os += "group_info_id_dup: "       + toDec(general_entry.group_info_id_dup) + " \n";
+        os += "reserved_B: "              + toDec(general_entry.reserved_B) + " \n";
+        os += "physical_memory_address: " + toDec(general_entry.physical_memory_address) + " \n";
+        os += "port_0: %04x "             + toDec(general_entry.port_0) + " \n";
+        os += "port_1: %04x "             + toDec(general_entry.port_1) + " \n";
+        os += "port_2: %04x "             + toDec(general_entry.port_2) + " \n";
+        os += "port_3: %04x "             + toDec(general_entry.port_3) + " \n";
+        return os;
     }
 
 
     std::string toString(DatagramHeader const& header)
     {
-        std::stringstream os;
-        os << "Header \n";
-        os << "  Command :   "  << toString(Command(header.command)) << "\n";
-        os << "  index :  "     << std::to_string(header.index) << "\n";
-        os << "  length :  "    << std::to_string(header.len) << "\n";
-        os << "  circulating  " << std::to_string(header.circulating) << "\n";
-        os << "  multiple  "    << std::to_string(header.multiple) << "\n";
-        os << "  IRQ  "         << std::to_string(header.irq) << "\n";
-        return os.str();
+        std::string os;
+        os += "Header \n";
+        os += "  Command :   ";
+        os += toString(Command(header.command));
+        os += "\n";
+        os += "  index :  "     + toDec(header.index) + "\n";
+        os += "  length :  "    + toDec(header.len) + "\n";
+        os += "  circulating  " + toDec(header.circulating) + "\n";
+        os += "  multiple  "    + toDec(header.multiple) + "\n";
+        os += "  IRQ  "         + toDec(header.irq) + "\n";
+        return os;
     }
 
 

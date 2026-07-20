@@ -174,7 +174,7 @@ namespace kickcat
 
     void Bus::waitForState(Slave& slave, State request, nanoseconds timeout, std::function<void()> background_task)
     {
-        nanoseconds now = since_epoch();
+        nanoseconds start = now();
         while (true)
         {
             background_task();
@@ -182,7 +182,7 @@ namespace kickcat
             {
                 return;
             }
-            if (elapsed_time(now) > timeout)
+            if (elapsed_time(start) > timeout)
             {
                 THROW_ERROR("Timeout");
             }
@@ -235,7 +235,7 @@ namespace kickcat
 
     void Bus::waitForState(State request, nanoseconds timeout, std::function<void()> background_task)
     {
-        nanoseconds now = since_epoch();
+        nanoseconds start = now();
 
         while (true)
         {
@@ -257,7 +257,7 @@ namespace kickcat
                 return;
             }
 
-            if (elapsed_time(now) > timeout)
+            if (elapsed_time(start) > timeout)
             {
                 THROW_ERROR("Timeout");
             }
@@ -1282,7 +1282,7 @@ namespace kickcat
 
         bool acknowledged = false;
 
-        nanoseconds start_time = since_epoch();
+        nanoseconds start_time = now();
         while (not acknowledged)
         {
             link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::EEPROM_CONTROL), &req, sizeof(req), process, error);

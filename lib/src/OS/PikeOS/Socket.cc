@@ -83,7 +83,7 @@ namespace kickcat
 
     int32_t Socket::read(void* frame, int32_t frame_size)
     {
-        nanoseconds deadline = since_epoch() + timeout_;
+        nanoseconds deadline = now() + timeout_;
         do
         {
             vm_io_buf_id_t rx = vm_io_sbuf_rx_get(&sbuf_, flags_); // 1 = non block
@@ -104,7 +104,7 @@ namespace kickcat
             std::memcpy(frame, rxbuf, to_copy);
             vm_io_sbuf_rx_free(&sbuf_, rx);
             return to_copy;
-        } while (since_epoch() < deadline);
+        } while (now() < deadline);
 
         return -EIO; // ETIMEDOUT or ETIME code unavailable on PikeOS
     }

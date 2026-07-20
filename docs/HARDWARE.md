@@ -34,7 +34,7 @@ See [NuttX prerequisites](#nuttx-prerequisites) before starting.
 ### Step 2: Flash the firmware
 
 ```bash
-./examples/slave/nuttx/lan9252/freedom-k64f/deploy.sh \
+./examples/slave/lan9252/freedom-k64f/nuttx/deploy.sh \
     build_freedom-k64f/easycat_frdm_k64f.bin
 ```
 
@@ -45,7 +45,7 @@ The slave requires EEPROM configuration with device information:
 ```bash
 # Connect the slave to your PC via Ethernet, then write the EEPROM.
 # "?" auto-detects the interface where the slave is connected.
-sudo ./tools/eeprom -s 0 -c write -f examples/slave/nuttx/lan9252/freedom-k64f/eeprom.bin -i "?"
+sudo ./tools/eeprom -s 0 -c write -f examples/slave/lan9252/freedom-k64f/nuttx/eeprom.bin -i "?"
 ```
 
 ### Step 4: Run the master
@@ -136,7 +136,7 @@ The Python interpreter needs raw-socket capabilities:
 
 ### Slave examples
 
-Located in `examples/slave/nuttx/`. Supported boards:
+Located in `examples/slave/<pdi-chip>/<board>/<os>/`. Supported boards:
 
 - **XMC4800** (Infineon XMC4800 Relax Kit)
 - **Arduino Due** (with EasyCAT shield + LAN9252)
@@ -183,15 +183,15 @@ Examples:
 ```bash
 # XMC4800
 ./scripts/build_slave_bin.sh xmc4800-relax ~/nuttxspace/nuttx
-./examples/slave/nuttx/xmc4800/deploy.sh build_xmc4800-relax/xmc4800_relax.bin
+./examples/slave/xmc4800/xmc4800-relax/nuttx/deploy.sh build_xmc4800-relax/xmc4800_relax.bin
 
 # Arduino Due
 ./scripts/build_slave_bin.sh arduino-due ~/nuttxspace/nuttx
-./examples/slave/nuttx/lan9252/arduino-due/deploy.sh build_arduino-due/easycat_arduino_due.bin
+./examples/slave/lan9252/arduino-due/nuttx/deploy.sh build_arduino-due/easycat_arduino_due.bin
 
 # Freedom K64F
 ./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx
-./examples/slave/nuttx/lan9252/freedom-k64f/deploy.sh build_freedom-k64f/easycat_frdm_k64f.bin
+./examples/slave/lan9252/freedom-k64f/nuttx/deploy.sh build_freedom-k64f/easycat_frdm_k64f.bin
 ```
 
 CI artifacts can be extracted and deployed with:

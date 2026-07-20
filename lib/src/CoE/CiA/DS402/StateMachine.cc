@@ -16,7 +16,7 @@ namespace kickcat::CoE::CiA::DS402
                 {
                     case State::OFF:
                     {
-                        start_motor_timestamp_ = since_epoch();
+                        start_motor_timestamp_ = now();
                         if ((status_word_ & status::value::FAULT_STATE) == status::value::FAULT_STATE)
                         {
                             was_faulted_ = true;
@@ -28,7 +28,7 @@ namespace kickcat::CoE::CiA::DS402
                             if (elapsed_time(toggle_timestamp_) >= FAULT_RESET_HALF_PERIOD)
                             {
                                 fault_reset_active_ = not fault_reset_active_;
-                                toggle_timestamp_ = since_epoch();
+                                toggle_timestamp_ = now();
                             }
 
                             if (fault_reset_active_)
@@ -49,7 +49,7 @@ namespace kickcat::CoE::CiA::DS402
                             if (not stabilizing_)
                             {
                                 stabilizing_ = true;
-                                stabilization_timestamp_ = since_epoch();
+                                stabilization_timestamp_ = now();
                             }
                             else if (elapsed_time(stabilization_timestamp_) >= STABILIZATION_DELAY)
                             {

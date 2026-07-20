@@ -93,7 +93,7 @@ Then run a master against an emulated slave -- no hardware, single process:
 
 ```bash
 ./build/examples/master/simulated_bus/simulated_bus \
-    -f examples/slave/nuttx/lan9252/freedom-k64f/freedom-k64f.xml -t Board
+    -f examples/slave/lan9252/freedom-k64f/nuttx/freedom-k64f.xml -t Board
 ```
 
 Point `-f` at any vendor ESI XML and `-t` at the device `<Type>` to emulate a
