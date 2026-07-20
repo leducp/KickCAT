@@ -1,9 +1,11 @@
-#include <sstream>
+#include <cstdio>
+#include <string>
 
 #include "Error.h"
 #include "protocol.h"
 #include "CoE/protocol.h"
 #include "CoE/mailbox/request.h"
+#include "kickcat/string_conversion.h"
 
 namespace kickcat::CoE
 {
@@ -105,13 +107,15 @@ namespace kickcat::CoE
             {
                 auto* sdo = pointData<CoE::ServiceData>(header);
 
-                std::stringstream result;
+                std::string result;
 
-                result << "SDO (" << std::hex << sdo->index << "." << std::dec << (int32_t)sdo->subindex << ")\n";
-                result << "  service: request\n";
-                result << "  command: " << CoE::SDO::request::toString(sdo->command) << '\n';
+                result += "SDO (" + toHex(sdo->index) + "." + toDec(static_cast<int32_t>(sdo->subindex)) + ")\n";
+                result += "  service: request\n";
+                result += "  command: ";
+                result += CoE::SDO::request::toString(sdo->command);
+                result += "\n";
 
-                return result.str();
+                return result;
             }
 
             case Service::SDO_RESPONSE:
@@ -184,26 +188,32 @@ namespace kickcat::CoE
 
         std::string toString(ObjectDescription const& desc)
         {
-            std::stringstream os;
-            os << "Object Description \n";
-            os << "  index:        0x" << std::hex << desc.index          << "\n";
-            os << "  data type:    " << toString(desc.data_type)          << "\n";
-            os << "  max subindex: " << std::to_string(desc.max_subindex) << "\n";
-            os << "  object code:  " << toString(desc.object_code)        << "\n";
-            return os.str();
+            std::string os;
+            os += "Object Description \n";
+            os += "  index:        0x" + toHex(desc.index) + "\n";
+            os += "  data type:    ";
+            os += toString(desc.data_type);
+            os += "\n";
+            os += "  max subindex: " + toDec(desc.max_subindex) + "\n";
+            os += "  object code:  ";
+            os += toString(desc.object_code);
+            os += "\n";
+            return os;
         }
 
         std::string toString(EntryDescription const& desc)
         {
-            std::stringstream os;
-            os << "Entry Description \n";
-            os << "  index:         0x" << std::hex << desc.index             << "\n";
-            os << "  subindex:      0x" << std::hex << static_cast<uint16_t>(desc.subindex) << "\n";
-            os << "  value info:    " << ValueInfo::toString(desc.value_info) << "\n";
-            os << "  data type:     " << toString(desc.data_type)             << "\n";
-            os << "  bit length:    " << std::to_string(desc.bit_length)      << "\n";
-            os << "  object access:"  << Access::toString(desc.access)        << "\n";
-            return os.str();
+            std::string os;
+            os += "Entry Description \n";
+            os += "  index:         0x" + toHex(desc.index) + "\n";
+            os += "  subindex:      0x" + toHex(static_cast<uint16_t>(desc.subindex)) + "\n";
+            os += "  value info:    " + ValueInfo::toString(desc.value_info) + "\n";
+            os += "  data type:     ";
+            os += toString(desc.data_type);
+            os += "\n";
+            os += "  bit length:    " + toDec(desc.bit_length) + "\n";
+            os += "  object access:" + Access::toString(desc.access) + "\n";
+            return os;
         }
     }
 }

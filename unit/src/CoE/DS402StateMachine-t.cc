@@ -13,15 +13,15 @@ protected:
 
     void SetUp() override
     {
-        resetSinceEpoch();
+        resetMockClock();
     }
 
-    // Each since_epoch() call advances the mock clock by 1ms.
+    // Each now() call advances the mock clock by 1ms.
     void advanceClock(milliseconds duration)
     {
         for (int i = 0; i < duration.count(); ++i)
         {
-            since_epoch();
+            now();
         }
     }
 

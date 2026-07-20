@@ -28,7 +28,7 @@ class BusTest : public testing::Test
 public:
     void SetUp() override
     {
-        resetSinceEpoch();
+        resetMockClock();
         bus.configureWaitLatency(0ns, 0ns);
         initBus();
     }

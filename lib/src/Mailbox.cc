@@ -215,7 +215,7 @@ namespace kickcat::mailbox::request
 
         if (timeout_ != 0ns)
         {
-            timeout_ += since_epoch();
+            timeout_ += now();
         }
     }
 

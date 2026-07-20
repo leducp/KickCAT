@@ -43,13 +43,17 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/slave/slave-t.cc
                             src/slave/PDO-t.cc
                             src/Mutex-t.cc
-                            src/Time.cc
+
+                            # Whole-TU override of the real Unix/Time.cc linked into libkickcat.a:
+                            # same symbol set (now/since_unix_epoch/sleep), resolved from this
+                            # exe's own object first. Must stay in symbol-lockstep with it.
+                            ${CMAKE_SOURCE_DIR}/lib/src/OS/Test/Time.cc
 )
 
 # ESI fixtures for Parser-t.cc, copied next to the test binary as a build
 # dependency so editing a fixture re-copies it without re-running CMake.
 set(KICKCAT_ESI_FIXTURES
-    ${CMAKE_SOURCE_DIR}/examples/slave/nuttx/xmc4800/boards/wdc_foot/foot.xml
+    ${CMAKE_SOURCE_DIR}/examples/slave/xmc4800/wdc_foot/nuttx/foot.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_basic.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_complex.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_multi_device.xml

@@ -456,14 +456,14 @@ TEST_F(CoE_Request, SDO_timedout)
     // unrelated reply to process the message
     header->type = mailbox::Type::VoE;
 
-    nanoseconds now = since_epoch();
+    nanoseconds start = now();
 
-    ASSERT_FALSE(mailbox.receive(raw_message, now + 1ms)); // unrelated message -> false
-    ASSERT_EQ(MessageStatus::RUNNING, message->status(now + 1ms));
+    ASSERT_FALSE(mailbox.receive(raw_message, start + 1ms)); // unrelated message -> false
+    ASSERT_EQ(MessageStatus::RUNNING, message->status(start + 1ms));
     ASSERT_EQ(1, mailbox.to_process.size());
 
-    ASSERT_FALSE(mailbox.receive(raw_message, now + TIMEOUT)); // unrelated message -> false
-    ASSERT_EQ(MessageStatus::TIMEDOUT, message->status(now + TIMEOUT));
+    ASSERT_FALSE(mailbox.receive(raw_message, start + TIMEOUT)); // unrelated message -> false
+    ASSERT_EQ(MessageStatus::TIMEDOUT, message->status(start + TIMEOUT));
     ASSERT_EQ(0, mailbox.to_process.size());
 }
 

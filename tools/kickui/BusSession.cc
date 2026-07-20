@@ -1283,9 +1283,9 @@ namespace kickcat::kickui
                     jitter_rng ^= jitter_rng << 13;
                     jitter_rng ^= jitter_rng >> 7;
                     jitter_rng ^= jitter_rng << 17;
-                    nanoseconds const until = since_epoch()
+                    nanoseconds const until = now()
                         + nanoseconds{static_cast<int64_t>(jitter_rng % static_cast<uint64_t>(jitter + 1))};
-                    while (since_epoch() < until) { /* burn the injected jitter */ }
+                    while (now() < until) { /* burn the injected jitter */ }
                 }
 
                 for (auto& r : rts)
@@ -1321,7 +1321,7 @@ namespace kickcat::kickui
                         r.cmd.manual_target = seed;        // persist for the next ticks
                         r.jog_accum = drive.actualPosition();
                         r.ramped    = seed;
-                        r.gen_start = since_epoch();
+                        r.gen_start = now();
                     }
 
                     int source = cmd.source;
@@ -1360,7 +1360,7 @@ namespace kickcat::kickui
                         // start_time/initial_position when the sine begins.
                         if (r.prev_source != source)
                         {
-                            r.gen_start = since_epoch();
+                            r.gen_start = now();
                             if (position_mode)
                             {
                                 double a = drive.actualPosition();

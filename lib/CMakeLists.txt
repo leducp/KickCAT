@@ -21,7 +21,21 @@ set(KICKCAT_SOURCES
 )
 
 
-if (NUTTX)
+if (KICKOS)
+  # KickOS backend. Time is real; Mutex/ConditionVariable/SharedMemory are throw-if-used
+  # placeholders so the full library still links (see OS/KickOS/*.cc). Must precede the UNIX
+  # branch: the KickOS sim builds on a host where CMake also defines UNIX.
+  set(OS_LIB_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/Mutex.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/ConditionVariable.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/SharedMemory.cc
+  )
+  set(OS_LIBRARIES )
+  # Selects the KickOS os_types branch in types.h, for the library and its consumers.
+  set(OS_COMPILE_DEFS KICKOS)
+elseif (NUTTX)
+  # NuttX is POSIX enough to share the Unix time backend (clock_gettime/clock_nanosleep).
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/NuttX/Socket.cc
@@ -52,7 +66,7 @@ elseif (WIN32)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/SharedMemory.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Timer.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/ConditionVariable.cc
   )
@@ -121,6 +135,7 @@ endif()
 
 add_library(kickcat ${KICKCAT_SOURCES} ${OS_LIB_SOURCES})
 kickcat_publish_includes(kickcat ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(kickcat PUBLIC ${OS_COMPILE_DEFS})
 
 if (ENABLE_AF_XDP AND LINUX)
   target_sources(kickcat PRIVATE ${BPF_HDR})
@@ -132,16 +147,15 @@ if (ENABLE_AF_XDP AND LINUX)
   target_compile_definitions(kickcat PUBLIC KICKCAT_AF_XDP_ENABLED)
 endif()
 
-# Provide default implementation for since_epoch()
-add_library(kickcat_time ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/SinceEpoch.cc)
-target_include_directories(kickcat_time
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/kickcat)
-
-target_link_libraries(kickcat ${OS_LIBRARIES} kickcat_time)
+target_link_libraries(kickcat ${OS_LIBRARIES})
 
 set_kickcat_properties(kickcat)
 
-add_subdirectory(master)
+if (NOT KICKOS)
+  # master/src/helpers.cc includes TapSocket.h (host-only); the KickOS build
+  # needs the slave path only.
+  add_subdirectory(master)
+endif()
 add_subdirectory(slave)
 
 # Host-only simulation support; needs the ESI parser + JSON. Built with the

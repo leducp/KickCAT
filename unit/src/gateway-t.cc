@@ -172,7 +172,7 @@ TEST_F(GatewayTest, evict_failed_requests)
     gateway.fetchRequest();
     ASSERT_EQ(1u, gateway.pendingRequests());
 
-    // Exhaust the message timeout (since_epoch() advances at each call in unit tests).
+    // Exhaust the message timeout (the mocked clock advances at each call in unit tests).
     while (msg->status() == MessageStatus::RUNNING)
     {
     }

@@ -17,8 +17,8 @@ namespace kickcat
 
     void Timer::start(nanoseconds sync_point)
     {
-        nanoseconds now = since_epoch();
-        nanoseconds delta = now - sync_point;
+        nanoseconds current = now();
+        nanoseconds delta = current - sync_point;
 
         int64_t periods_to_skip = 0;
         if (delta >= 0ns)

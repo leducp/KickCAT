@@ -63,7 +63,7 @@ namespace kickcat
     int32_t Lan9252::waitCSR()
     {
         uint32_t esc_status;
-        nanoseconds start_time = since_epoch();
+        nanoseconds start_time = now();
         do
         {
             readInternalRegister(ECAT_CSR_CMD, esc_status);
@@ -163,7 +163,7 @@ namespace kickcat
             uint8_t* buffer_pos = static_cast<uint8_t*>(data);
 
             uint16_t fifo_slot_available; // slot of 4 bytes
-            nanoseconds start_time = since_epoch();
+            nanoseconds start_time = now();
             do
             {
                 readInternalRegister(ECAT_PRAM_RD_CMD, fifo_slot_available);

@@ -40,6 +40,14 @@ namespace kickcat
         }
 
 #ifndef __MINGW64__
+        // wait_until() builds its abstime from now() (CLOCK_MONOTONIC); the cond must wait on the
+        // same clock or every timed wait deadlines instantly against CLOCK_REALTIME.
+        rc = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+        if (rc != 0)
+        {
+            THROW_SYSTEM_ERROR_CODE("pthread_condattr_setclock()", rc);
+        }
+
         if (&cond_ != pcond_)
         {
             rc = pthread_condattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
@@ -79,7 +87,7 @@ namespace kickcat
 
     int ConditionVariable::wait_until(Mutex& mutex, nanoseconds timeout, std::function<bool(void)> stopWaiting)
     {
-        nanoseconds deadline = since_epoch() + timeout;
+        nanoseconds deadline = now() + timeout;
         seconds deadline_sec = duration_cast<seconds>(deadline);
         deadline -= deadline_sec;
         struct timespec abstime{deadline_sec.count(), deadline.count()};

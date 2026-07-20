@@ -92,8 +92,8 @@ int main()
 ```
 
 You can also write `od_populator.cc` by hand by implementing `CoE::createOD()`.
-See `examples/slave/nuttx/xmc4800/od_populator.cc` and
-`examples/slave/nuttx/lan9252/freedom-k64f/od_populator.cc` for references.
+See `examples/slave/xmc4800/xmc4800-relax/nuttx/od_populator.cc` and
+`examples/slave/lan9252/freedom-k64f/nuttx/od_populator.cc` for references.
 
 ## ethercat_gui (Python, PySide6)
 

@@ -83,10 +83,6 @@ int main(int argc, char *argv[])
         bus.waitForState(State::INIT, 5000ms);
 
         sync_point = bus.enableDC(1ms, 500us, 100ms);
-        printf("now %f, sp: %f -> %f\n",
-            seconds_f(since_epoch()).count(),
-            seconds_f(sync_point).count(),
-            seconds_f(sync_point - since_epoch()).count());
 
         bus.requestState(State::PRE_OP);
         bus.waitForState(State::PRE_OP, 3000ms);
@@ -202,7 +198,7 @@ int main(int argc, char *argv[])
 
     link->setTimeout(1500us);
 
-    nanoseconds start_time = kickcat::since_epoch();
+    nanoseconds start_time = kickcat::now();
     constexpr int64_t LOOP_NUMBER = 12 * 3600 * 1000; // 12h
     //constexpr int64_t LOOP_NUMBER = 1000 * 60 * 5; // 5min
     int64_t last_error = 0;
@@ -235,7 +231,7 @@ int main(int argc, char *argv[])
                 {
                     motor.initial_position = motor.drive->actualPositionRaw();
                 }
-                start_time = kickcat::since_epoch();
+                start_time = kickcat::now();
             }
 
             if (i > 4000)

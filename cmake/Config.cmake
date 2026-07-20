@@ -5,7 +5,12 @@ macro(set_kickcat_properties binary)
       CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
       CXX_EXTENSIONS NO
-      POSITION_INDEPENDENT_CODE ON
       COMPILE_FLAGS ${WARNINGS_FLAGS}
     )
+    # Only the wheel build (SKBUILD) folds static libkickcat into the nanobind .so, which
+    # needs PIC. Bare-metal arm (KickOS) has no loader to place the resulting .got/
+    # .data.rel.ro, so it must never get PIC -- and SKBUILD is never set there.
+    if (SKBUILD)
+      set_target_properties(${binary} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
 endmacro()

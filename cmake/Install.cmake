@@ -27,7 +27,7 @@ function(kickcat_install_package os_libraries)
     return()
   endif()
 
-  install(TARGETS kickcat kickcat_time
+  install(TARGETS kickcat
     EXPORT KickCATTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

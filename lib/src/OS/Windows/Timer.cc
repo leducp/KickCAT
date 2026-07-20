@@ -8,12 +8,12 @@ namespace kickcat
 {
     std::error_code Timer::wait_next_tick()
     {
-        nanoseconds now = since_epoch();
-        if (next_deadline_ > now)
+        nanoseconds current = now();
+        if (next_deadline_ > current)
         {
-            std::this_thread::sleep_for(next_deadline_ - now);
+            std::this_thread::sleep_for(next_deadline_ - current);
         }
-        last_wakeup_ = since_epoch();
+        last_wakeup_ = now();
 
         next_deadline_ += period_;
         last_overran_ = false;

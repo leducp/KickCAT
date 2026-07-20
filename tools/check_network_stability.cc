@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
 
         if (elapsed_time(last_time) > 5s)
         {
-            last_time = since_epoch();
+            last_time = now();
             uint32_t tx_packets = 0, rx_packets = 0, rx_errors = 0;
             
             file_tx_packets.clear();

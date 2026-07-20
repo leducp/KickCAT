@@ -142,7 +142,7 @@ namespace
 
         while (running)
         {
-            auto t1 = since_epoch();
+            auto t1 = now();
 
             bool serviced = serviceFrame(socket, socket_redundancy, false);
             if (redundancy)
@@ -193,7 +193,7 @@ namespace
                 else                       { current_value += 0x11; }
             }
 
-            auto t2 = since_epoch();
+            auto t2 = now();
             stats.push_back(t2 - t1);
             if (stats.size() >= 1000)
             {

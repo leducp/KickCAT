@@ -1,6 +1,6 @@
 // Distributed Clocks end-to-end tests: a real master Bus driving emulated slaves
 // whose local clocks (drift injection, time control loop) derive from the mocked
-// since_epoch(), so propagation delay measurement, offset compensation and drift
+// clock, so propagation delay measurement, offset compensation and drift
 // convergence are fully deterministic.
 #include <gtest/gtest.h>
 
@@ -105,7 +105,7 @@ namespace
     protected:
         void createSlaves(size_t n, nanoseconds forwarding_delay)
         {
-            resetSinceEpoch();
+            resetMockClock();
             slaves_ = makeSlaves(n);
             for (auto& s : slaves_)
             {
@@ -139,7 +139,7 @@ namespace
     protected:
         void SetUp() override
         {
-            resetSinceEpoch();
+            resetMockClock();
             slaves_ = makeSlaves(3);
             for (auto& s : slaves_)
             {
@@ -282,10 +282,14 @@ TEST_F(DcBusTest, enable_dc_configures_time_loop_and_sync0)
         esc.read(reg::DC_SYNC_PULSE_LENGTH, &pulse_length, sizeof(pulse_length));
         EXPECT_EQ(0, pulse_length);
 
-        // The returned sync point is the start time minus delay and shift, in unix epoch.
+        // The returned sync point is the DC start grid projected into the Timer's monotonic now()
+        // domain: it sits near now(), not at wall/ECAT-epoch scale (the pre-split value that made
+        // Timer sleep ~decades). The soft PLL trims the sub-cycle residual afterwards.
         if (i == 0)
         {
-            EXPECT_EQ(ret, to_unix_epoch(nanoseconds(start_time) - delay - shift));
+            nanoseconds const mono = now();
+            EXPECT_LT(abs((ret - mono).count()), duration_cast<nanoseconds>(100ms).count());
+            EXPECT_LT(ret.count(), to_unix_epoch(0ns).count());
         }
     }
 
@@ -426,7 +430,7 @@ TEST_F(DcRingTest, split_ring_tail_segment_keeps_tracking_master_time)
     ASSERT_FALSE(net_->ringIntact());
 
     // The switch from reference-slave time to master prefill time is a millisecond
-    // scale step under the mocked clock (1ms per since_epoch() call); the loop
+    // scale step under the mocked clock (1ms per now() call); the loop
     // slews it away at the speed-counter-start bound (~4us per cycle).
     for (int i = 0; i < 400; ++i)
     {

@@ -308,7 +308,7 @@ namespace kickcat
 
     void Link::read()
     {
-        nanoseconds deadline = since_epoch() + timeout_;
+        nanoseconds deadline = now() + timeout_;
 
         socket_redundancy_->setTimeout(timeout_);
         if (readFrame(*socket_redundancy_, frame_nominal_) < 0)
@@ -316,7 +316,7 @@ namespace kickcat
             link_warning("Nominal frame read fail\n");
         }
 
-        nanoseconds remaining_timeout = deadline - since_epoch();
+        nanoseconds remaining_timeout = deadline - now();
         nanoseconds min_timeout = 0us;
         nanoseconds timeout_second_socket = std::max(remaining_timeout, min_timeout);
 

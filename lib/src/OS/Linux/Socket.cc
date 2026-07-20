@@ -175,7 +175,7 @@ namespace kickcat
 
     int32_t Socket::read(void* frame, int32_t frame_size)
     {
-        nanoseconds deadline = since_epoch() + timeout_;
+        nanoseconds deadline = now() + timeout_;
         do
         {
             ssize_t read_size = ::recv(fd_, frame, frame_size, flags_);
@@ -193,7 +193,7 @@ namespace kickcat
             }
 
             return static_cast<int32_t>(read_size);
-        } while (since_epoch() < deadline);
+        } while (now() < deadline);
 
         return -ETIMEDOUT;
     }

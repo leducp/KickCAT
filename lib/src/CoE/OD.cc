@@ -1,8 +1,10 @@
-#include <sstream>
+#include <cstdio>
+#include <string>
 #include <algorithm>
 #include <string_view>
 
 #include "kickcat/CoE/OD.h"
+#include "kickcat/string_conversion.h"
 
 namespace kickcat::CoE
 {
@@ -108,13 +110,12 @@ namespace kickcat::CoE
 
     std::string Entry::dataToString() const
     {
-        std::stringstream result;
         if (data == nullptr)
         {
-            result << "nullptr";
-            return result.str();
+            return "nullptr";
         }
 
+        char buf[64];
         switch (type)
         {
             case CoE::DataType::INTEGER8:
@@ -122,29 +123,35 @@ namespace kickcat::CoE
             case CoE::DataType::BYTE:
             case CoE::DataType::BOOLEAN:
             {
-                /// StringStream take uint8_t as ASCII character. uint16 wrapper to avoid that.
-                uint16_t uint8Wrapper{0};
-                uint8Wrapper = *static_cast<uint8_t const *>(data);
-                result << uint8Wrapper;
-                break;
+                // A uint8_t rendered as a stream would print an ASCII character; widen it.
+                uint16_t uint8Wrapper = *static_cast<uint8_t const *>(data);
+                return toDec(uint8Wrapper);
             }
-            case CoE::DataType::INTEGER16:  { result << *static_cast<int16_t  const *>(data); break; }
-            case CoE::DataType::UNSIGNED16: { result << *static_cast<uint16_t const *>(data); break; }
-            case CoE::DataType::INTEGER32:  { result << *static_cast<int32_t  const *>(data); break; }
-            case CoE::DataType::UNSIGNED32: { result << *static_cast<uint32_t const *>(data); break; }
-            case CoE::DataType::REAL32:     { result << *static_cast<float    const *>(data); break; }
-            case CoE::DataType::INTEGER64:  { result << *static_cast<int64_t  const *>(data); break; }
-            case CoE::DataType::UNSIGNED64: { result << *static_cast<uint64_t const *>(data); break; }
+            case CoE::DataType::INTEGER16:  { return toDec(*static_cast<int16_t  const *>(data)); }
+            case CoE::DataType::UNSIGNED16: { return toDec(*static_cast<uint16_t const *>(data)); }
+            case CoE::DataType::INTEGER32:  { return toDec(*static_cast<int32_t  const *>(data)); }
+            case CoE::DataType::UNSIGNED32: { return toDec(*static_cast<uint32_t const *>(data)); }
+            case CoE::DataType::REAL32:
+            {
+                std::snprintf(buf, sizeof(buf), "%g", static_cast<double>(*static_cast<float const *>(data)));
+                return std::string(buf);
+            }
+            case CoE::DataType::INTEGER64:  { return toDec(*static_cast<int64_t  const *>(data)); }
+            case CoE::DataType::UNSIGNED64: { return toDec(*static_cast<uint64_t const *>(data)); }
             case CoE::DataType::REAL64:
             {
-                result.precision(16);
-                result << *static_cast<double   const *>(data);
-                break;
+                std::snprintf(buf, sizeof(buf), "%.16g", *static_cast<double const *>(data));
+                return std::string(buf);
             }
             case CoE::DataType::VISIBLE_STRING:
             {
                 char const* rawString = static_cast<char const*>(data);
-                std::string_view strResult{rawString, strnlen(rawString, bitlen/8)};
+                std::string_view strResult{rawString, static_cast<std::string_view::size_type>(bitlen / 8)};
+                std::string_view::size_type nul = strResult.find('\0');
+                if (nul != std::string_view::npos)
+                {
+                    strResult = strResult.substr(0, nul);
+                }
                 return std::string(strResult);
             }
             default:
@@ -152,41 +159,43 @@ namespace kickcat::CoE
                 return "no rendered";
             }
         }
-
-        return result.str();
     }
 
     std::string toString(Entry const& entry)
     {
-        std::stringstream result;
+        std::string result;
 
-        result << "  * Subindex " << (int)entry.subindex << '\n';
-        result << "      Desc:   " << entry.description << '\n';
-        result << "      Type:   " << toString(entry.type) << '\n';
-        result << "      BitLen: " << entry.bitlen << '\n';
-        result << "      BitOff: " << entry.bitoff << '\n';
-        result << "      Access: " << Access::toString(entry.access) << '\n';
-        result << "      Data:   " << entry.dataToString();
+        result += "  * Subindex " + toDec(static_cast<int>(entry.subindex)) + "\n";
+        result += "      Desc:   " + entry.description + "\n";
+        result += "      Type:   ";
+        result += toString(entry.type);
+        result += "\n";
+        result += "      BitLen: " + toDec(entry.bitlen) + "\n";
+        result += "      BitOff: " + toDec(entry.bitoff) + "\n";
+        result += "      Access: " + Access::toString(entry.access) + "\n";
+        result += "      Data:   " + entry.dataToString();
 
-        return result.str();
+        return result;
     }
 
 
     std::string toString(Object const& object)
     {
-        std::stringstream result;
+        std::string result;
 
-        result << "Object 0x" << std::hex << object.index << std::dec << '\n';
-        result << "  Name:         " << object.name << '\n';
-        result << "  Code:         " << toString(object.code) << '\n';
-        result << "  Max subindex: " << object.entries.size() << '\n';
+        result += "Object 0x" + toHex(object.index) + "\n";
+        result += "  Name:         " + object.name + "\n";
+        result += "  Code:         ";
+        result += toString(object.code);
+        result += "\n";
+        result += "  Max subindex: " + toDec(object.entries.size()) + "\n";
 
         for (auto const& entry : object.entries)
         {
-            result << toString(entry) << "\n";
+            result += toString(entry) + "\n";
         }
 
-        return result.str();
+        return result;
     }
 
 
@@ -315,9 +324,11 @@ namespace kickcat::CoE
 
         auto where = [](uint16_t index, int subindex)
         {
-            std::stringstream ss;
-            ss << "0x" << std::hex << index << std::dec << "." << subindex;
-            return ss.str();
+            std::string s = "0x";
+            s += toHex(index);
+            s += ".";
+            s += toDec(subindex);
+            return s;
         };
 
         for (auto const& object : dict)

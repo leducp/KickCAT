@@ -12,14 +12,19 @@ namespace kickcat
 
     void sleep(nanoseconds ns);
 
-    // return the time in ns since epoch
-    nanoseconds since_epoch();
+    // Monotonic/steady clock in ns. Use this for every timeout, deadline,
+    // watchdog and delta: it never jumps backward and is immune to wall-clock
+    // adjustments. This is the primitive; wall-clock time is only for DC below.
+    nanoseconds now();
 
     // return time in ns since the processus start
     nanoseconds since_start();
 
     // return the time since since another point in time
-    nanoseconds elapsed_time(nanoseconds start = since_epoch());
+    nanoseconds elapsed_time(nanoseconds start = now());
+
+    // Wall-clock ns since the Unix epoch (1970-01-01).
+    nanoseconds since_unix_epoch();
 
     // Convert an std::chrono duration to a POSIX timespec
     constexpr timespec to_timespec(nanoseconds time)

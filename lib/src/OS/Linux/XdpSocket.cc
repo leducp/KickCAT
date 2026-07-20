@@ -285,7 +285,7 @@ namespace kickcat
 
     int32_t XdpSocket::read(void* frame, int32_t frame_size)
     {
-        nanoseconds deadline = since_epoch() + timeout_;
+        nanoseconds deadline = now() + timeout_;
 
         do
         {
@@ -316,7 +316,7 @@ namespace kickcat
             }
 
             sleep(polling_period_);
-        } while (since_epoch() < deadline);
+        } while (now() < deadline);
 
         return -ETIMEDOUT;
     }

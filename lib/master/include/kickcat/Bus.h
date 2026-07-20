@@ -46,7 +46,7 @@ namespace kickcat
         /// \param    cycle_time    Duration of the slave cycle time
         /// \param    shift_cycle   When the DC SYNC0 shall be generated in the cycle
         /// \param    start_delay   Delay before activating the DC cycle
-        /// \return   an absolute time point that serve as a sync point with the slaves DC cycle
+        /// \return   a now()-domain sync point for Timer::start, phase-aligned to the slaves DC cycle
         nanoseconds enableDC(nanoseconds cycle_time = 1ms, nanoseconds shift_cycle = 500us, nanoseconds start_delay = 100ms);
 
         /// \return the number of slaves detected on the bus

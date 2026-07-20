@@ -23,7 +23,7 @@ namespace kickcat
         /// \brief  Start (or restart) the timer.
         /// \details Aligns the next deadline to sync_point + N*period so that it lies in the future.
         ///          Safe to call multiple times.
-        void start(nanoseconds sync_point = since_epoch());
+        void start(nanoseconds sync_point = now());
 
         ///  Change the timer values to the new provided values and reset it.
         ///  This does not take effect before the timer is restarted.

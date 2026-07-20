@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
     std::vector<uint64_t> no_handler_window(60, 0);
     size_t window_pos = 0;
 
-    auto last_tick = since_epoch();
+    auto last_tick = now();
 
     Timer timer{1ms};
     timer.start();
@@ -193,10 +193,10 @@ int main(int argc, char *argv[])
 
         bus.processAwaitingFrames();
 
-        auto now = since_epoch();
-        if (now - last_tick >= 1s)
+        auto current = now();
+        if (current - last_tick >= 1s)
         {
-            last_tick = now;
+            last_tick = current;
 
             lost_window[window_pos]        = lost_in_sec;
             send_error_window[window_pos]  = send_error_in_sec;
