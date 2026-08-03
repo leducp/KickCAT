@@ -19,6 +19,10 @@ namespace kickcat
     // Topology utils
     void print(std::unordered_map<uint16_t, uint16_t> const& topology_mapping);
 
+    /// \brief Same tree, with each node annotated with its SII name and type so the wiring
+    ///        can be read against the physical devices instead of bare station addresses.
+    void print(std::unordered_map<uint16_t, uint16_t> const& topology_mapping, std::vector<Slave> const& slaves);
+
     // Helpers to parse register and get human readable output from them
     char const* fmmuTypeToString(uint8_t fmmu_type);
     char const* typeToString(uint8_t esc_type);
