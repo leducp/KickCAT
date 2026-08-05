@@ -7,6 +7,7 @@ set(KICKCAT_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/TapSocket.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/SIIParser.cc
 
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Filesystem.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/SoftPll.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Time.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Timer.cc
@@ -30,6 +31,7 @@ if (KICKOS)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/Mutex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/ConditionVariable.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/SharedMemory.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/KickOS/Filesystem.cc
   )
   set(OS_LIBRARIES )
   # Selects the KickOS os_types branch in types.h, for the library and its consumers.
@@ -38,6 +40,7 @@ elseif (NUTTX)
   # NuttX is POSIX enough to share the Unix time backend (clock_gettime/clock_nanosleep).
   set(OS_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Time.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Filesystem.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/NuttX/Socket.cc
   )
   set(OS_LIBRARIES )
@@ -46,6 +49,7 @@ elseif(PIKEOS)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Socket.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/PikeOS/ErrorCategory.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Filesystem.cc
   )
 
   set(OS_LIBRARIES )
@@ -59,6 +63,7 @@ elseif (UNIX)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/SharedMemory.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/ConditionVariable.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Thread.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Filesystem.cc
   )
   set(OS_LIBRARIES pthread rt)
 elseif (WIN32)
@@ -69,6 +74,7 @@ elseif (WIN32)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Time.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/Mutex.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Unix/ConditionVariable.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/OS/Windows/Filesystem.cc
   )
 
   find_package(npcap CONFIG REQUIRED)

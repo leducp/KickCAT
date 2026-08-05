@@ -1803,7 +1803,7 @@ uint16_t Parser::loadAccess(XMLNode* node)
 
             std::string restrictions{raw_restrictions};
             std::transform(restrictions.begin(), restrictions.end(), restrictions.begin(),
-                [](char c){ return std::tolower(c); });
+                [](char c){ return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
 
             uint16_t result = 0;
             if (restrictions.find("preop")  != std::string::npos) { result |= CoE::Access::READ_PREOP;  }
@@ -1829,11 +1829,11 @@ uint16_t Parser::loadAccess(XMLNode* node)
     {
         for (char const* c = mapping; *c != '\0'; ++c)
         {
-            if (std::tolower(*c) == 'r')
+            if (std::tolower(static_cast<unsigned char>(*c)) == 'r')
             {
                 flags |= CoE::Access::RxPDO;
             }
-            if (std::tolower(*c) == 't')
+            if (std::tolower(static_cast<unsigned char>(*c)) == 't')
             {
                 flags |= CoE::Access::TxPDO;
             }

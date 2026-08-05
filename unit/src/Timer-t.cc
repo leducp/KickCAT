@@ -5,6 +5,7 @@
 
 #include <cstdint>
 
+#include "kickcat/Error.h"
 #include "kickcat/OS/Timer.h"
 
 using namespace kickcat;
@@ -43,4 +44,17 @@ TEST(TimerPllTest, update_period_rebuilds_the_pll_on_the_new_grid)
     timer.update_period(2ms);
     EXPECT_EQ(0u, timer.pll().samples());
     EXPECT_FALSE(timer.locked());
+}
+
+
+TEST(TimerPllTest, non_positive_period_is_rejected)
+{
+    // start() divides the elapsed time by the period to align the next deadline: a zero period
+    // must be refused where the mistake is made rather than divide by zero later.
+    EXPECT_THROW((Timer{0ns}),   Error);
+    EXPECT_THROW((Timer{-1ms}),  Error);
+
+    Timer timer{1ms};
+    EXPECT_THROW(timer.update_period(0ns), Error);
+    EXPECT_EQ(1ms, timer.period());
 }

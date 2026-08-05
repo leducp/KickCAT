@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cstdio>
-#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -9,12 +8,12 @@
 
 #include "kickcat/ESI/Parser.h"
 #include "kickcat/ESI/SIIBuilder.h"
+#include "kickcat/OS/Filesystem.h"
 #include "kickcat/SIIParser.h"
 #include "kickcat/CoE/OD.h"
 #include "kickcat/CoE/protocol.h"
 
 using namespace kickcat;
-namespace fs = std::filesystem;
 
 // Replicates the slave-side SAFE_OP mapping resolution (PDO::parseAssignment +
 // parsePdoMap, ETG.1000.6 Tables 74/75): every PDO in a SyncManager assignment
@@ -79,7 +78,7 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    fs::path dir = path_arg;
+    std::string const& dir = path_arg;
     int files = 0, total = 0, built = 0, build_fail = 0, sii_ok = 0, sii_fail = 0;
     int map_ok = 0, map_fail = 0;
 
@@ -90,31 +89,31 @@ int main(int argc, char** argv)
         if (hb) { std::fputs(s.c_str(), hb); std::fclose(hb); }
     };
 
-    std::vector<fs::path> xmls;
-    for (auto& e : fs::recursive_directory_iterator(dir))
+    std::vector<std::string> xmls;
+    for (auto& file : filesystem::listFilesRecursive(dir))
     {
-        if (e.path().extension() == ".xml") { xmls.push_back(e.path()); }
+        if (filesystem::extension(file) == ".xml") { xmls.push_back(file); }
     }
     std::sort(xmls.begin(), xmls.end());
 
     for (auto& path : xmls)
     {
         files++;
-        heartbeat("PARSING " + path.filename().string());
+        heartbeat("PARSING " + filesystem::filename(path));
         ESI::Parser p;
         std::vector<std::string> errs;
         std::vector<ESI::Device> devs;
-        try { devs = p.loadAllDevices(path.string(), &errs); }
-        catch (std::exception& ex) { printf("FILE-FAIL %s : %s\n", path.filename().string().c_str(), ex.what()); continue; }
+        try { devs = p.loadAllDevices(path, &errs); }
+        catch (std::exception& ex) { printf("FILE-FAIL %s : %s\n", filesystem::filename(path).c_str(), ex.what()); continue; }
 
         total += (int)devs.size() + (int)errs.size();
         built += (int)devs.size();
         build_fail += (int)errs.size();
-        for (auto& er : errs) { printf("BUILD-FAIL %s | %s\n", path.filename().string().c_str(), er.c_str()); }
+        for (auto& er : errs) { printf("BUILD-FAIL %s | %s\n", filesystem::filename(path).c_str(), er.c_str()); }
 
         for (auto& d : devs)
         {
-            heartbeat(path.filename().string() + " | " + d.type);
+            heartbeat(filesystem::filename(path) + " | " + d.type);
             try
             {
                 auto img = ESI::buildEepromImage(d);
@@ -124,19 +123,19 @@ int main(int argc, char** argv)
                        && (s.info.product_code == d.product_code)
                        && (eeprom::computeInfoCRC(s.info) == s.info.crc);
                 if (ok) { sii_ok++; }
-                else { sii_fail++; printf("SII-BAD  %s | %s pc=0x%08x\n", path.filename().string().c_str(), d.type.c_str(), d.product_code); }
+                else { sii_fail++; printf("SII-BAD  %s | %s pc=0x%08x\n", filesystem::filename(path).c_str(), d.type.c_str(), d.product_code); }
 
                 CoE::materializeStorage(d.dictionary);
                 std::string mfail;
                 bool mok = resolveAssignment(d.dictionary, 0x1C12, mfail)
                         && resolveAssignment(d.dictionary, 0x1C13, mfail);
                 if (mok) { map_ok++; }
-                else { map_fail++; printf("MAP-FAIL %s | %s rev=0x%x : %s\n", path.filename().string().c_str(), d.type.c_str(), d.revision_no, mfail.c_str()); }
+                else { map_fail++; printf("MAP-FAIL %s | %s rev=0x%x : %s\n", filesystem::filename(path).c_str(), d.type.c_str(), d.revision_no, mfail.c_str()); }
             }
             catch (std::exception& ex)
             {
                 sii_fail++;
-                printf("SII-THROW %s | %s : %s\n", path.filename().string().c_str(), d.type.c_str(), ex.what());
+                printf("SII-THROW %s | %s : %s\n", filesystem::filename(path).c_str(), d.type.c_str(), ex.what());
             }
         }
     }

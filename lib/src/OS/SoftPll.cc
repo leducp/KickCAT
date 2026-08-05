@@ -1,5 +1,5 @@
 #include "kickcat/OS/SoftPll.h"
-#include "kickcat/OS/math.h"
+#include "kickcat/utils/math.h"
 
 namespace kickcat
 {

@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+
+#include <limits>
 #include <cstring>
 
 #include "mocks/Link.h"
@@ -348,4 +350,103 @@ TEST(DS402DrivePdoLayoutTest, packed_struct_sizes)
 {
     EXPECT_EQ(sizeof(Drive::Input),  16U);
     EXPECT_EQ(sizeof(Drive::Output), 14U);
+}
+
+
+// --- integration limits ---
+
+TEST_F(DS402DriveTest, set_limits_rejects_inverted_position_range)
+{
+    Drive::Limits limits;
+    limits.min_position_rad = 1.0;
+    limits.max_position_rad = -1.0;
+    EXPECT_THROW(drive.setLimits(limits), kickcat::Error);
+}
+
+TEST_F(DS402DriveTest, set_limits_rejects_negative_magnitudes)
+{
+    Drive::Limits limits;
+    limits.max_velocity_rad_per_s = -1.0;
+    EXPECT_THROW(drive.setLimits(limits), kickcat::Error);
+
+    Drive::Limits torque;
+    torque.max_torque_Nm = -1.0;
+    EXPECT_THROW(drive.setLimits(torque), kickcat::Error);
+}
+
+TEST_F(DS402DriveTest, setpoints_are_held_inside_the_limits)
+{
+    drive.setUnits({1000.0, 1.0, 10.0});   // 1000 ticks/rad-ish, 10 Nm rated
+
+    Drive::Limits limits;
+    limits.min_position_rad       = -0.5;
+    limits.max_position_rad       = 0.5;
+    limits.max_velocity_rad_per_s = 2.0;
+    limits.max_torque_Nm          = 1.0;
+    drive.setLimits(limits);
+
+    double const ticks_per_rad = 1000.0 / kickcat::tau;
+
+    drive.setTargetPosition(100.0);
+    EXPECT_EQ(static_cast<int32_t>(0.5 * ticks_per_rad), rx.target_position);
+    drive.setTargetPosition(-100.0);
+    EXPECT_EQ(static_cast<int32_t>(-0.5 * ticks_per_rad), rx.target_position);
+
+    drive.setTargetVelocity(50.0);
+    EXPECT_EQ(static_cast<int32_t>(2.0 * ticks_per_rad), rx.target_velocity);
+
+    drive.setTargetTorque(50.0);
+    EXPECT_EQ(static_cast<int16_t>(1.0 * 1000.0 / 10.0), rx.target_torque);   // per-mille of rated
+}
+
+TEST_F(DS402DriveTest, wide_open_limits_still_clamp_at_the_wire_type)
+{
+    // Nothing physical bounds this one, so it must not wrap into a reversed setpoint.
+    drive.setUnits({1e9, 1.0, 1.0});
+    drive.setTargetPosition(1e6);
+
+    EXPECT_EQ(INT32_MAX, rx.target_position);
+}
+
+TEST_F(DS402DriveTest, raw_setpoints_bypass_the_limits)
+{
+    Drive::Limits limits;
+    limits.min_position_rad = 0.0;
+    limits.max_position_rad = 0.0;
+    drive.setLimits(limits);
+
+    drive.setTargetPositionRaw(12345);
+    EXPECT_EQ(12345, rx.target_position);
+}
+
+
+TEST_F(DS402DriveTest, set_units_rejects_nan)
+{
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+    EXPECT_THROW(drive.setUnits({nan, 1.0, 1.0}), kickcat::Error);
+    EXPECT_THROW(drive.setUnits({1.0, nan, 1.0}), kickcat::Error);
+    EXPECT_THROW(drive.setUnits({1.0, 1.0, nan}), kickcat::Error);
+}
+
+TEST_F(DS402DriveTest, set_limits_rejects_nan)
+{
+    // NaN compares false against every bound, so it passes the ordered checks and would then
+    // collapse the clamp in saturate().
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+
+    Drive::Limits position;
+    position.min_position_rad = nan;
+    EXPECT_THROW(drive.setLimits(position), kickcat::Error);
+
+    Drive::Limits maximum;
+    maximum.max_position_rad = nan;
+    EXPECT_THROW(drive.setLimits(maximum), kickcat::Error);
+
+    Drive::Limits velocity;
+    velocity.max_velocity_rad_per_s = nan;
+    EXPECT_THROW(drive.setLimits(velocity), kickcat::Error);
+
+    Drive::Limits torque;
+    torque.max_torque_Nm = nan;
+    EXPECT_THROW(drive.setLimits(torque), kickcat::Error);
 }

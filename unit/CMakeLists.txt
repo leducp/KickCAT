@@ -6,6 +6,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/debughelpers-t.cc
                             src/diagnostics-t.cc
                             src/error-t.cc
+                            src/Filesystem-t.cc
                             src/frame-t.cc
                             src/gateway-t.cc
                             src/kickcat-t.cc
@@ -26,6 +27,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/ESMStateInit-t.cc
                             src/ESMStatePreOP-t.cc
                             src/ESMStateSafeOP-t.cc
+                            src/utils/math-t.cc
                             src/Units-t.cc
                             src/Timer-t.cc
                             src/CoE/protocol-t.cc
@@ -44,6 +46,8 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/slave/PDO-t.cc
                             src/Mutex-t.cc
 
+                            src/unbuffered_output.cc
+
                             # Whole-TU override of the real Unix/Time.cc linked into libkickcat.a:
                             # same symbol set (now/since_unix_epoch/sleep), resolved from this
                             # exe's own object first. Must stay in symbol-lockstep with it.
@@ -58,6 +62,8 @@ set(KICKCAT_ESI_FIXTURES
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_complex.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_multi_device.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_sm_fmmu.xml
+    ${CMAKE_SOURCE_DIR}/simulation/slave_configs/ecat402-drive.json
+    ${CMAKE_SOURCE_DIR}/simulation/slave_configs/ecat402-drive.xml
 )
 
 set(KICKCAT_ESI_FIXTURES_COPIED "")
@@ -79,8 +85,15 @@ target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
 # Simulation-support tests. lib/simulation is processed after unit/, so gate on
 # the build condition (not TARGET); the link resolves at generation time.
 if (ENABLE_ESI_PARSER AND BUILD_SIMULATION)
-    target_sources(kickcat_unit PRIVATE src/simulation-t.cc src/SimulatorControl-t.cc)
+    target_sources(kickcat_unit PRIVATE src/simulation-t.cc src/SimulatorControl-t.cc src/Ds402Motor-t.cc)
     target_link_libraries(kickcat_unit kickcat_simulation)
+endif()
+
+if (WIN32)
+    # The exe died at load with STATUS_ENTRYPOINT_NOT_FOUND: it links against the import libraries
+    # of the toolchain that built it, while the loader searches the exe's directory and PATH first
+    # and can find an older libstdc++-6.dll there. Carrying those two in the binary removes the skew.
+    target_link_options(kickcat_unit PRIVATE -static-libgcc -static-libstdc++)
 endif()
 
 target_include_directories(kickcat_unit PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -89,6 +102,9 @@ set_target_properties(kickcat_unit
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 add_test(NAME kickcat COMMAND kickcat_unit WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+# The suite runs in about a second: anything past this is a hang, and ctest's default 1500s would
+# burn a whole CI job on it.
+set_tests_properties(kickcat PROPERTIES TIMEOUT 120)
 
 if (ENABLE_CODE_COVERAGE)
   set(EXCLUDE_FILES "unit/*" ".*gtest.*" "examples/*" ".*gmock.*" ".*/OS/.*" "tools/*"

@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <numeric>
@@ -23,6 +22,7 @@
 
 #include <argparse/argparse.hpp>
 
+#include "kickcat/OS/Filesystem.h"
 #include "kickcat/OS/Mutex.h"
 
 #include "kickcat/CoE/OD.h"
@@ -39,7 +39,6 @@
 #include "kickcat/LoopbackSocket.h"
 
 using namespace kickcat;
-namespace fs = std::filesystem;
 
 enum class Reached { INIT_FAIL, INIT, PRE_OP, SAFE_OP, OP };
 
@@ -216,17 +215,17 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    fs::path root = path_arg;
+    std::string const& root = path_arg;
     if (num_threads < 1) { num_threads = 1; }
 
     setvbuf(stdout, nullptr, _IONBF, 0);
 
-    std::vector<fs::path> xmls;
-    if (fs::is_directory(root))
+    std::vector<std::string> xmls;
+    if (filesystem::isDirectory(root))
     {
-        for (auto& e : fs::recursive_directory_iterator(root))
+        for (auto& file : filesystem::listFilesRecursive(root))
         {
-            if (e.path().extension() == ".xml") { xmls.push_back(e.path()); }
+            if (filesystem::extension(file) == ".xml") { xmls.push_back(file); }
         }
         std::sort(xmls.begin(), xmls.end());
     }
@@ -261,7 +260,7 @@ int main(int argc, char** argv)
             std::vector<ESI::Device> devs;
             try
             {
-                devs = parser.loadAllDevices(xmls[idx].string(), &errs);
+                devs = parser.loadAllDevices(xmls[idx], &errs);
             }
             catch (std::exception&)
             {
@@ -270,7 +269,7 @@ int main(int argc, char** argv)
 
             Counts local;
             std::string failures;
-            std::string fname = xmls[idx].filename().string();
+            std::string fname = filesystem::filename(xmls[idx]);
             for (auto& dev : devs)
             {
                 local.total++;

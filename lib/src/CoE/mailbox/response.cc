@@ -15,11 +15,25 @@ namespace kickcat::mailbox::response
             return nullptr;
         }
 
+        // The received buffer -- not the announced len -- is what bounds the reads below: a
+        // mailbox message shorter than the CoE header it claims to carry must be refused before
+        // the service field is read.
+        if (raw_message.size() < (sizeof(mailbox::Header) + sizeof(CoE::Header)))
+        {
+            return std::make_shared<MailboxErrorMessage>(
+                mbx, std::move(raw_message), mailbox::Error::SIZE_TOO_SHORT);
+        }
+
         auto const* coe = pointData<CoE::Header>(header);
         switch (coe->service)
         {
             case CoE::Service::SDO_REQUEST:
             {
+                if (raw_message.size() < (sizeof(mailbox::Header) + sizeof(CoE::Header) + sizeof(CoE::ServiceData)))
+                {
+                    return std::make_shared<MailboxErrorMessage>(
+                        mbx, std::move(raw_message), mailbox::Error::SIZE_TOO_SHORT);
+                }
                 return std::make_shared<SDOMessage>(mbx, std::move(raw_message));
             }
             case CoE::Service::EMERGENCY:
@@ -33,6 +47,11 @@ namespace kickcat::mailbox::response
             }
             case CoE::Service::SDO_INFORMATION:
             {
+                if (raw_message.size() < (sizeof(mailbox::Header) + sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo)))
+                {
+                    return std::make_shared<MailboxErrorMessage>(
+                        mbx, std::move(raw_message), mailbox::Error::SIZE_TOO_SHORT);
+                }
                 return std::make_shared<SDOInformationMessage>(mbx, std::move(raw_message));
             }
 
@@ -76,6 +95,24 @@ namespace kickcat::mailbox::response
         if (header_->len < (sizeof(mailbox::Header) + sizeof(CoE::ServiceData)))
         {
             replyError(std::move(data_), mailbox::Error::SIZE_TOO_SHORT);
+            return ProcessingResult::FINALIZE;
+        }
+
+        // ETG.1000.6 Table 109: the command specifier is checked on reception, before any object
+        // lookup, so the answer does not depend on the dictionary.
+        if (sdo_->command > CoE::SDO::request::UPLOAD_SEGMENTED)
+        {
+            // Above 3 is not a client service (4 is the server's own abort): invalid header.
+            replyError(std::move(data_), mailbox::Error::INVALID_HEADER);
+            return ProcessingResult::FINALIZE;
+        }
+
+        if ((sdo_->command == CoE::SDO::request::DOWNLOAD_SEGMENTED)
+         or (sdo_->command == CoE::SDO::request::UPLOAD_SEGMENTED))
+        {
+            // A segment with no transfer in progress: process(raw_message) serves the ones that
+            // belong to a transfer, so reaching here is out of sequence.
+            abort(CoE::SDO::abort::COMMAND_SPECIFIER_INVALID);
             return ProcessingResult::FINALIZE;
         }
 
@@ -123,11 +160,23 @@ namespace kickcat::mailbox::response
             return ProcessingResult::NOOP; // not serving a segmented upload
         }
 
+        // Both the buffer and the announced len must cover the CoE service data before coe/sdo
+        // are dereferenced: the segment payload below is located from len.
+        constexpr std::size_t MIN_SIZE = sizeof(mailbox::Header) + sizeof(CoE::Header) + sizeof(CoE::ServiceData);
+        if (raw_message.size() < MIN_SIZE)
+        {
+            return ProcessingResult::NOOP;
+        }
+
         auto const* header = pointData<mailbox::Header>(raw_message.data());
-        auto const* coe    = pointData<CoE::Header>(header);
-        auto const* sdo    = pointData<CoE::ServiceData>(coe);
-        if ((header->type != mailbox::Type::CoE) or (coe->service != CoE::Service::SDO_REQUEST)
-            or (header->len < 10))
+        if ((header->len < 10) or (header->type != mailbox::Type::CoE))
+        {
+            return ProcessingResult::NOOP;
+        }
+
+        auto const* coe = pointData<CoE::Header>(header);
+        auto const* sdo = pointData<CoE::ServiceData>(coe);
+        if (coe->service != CoE::Service::SDO_REQUEST)
         {
             return ProcessingResult::NOOP;
         }
@@ -524,6 +573,12 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOInformationMessage::process()
     {
+        if (data_.size() < (sizeof(mailbox::Header) + CoE::SDO::information::responseSize(sdo_->opcode)))
+        {
+            replyError(std::move(data_), mailbox::Error::SIZE_TOO_SHORT);
+            return ProcessingResult::FINALIZE;
+        }
+
         switch (sdo_->opcode)
         {
             case CoE::SDO::information::GET_OD_LIST_REQ: { return processODList();  }
@@ -756,7 +811,7 @@ namespace kickcat::mailbox::response
 
     ProcessingResult MailboxErrorMessage::process()
     {
-        replyError(std::move(data_), mailbox::Error::INVALID_HEADER);
+        replyError(std::move(data_), error_);
         return ProcessingResult::FINALIZE;
     }
 

@@ -178,6 +178,22 @@ namespace kickcat::CoE
                 uint16_t  access;
             } __attribute__((__packed__));
             std::string toString(EntryDescription const& entry_description);
+
+            /// \brief Size of the CoE service a response to this opcode occupies, headers included.
+            /// \details A server builds its answer in the buffer the request arrived in, past the
+            ///          request it parsed, so a request sized to its own length cannot hold it. The
+            ///          mailbox header is the mailbox layer's own and is not counted here.
+            constexpr std::size_t responseSize(uint16_t opcode)
+            {
+                constexpr std::size_t headers = sizeof(Header) + sizeof(ServiceDataInfo);
+                switch (opcode)
+                {
+                    case GET_OD_LIST_REQ: { return headers + sizeof(ListType) + 5 * sizeof(uint16_t); }
+                    case GET_OD_REQ:      { return headers + sizeof(ObjectDescription);               }
+                    case GET_ED_REQ:      { return headers + sizeof(EntryDescription);                }
+                    default:              { return headers + sizeof(uint32_t); } // abort code
+                }
+            }
         }
 
         namespace abort

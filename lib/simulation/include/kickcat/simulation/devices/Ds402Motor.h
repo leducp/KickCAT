@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "kickcat/CoE/CiA/DS402/protocol.h"
+#include "kickcat/utils/math.h"
 #include "kickcat/simulation/DeviceApp.h"
 #include "kickcat/slave/Slave.h"
 
@@ -194,14 +195,14 @@ namespace kickcat::sim
                 pos_ += vel_ * dt;
             }
 
-            if (actual_position_ != nullptr) { *actual_position_ = static_cast<int32_t>(pos_); }
-            if (actual_velocity_ != nullptr) { *actual_velocity_ = static_cast<int32_t>(vel_); }
+            // The emulated feedback registers are the only range the plant state has to fit.
+            if (actual_position_ != nullptr) { *actual_position_ = saturate<int32_t>(pos_, INT32_MIN, INT32_MAX); }
+            if (actual_velocity_ != nullptr) { *actual_velocity_ = saturate<int32_t>(vel_, INT32_MIN, INT32_MAX); }
             if (actual_torque_ != nullptr)
             {
                 // Torque the motor experiences; for CST this equals the commanded torque.
-                double torque = params_.inertia * accel + params_.friction * vel_;
-                torque = std::clamp(torque, -32768.0, 32767.0);
-                *actual_torque_ = static_cast<int16_t>(torque);
+                *actual_torque_ = saturate<int16_t>(params_.inertia * accel + params_.friction * vel_,
+                                                   INT16_MIN, INT16_MAX);
             }
         }
 

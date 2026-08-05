@@ -1,17 +1,24 @@
 #include <cstring>
 #include <cinttypes>
 
+#include "Error.h"
 #include "debug.h"
 #include "kickcat/CoE/mailbox/request.h"
 
 namespace kickcat::mailbox::request
 {
-    SDOMessage::SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout)
-        : AbstractMessage(mailbox_size, timeout)
+    SDOMessage::SDOMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout)
+        : AbstractMessage(mbx_recv_size, mbx_send_size, timeout)
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
         , client_buffer_size_(*data_size)
     {
+        // What this message writes below: headers, service data and the four expedited/size bytes.
+        if (data_.size() < (sizeof(mailbox::Header) + sizeof(CoE::Header) + sizeof(CoE::ServiceData) + sizeof(uint32_t)))
+        {
+            THROW_ERROR("Mailbox is too small to hold an SDO request");
+        }
+
         coe_ = pointData<CoE::Header>(header_);
         sdo_ = pointData<CoE::ServiceData>(coe_);
         payload_ = pointData<uint8_t>(sdo_);
@@ -106,9 +113,9 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE;
         }
 
-        // the declared service-data length cannot exceed what the mailbox carries; otherwise the
+        // the declared service-data length cannot exceed what the reply carries; otherwise the
         // size/segment reads below would run past the end of the received frame
-        if ((sizeof(mailbox::Header) + header->len) > data_.size())
+        if ((sizeof(mailbox::Header) + header->len) > send_size_)
         {
             status_ = MessageStatus::COE_WRONG_SERVICE;
             return ProcessingResult::FINALIZE;
@@ -322,12 +329,18 @@ namespace kickcat::mailbox::request
     }
 
 
-    SDOInformationMessage::SDOInformationMessage(uint16_t mailbox_size, uint8_t request, void* data, uint32_t* data_size,
+    SDOInformationMessage::SDOInformationMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint8_t request, void* data, uint32_t* data_size,
                                                  uint32_t request_payload_size, nanoseconds timeout)
-        : AbstractMessage(mailbox_size, timeout)
+        : AbstractMessage(mbx_recv_size, mbx_send_size, timeout)
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
     {
+        if (data_.size() < (sizeof(mailbox::Header) + sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo)
+                            + request_payload_size))
+        {
+            THROW_ERROR("Mailbox is too small to hold an SDO information request");
+        }
+
         coe_ = pointData<CoE::Header>(header_);
         sdo_ = pointData<CoE::ServiceDataInfo>(coe_);
         payload_ = pointData<uint8_t>(sdo_);
@@ -409,6 +422,13 @@ namespace kickcat::mailbox::request
             return ProcessingResult::FINALIZE;
         }
 
+        // the fragment length is taken from the reply itself, so it must fit what the reply carries
+        if ((sizeof(mailbox::Header) + header->len) > send_size_)
+        {
+            status_ = MessageStatus::COE_WRONG_SERVICE;
+            return ProcessingResult::FINALIZE;
+        }
+
         int32_t size = header->len - sizeof(CoE::ServiceDataInfo) - sizeof(CoE::Header);
         int32_t remaining_size = *client_data_size_ - already_received_size_;
 
@@ -449,7 +469,7 @@ namespace kickcat::mailbox::request
     }
 
     EmergencyMessage::EmergencyMessage(Mailbox& mailbox)
-        : AbstractMessage(mailbox.recv_size, 0ns)
+        : AbstractMessage(mailbox.recv_size, mailbox.send_size, 0ns)
         , mailbox_{mailbox}
     { }
 
@@ -474,7 +494,7 @@ namespace kickcat::mailbox::request
     }
 
     CheckMessage::CheckMessage(Mailbox& mailbox)
-        : AbstractMessage(mailbox.recv_size, 0ns)
+        : AbstractMessage(mailbox.recv_size, mailbox.send_size, 0ns)
         , mailbox_{mailbox}
     { }
 

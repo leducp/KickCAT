@@ -2,6 +2,7 @@
 #define KICKCAT_COE_CiA_DS402_DRIVE_H
 
 #include <cstdint>
+#include <limits>
 
 #include "kickcat/CoE/CiA/DS402/StateMachine.h"
 
@@ -112,6 +113,22 @@ namespace kickcat::CoE::CiA::DS402
         // caches the conversion factors. Call before any SI accessor.
         void setUnits(UnitConfig const& units);
 
+        // Integration limits, output-shaft frame. These are the envelope the machine imposes, which
+        // is tighter than the joint's own capability and is not in the slave OD: commissioning a
+        // robot starts with a deliberately small range and opens it up. Defaults are wide open.
+        // A zero limit means zero, not "unlimited".
+        struct Limits
+        {
+            double min_position_rad       = std::numeric_limits<double>::lowest();
+            double max_position_rad       = std::numeric_limits<double>::max();
+            double max_velocity_rad_per_s = std::numeric_limits<double>::max();
+            double max_torque_Nm          = std::numeric_limits<double>::max();
+        };
+
+        // Rejects min_position > max_position and negative magnitudes.
+        void setLimits(Limits const& limits);
+        Limits const& limits() const { return limits_; }
+
         void update();
 
         void enable()  { sm_.enable();  }
@@ -129,8 +146,8 @@ namespace kickcat::CoE::CiA::DS402
         void setTargetVelocityRaw (int32_t ticks_per_s){ out_->target_velocity   = ticks_per_s; }
         void setTargetTorqueRaw   (int16_t per_mille)  { out_->target_torque     = per_mille; }
 
-        // SI setpoints. Output-shaft frame. Out-of-range values are clamped
-        // to the underlying int range, not silently wrapped.
+        // SI setpoints. Output-shaft frame. Values outside the limits are clamped into them,
+        // never wrapped. The Raw setters bypass the limits.
         void setTargetPosition(double rad);
         void setTargetVelocity(double rad_per_s);
         void setTargetTorque  (double nm);
@@ -151,6 +168,8 @@ namespace kickcat::CoE::CiA::DS402
         StateMachine sm_{};
         UnitConfig   units_{};
         control::ControlMode mode_ = control::NO_MODE;
+
+        Limits limits_{};
 
         // Cached conversion factors, recomputed in setUnits().
         double pos_ticks_per_rad_     = 0.0;

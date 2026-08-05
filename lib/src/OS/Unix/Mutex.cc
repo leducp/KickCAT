@@ -1,3 +1,7 @@
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 #include "Error.h"
 #include "OS/Mutex.h"
 
@@ -22,7 +26,10 @@ namespace kickcat
             int rc = pthread_mutex_destroy(pmutex_);
             if (rc != 0)
             {
-                THROW_SYSTEM_ERROR_CODE("pthread_mutex_destroy()", rc);
+                // Still locked or referenced, and the storage is about to go away: whoever holds it
+                // would be left with a dangling mutex. A destructor cannot report this by throwing.
+                std::fprintf(stderr, "~Mutex: pthread_mutex_destroy() failed: %s\n", std::strerror(rc));
+                std::abort();
             }
         }
     }

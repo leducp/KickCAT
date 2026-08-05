@@ -56,7 +56,7 @@ namespace kickcat::mailbox::request
         {
             THROW_ERROR("This mailbox is inactive");
         }
-        auto sdo = std::make_shared<SDOMessage>(recv_size, index, subindex, CA, request, data, data_size, timeout);
+        auto sdo = std::make_shared<SDOMessage>(recv_size, send_size, index, subindex, CA, request, data, data_size, timeout);
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
         return sdo;
@@ -83,7 +83,7 @@ namespace kickcat::mailbox::request
                 header->len, raw_message_size, gateway_index);
             return nullptr;
         }
-        auto msg = std::make_shared<GatewayMessage>(recv_size, raw_message, gateway_index, timeout);
+        auto msg = std::make_shared<GatewayMessage>(recv_size, send_size, raw_message, gateway_index, timeout);
         msg->setCounter(nextCounter());
         to_send.push(msg);
         return msg;
@@ -100,7 +100,7 @@ namespace kickcat::mailbox::request
         uint32_t request_payload_size = sizeof(type);
         std::memcpy(data, &type, request_payload_size);
 
-        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, CoE::SDO::information::GET_OD_LIST_REQ, data, data_size, request_payload_size, timeout);
+        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, send_size, CoE::SDO::information::GET_OD_LIST_REQ, data, data_size, request_payload_size, timeout);
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
         return sdo;
@@ -116,7 +116,7 @@ namespace kickcat::mailbox::request
 
         uint32_t request_payload_size = sizeof(index);
         std::memcpy(data, &index, request_payload_size);
-        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, CoE::SDO::information::GET_OD_REQ, data, data_size, request_payload_size, timeout);
+        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, send_size, CoE::SDO::information::GET_OD_REQ, data, data_size, request_payload_size, timeout);
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
         return sdo;
@@ -137,7 +137,7 @@ namespace kickcat::mailbox::request
         std::memcpy(static_cast<uint8_t*>(data) + sizeof(index), &subindex, sizeof(subindex));
         std::memcpy(static_cast<uint8_t*>(data) + sizeof(index) + sizeof(subindex), &value_info, sizeof(value_info));
         uint32_t request_payload_size = sizeof(index) + sizeof(subindex) + sizeof(value_info);
-        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, CoE::SDO::information::GET_ED_REQ, data, data_size, request_payload_size, timeout);
+        auto sdo = std::make_shared<SDOInformationMessage>(recv_size, send_size, CoE::SDO::information::GET_ED_REQ, data, data_size, request_payload_size, timeout);
         sdo->setCounter(nextCounter());
         to_send.push(sdo);
         return sdo;
@@ -201,14 +201,15 @@ namespace kickcat::mailbox::request
     }
 
 
-    AbstractMessage::AbstractMessage(uint16_t mailbox_size, nanoseconds timeout)
-        : timeout_{timeout}
+    AbstractMessage::AbstractMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, nanoseconds timeout)
+        : send_size_{mbx_send_size}
+        , timeout_{timeout}
     {
         // A slave may advertise a mailbox protocol yet a zero (or sub-header) mailbox
         // size in its SII (seen in the wild, e.g. Beckhoff AMP8805-A000). The buffer
         // must still hold a header, otherwise data() is null and the writes below
         // dereference it.
-        data_.resize(std::max<std::size_t>(mailbox_size, sizeof(mailbox::Header)));
+        data_.resize(std::max<std::size_t>(mbx_recv_size, sizeof(mailbox::Header)));
         header_ = reinterpret_cast<mailbox::Header*>(data_.data());
         header_->address  = 0;            // Default: local processing address
         status_ = MessageStatus::RUNNING; // Default mode is running to send the msg on the bus
@@ -233,8 +234,8 @@ namespace kickcat::mailbox::request
     }
 
 
-    GatewayMessage::GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout)
-        : AbstractMessage(mailbox_size, timeout)
+    GatewayMessage::GatewayMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout)
+        : AbstractMessage(mbx_recv_size, mbx_send_size, timeout)
     {
         auto const* header = pointData<mailbox::Header>(raw_message);
 
@@ -255,8 +256,9 @@ namespace kickcat::mailbox::request
     }
 
 
+    // send size 0: this message is already complete, no bus reply is processed for it.
     GatewayMessage::GatewayMessage(std::vector<uint8_t>&& reply, uint16_t gateway_index)
-        : AbstractMessage(static_cast<uint16_t>(reply.size()), 0ms)
+        : AbstractMessage(static_cast<uint16_t>(reply.size()), 0, 0ms)
     {
         // SDO response preserves header->address, so no mask-tag + process() round-trip is needed.
         data_          = std::move(reply);
@@ -279,15 +281,18 @@ namespace kickcat::mailbox::request
 
         // It is the reply to this request: store the result and set back the address field
         int32_t size = header->len + sizeof(mailbox::Header);
-        if (size > static_cast<int32_t>(data_.size()))
+        if (size > static_cast<int32_t>(send_size_))
         {
             // oversized reply: drop rather than over-read 'received' (the message then times out)
-            gateway_error("Reply for gateway index %u claims %d bytes, exceeds mailbox size %zu; dropping it\n",
-                gateway_index_, size, data_.size());
+            gateway_error("Reply for gateway index %u claims %d bytes, exceeds send mailbox size %u; dropping it\n",
+                gateway_index_, size, send_size_);
             return ProcessingResult::NOOP;
         }
+        // On an asymmetric mailbox the reply can be larger than the request buffer, so this resize
+        // may reallocate: header_ has to follow the new storage.
         data_.resize(size);
         std::memcpy(data_.data(), received, size);
+        header_ = pointData<mailbox::Header>(data_.data());
 
         header_->address = address_;
 
@@ -382,6 +387,23 @@ namespace kickcat::mailbox::response
 
     void Mailbox::handleMessage(std::vector<uint8_t>&& raw_message)
     {
+        // The buffer is sized by the mailbox SyncManager (or by the gateway request) while len
+        // comes from the wire: handlers below locate their payload from len, so an incoherent pair
+        // must be rejected here rather than dereferenced.
+        if (raw_message.size() < sizeof(mailbox::Header))
+        {
+            // replyError zero-pads up to the error reply, so an answer is still possible.
+            replyError(std::move(raw_message), mailbox::Error::SIZE_TOO_SHORT);
+            return;
+        }
+
+        auto const* header = pointData<mailbox::Header>(raw_message.data());
+        if ((sizeof(mailbox::Header) + header->len) > raw_message.size())
+        {
+            replyError(std::move(raw_message), mailbox::Error::INVALID_SIZE);
+            return;
+        }
+
         for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
         {
             ProcessingResult state = (*it)->process(raw_message);

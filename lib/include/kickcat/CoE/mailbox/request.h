@@ -9,7 +9,7 @@ namespace kickcat::mailbox::request
     class SDOMessage final : public AbstractMessage
     {
     public:
-        SDOMessage(uint16_t mailbox_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout);
+        SDOMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout);
         virtual ~SDOMessage() = default;
 
         ProcessingResult process(uint8_t const* received) override;
@@ -33,7 +33,7 @@ namespace kickcat::mailbox::request
     class SDOInformationMessage final : public AbstractMessage
     {
     public:
-        SDOInformationMessage(uint16_t mailbox_size, uint8_t request, void* data, uint32_t* data_size, uint32_t request_payload_size, nanoseconds timeout);
+        SDOInformationMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint8_t request, void* data, uint32_t* data_size, uint32_t request_payload_size, nanoseconds timeout);
         virtual ~SDOInformationMessage() = default;
 
         ProcessingResult process(uint8_t const* received) override;
