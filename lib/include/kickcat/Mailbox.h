@@ -49,8 +49,10 @@ namespace kickcat::mailbox::request
     class AbstractMessage
     {
     public:
-        /// \param mailbox_size Size of the mailbox the message is targeted to (required to adapt internal buffer)
-        AbstractMessage(uint16_t mailbox_size, nanoseconds timeout);
+        /// \param mbx_recv_size Slave receive mailbox size: sizes the internal buffer
+        /// \param mbx_send_size Slave send mailbox size. A mailbox may be asymmetric, so this is
+        ///                      not mbx_recv_size.
+        AbstractMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, nanoseconds timeout);
         virtual ~AbstractMessage() = default;
 
         // set message counter (aka session handle)
@@ -78,6 +80,7 @@ namespace kickcat::mailbox::request
         std::vector<uint8_t> data_;     // data of the message (send and gateway rec)
         mailbox::Header* header_;       // pointer on the mailbox header in data
         uint32_t status_;               // message current status
+        uint16_t send_size_;            // valid bytes in the buffer given to process() - not data_.size()
 
     private:
         nanoseconds timeout_;           // Max time to handle the message. Relative time before sending, absolute time after. 0 means no timeout
@@ -89,7 +92,7 @@ namespace kickcat::mailbox::request
     class GatewayMessage final : public AbstractMessage
     {
     public:
-        GatewayMessage(uint16_t mailbox_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout);
+        GatewayMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint8_t const* raw_message, uint16_t gateway_index, nanoseconds timeout);
 
         /// \brief Build a GatewayMessage that is already completed: the reply is already in hand,
         ///        so there is no bus round-trip. Used by synchronous dispatch paths (e.g. the master OD,
@@ -110,15 +113,15 @@ namespace kickcat::mailbox::request
     /// \brief Request mailbox - it orchestrates the emission and the processing of messages (for master)
     struct Mailbox
     {
-        uint16_t recv_offset;
-        uint16_t recv_size;
-        uint16_t send_offset;
-        uint16_t send_size;
+        uint16_t recv_offset{0};
+        uint16_t recv_size{0};      // slave receive mailbox: bounds what the master writes
+        uint16_t send_offset{0};
+        uint16_t send_size{0};      // slave send mailbox: bounds what a reply carries
 
-        bool can_read;      // data available on the slave
-        bool can_write;     // free space for a new message on the slave
-        uint8_t counter{0}; // session handle, from 1 to 7
-        bool toggle;        // for SDO segmented transfer
+        bool can_read{false};       // data available on the slave
+        bool can_write{false};      // free space for a new message on the slave
+        uint8_t counter{0};         // session handle, from 1 to 7
+        bool toggle{false};         // for SDO segmented transfer
 
         //
         void generateSMConfig(SyncManager::Register SM[2]);

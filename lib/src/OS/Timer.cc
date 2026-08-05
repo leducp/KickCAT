@@ -1,5 +1,6 @@
 // \brief OS agnostic Timer API - shared logic
 #include "kickcat/OS/Timer.h"
+#include "kickcat/Error.h"
 
 namespace kickcat
 {
@@ -8,6 +9,10 @@ namespace kickcat
         , pll_config_{pll_config}
         , pll_{period, pll_config}
     {
+        if (period_ <= 0ns)
+        {
+            THROW_ERROR("Timer period shall be strictly positive");
+        }
     }
 
     nanoseconds Timer::period() const
@@ -30,6 +35,11 @@ namespace kickcat
 
     void Timer::update_period(nanoseconds period)
     {
+        if (period <= 0ns)
+        {
+            THROW_ERROR("Timer period shall be strictly positive");
+        }
+
         period_ = period;
         // The grid changed, so the PLL's learned target phase is stale: rebuild on the new cycle.
         pll_ = SoftPll{period, pll_config_};

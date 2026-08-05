@@ -23,7 +23,7 @@ std::vector<uint8_t> createTestReadSDO(uint16_t index, uint8_t subindex, bool CA
 {
     uint32_t data;
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, index, subindex, CA, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, TEST_MAILBOX_SIZE, index, subindex, CA, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
 
     std::vector<uint8_t> raw_message;
     raw_message.insert(raw_message.begin(), msg.data(), msg.data() + TEST_MAILBOX_SIZE);
@@ -33,7 +33,7 @@ std::vector<uint8_t> createTestReadSDO(uint16_t index, uint8_t subindex, bool CA
 std::vector<uint8_t> createTestWriteSDO(uint16_t index, uint8_t subindex, uint32_t data, bool CA=false)
 {
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, index, subindex, CA, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, TEST_MAILBOX_SIZE, index, subindex, CA, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
 
     std::vector<uint8_t> raw_message;
     raw_message.insert(raw_message.begin(), msg.data(), msg.data() + TEST_MAILBOX_SIZE);
@@ -315,7 +315,7 @@ TEST_F(CoE_Response, SDO_write_complete_OK)
     uint32_t data_size = sizeof(data);
     std::vector<uint8_t> raw_message;
     {
-        mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, 0x7000, 1, true, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
+        mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, TEST_MAILBOX_SIZE, 0x7000, 1, true, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
 
         raw_message.insert(raw_message.begin(), msg.data(), msg.data() + TEST_MAILBOX_SIZE);
     }
@@ -604,7 +604,7 @@ TEST_F(CoE_Response, SDO_write_CA_unauthorized_entry)
     uint32_t data_size = sizeof(data);
     std::vector<uint8_t> raw_message;
     {
-        mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, 0xB000, 0, true, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
+        mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, TEST_MAILBOX_SIZE, 0xB000, 0, true, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
         raw_message.insert(raw_message.begin(), msg.data(), msg.data() + TEST_MAILBOX_SIZE);
     }
     auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
@@ -631,7 +631,7 @@ TEST_F(CoE_Response, SDO_write_CA_subindex_0)
     uint32_t data_size = sizeof(data);
     std::vector<uint8_t> raw_message;
     {
-        mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, 0x7000, 0, true, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
+        mailbox::request::SDOMessage msg{TEST_MAILBOX_SIZE, TEST_MAILBOX_SIZE, 0x7000, 0, true, CoE::SDO::request::DOWNLOAD, &data, &data_size, 1ms};
         raw_message.insert(raw_message.begin(), msg.data(), msg.data() + TEST_MAILBOX_SIZE);
     }
     auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
@@ -870,18 +870,52 @@ TEST_F(CoE_Response, createSDOMessage_invalid_service)
     }
 }
 
-TEST_F(CoE_Response, SDO_invalid_command)
+// ETG.1000.6 Table 109 transition 6: a command specifier above 3 is not a client service (4 is the
+// server's own abort, 5..7 are reserved), so the slave answers with a mailbox error. The check comes
+// before the object lookup, so the answer does not depend on the dictionary.
+TEST_F(CoE_Response, SDO_command_specifier_above_three_is_an_invalid_header)
 {
-    std::vector<uint8_t> raw_message = createTestReadSDO(0x1018, 2);
+    for (uint8_t command : {0x04, 0x05, 0x06, 0x07})
     {
-        auto header = pointData<mailbox::Header>(raw_message.data());
-        auto coe = pointData<CoE::Header>(header);
-        auto sdo = pointData<CoE::ServiceData>(coe);
-        sdo->command = 0x07; // Invalid command (max value for 3-bit field, not in enum)
-    }
-    auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
+        std::vector<uint8_t> raw_message = createTestReadSDO(0x1018, 2);
+        {
+            auto sdo = pointData<CoE::ServiceData>(
+                pointData<CoE::Header>(pointData<mailbox::Header>(raw_message.data())));
+            sdo->command = command;
+        }
+        auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
+        ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, response_msg->process()) << "command " << int(command);
 
-    ASSERT_EQ(mailbox::ProcessingResult::NOOP, response_msg->process());
+        auto const& msg = mbx.readyToSend();
+        auto resp_header = pointData<mailbox::Header>(msg.data());
+        ASSERT_EQ(mailbox::ERR, resp_header->type) << "command " << int(command);
+        ASSERT_EQ(mailbox::Error::INVALID_HEADER,
+                  pointData<mailbox::Error::ServiceData>(resp_header)->detail) << "command " << int(command);
+    }
+}
+
+// ETG.1000.6 Table 109 transitions 12 and 18: a segment request with no transfer in progress is out
+// of sequence and is answered with an SDO abort.
+TEST_F(CoE_Response, SDO_segment_with_no_transfer_in_progress_aborts)
+{
+    for (uint8_t command : {CoE::SDO::request::DOWNLOAD_SEGMENTED, CoE::SDO::request::UPLOAD_SEGMENTED})
+    {
+        std::vector<uint8_t> raw_message = createTestReadSDO(0x1018, 2);
+        {
+            auto sdo = pointData<CoE::ServiceData>(
+                pointData<CoE::Header>(pointData<mailbox::Header>(raw_message.data())));
+            sdo->command = command;
+        }
+        auto response_msg = createSDOMessage(&mbx, std::move(raw_message));
+        ASSERT_EQ(mailbox::ProcessingResult::FINALIZE, response_msg->process()) << "command " << int(command);
+
+        auto const& msg = mbx.readyToSend();
+        auto coe     = pointData<CoE::Header>(pointData<mailbox::Header>(msg.data()));
+        auto sdo     = pointData<CoE::ServiceData>(coe);
+        auto payload = pointData<uint32_t>(sdo);
+        ASSERT_EQ(CoE::SDO::request::ABORT, sdo->command) << "command " << int(command);
+        ASSERT_EQ(CoE::SDO::abort::COMMAND_SPECIFIER_INVALID, *payload) << "command " << int(command);
+    }
 }
 
 TEST_F(CoE_Response, SDO_process_with_raw_message)
@@ -1092,6 +1126,52 @@ TEST(CoE_Roundtrip, sdo_segmented_upload_master_slave)
     ASSERT_EQ(mailbox::request::MessageStatus::SUCCESS, msg->status());
     ASSERT_EQ(sizeof(blob), received_size);
     ASSERT_EQ(0, std::memcmp(received, blob, sizeof(blob)));
+}
+
+// A truncated segment request arriving mid-transfer must be rejected without touching memory past
+// the received buffer (ASan gates this in CI).
+TEST(CoE_Roundtrip, sdo_segmented_upload_survives_truncated_segment_request)
+{
+    constexpr uint16_t MBX = 32;
+
+    CoE::Dictionary dict;
+    {
+        CoE::Object object{0x2000, CoE::ObjectCode::VAR, "Big blob", {}};
+        object.entries.emplace_back(0, 50 * 8, 0, CoE::Access::READ, CoE::DataType::OCTET_STRING, "blob");
+        object.entries.back().data = std::calloc(50, 1);
+        dict.push_back(std::move(object));
+    }
+
+    Mailbox slave{MBX, 1};
+    slave.enableCoE(dict);
+
+    mailbox::request::Mailbox master;
+    master.recv_size = MBX;
+    master.send_size = MBX;
+
+    uint8_t received[50] = {0};
+    uint32_t received_size = sizeof(received);
+    master.createSDO(0x2000, 0, false, CoE::SDO::request::UPLOAD, received, &received_size);
+
+    // Initiate the upload so the slave keeps a segmented transfer alive...
+    auto msg = master.send();
+    std::vector<uint8_t> initiate(msg->data(), msg->data() + msg->size());
+    std::vector<uint8_t> reply = slave.processRequest(std::move(initiate));
+    ASSERT_FALSE(reply.empty());
+
+    // ...then hand it every truncation of the follow-up segment request. Replies are queued, so a
+    // given call may pop an earlier one; every answer produced must still be a well-formed message.
+    master.receive(reply.data());
+    auto segment = master.send();
+    for (std::size_t size = 0; size <= segment->size(); ++size)
+    {
+        std::vector<uint8_t> truncated(segment->data(), segment->data() + size);
+        std::vector<uint8_t> answer = slave.processRequest(std::move(truncated));
+        if (not answer.empty())
+        {
+            EXPECT_GE(answer.size(), sizeof(mailbox::Header)) << "size " << size;
+        }
+    }
 }
 
 // Mirror of the upload coherency check: the master's segmented-download sender and the slave's

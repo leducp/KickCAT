@@ -1,4 +1,7 @@
 #include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "Error.h"
 #include "OS/ConditionVariable.h"
@@ -24,7 +27,10 @@ namespace kickcat
             int rc = pthread_cond_destroy(pcond_);
             if (rc != 0)
             {
-                THROW_SYSTEM_ERROR_CODE("pthread_cond_destroy()", rc);
+                // Threads are still waiting on it: they would never be woken, and the storage is
+                // about to go away. A destructor cannot report this by throwing.
+                std::fprintf(stderr, "~ConditionVariable: pthread_cond_destroy() failed: %s\n", std::strerror(rc));
+                std::abort();
             }
         }
     }

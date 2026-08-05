@@ -144,3 +144,17 @@ TEST(CoE, pdo_mapping_word_pack_unpack)
     // A padding gap (index 0) round-trips its bit length.
     EXPECT_EQ(fromMappingWord(toMappingWord({0x0000, 0x00, 0x08})).bitlen, 0x08);
 }
+
+
+TEST(CoE_Protocol, sdo_information_response_size_is_known_at_compile_time)
+{
+    using namespace CoE::SDO::information;
+    constexpr std::size_t headers = sizeof(CoE::Header) + sizeof(CoE::ServiceDataInfo);
+
+    static_assert(responseSize(GET_OD_LIST_REQ) == headers + sizeof(ListType) + 5 * sizeof(uint16_t));
+    static_assert(responseSize(GET_OD_REQ)      == headers + sizeof(ObjectDescription));
+    static_assert(responseSize(GET_ED_REQ)      == headers + sizeof(EntryDescription));
+
+    // Anything else is answered with an abort code.
+    static_assert(responseSize(0x7F) == headers + sizeof(uint32_t));
+}

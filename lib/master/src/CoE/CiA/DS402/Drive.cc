@@ -1,11 +1,10 @@
-#include <algorithm>
 #include <cstddef>
 #include <iterator>
-#include <limits>
 
 #include "kickcat/CoE/CiA/DS402/Drive.h"
 #include "kickcat/Bus.h"
 #include "kickcat/Error.h"
+#include "kickcat/utils/math.h"
 #include "kickcat/Slave.h"
 #include "kickcat/Units.h"
 
@@ -31,16 +30,6 @@ namespace kickcat::CoE::CiA::DS402
             0x60400010, 0x60600010,
             0x607A0020, 0x60FF0020, 0x60710010
         };
-
-        // Clamp before cast: static_cast<int>(double) is UB when the
-        // truncated value falls outside the destination type's range.
-        template<typename T>
-        T saturate(double v)
-        {
-            return static_cast<T>(std::clamp(v,
-                static_cast<double>(std::numeric_limits<T>::min()),
-                static_cast<double>(std::numeric_limits<T>::max())));
-        }
     }
 
     // Cross-check: the bit-lengths declared in the PDO mapping arrays must
@@ -147,6 +136,14 @@ namespace kickcat::CoE::CiA::DS402
 
     void Drive::setUnits(UnitConfig const& units)
     {
+        // NaN compares false against everything, so it has to be rejected on its own.
+        if (is_nan(units.encoder_ticks_per_rev)
+            or is_nan(units.gear_ratio)
+            or is_nan(units.rated_torque_Nm))
+        {
+            THROW_ERROR("Drive::setUnits does not accept NaN");
+        }
+
         if (units.encoder_ticks_per_rev <= 0.0
             or units.gear_ratio <= 0.0
             or units.rated_torque_Nm <= 0.0)
@@ -165,19 +162,43 @@ namespace kickcat::CoE::CiA::DS402
         out_->control_word = sm_.controlWord();
     }
 
+    void Drive::setLimits(Limits const& limits)
+    {
+        if (is_nan(limits.min_position_rad) or is_nan(limits.max_position_rad)
+            or is_nan(limits.max_velocity_rad_per_s) or is_nan(limits.max_torque_Nm))
+        {
+            THROW_ERROR("Drive::setLimits does not accept NaN");
+        }
+
+        if (limits.min_position_rad > limits.max_position_rad)
+        {
+            THROW_ERROR("Drive::setLimits requires min_position_rad <= max_position_rad");
+        }
+        if (limits.max_velocity_rad_per_s < 0.0 or limits.max_torque_Nm < 0.0)
+        {
+            THROW_ERROR("Drive::setLimits requires non-negative velocity and torque magnitudes");
+        }
+
+        limits_ = limits;
+    }
+
     void Drive::setTargetPosition(double rad)
     {
-        out_->target_position = saturate<int32_t>(rad * pos_ticks_per_rad_);
+        out_->target_position = saturate<int32_t>(rad * pos_ticks_per_rad_,
+            limits_.min_position_rad * pos_ticks_per_rad_,
+            limits_.max_position_rad * pos_ticks_per_rad_);
     }
 
     void Drive::setTargetVelocity(double rad_per_s)
     {
-        out_->target_velocity = saturate<int32_t>(rad_per_s * pos_ticks_per_rad_);
+        double const magnitude = limits_.max_velocity_rad_per_s * pos_ticks_per_rad_;
+        out_->target_velocity = saturate<int32_t>(rad_per_s * pos_ticks_per_rad_, -magnitude, magnitude);
     }
 
     void Drive::setTargetTorque(double nm)
     {
-        out_->target_torque = saturate<int16_t>(nm * torque_per_mille_per_nm_);
+        double const magnitude = limits_.max_torque_Nm * torque_per_mille_per_nm_;
+        out_->target_torque = saturate<int16_t>(nm * torque_per_mille_per_nm_, -magnitude, magnitude);
     }
 
     double Drive::actualPosition() const

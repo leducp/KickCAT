@@ -62,6 +62,7 @@ TEST_F(GatewayTest, incoherent_request)
     // Message too big for the targeted mailbox
     Mailbox mbx;
     mbx.recv_size = 4;
+    mbx.send_size = 4;
 
     EXPECT_CALL(*socket_, recv(_, _))
         .WillOnce([&](void* frame, int32_t)
@@ -90,6 +91,7 @@ TEST_F(GatewayTest, nominal_loop)
     uint16_t GEN_GATEWAY_INDEX = 2;
     Mailbox mbx;
     mbx.recv_size = 128;
+    mbx.send_size = 128;
 
     EXPECT_CALL(*socket_, sendTo(_, 18, GEN_GATEWAY_INDEX))
     .WillOnce([](void const* frame, int32_t size, uint16_t)
@@ -150,6 +152,7 @@ TEST_F(GatewayTest, evict_failed_requests)
     uint16_t GEN_GATEWAY_INDEX = 2;
     Mailbox mbx;
     mbx.recv_size = 128;
+    mbx.send_size = 128;
 
     EXPECT_CALL(*socket_, recv(_, _))
     .WillOnce([&](void* frame, int32_t)

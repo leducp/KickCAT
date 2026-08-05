@@ -50,7 +50,7 @@ TEST_F(MasterGatewayTest, address_zero_reads_master_identity)
     // SDO upload 0x1018:01 (Vendor ID) with the default mailbox header address == 0 targets the master OD.
     uint32_t data{0};
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
     ASSERT_EQ(0u, sdo_msg.address());
 
     auto gw_msg = bus.addGatewayMessage(sdo_msg.data(), static_cast<int32_t>(sdo_msg.size()), 42);
@@ -82,13 +82,106 @@ TEST_F(MasterGatewayTest, malformed_tiny_request_returns_nullptr)
 }
 
 
+// A client picks `size` and `len` independently, so the pair is never trusted to be coherent.
+static std::vector<uint8_t> createRawRequest(std::size_t size, uint16_t len, uint16_t service)
+{
+    std::vector<uint8_t> raw(size, 0);
+    auto* header = reinterpret_cast<mailbox::Header*>(raw.data());
+    header->len     = len;
+    header->address = 0; // master OD
+    header->type    = mailbox::Type::CoE;
+
+    if (size >= (sizeof(mailbox::Header) + sizeof(CoE::Header)))
+    {
+        pointData<CoE::Header>(header)->service = service;
+    }
+    return raw;
+}
+
+
+static uint16_t mailboxErrorDetail(uint8_t const* reply)
+{
+    auto const* header = reinterpret_cast<mailbox::Header const*>(reply);
+    EXPECT_EQ(mailbox::ERR, header->type);
+    return pointData<mailbox::Error::ServiceData>(header)->detail;
+}
+
+
+TEST_F(MasterGatewayTest, header_only_request_reports_size_too_short)
+{
+    // A bare mailbox header is the smallest request the gateway accepts.
+    auto raw = createRawRequest(sizeof(mailbox::Header), 0, CoE::Service::SDO_REQUEST);
+
+    auto gw_msg = bus.addGatewayMessage(raw.data(), static_cast<int32_t>(raw.size()), 3);
+    ASSERT_NE(nullptr, gw_msg);
+    EXPECT_EQ(mailbox::request::MessageStatus::SUCCESS, gw_msg->status());
+    EXPECT_EQ(mailbox::Error::SIZE_TOO_SHORT, mailboxErrorDetail(gw_msg->data()));
+}
+
+
+TEST_F(MasterGatewayTest, announced_len_beyond_received_bytes_reports_invalid_size)
+{
+    // header->len locates every payload field, so it must not exceed the bytes received.
+    auto raw = createRawRequest(sizeof(mailbox::Header) + sizeof(CoE::Header), 100, CoE::Service::SDO_REQUEST);
+
+    auto gw_msg = bus.addGatewayMessage(raw.data(), static_cast<int32_t>(raw.size()), 4);
+    ASSERT_NE(nullptr, gw_msg);
+    EXPECT_EQ(mailbox::request::MessageStatus::SUCCESS, gw_msg->status());
+    EXPECT_EQ(mailbox::Error::INVALID_SIZE, mailboxErrorDetail(gw_msg->data()));
+}
+
+
+TEST_F(MasterGatewayTest, truncated_sdo_request_reports_size_too_short)
+{
+    // Coherent header/len pair, still too short for the announced service.
+    auto raw = createRawRequest(sizeof(mailbox::Header) + sizeof(CoE::Header),
+                                sizeof(CoE::Header), CoE::Service::SDO_REQUEST);
+
+    auto gw_msg = bus.addGatewayMessage(raw.data(), static_cast<int32_t>(raw.size()), 5);
+    ASSERT_NE(nullptr, gw_msg);
+    EXPECT_EQ(mailbox::Error::SIZE_TOO_SHORT, mailboxErrorDetail(gw_msg->data()));
+}
+
+
+TEST_F(MasterGatewayTest, truncated_sdo_information_request_reports_size_too_short)
+{
+    // Same for SDO information, whose opcode sits further into the payload.
+    auto raw = createRawRequest(sizeof(mailbox::Header) + sizeof(CoE::Header),
+                                sizeof(CoE::Header), CoE::Service::SDO_INFORMATION);
+
+    auto gw_msg = bus.addGatewayMessage(raw.data(), static_cast<int32_t>(raw.size()), 6);
+    ASSERT_NE(nullptr, gw_msg);
+    EXPECT_EQ(mailbox::Error::SIZE_TOO_SHORT, mailboxErrorDetail(gw_msg->data()));
+}
+
+
+TEST_F(MasterGatewayTest, every_truncation_of_a_valid_request_is_handled)
+{
+    // Truncating a well-formed request at any offset yields a clean rejection or an error reply,
+    // never an out-of-bounds access (ASan gates this in CI).
+    uint32_t data{0};
+    uint32_t data_size = sizeof(data);
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+
+    for (std::size_t size = 0; size <= sdo_msg.size(); ++size)
+    {
+        std::vector<uint8_t> raw(sdo_msg.data(), sdo_msg.data() + size);
+        auto gw_msg = bus.addGatewayMessage(raw.data(), static_cast<int32_t>(size), 8);
+        if (gw_msg != nullptr)
+        {
+            EXPECT_EQ(mailbox::request::MessageStatus::SUCCESS, gw_msg->status()) << "size " << size;
+        }
+    }
+}
+
+
 TEST_F(MasterGatewayTest, unknown_slave_address_still_returns_nullptr_when_master_mailbox_set)
 {
     // Regression: installing a master mailbox must not reroute slave-addressed requests to it.
     // Unknown slave addresses continue to fall through to the "no slave on the bus" error path.
     uint32_t data{0};
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
     sdo_msg.setAddress(0x1234);
 
     EXPECT_EQ(nullptr, bus.addGatewayMessage(sdo_msg.data(), static_cast<int32_t>(sdo_msg.size()), 1));
@@ -101,7 +194,7 @@ TEST_F(MasterGatewayTest, address_zero_unknown_object_returns_sdo_abort)
     // the error reply and the gateway path must deliver it to the client.
     uint32_t data{0};
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, 0x9999, 0, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x9999, 0, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
 
     auto gw_msg = bus.addGatewayMessage(sdo_msg.data(), static_cast<int32_t>(sdo_msg.size()), 7);
     ASSERT_NE(nullptr, gw_msg);
@@ -125,7 +218,7 @@ TEST(MasterGatewayNoMailbox, address_zero_without_master_mailbox_returns_nullptr
 
     uint32_t data{0};
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
 
     EXPECT_EQ(nullptr, bus.addGatewayMessage(sdo_msg.data(), static_cast<int32_t>(sdo_msg.size()), 1));
 }
@@ -139,7 +232,7 @@ TEST(MasterGatewayNoMailbox, unknown_slave_address_still_returns_nullptr)
 
     uint32_t data{0};
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
     sdo_msg.setAddress(0x1234);
 
     EXPECT_EQ(nullptr, bus.addGatewayMessage(sdo_msg.data(), static_cast<int32_t>(sdo_msg.size()), 1));
@@ -159,7 +252,7 @@ TEST_F(MasterGatewayTest, full_udp_loop_through_gateway)
 
     uint32_t data{0};
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, 0x1018, 2, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x1018, 2, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
 
     std::vector<uint8_t> udp_frame(sizeof(EthercatHeader) + sdo_msg.size());
     auto* eth_header = reinterpret_cast<EthercatHeader*>(udp_frame.data());
@@ -196,4 +289,93 @@ TEST_F(MasterGatewayTest, full_udp_loop_through_gateway)
 
     gateway.fetchRequest();
     gateway.processPendingRequests();
+}
+
+
+// A gateway client sizes its request to its own length, but the SDO information handlers write
+// their response into that same buffer: the answer has to fit too.
+TEST_F(MasterGatewayTest, sdo_information_request_too_small_for_its_response)
+{
+    struct Case
+    {
+        char const* name;
+        uint8_t     opcode;
+        std::size_t size;
+    };
+
+    // Fixed response sizes are 24 (list), 18 (object description) and 22 (entry description).
+    Case const cases[] = {
+        {"GET_OD_LIST", CoE::SDO::information::GET_OD_LIST_REQ, 14},
+        {"GET_OD",      CoE::SDO::information::GET_OD_REQ,      14},
+        {"GET_ED",      CoE::SDO::information::GET_ED_REQ,      16},
+        {"GET_OD_LIST", CoE::SDO::information::GET_OD_LIST_REQ, 23},
+    };
+
+    for (auto const& test : cases)
+    {
+        uint8_t raw[32] = {0};
+        auto* header = reinterpret_cast<mailbox::Header*>(raw);
+        header->len     = static_cast<uint16_t>(test.size - sizeof(mailbox::Header));
+        header->address = 0;
+        header->type    = mailbox::Type::CoE;
+        auto* coe = pointData<CoE::Header>(header);
+        coe->service = CoE::Service::SDO_INFORMATION;
+        pointData<CoE::ServiceDataInfo>(coe)->opcode = test.opcode;
+
+        auto gw_msg = bus.addGatewayMessage(raw, static_cast<int32_t>(test.size), 9);
+        ASSERT_NE(nullptr, gw_msg) << test.name << " " << test.size;
+        EXPECT_EQ(mailbox::Error::SIZE_TOO_SHORT, mailboxErrorDetail(gw_msg->data()))
+            << test.name << " " << test.size;
+    }
+}
+
+
+TEST_F(MasterGatewayTest, sdo_information_list_request_that_fits_is_served)
+{
+    // 24 bytes is the smallest buffer the list response fits in: it must not be refused.
+    uint8_t raw[24] = {0};
+    auto* header = reinterpret_cast<mailbox::Header*>(raw);
+    header->len     = static_cast<uint16_t>(sizeof(raw) - sizeof(mailbox::Header));
+    header->address = 0;
+    header->type    = mailbox::Type::CoE;
+    auto* coe = pointData<CoE::Header>(header);
+    coe->service = CoE::Service::SDO_INFORMATION;
+    auto* sdo = pointData<CoE::ServiceDataInfo>(coe);
+    sdo->opcode = CoE::SDO::information::GET_OD_LIST_REQ;
+    auto const list_type = CoE::SDO::information::ListType::NUMBER;
+    std::memcpy(pointData<uint8_t>(sdo), &list_type, sizeof(list_type));
+
+    auto gw_msg = bus.addGatewayMessage(raw, static_cast<int32_t>(sizeof(raw)), 10);
+    ASSERT_NE(nullptr, gw_msg);
+
+    auto const* reply = reinterpret_cast<mailbox::Header const*>(gw_msg->data());
+    EXPECT_EQ(mailbox::Type::CoE, reply->type);
+    EXPECT_EQ(CoE::SDO::information::GET_OD_LIST_RESP,
+              pointData<CoE::ServiceDataInfo>(pointData<CoE::Header>(reply))->opcode);
+}
+
+
+TEST_F(MasterGatewayTest, an_abort_does_not_wedge_the_master_object_dictionary)
+{
+    // A message the dispatcher does not serve used to stay queued forever, and max_msgs is 1: every
+    // later request was then answered NO_MORE_MEMORY for the process lifetime.
+    uint32_t data{0};
+    uint32_t data_size = sizeof(data);
+    mailbox::request::SDOMessage sdo_msg{MBX_SIZE, MBX_SIZE, 0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+
+    std::vector<uint8_t> abort_request(sdo_msg.data(), sdo_msg.data() + sdo_msg.size());
+    pointData<CoE::ServiceData>(pointData<CoE::Header>(
+        pointData<mailbox::Header>(abort_request.data())))->command = CoE::SDO::request::ABORT;
+
+    auto aborted = bus.addGatewayMessage(abort_request.data(), static_cast<int32_t>(abort_request.size()), 11);
+    ASSERT_NE(nullptr, aborted);
+    EXPECT_EQ(mailbox::Error::INVALID_HEADER, mailboxErrorDetail(aborted->data()));
+
+    // The dictionary must still answer afterwards.
+    auto served = bus.addGatewayMessage(sdo_msg.data(), static_cast<int32_t>(sdo_msg.size()), 12);
+    ASSERT_NE(nullptr, served);
+    auto const* reply = reinterpret_cast<mailbox::Header const*>(served->data());
+    auto const* sdo   = pointData<CoE::ServiceData>(pointData<CoE::Header>(reply));
+    EXPECT_EQ(CoE::SDO::response::UPLOAD, sdo->command);
+    EXPECT_EQ(testIdentity().vendor_id, *pointData<uint32_t>(sdo));
 }

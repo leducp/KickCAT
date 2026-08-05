@@ -708,3 +708,112 @@ TEST_F(CoE_Request, sdo_information_wrong_opcode)
     ASSERT_TRUE(mailbox.receive(raw_message));
     ASSERT_EQ(MessageStatus::COE_WRONG_SERVICE, message->status());
 }
+
+
+// The slave receive and send mailboxes are declared separately in the SII and may differ. A reply
+// is read from the send mailbox, so that is what bounds its payload reads.
+
+TEST_F(CoE_Request, asymmetric_mailbox_reply_longer_than_send_mailbox_is_rejected)
+{
+    // The announced length fits the request buffer but not the reply. The reply buffer is exactly
+    // send_size, so any read past it is a heap overflow (ASan gates this in CI).
+    mailbox.recv_size = 256;
+    mailbox.send_size = 32;
+
+    uint8_t client[200] = {0};
+    uint32_t client_size = sizeof(client);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, client, &client_size);
+    auto message = mailbox.send();
+
+    std::vector<uint8_t> reply(mailbox.send_size, 0);
+    auto* reply_header = pointData<mailbox::Header>(reply.data());
+    auto* reply_coe    = pointData<CoE::Header>(reply_header);
+    auto* reply_sdo    = pointData<CoE::ServiceData>(reply_coe);
+
+    reply_header->type    = mailbox::Type::CoE;
+    reply_header->len     = 210;                     // fits recv_size (256) but not send_size (32)
+    reply_coe->service    = CoE::Service::SDO_RESPONSE;
+    reply_sdo->command    = CoE::SDO::response::UPLOAD;
+    reply_sdo->index      = 0x1018;
+    reply_sdo->subindex   = 1;
+    reply_sdo->transfer_type = 0;                    // standard transfer: reads a size then payload
+    uint32_t complete_size = sizeof(client);
+    std::memcpy(pointData<uint8_t>(reply_sdo), &complete_size, sizeof(complete_size));
+
+    ASSERT_TRUE(mailbox.receive(reply.data()));
+    ASSERT_EQ(MessageStatus::COE_WRONG_SERVICE, message->status());
+}
+
+
+TEST_F(CoE_Request, asymmetric_mailbox_reply_larger_than_recv_mailbox_is_accepted)
+{
+    // A reply larger than the request buffer is legal and must be processed, not refused.
+    mailbox.recv_size = 32;
+    mailbox.send_size = 256;
+
+    uint8_t expected[200];
+    std::mt19937 rng{0xA5A5F00Du};
+    for (auto& byte : expected) { byte = static_cast<uint8_t>(rng()); }
+
+    uint8_t client[sizeof(expected)] = {0};
+    uint32_t client_size = sizeof(client);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, client, &client_size);
+    auto message = mailbox.send();
+
+    std::vector<uint8_t> reply(mailbox.send_size, 0);
+    auto* reply_header = pointData<mailbox::Header>(reply.data());
+    auto* reply_coe    = pointData<CoE::Header>(reply_header);
+    auto* reply_sdo    = pointData<CoE::ServiceData>(reply_coe);
+
+    reply_header->type    = mailbox::Type::CoE;
+    reply_header->len     = static_cast<uint16_t>(10 + sizeof(expected));
+    reply_coe->service    = CoE::Service::SDO_RESPONSE;
+    reply_sdo->command    = CoE::SDO::response::UPLOAD;
+    reply_sdo->index      = 0x1018;
+    reply_sdo->subindex   = 1;
+    reply_sdo->transfer_type = 0;
+    uint32_t complete_size = sizeof(expected);
+    auto* reply_payload = pointData<uint8_t>(reply_sdo);
+    std::memcpy(reply_payload, &complete_size, sizeof(complete_size));
+    std::memcpy(reply_payload + sizeof(complete_size), expected, sizeof(expected));
+
+    ASSERT_TRUE(mailbox.receive(reply.data()));
+    ASSERT_EQ(MessageStatus::SUCCESS, message->status());
+    ASSERT_EQ(sizeof(expected), client_size);
+    ASSERT_EQ(0, std::memcmp(client, expected, sizeof(expected)));
+}
+
+
+// Each message checks the footprint it writes against the buffer it was given, so the limit is the
+// request's own size rather than one figure for all of CoE. Inflating the buffer instead would make
+// the master write past the slave's mailbox SyncManager.
+TEST_F(CoE_Request, mailbox_too_small_for_the_request_it_must_hold)
+{
+    uint32_t data{0};
+    uint32_t data_size = sizeof(data);
+
+    // An SDO request writes the headers, the service data and four expedited/size bytes.
+    for (uint16_t size : {1, 6, 8, 12, 15})
+    {
+        mailbox.recv_size = size;
+        mailbox.send_size = size;
+        ASSERT_THROW(mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size), Error)
+            << "recv_size " << size;
+    }
+
+    mailbox.recv_size = 16;
+    mailbox.send_size = 16;
+    ASSERT_NO_THROW(mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size));
+
+    // An SDO information request carries only its own payload, so it fits in less.
+    for (uint16_t size : {1, 6, 12, 13})
+    {
+        mailbox.recv_size = size;
+        mailbox.send_size = size;
+        ASSERT_THROW(mailbox.createSDOInfoGetOD(0x1018, &data, &data_size), Error) << "recv_size " << size;
+    }
+
+    mailbox.recv_size = 14;
+    mailbox.send_size = 14;
+    ASSERT_NO_THROW(mailbox.createSDOInfoGetOD(0x1018, &data, &data_size));
+}

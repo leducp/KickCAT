@@ -1,7 +1,5 @@
 #include "kickcat/simulation/SimulatedSlave.h"
 
-#include <filesystem>
-#include <fstream>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
@@ -12,12 +10,12 @@
 #include "kickcat/ESC/EmulatedESC.h"
 #include "kickcat/ESI/Parser.h"
 #include "kickcat/ESI/SIIBuilder.h"
+#include "kickcat/OS/Filesystem.h"
 #include "kickcat/SIIParser.h"
 
 namespace kickcat::sim
 {
     using json = nlohmann::json;
-    namespace fs = std::filesystem;
 
     void configureDeviceDictionary(SimulatedSlave& sim, ESI::Device& device)
     {
@@ -38,23 +36,28 @@ namespace kickcat::sim
         }
     }
 
-    SimulatedSlave buildSlave(fs::path const& config_path)
+    SimulatedSlave buildSlave(std::string const& config_path)
     {
-        fs::path config_dir = config_path.parent_path();
+        std::string config_dir = filesystem::parent(config_path);
 
-        std::ifstream f(config_path);
-        if (not f.is_open())
+        std::vector<uint8_t> raw_config;
+        try
         {
-            throw std::runtime_error("Failed to open config file: " + config_path.string());
+            raw_config = filesystem::readFile(config_path);
         }
+        catch (std::exception const& e)
+        {
+            throw std::runtime_error("Failed to open config file: " + config_path + ": " + e.what());
+        }
+
         json config;
         try
         {
-            f >> config;
+            config = json::parse(raw_config);
         }
         catch (const json::parse_error& e)
         {
-            throw std::runtime_error("Failed to parse JSON in " + config_path.string() + ": " + e.what());
+            throw std::runtime_error("Failed to parse JSON in " + config_path + ": " + e.what());
         }
 
         SimulatedSlave sim;
@@ -65,10 +68,10 @@ namespace kickcat::sim
         if (config.contains("esi"))
         {
             // Build the EEPROM image (and CoE dictionary) from a selected ESI device.
-            fs::path esi_full_path = config_dir / config["esi"].get<std::string>();
-            if (not fs::exists(esi_full_path))
+            std::string esi_full_path = filesystem::join(config_dir, config["esi"].get<std::string>());
+            if (not filesystem::exists(esi_full_path))
             {
-                throw std::runtime_error("ESI file not found: " + esi_full_path.string());
+                throw std::runtime_error("ESI file not found: " + esi_full_path);
             }
             ESI::DeviceFilter filter;
             if (config.contains("device_type"))  { filter.type         = config["device_type"].get<std::string>(); }
@@ -78,32 +81,32 @@ namespace kickcat::sim
             try
             {
                 ESI::Parser parser;
-                ESI::Device device = parser.loadDevice(esi_full_path.string(), filter);
+                ESI::Device device = parser.loadDevice(esi_full_path, filter);
                 CoE::materializeStorage(device.dictionary);
                 sim.esc->loadEeprom(ESI::buildEepromImage(device));
                 configureDeviceDictionary(sim, device);
             }
             catch (std::exception const& e)
             {
-                throw std::runtime_error("Failed to build EEPROM from ESI " + esi_full_path.string() + ": " + e.what());
+                throw std::runtime_error("Failed to build EEPROM from ESI " + esi_full_path + ": " + e.what());
             }
         }
         else if (config.contains("eeprom"))
         {
-            fs::path eeprom_full_path = config_dir / config["eeprom"].get<std::string>();
-            if (not fs::exists(eeprom_full_path))
+            std::string eeprom_full_path = filesystem::join(config_dir, config["eeprom"].get<std::string>());
+            if (not filesystem::exists(eeprom_full_path))
             {
-                throw std::runtime_error("EEPROM file not found: " + eeprom_full_path.string());
+                throw std::runtime_error("EEPROM file not found: " + eeprom_full_path);
             }
-            std::vector<uint8_t> eeprom_image = loadBinaryFile(eeprom_full_path);
+            std::vector<uint8_t> eeprom_image = filesystem::readFile(eeprom_full_path);
             sim.esc->loadEeprom(eeprom_image);
 
             if (config.contains("coe_xml"))
             {
-                fs::path coe_xml_full_path = config_dir / config["coe_xml"].get<std::string>();
-                if (not fs::exists(coe_xml_full_path))
+                std::string coe_xml_full_path = filesystem::join(config_dir, config["coe_xml"].get<std::string>());
+                if (not filesystem::exists(coe_xml_full_path))
                 {
-                    throw std::runtime_error("CoE XML file not found: " + coe_xml_full_path.string());
+                    throw std::runtime_error("CoE XML file not found: " + coe_xml_full_path);
                 }
                 eeprom::SII sii;
                 sii.parse(eeprom_image);
@@ -114,14 +117,14 @@ namespace kickcat::sim
                 filter.revision_no = revision_no;
                 filter.product_code = product_code;
                 ESI::Parser parser;
-                ESI::Device device = parser.loadDevice(coe_xml_full_path.string(), filter);
+                ESI::Device device = parser.loadDevice(coe_xml_full_path, filter);
                 CoE::materializeStorage(device.dictionary);
                 configureDeviceDictionary(sim, device);
             }
         }
         else
         {
-            throw std::runtime_error("Config file " + config_path.string() + " missing 'eeprom' or 'esi' field");
+            throw std::runtime_error("Config file " + config_path + " missing 'eeprom' or 'esi' field");
         }
 
         sim.input.resize(PDO_MAX_SIZE);

@@ -46,8 +46,10 @@ endif()
 if (ENABLE_UBSAN)
   # 'alignment' is excluded on purpose: the EtherCAT frame layer reads/writes packed buffers at
   # unaligned offsets (supported on the x86/Cortex-M targets). The other UB checks stay on and abort.
-  add_compile_options(-fsanitize=undefined -fno-sanitize=alignment -fno-sanitize-recover=undefined)
-  add_link_options(-fsanitize=undefined)
+  # float-cast-overflow is not in gcc's -fsanitize=undefined, and its no-recover needs naming too.
+  add_compile_options(-fsanitize=undefined,float-cast-overflow -fno-sanitize=alignment
+                      -fno-sanitize-recover=undefined,float-cast-overflow)
+  add_link_options(-fsanitize=undefined,float-cast-overflow)
 endif()
 
 

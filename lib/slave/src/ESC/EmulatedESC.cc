@@ -1,7 +1,7 @@
 #include <cstring>
-#include <fstream>
 
 #include "kickcat/ESC/EmulatedESC.h"
+#include "kickcat/OS/Filesystem.h"
 #include "kickcat/OS/Time.h"
 #include "kickcat/debug.h"
 
@@ -43,31 +43,15 @@ namespace kickcat
         std::memset(memory_.sync_manager, 0, sizeof(memory_.sync_manager));
     }
 
-    EmulatedESC::EmulatedESC(fs::path const& path)
+    EmulatedESC::EmulatedESC(std::string const& path)
         : EmulatedESC()
     {
         loadEeprom(path);
     }
 
-    void EmulatedESC::loadEeprom(fs::path const& path)
+    void EmulatedESC::loadEeprom(std::string const& path)
     {
-        std::vector<uint8_t> image = loadBinaryFile(path);
-        loadEeprom(image);
-    }
-
-    std::vector<uint8_t> loadBinaryFile(fs::path const& path) {
-        std::ifstream eeprom_file;
-        eeprom_file.open(path, std::ios::binary | std::ios::ate);
-        if (not eeprom_file.is_open())
-        {
-            THROW_ERROR("Cannot load EEPROM");
-        }
-        int size = eeprom_file.tellg();
-        eeprom_file.seekg (0, std::ios::beg);
-        std::vector<uint8_t> image(static_cast<std::size_t>(size));
-        eeprom_file.read(reinterpret_cast<char*>(image.data()), size);
-        eeprom_file.close();
-        return image;
+        loadEeprom(filesystem::readFile(path));
     }
 
     void EmulatedESC::loadEeprom(std::vector<uint16_t> const& eeprom_data)

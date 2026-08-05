@@ -29,7 +29,7 @@ static std::vector<uint8_t> buildSDOUpload(uint16_t index, uint8_t subindex)
 {
     uint32_t data;
     uint32_t data_size = sizeof(data);
-    mailbox::request::SDOMessage msg{MBX_SIZE, index, subindex, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
+    mailbox::request::SDOMessage msg{MBX_SIZE, MBX_SIZE, index, subindex, false, CoE::SDO::request::UPLOAD, &data, &data_size, 1ms};
 
     std::vector<uint8_t> raw(MBX_SIZE, 0);
     std::memcpy(raw.data(), msg.data(), MBX_SIZE);
