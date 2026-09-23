@@ -8,6 +8,7 @@
 #include "kickcat/CoE/OD.h"
 #include "kickcat/CoE/mailbox/response.h"
 #include "kickcat/ESC/EmulatedESC.h"
+#include "kickcat/FoE/Storage.h"
 #include "kickcat/PDO.h"
 #include "kickcat/simulation/DeviceApp.h"
 #include "kickcat/slave/Slave.h"
@@ -23,7 +24,8 @@ namespace kickcat::sim
         std::unique_ptr<PDO>                                  pdo;
         std::unique_ptr<slave::Slave>                         slave;
         std::unique_ptr<CoE::Dictionary>                      dictionary;  // ESI/coe_xml OD, if any
-        std::unique_ptr<mailbox::response::Mailbox>           mailbox;     // only if CoE is advertised
+        std::unique_ptr<FoE::AbstractStorage>                 foe;         // foe_dir backend, if any
+        std::unique_ptr<mailbox::response::Mailbox>           mailbox;     // only if CoE or FoE is served
         std::unique_ptr<DeviceApp>                            device;      // behaviour (e.g. DS402), if any
         std::vector<uint8_t>                                  input;
         std::vector<uint8_t>                                  output;
@@ -32,7 +34,7 @@ namespace kickcat::sim
     // Process-image buffer; full-frame sized (updateInput/updateOutput copy the SM length).
     constexpr uint32_t PDO_MAX_SIZE = 4096;
 
-    // Build one slave from its JSON config (ESI device or raw eeprom, optional CoE).
+    // Build one slave from its JSON config (ESI device or raw eeprom, optional CoE and FoE).
     // Throws std::runtime_error on any failure.
     SimulatedSlave buildSlave(std::string const& config_path);
 }

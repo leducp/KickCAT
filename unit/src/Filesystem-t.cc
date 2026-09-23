@@ -5,6 +5,11 @@
 #include "kickcat/Error.h"
 #include "kickcat/OS/Filesystem.h"
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 using namespace kickcat;
 using namespace kickcat::filesystem;
 
@@ -228,3 +233,110 @@ TEST_F(FilesystemTest, recursive_list_returns_files_only_as_full_paths)
     EXPECT_EQ(join(root_, "sub/middle.xml"), files[1]);
     EXPECT_EQ(join(root_, "top.xml"), files[2]);
 }
+
+TEST_F(FilesystemTest, regular_file_read_and_write)
+{
+    std::string path = join(root_, "payload.bin");
+    writeFile(path, std::string{"a long first content"});
+
+    std::string content{"short"};
+    writeRegularFile(path, content.data(), content.size());
+    std::vector<uint8_t> read = readRegularFile(path);
+    EXPECT_EQ(content, std::string(read.begin(), read.end()));
+
+    std::string created = join(root_, "created.bin");
+    writeRegularFile(created, content.data(), content.size());
+    EXPECT_EQ(read, readFile(created));
+}
+
+TEST_F(FilesystemTest, regular_file_read_of_an_absent_file_throws)
+{
+    EXPECT_THROW(readRegularFile(join(root_, "absent.bin")), std::system_error);
+}
+
+#ifndef _WIN32
+TEST_F(FilesystemTest, regular_file_does_not_follow_a_symbolic_link)
+{
+    std::string target = join(root_, "target.bin");
+    std::string link   = join(root_, "link.bin");
+    writeFile(target, std::string{"secret"});
+    ASSERT_EQ(0, ::symlink("target.bin", link.c_str()));
+
+    EXPECT_THROW(readRegularFile(link), std::system_error);
+
+    // The write replaces the link itself
+    std::string content{"overwritten"};
+    writeRegularFile(link, content.data(), content.size());
+    std::vector<uint8_t> kept = readFile(target);
+    EXPECT_EQ("secret", std::string(kept.begin(), kept.end()));
+    std::vector<uint8_t> written = readRegularFile(link);
+    EXPECT_EQ(content, std::string(written.begin(), written.end()));
+}
+
+TEST_F(FilesystemTest, regular_file_does_not_go_through_a_hard_link)
+{
+    std::string target = join(root_, "target.bin");
+    std::string link   = join(root_, "link.bin");
+    writeFile(target, std::string{"secret"});
+    ASSERT_EQ(0, ::link(target.c_str(), link.c_str()));
+
+    EXPECT_THROW(readRegularFile(link), std::system_error);
+
+    // The write gives this name its own file: the other name keeps the previous content
+    std::string content{"overwritten"};
+    writeRegularFile(link, content.data(), content.size());
+    std::vector<uint8_t> kept = readFile(target);
+    EXPECT_EQ("secret", std::string(kept.begin(), kept.end()));
+    std::vector<uint8_t> written = readRegularFile(link);
+    EXPECT_EQ(content, std::string(written.begin(), written.end()));
+}
+
+TEST_F(FilesystemTest, regular_file_write_keeps_the_permissions)
+{
+    std::string content{"data"};
+
+    std::string restricted = join(root_, "restricted.bin");
+    writeFile(restricted, std::string{"old"});
+    ASSERT_EQ(0, ::chmod(restricted.c_str(), 0600));
+    writeRegularFile(restricted, content.data(), content.size());
+    struct stat info;
+    ASSERT_EQ(0, ::stat(restricted.c_str(), &info));
+    EXPECT_EQ(0600u, info.st_mode & 07777);
+
+    // Never a set-user-ID file with a new content
+    std::string setuid = join(root_, "setuid.bin");
+    writeFile(setuid, std::string{"old"});
+    ASSERT_EQ(0, ::chmod(setuid.c_str(), 04755));
+    writeRegularFile(setuid, content.data(), content.size());
+    ASSERT_EQ(0, ::stat(setuid.c_str(), &info));
+    EXPECT_EQ(0755u, info.st_mode & 07777);
+
+    mode_t mask = ::umask(0);
+    ::umask(mask);
+    std::string created = join(root_, "created.bin");
+    writeRegularFile(created, content.data(), content.size());
+    ASSERT_EQ(0, ::stat(created.c_str(), &info));
+    EXPECT_EQ(0644u & ~mask, info.st_mode & 07777);
+}
+
+TEST_F(FilesystemTest, regular_file_refuses_a_fifo)
+{
+    std::string fifo = join(root_, "fifo");
+    ASSERT_EQ(0, ::mkfifo(fifo.c_str(), 0600));
+
+    EXPECT_THROW(readRegularFile(fifo), std::system_error);
+}
+
+TEST_F(FilesystemTest, regular_file_refuses_a_directory)
+{
+    std::string directory = join(root_, "directory");
+    ASSERT_TRUE(createDirectory(directory));
+
+    EXPECT_THROW(readRegularFile(directory), std::system_error);
+
+    // A failed write leaves nothing behind
+    std::string content{"data"};
+    EXPECT_THROW(writeRegularFile(directory, content.data(), content.size()), std::system_error);
+    EXPECT_EQ(1u, list(root_).size());
+}
+#endif

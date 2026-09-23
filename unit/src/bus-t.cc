@@ -3,6 +3,7 @@
 #include "mocks/Time.h"
 
 #include "kickcat/Bus.h"
+#include "kickcat/FoE/protocol.h"
 #include "kickcat/MailboxSequencer.h"
 
 using namespace kickcat;
@@ -14,6 +15,23 @@ struct SDOAnswer
     CoE::ServiceData sdo;
     uint8_t payload[4];
 } __attribute__((__packed__));
+
+struct FoEAnswer
+{
+    mailbox::Header header;
+    FoE::Header foe;
+    uint8_t payload[4];
+} __attribute__((__packed__));
+
+FoEAnswer createFoEAnswer(uint8_t opcode, uint32_t value, uint16_t payload_size = 0)
+{
+    FoEAnswer answer{};
+    answer.header.len = static_cast<uint16_t>(sizeof(FoE::Header) + payload_size);
+    answer.header.type = mailbox::Type::FoE;
+    answer.foe.opcode = opcode;
+    answer.foe.value = value;
+    return answer;
+}
 
 
 struct BusAccessor : public Bus
@@ -532,6 +550,105 @@ TEST_F(BusTest, read_SDO_OK)
     bus.readSDO(slave, 0x1018, 1, Bus::Access::PARTIAL, &data, &data_size);
     ASSERT_EQ(0xDEADBEEF, data);
     ASSERT_EQ(4, data_size);
+}
+
+TEST_F(BusTest, read_FoE_OK)
+{
+    auto& slave = bus.slaves().at(0);
+
+    // checkMailboxes: can write, nothing to read
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+
+    // write read request
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    // checkMailboxes: can write, something to read
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
+
+    // read the only (short) data packet
+    FoEAnswer answer = createFoEAnswer(FoE::opcode::DATA, 1, 4);
+    answer.payload[0] = 0xCA;
+    answer.payload[1] = 0xFE;
+    answer.payload[2] = 0xDE;
+    answer.payload[3] = 0xCA;
+    mock_link->handleProcess(Command::FPRD, answer, 1);
+
+    // checkMailboxes: can write, nothing to read
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+
+    // write the last ack
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    uint32_t last_progress = 0;
+    std::vector<uint8_t> file;
+    bus.readFoE(slave, "fw.bin", 0, file, 1s, [&](uint32_t bytes){ last_progress = bytes; });
+    ASSERT_EQ((std::vector<uint8_t>{0xCA, 0xFE, 0xDE, 0xCA}), file);
+    ASSERT_EQ(4, last_progress);
+}
+
+TEST_F(BusTest, read_FoE_error)
+{
+    auto& slave = bus.slaves().at(0);
+
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
+    mock_link->handleProcess(Command::FPRD, createFoEAnswer(FoE::opcode::ERROR, FoE::result::NOT_FOUND), 1);
+
+    std::vector<uint8_t> file;
+    try
+    {
+        bus.readFoE(slave, "fw.bin", 0, file);
+        FAIL() << "readFoE shall throw";
+    }
+    catch (ErrorFoE const& e)
+    {
+        ASSERT_EQ(FoE::result::NOT_FOUND, e.code());
+    }
+}
+
+TEST_F(BusTest, write_FoE_OK)
+{
+    auto& slave = bus.slaves().at(0);
+
+    // write request
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    // ack of the write request
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
+    mock_link->handleProcess(Command::FPRD, createFoEAnswer(FoE::opcode::ACK, 0), 1);
+
+    // data packet
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    // ack of the data packet
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
+    mock_link->handleProcess(Command::FPRD, createFoEAnswer(FoE::opcode::ACK, 1), 1);
+
+    bus.writeFoE(slave, "fw.bin", 0, {1, 2, 3, 4});
+}
+
+TEST_F(BusTest, write_FoE_timeout)
+{
+    auto& slave = bus.slaves().at(0);
+
+    // checkMailboxes: cannot write, nothing to read
+    mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
+    mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
+
+    ASSERT_THROW(bus.writeFoE(slave, "fw.bin", 0, {1, 2, 3, 4}, 1ms), Error);
 }
 
 TEST_F(BusTest, read_SDO_emulated_complete_access_OK)

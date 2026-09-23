@@ -40,6 +40,8 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/mailbox/response-t.cc
                             src/mailbox/CoE/request-t.cc
                             src/mailbox/CoE/response-t.cc
+                            src/mailbox/FoE/request-t.cc
+                            src/mailbox/FoE/response-t.cc
                             src/masterOD-t.cc
                             src/masterOD-gateway-t.cc
                             src/slave/slave-t.cc
@@ -85,7 +87,8 @@ target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
 # Simulation-support tests. lib/simulation is processed after unit/, so gate on
 # the build condition (not TARGET); the link resolves at generation time.
 if (ENABLE_ESI_PARSER AND BUILD_SIMULATION)
-    target_sources(kickcat_unit PRIVATE src/simulation-t.cc src/SimulatorControl-t.cc src/Ds402Motor-t.cc)
+    target_sources(kickcat_unit PRIVATE src/simulation-t.cc src/SimulatorControl-t.cc src/Ds402Motor-t.cc
+                                        src/DirectoryStorage-t.cc src/FoE-sim-t.cc)
     target_link_libraries(kickcat_unit kickcat_simulation)
 endif()
 

@@ -503,7 +503,7 @@ namespace kickcat::mailbox::request
         // check message that are not CoE
         auto const* header = pointData<mailbox::Header>(received);
 
-        if (header->type == mailbox::Type::ERR)
+        if ((header->type == mailbox::Type::ERR) or (header->type == mailbox::Type::FoE))
         {
             return ProcessingResult::NOOP;
         }

@@ -39,6 +39,7 @@ namespace kickcat
     {
         constexpr int32_t AL  = 1;
         constexpr int32_t CoE = 2;
+        constexpr int32_t FoE = 3;
     }
 
     struct Error : public std::exception
@@ -79,6 +80,7 @@ namespace kickcat
     };
     using ErrorAL  = ErrorCode<error::category::AL>;
     using ErrorCoE = ErrorCode<error::category::CoE>;
+    using ErrorFoE = ErrorCode<error::category::FoE>;
 
     struct ErrorDatagram final : public Error
     {

@@ -655,10 +655,6 @@ namespace kickcat::mailbox::response
                     header->len += sizeof(uint16_t);
                 }
                 reply(std::move(raw_reply));
-
-                // Update counter handle
-                uint8_t counter = header_->count;
-                header_->count = mailbox::nextCounter(counter);
             }
         };
 

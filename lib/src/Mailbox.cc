@@ -6,6 +6,8 @@
 #include "debug.h"
 #include "CoE/mailbox/request.h"
 #include "CoE/mailbox/response.h"
+#include "FoE/mailbox/request.h"
+#include "FoE/mailbox/response.h"
 #include "Error.h"
 #include "Mailbox.h"
 #include "protocol.h"
@@ -144,10 +146,40 @@ namespace kickcat::mailbox::request
     }
 
 
+    std::shared_ptr<FoEMessage> Mailbox::createFoERead(std::string const& name, uint32_t password, nanoseconds timeout)
+    {
+        if (recv_size == 0)
+        {
+            THROW_ERROR("This mailbox is inactive");
+        }
+        auto foe = std::make_shared<FoEMessage>(recv_size, send_size, FoE::opcode::READ, name, password,
+                                                std::vector<uint8_t>{}, timeout);
+        foe->setCounter(nextCounter());
+        to_send.push(foe);
+        return foe;
+    }
+
+
+    std::shared_ptr<FoEMessage> Mailbox::createFoEWrite(std::string const& name, uint32_t password,
+                                                        std::vector<uint8_t> file, nanoseconds timeout)
+    {
+        if (recv_size == 0)
+        {
+            THROW_ERROR("This mailbox is inactive");
+        }
+        auto foe = std::make_shared<FoEMessage>(recv_size, send_size, FoE::opcode::WRITE, name, password,
+                                                std::move(file), timeout);
+        foe->setCounter(nextCounter());
+        to_send.push(foe);
+        return foe;
+    }
+
+
     std::shared_ptr<AbstractMessage> Mailbox::send()
     {
         auto message = to_send.front();
         to_send.pop();
+        message->sent();
 
         // add message to processing queue if needed
         if (message->status() == MessageStatus::RUNNING)
@@ -204,6 +236,7 @@ namespace kickcat::mailbox::request
     AbstractMessage::AbstractMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, nanoseconds timeout)
         : send_size_{mbx_send_size}
         , timeout_{timeout}
+        , timeout_duration_{timeout}
     {
         // A slave may advertise a mailbox protocol yet a zero (or sub-header) mailbox
         // size in its SII (seen in the wild, e.g. Beckhoff AMP8805-A000). The buffer
@@ -217,6 +250,15 @@ namespace kickcat::mailbox::request
         if (timeout_ != 0ns)
         {
             timeout_ += now();
+        }
+    }
+
+
+    void AbstractMessage::rearmTimeout()
+    {
+        if (timeout_duration_ != 0ns)
+        {
+            timeout_ = now() + timeout_duration_;
         }
     }
 
@@ -357,6 +399,14 @@ namespace kickcat::mailbox::response
 
     void Mailbox::activate(bool is_activated)
     {
+        if (not is_activated)
+        {
+            // The mailbox handler stops (ETG.1000.6 ESM, STOP_MBX_HANDLER): pending services are over, e.g. an FoE
+            // transfer interrupted by a state change is closed as failed
+            to_process_.clear();
+            to_send_ = {};
+        }
+
         if (mbx_in_.type != SyncManager::Unused and mbx_out_.type != SyncManager::Unused )
         {
             esc_->setSmActivate({mbx_in_, mbx_out_}, is_activated);
@@ -584,6 +634,12 @@ namespace kickcat::mailbox::response
         factories_.push_back(&createSDOMessage);
     }
 
+    void Mailbox::enableFoE(FoE::AbstractStorage& storage)
+    {
+        storage_ = &storage;
+        factories_.push_back(&createFoEMessage);
+    }
+
     void Mailbox::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)
     {
         constexpr size_t required = sizeof(mailbox::Header) + sizeof(mailbox::Error::ServiceData);
@@ -599,7 +655,14 @@ namespace kickcat::mailbox::response
         err->type    = 0x1;
         err->detail  = code;
 
-        to_send_.push(std::move(raw_message));
+        enqueue(std::move(raw_message));
+    }
+
+    void Mailbox::enqueue(std::vector<uint8_t>&& message)
+    {
+        // Each reply is a new mailbox service: its counter is the slave one (ETG.1000.4, 0 is reserved)
+        pointData<mailbox::Header>(message.data())->count = mailbox::nextCounter(counter_) & 0x7;
+        to_send_.push(std::move(message));
     }
 
     AbstractMessage::AbstractMessage(Mailbox* mbx)
@@ -610,7 +673,7 @@ namespace kickcat::mailbox::response
 
     void AbstractMessage::reply(std::vector<uint8_t>&& reply)
     {
-        mailbox_->to_send_.push(std::move(reply));
+        mailbox_->enqueue(std::move(reply));
     }
 
     void AbstractMessage::replyError(std::vector<uint8_t>&& raw_message, uint16_t code)

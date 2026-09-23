@@ -32,7 +32,7 @@ authoritative source for "what works today"; the README only summarizes it.
 | Protocol | Master     | Slave      | Notes |
 |----------|------------|------------|-------|
 | CoE (CANopen over EtherCAT) | Supported | Supported | See CoE breakdown below. |
-| FoE (File over EtherCAT)    | Planned    | Planned    | Protocol header only; no mailbox handlers yet. |
+| FoE (File over EtherCAT)    | Experimental | Experimental | See FoE breakdown below. |
 | EoE (Ethernet over EtherCAT)| Planned    | Planned    | Protocol header only; no mailbox handlers yet. |
 | SoE (Servo over EtherCAT)   | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
 | AoE (ADS over EtherCAT)     | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
@@ -49,6 +49,20 @@ authoritative source for "what works today"; the README only summarizes it.
 | Emergency messages                  | Supported | Not applicable |
 | Object Dictionary                   | Not applicable | Supported |
 | PDO mapping / assignment            | Supported | Supported |
+
+### FoE breakdown
+
+| FoE feature                                   | Master       | Slave        |
+|-----------------------------------------------|--------------|--------------|
+| File read / write (PRE-OP, SAFE-OP, OP)       | Experimental | Experimental |
+| Password                                      | Experimental | Experimental |
+| Busy (slave asks the master to wait)          | Experimental | Not supported |
+| Bootstrap state (firmware update)             | Planned      | Planned      |
+| Simulator file backend (`foe_dir`)            | Not applicable | Supported  |
+
+The master timeout applies to each exchange, not to the whole transfer. On the
+slave, the application provides the files through `FoE::AbstractStorage`
+(`mailbox::response::Mailbox::enableFoE`).
 
 ## Distributed Clocks (DC)
 
