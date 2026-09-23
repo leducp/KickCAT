@@ -1,6 +1,9 @@
+#include <string>
+
 #include <nanobind/nanobind.h>
 
 #include "kickcat/Error.h"
+#include "kickcat/FoE/protocol.h"
 #include "kickcat/protocol.h"
 
 namespace nb = nanobind;
@@ -16,6 +19,20 @@ namespace kickcat
     {
         nb::exception<ErrorAL>(m,  "ErrorAL");
         nb::exception<ErrorCoE>(m, "ErrorCoE");
+
+        static nb::exception<ErrorFoE> foe_error(m, "ErrorFoE");
+        nb::register_exception_translator([](std::exception_ptr const& p, void* payload)
+        {
+            try
+            {
+                std::rethrow_exception(p);
+            }
+            catch (ErrorFoE const& e)
+            {
+                std::string message = std::string{e.what()} + ": " + FoE::errorToString(static_cast<uint32_t>(e.code()));
+                PyErr_SetString(static_cast<PyObject*>(payload), message.c_str());
+            }
+        }, foe_error.ptr());
 
         nb::enum_<State>(m, "State")
             .value("INIT",        State::INIT)
