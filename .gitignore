@@ -9,3 +9,7 @@ compile_commands.json
 .clangd
 flashBin.jlink
 __pycache__/
+
+# Files pushed to the simulated FoE slave
+simulation/slave_configs/foe_files/*
+!simulation/slave_configs/foe_files/README.txt

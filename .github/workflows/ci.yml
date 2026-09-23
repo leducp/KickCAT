@@ -256,6 +256,8 @@ jobs:
             run: simulation/ci/example.sh py_bindings/examples/freedom-k64f.py simulation/slave_configs/freedom-k64f.json
           - name: wdc-foot
             run: simulation/ci/example.sh build/examples/master/wdc_foot/wdc_foot_example simulation/slave_configs/xmc4800.json
+          - name: foe
+            run: simulation/ci/foe.sh
 
     steps:
       - uses: actions/checkout@v7
