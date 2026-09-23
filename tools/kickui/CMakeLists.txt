@@ -4,6 +4,7 @@ add_executable(kickui
     BusSession.cc
     EtherCATPanel.cc
     EventLog.cc
+    FoePanel.cc
     MotorPanel.cc
     PdoValuesPanel.cc
     PrivilegeHelper.cc
