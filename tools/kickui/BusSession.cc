@@ -189,6 +189,7 @@ namespace kickcat::kickui
                     auto& t = foe_transfers_[ev.slave];
                     t.running = false;
                     t.error   = ev.message;
+                    t.warning = ev.warning;
                     foe_files_[ev.slave] = std::move(ev.file);
                     break;
                 }
@@ -2193,7 +2194,7 @@ namespace kickcat::kickui
         return result;
     }
 
-    void BusSession::readFoE(int slave_index, std::string name, uint32_t password)
+    void BusSession::readFoE(int slave_index, std::string name, uint32_t password, bool bootstrap)
     {
         auto& t = foe_transfers_[slave_index];   // UI thread
         if (t.running)
@@ -2214,12 +2215,14 @@ namespace kickcat::kickui
         SdoCommand cmd;
         cmd.kind         = SdoCommand::Kind::FoeRead;
         cmd.slave_index  = slave_index;
-        cmd.foe_name     = std::move(name);
-        cmd.foe_password = password;
+        cmd.foe_name      = std::move(name);
+        cmd.foe_password  = password;
+        cmd.foe_bootstrap = bootstrap;
         enqueue(std::move(cmd));
     }
 
-    void BusSession::writeFoE(int slave_index, std::string name, uint32_t password, std::vector<uint8_t> file)
+    void BusSession::writeFoE(int slave_index, std::string name, uint32_t password, bool bootstrap,
+                              std::vector<uint8_t> file)
     {
         auto& t = foe_transfers_[slave_index];   // UI thread
         if (t.running)
@@ -2240,8 +2243,9 @@ namespace kickcat::kickui
         SdoCommand cmd;
         cmd.kind         = SdoCommand::Kind::FoeWrite;
         cmd.slave_index  = slave_index;
-        cmd.foe_name     = std::move(name);
-        cmd.foe_password = password;
+        cmd.foe_name      = std::move(name);
+        cmd.foe_password  = password;
+        cmd.foe_bootstrap = bootstrap;
         cmd.payload      = std::move(file);
         enqueue(std::move(cmd));
     }
@@ -2452,6 +2456,7 @@ namespace kickcat::kickui
         Event done;
         done.kind  = Event::Kind::FoeDone;
         done.slave = cmd.slave_index;
+        Slave* bootstrapped = nullptr;   // set once in BOOT: leave it whatever happens next
         try
         {
             Bus* bus = bus_.get();
@@ -2460,6 +2465,13 @@ namespace kickcat::kickui
                 THROW_ERROR("bus not available");
             }
             Slave& slave = bus->slaves().at(cmd.slave_index);
+
+            if (cmd.foe_bootstrap)
+            {
+                bus->enterBootstrap(slave);
+                bootstrapped = &slave;
+                refreshSlaveStates();
+            }
 
             std::shared_ptr<mailbox::request::FoEMessage> msg;
             if (cmd.kind == SdoCommand::Kind::FoeRead)
@@ -2519,7 +2531,21 @@ namespace kickcat::kickui
         }
         catch (std::exception const& e)
         {
-            done.message = e.what();
+            done.message = describeError(e);
+        }
+
+        if (bootstrapped != nullptr)
+        {
+            try
+            {
+                bus_->exitBootstrap(*bootstrapped);
+            }
+            catch (std::exception const& e)
+            {
+                // Expected when the device restarts to run a new firmware
+                done.warning = "The slave did not go back to PRE-OP (" + describeError(e) + "), rescan the bus";
+            }
+            refreshSlaveStates();
         }
 
         int cancelled = cmd.slave_index;

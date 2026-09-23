@@ -23,6 +23,7 @@ namespace kickcat::kickui
 
         char     remote_name_[NAME_BUF] = "";
         uint32_t password_ = 0;
+        bool     bootstrap_ = false;
 
         bool        started_    = false;   // a transfer was started from this panel: show its outcome
         bool        pull_       = false;

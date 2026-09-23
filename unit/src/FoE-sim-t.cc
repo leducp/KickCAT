@@ -27,6 +27,7 @@ namespace
     constexpr char const* DIR    = "foe_sim_test_dir";
     constexpr char const* ESI    = "ecat402-drive.xml";
     constexpr char const* ASYMMETRIC_ESI = "foe_sim_test_asymmetric.xml";
+    constexpr char const* BOOT_ESI = "foe_sim_test_boot.xml";
 
     class FoESimTest : public testing::Test
     {
@@ -46,6 +47,7 @@ namespace
             sim_.reset();
             filesystem::removeFile(CONFIG);
             filesystem::removeFile(ASYMMETRIC_ESI);
+            filesystem::removeFile(BOOT_ESI);
             for (auto const& entry : filesystem::list(DIR))
             {
                 filesystem::removeFile(filesystem::join(DIR, entry.name));
@@ -135,6 +137,47 @@ TEST_F(FoESimTest, password)
 
     bus_->writeFoE(slave(), "fw.bin", 0x1234, {1, 2, 3});
     ASSERT_EQ((std::vector<uint8_t>{1, 2, 3}), filesystem::readFile(filesystem::join(DIR, "fw.bin")));
+}
+
+TEST_F(FoESimTest, firmware_update_in_bootstrap)
+{
+    // The fixture bootstrap mailbox matches the standard one: move it and make it asymmetric
+    // (0x1800 256 bytes from the master, 0x1900 128 bytes to the master)
+    std::vector<uint8_t> raw = filesystem::readFile(ESI);
+    std::string esi{raw.begin(), raw.end()};
+    std::string const standard = "<BootStrap>0010800000148000</BootStrap>";
+    std::size_t pos = esi.find(standard);
+    ASSERT_NE(std::string::npos, pos);
+    esi.replace(pos, standard.size(), "<BootStrap>0018000100198000</BootStrap>");
+    filesystem::writeFile(BOOT_ESI, esi);
+
+    start("", BOOT_ESI);
+    uint16_t standard_recv_offset = slave().mailbox.recv_offset;
+
+    bus_->enterBootstrap(slave());
+    ASSERT_EQ(State::BOOT, sim_->slave->state());
+    ASSERT_EQ(slave().sii.info.bootstrap_recv_mbx_offset, slave().mailbox.recv_offset);
+    ASSERT_EQ(256, slave().mailbox.recv_size);
+    ASSERT_EQ(128, slave().mailbox.send_size);
+    ASSERT_NE(standard_recv_offset, slave().mailbox.recv_offset);
+
+    std::vector<uint8_t> firmware(500);
+    std::iota(firmware.begin(), firmware.end(), uint8_t{11});
+    bus_->writeFoE(slave(), "firmware.bin", 0, firmware);
+    ASSERT_EQ(firmware, filesystem::readFile(filesystem::join(DIR, "firmware.bin")));
+
+    // Only FoE is served in the Bootstrap state
+    uint32_t vendor_id = 0;
+    uint32_t size = sizeof(vendor_id);
+    ASSERT_THROW(bus_->readSDO(slave(), 0x1018, 1, Bus::Access::PARTIAL, &vendor_id, &size, 10ms), std::exception);
+
+    bus_->exitBootstrap(slave());
+    ASSERT_EQ(State::PRE_OP, sim_->slave->state());
+    ASSERT_EQ(standard_recv_offset, slave().mailbox.recv_offset);
+
+    size = sizeof(vendor_id);
+    bus_->readSDO(slave(), 0x1018, 1, Bus::Access::PARTIAL, &vendor_id, &size);
+    ASSERT_EQ(slave().sii.info.vendor_id, vendor_id);
 }
 
 TEST_F(FoESimTest, missing_directory)

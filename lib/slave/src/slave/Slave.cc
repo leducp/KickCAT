@@ -17,6 +17,13 @@ namespace kickcat::slave
         OP_.setMailbox(mbx);
     }
 
+    void Slave::setBootstrapMailbox(mailbox::response::Mailbox* mbx)
+    {
+        boot_mbx_ = mbx;
+        init_.setBootstrapMailbox(mbx);
+        boot_.setBootstrapMailbox(mbx);
+    }
+
     void Slave::setDictionary(CoE::Dictionary* dictionary)
     {
         dictionary_ = dictionary;
@@ -24,6 +31,7 @@ namespace kickcat::slave
         preOp_.setDictionary(dictionary);
         safeOP_.setDictionary(dictionary);
         OP_.setDictionary(dictionary);
+        boot_.setDictionary(dictionary);
     }
 
     void Slave::start()
@@ -33,11 +41,17 @@ namespace kickcat::slave
 
     void Slave::routine()
     {
-        if (mbx_)
+        mailbox::response::Mailbox* mbx = mbx_;
+        if (stateMachine_.state() == State::BOOT)
         {
-            mbx_->receive();
-            mbx_->process();
-            mbx_->send();
+            mbx = boot_mbx_;
+        }
+
+        if (mbx)
+        {
+            mbx->receive();
+            mbx->process();
+            mbx->send();
         }
 
         stateMachine_.play();

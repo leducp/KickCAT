@@ -169,6 +169,19 @@ namespace kickcat
         void writeFoE(Slave& slave, std::string const& name, uint32_t password, std::vector<uint8_t> file,
                       nanoseconds timeout = 5s, FoEProgress const& progress = [](uint32_t){});
 
+        /// \brief Move the slave to the Bootstrap state (firmware update over FoE): INIT, bootstrap mailbox
+        ///        layout from the SII, then BOOT. The slave mailbox then uses the bootstrap layout.
+        /// \details The other slaves are not touched: the bus shall not be exchanging process data.
+        ///          Messages still queued in the slave mailbox are dropped. If the transition fails, the slave is brought
+        ///          back to INIT with the standard mailbox layout; when even that cannot be confirmed, its state is
+        ///          unknown and the bus needs a new init().
+        void enterBootstrap(Slave& slave, nanoseconds timeout = 3s);
+
+        /// \brief Move the slave from the Bootstrap state back to PRE-OP, with the standard mailbox layout.
+        /// \details A slave that restarts when leaving the Bootstrap state (e.g. to boot a new firmware) needs a
+        ///          new init() instead.
+        void exitBootstrap(Slave& slave, nanoseconds timeout = 3s);
+
         /// \brief  Add a gateway message to the bus
         /// \param  raw_message         A raw EtherCAT mailbox message
         /// \param  raw_message_size    Size of the mailbox message (shall be less or equal of the actual storage size)
@@ -225,6 +238,9 @@ namespace kickcat
         // INIT state methods
 
         void configureMailboxes();
+        void addMailboxConfiguration(Slave& slave);
+        void addMailboxHandlers(Slave& slave);
+        void switchMailboxLayout(Slave& slave, bool bootstrap);
 
         // mapping helpers
         void detectMapping();

@@ -15,6 +15,9 @@ namespace kickcat
     {
         void parseSII(uint8_t const* data, std::size_t size);
 
+        /// \brief Point the mailbox at the standard layout, or at the bootstrap one (SII words 0x14-0x17)
+        void selectMailboxLayout(bool bootstrap);
+
         /// \brief Human-readable slave name. Returns the SII general-category device name when present,
         ///        otherwise a fallback derived from the fixed station address (e.g. "Slave @0x1001").
         std::string name() const;
@@ -63,7 +66,6 @@ namespace kickcat
         uint16_t al_status_code{0};
 
         mailbox::request::Mailbox mailbox{};
-        mailbox::request::Mailbox mailbox_bootstrap{};
         int32_t waiting_datagram{0};  // how many datagram to process for this slave
 
         DLStatus dl_status{};

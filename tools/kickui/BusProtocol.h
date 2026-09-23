@@ -175,6 +175,7 @@ namespace kickcat::kickui
         int        total = 0;
         PdoMapping mapping;          // MappingResult
         std::vector<uint8_t> file;   // FoeDone: content read
+        std::string warning;         // FoeDone: reported whatever the outcome
     };
 
     // ---- bus actor -> UI (high-rate, lossy snapshot) ------------------------

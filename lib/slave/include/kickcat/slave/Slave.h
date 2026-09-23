@@ -19,6 +19,10 @@ namespace kickcat::slave
 
         void setMailbox(mailbox::response::Mailbox* mbx);
 
+        // Mailbox served in the Bootstrap state, with the bootstrap SyncManager layout; typically only FoE is enabled
+        // on it. Without one, the Bootstrap state is refused.
+        void setBootstrapMailbox(mailbox::response::Mailbox* mbx);
+
         // Object dictionary for PDO mapping and bind(), owned by the application and injected
         // here (a mailboxless terminal has one too); it must outlive the slave.
         void setDictionary(CoE::Dictionary* dictionary);
@@ -44,6 +48,7 @@ namespace kickcat::slave
     private:
         AbstractESC* esc_;
         mailbox::response::Mailbox* mbx_{nullptr};
+        mailbox::response::Mailbox* boot_mbx_{nullptr};
         CoE::Dictionary* dictionary_{nullptr};
         PDO* pdo_;
 
@@ -51,7 +56,8 @@ namespace kickcat::slave
         ESM::PreOP preOp_{*esc_, *pdo_};
         ESM::SafeOP safeOP_{*esc_, *pdo_};
         ESM::OP OP_{*esc_, *pdo_};
-        ESM::StateMachine stateMachine_{*esc_, {{&init_, &preOp_, &safeOP_, &OP_}}};
+        ESM::Boot boot_{*esc_, *pdo_};
+        ESM::StateMachine stateMachine_{*esc_, {{&init_, &preOp_, &safeOP_, &OP_, &boot_}}};
     };
 }
 

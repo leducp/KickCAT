@@ -50,6 +50,7 @@ namespace kickcat::kickui
         uint32_t    transferred = 0;
         uint32_t    total       = 0;    // 0 when unknown (read)
         std::string error;              // outcome of the last transfer, empty on success
+        std::string warning;            // e.g. the slave did not come back from the Bootstrap state
     };
 
     // Per-slave PDO-mapping read-back state.
@@ -329,8 +330,9 @@ namespace kickcat::kickui
         // Idle phase only: a long transfer would hold the cyclic loop's single
         // blocking-command slot and starve the motor commands.
         bool foeAvailable() const { return connected_ and (not rt_running_); }
-        void readFoE(int slave_index, std::string name, uint32_t password);
-        void writeFoE(int slave_index, std::string name, uint32_t password, std::vector<uint8_t> file);
+        // bootstrap: run the transfer in the Bootstrap state (firmware update), then go back to PRE-OP.
+        void readFoE(int slave_index, std::string name, uint32_t password, bool bootstrap);
+        void writeFoE(int slave_index, std::string name, uint32_t password, bool bootstrap, std::vector<uint8_t> file);
         void cancelFoE(int slave_index);
         FoeTransfer foeTransfer(int slave_index) const;
         std::vector<uint8_t> takeFoeFile(int slave_index);   // content of the last successful read
@@ -364,6 +366,7 @@ namespace kickcat::kickui
             CoE::CiA::DS402::UnitConfig motor_units;  // Kind::MotorUnits: live unit change
             std::string                  foe_name;     // Kind::FoeRead/FoeWrite (payload: file to write)
             uint32_t                     foe_password = 0;
+            bool                         foe_bootstrap = false;
         };
 
         void serviceLoop();      // idle phase; returns on operate_requested_ / bus_stop_

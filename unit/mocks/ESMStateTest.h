@@ -17,6 +17,7 @@ public:
     MockESC esc_{};
     PDO pdo_{&esc_};
     mailbox::response::Mailbox mbx_{&esc_, 200};
+    mailbox::response::Mailbox boot_mbx_{&esc_, 200};   // not given to the states by default: BOOT unsupported
     uint8_t buffer_in_[1024];
     uint8_t buffer_out_[1024];
 
@@ -29,6 +30,7 @@ public:
     PreOP preop{esc_, pdo_};
     SafeOP safeop{esc_, pdo_};
     OP op{esc_, pdo_};
+    Boot boot{esc_, pdo_};
 
     virtual void SetUpSpecific()
     {
@@ -36,7 +38,7 @@ public:
 
     void SetUp() override
     {
-        for (auto state : std::initializer_list<AbstractState*>{&init, &preop, &safeop, &op})
+        for (auto state : std::initializer_list<AbstractState*>{&init, &preop, &safeop, &op, &boot})
         {
             state->setMailbox(&mbx_);
         }

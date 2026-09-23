@@ -53,6 +53,7 @@ namespace kickcat::kickui
         ImGui::SetNextItemWidth(px(120.0f));
         ImGui::InputScalar("Password", ImGuiDataType_U32, &password_, nullptr, nullptr, "%08X",
                            ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::Checkbox("Bootstrap state (firmware update)", &bootstrap_);
 
         ImGui::BeginDisabled(busy);
         if (ImGui::Button("Push file..."))
@@ -73,7 +74,7 @@ namespace kickcat::kickui
                     started_    = true;
                     pull_       = false;
                     cancelling_ = false;
-                    session.writeFoE(device.index, name, password_, std::move(file));
+                    session.writeFoE(device.index, name, password_, bootstrap_, std::move(file));
                 }
                 catch (std::exception const& e)
                 {
@@ -94,7 +95,7 @@ namespace kickcat::kickui
                 saved_      = false;
                 cancelling_ = false;
                 save_path_  = path;
-                session.readFoE(device.index, remote_name_, password_);
+                session.readFoE(device.index, remote_name_, password_, bootstrap_);
             }
         }
         ImGui::EndDisabled();
@@ -143,32 +144,38 @@ namespace kickcat::kickui
         if (not transfer.error.empty())
         {
             ImGui::TextColored(COLOR_RED, "%s", transfer.error.c_str());
-            return;
-        }
-
-        if (pull_ and not saved_)
-        {
-            saved_ = true;
-            std::vector<uint8_t> file = session.takeFoeFile(slave_index);
-            try
-            {
-                filesystem::writeFile(save_path_, file.data(), file.size());
-            }
-            catch (std::exception const& e)
-            {
-                message_ = "Cannot write " + save_path_ + ": " + e.what();
-                return;
-            }
-        }
-
-        std::string done = "OK (" + std::to_string(transfer.transferred) + " bytes)";
-        if (pull_)
-        {
-            ImGui::TextColored(COLOR_GREEN, "%s, saved to %s", done.c_str(), save_path_.c_str());
         }
         else
         {
-            ImGui::TextColored(COLOR_GREEN, "%s", done.c_str());
+            if (pull_ and not saved_)
+            {
+                saved_ = true;
+                std::vector<uint8_t> file = session.takeFoeFile(slave_index);
+                try
+                {
+                    filesystem::writeFile(save_path_, file.data(), file.size());
+                }
+                catch (std::exception const& e)
+                {
+                    message_ = "Cannot write " + save_path_ + ": " + e.what();
+                    return;
+                }
+            }
+
+            std::string done = "OK (" + std::to_string(transfer.transferred) + " bytes)";
+            if (pull_)
+            {
+                ImGui::TextColored(COLOR_GREEN, "%s, saved to %s", done.c_str(), save_path_.c_str());
+            }
+            else
+            {
+                ImGui::TextColored(COLOR_GREEN, "%s", done.c_str());
+            }
+        }
+
+        if (not transfer.warning.empty())
+        {
+            ImGui::TextColored(COLOR_YELLOW, "%s", transfer.warning.c_str());
         }
     }
 }

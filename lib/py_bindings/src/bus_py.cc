@@ -228,6 +228,10 @@ namespace kickcat
                 }, "slave"_a, "name"_a, "data"_a, "password"_a = 0, "timeout"_a = 5s,
                    "progress"_a = nb::none(),
                 "Write a file to the slave (FoE). The timeout applies to each exchange.")
+            .def("enter_bootstrap", &Bus::enterBootstrap, "slave"_a, "timeout"_a = 3s,
+                "Move the slave to the Bootstrap state (firmware update over FoE).")
+            .def("exit_bootstrap", &Bus::exitBootstrap, "slave"_a, "timeout"_a = 3s,
+                "Move the slave from the Bootstrap state back to PRE-OP.")
             .def("read_object_description", [](PyBus &self, Slave& slave, uint16_t index) -> std::tuple<std::string, std::string>
                 {
                     char buffer[4096];

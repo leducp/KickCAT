@@ -17,7 +17,8 @@ bus from the master side (`tools/kickui/`). It provides:
 - **SDO** read/write across data types (integers, reals, strings, raw hex).
 - **PDO** mapping inspection/editing and a real-time process-data view.
 - A **DS402 motor bench** (setpoints, units configuration).
-- **FoE** file push/pull with progress and cancel (while the bus is not cycling).
+- **FoE** file push/pull with progress and cancel (while the bus is not cycling),
+  optionally in the Bootstrap state for a firmware update.
 - An event/error log and an embedded simulator launcher.
 
 Off by default; build it with:
@@ -61,7 +62,8 @@ sudo ./tools/eeprom -s 0 -c read -f output.bin -i <interface>
 ## foe (CLI)
 
 Read or write a file on a slave with FoE (`tools/foe.cc`). The bus is brought
-to PRE-OP first; the Bootstrap state is not supported yet.
+to PRE-OP first; with `--boot`, the slave is moved to the Bootstrap state for
+the transfer (firmware update) and back to PRE-OP afterwards.
 
 ```bash
 # Write a file to the slave at position 0 (remote name: the local file name)
@@ -69,6 +71,9 @@ sudo ./tools/foe -s 0 -c write -f firmware.bin -i <interface>
 
 # Read a file from the slave, with a password and an explicit remote name
 sudo ./tools/foe -s 0 -c read -f dump.bin -n config.bin -p 0x1234 -i <interface>
+
+# Firmware update in the Bootstrap state
+sudo ./tools/foe -s 0 -c write -f firmware.efw --boot -i <interface>
 ```
 
 `-t` sets the maximum time of each exchange with the slave (default 5000 ms).
