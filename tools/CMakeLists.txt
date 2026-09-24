@@ -10,6 +10,10 @@ add_executable(eeprom eeprom.cc)
 target_link_libraries(eeprom kickcat argparse::argparse)
 set_kickcat_properties(eeprom)
 
+add_executable(foe foe.cc)
+target_link_libraries(foe kickcat argparse::argparse)
+set_kickcat_properties(foe)
+
 if (ENABLE_ESI_PARSER)
     add_executable(od_generator od_generator.cc)
     target_link_libraries(od_generator kickcat argparse::argparse)

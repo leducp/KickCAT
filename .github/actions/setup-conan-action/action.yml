@@ -1,8 +1,36 @@
 name: "Setup Conan"
-description: "Setup Conan"
+description: "Setup Conan, with the pip downloads and the Conan packages cached between runs"
+inputs:
+  cache-id:
+    description: "Identifies the job in the Conan cache key: jobs with different dependencies shall not share it"
+    required: false
+    default: "default"
 runs:
   using: "composite"
   steps:
+    - name: Cache keys
+      id: key
+      shell: bash
+      # The runner image version renews the caches when the image (compiler, Python) moves on
+      run: |
+        echo "pip_dir=$(python3 -m pip cache dir)" >> "$GITHUB_OUTPUT"
+        echo "pip_prefix=pip-${ImageOS}-$(uname -m)-" >> "$GITHUB_OUTPUT"
+        echo "pip_key=pip-${ImageOS}-$(uname -m)-${ImageVersion}" >> "$GITHUB_OUTPUT"
+        conan="conan-${ImageOS}-$(uname -m)-${{ inputs.cache-id }}-${{ hashFiles('conan/conanfile.py') }}-"
+        echo "conan_prefix=${conan}" >> "$GITHUB_OUTPUT"
+        echo "conan_key=${conan}${ImageVersion}" >> "$GITHUB_OUTPUT"
+    - name: Cache pip downloads
+      uses: actions/cache@v6
+      with:
+        path: ${{ steps.key.outputs.pip_dir }}
+        key: ${{ steps.key.outputs.pip_key }}
+        restore-keys: ${{ steps.key.outputs.pip_prefix }}
+    - name: Cache Conan packages
+      uses: actions/cache@v6
+      with:
+        path: ~/.conan2/p
+        key: ${{ steps.key.outputs.conan_key }}
+        restore-keys: ${{ steps.key.outputs.conan_prefix }}
     - name: Setup venv
       run: |
         python3 -m venv venv

@@ -63,6 +63,7 @@ against) -- contributions are welcome. See the
 - **KickUI** -- ImGui bus dashboard: topology view, SDO/PDO panels, DS402 motor bench
 - **EEPROM editor** -- ImGui structured SII/EEPROM editor
 - **eeprom** -- CLI to read/write slave EEPROM
+- **foe** -- CLI to read/write a file on a slave over FoE
 - **scan_topology** -- enumerate slaves and per-port link status
 - **check_network_stability** -- monitor packet loss/corruption over time (Linux)
 - **od_generator** -- generate CoE Object Dictionary code from ESI files

@@ -57,6 +57,21 @@ sudo ./tools/eeprom -s 0 -c write -f path/to/eeprom.bin -i "?"
 sudo ./tools/eeprom -s 0 -c read -f output.bin -i <interface>
 ```
 
+## foe (CLI)
+
+Read or write a file on a slave with FoE (`tools/foe.cc`). The bus is brought
+to PRE-OP first; the Bootstrap state is not supported yet.
+
+```bash
+# Write a file to the slave at position 0 (remote name: the local file name)
+sudo ./tools/foe -s 0 -c write -f firmware.bin -i <interface>
+
+# Read a file from the slave, with a password and an explicit remote name
+sudo ./tools/foe -s 0 -c read -f dump.bin -n config.bin -p 0x1234 -i <interface>
+```
+
+`-t` sets the maximum time of each exchange with the slave (default 5000 ms).
+
 ## scan_topology (CLI)
 
 Enumerate the slaves on the bus and display the topology, including each slave's
