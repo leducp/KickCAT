@@ -1,10 +1,12 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/chrono.h>
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
 #include "kickcat/protocol.h"
 #include "kickcat/CoE/mailbox/request.h"
+#include "kickcat/FoE/mailbox/request.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -58,6 +60,9 @@ namespace kickcat
         message_status.attr("COE_UNKNOWN_SERVICE") = MessageStatus::COE_UNKNOWN_SERVICE;
         message_status.attr("COE_CLIENT_BUFFER_TOO_SMALL") = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
         message_status.attr("COE_SEGMENT_BAD_TOGGLE_BIT") = MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT;
+        message_status.attr("FOE_UNEXPECTED_OPCODE") = MessageStatus::FOE_UNEXPECTED_OPCODE;
+        message_status.attr("FOE_PACKET_NUMBER_WRONG") = MessageStatus::FOE_PACKET_NUMBER_WRONG;
+        message_status.attr("FOE_INVALID_REPLY") = MessageStatus::FOE_INVALID_REPLY;
 
         nb::class_<SDOMessagePy>(m_request, "SDOMessage")
             .def(nb::init<>(), "Default constructor")
@@ -67,6 +72,15 @@ namespace kickcat
             .def("address",     &SDOMessagePy::address)
             .def("status",      &SDOMessagePy::status);
 
+
+        nb::class_<FoEMessage>(m_request, "FoEMessage")
+            .def("status",            [](FoEMessage& self) { return self.status(); })
+            .def("bytes_transferred", &FoEMessage::bytesTransferred)
+            .def("error_text",        &FoEMessage::errorText)
+            .def_prop_ro("file",      [](FoEMessage& self)
+                {
+                    return nb::bytes(reinterpret_cast<char const*>(self.file().data()), self.file().size());
+                }, "Read: content received so far. Write: content to send.");
 
         // Bind the request Mailbox class
         nb::class_<Mailbox>(m_request, "Mailbox")
@@ -100,6 +114,21 @@ namespace kickcat
                     return msg_py;
                 },
                 "index"_a, "subindex"_a, "CA"_a = false, "data"_a, "timeout"_a = milliseconds(100),
-                "Write an SDO");
+                "Write an SDO")
+            .def("read_foe",
+                [](Mailbox& self, std::string const& name, uint32_t password, nanoseconds timeout)
+                {
+                    return self.createFoERead(name, password, timeout);
+                },
+                "name"_a, "password"_a = 0, "timeout"_a = 5s,
+                "Read a file over FoE. The timeout applies to each exchange.")
+            .def("write_foe",
+                [](Mailbox& self, std::string const& name, nb::bytes data, uint32_t password, nanoseconds timeout)
+                {
+                    auto const* begin = reinterpret_cast<uint8_t const*>(data.c_str());
+                    return self.createFoEWrite(name, password, std::vector<uint8_t>(begin, begin + data.size()), timeout);
+                },
+                "name"_a, "data"_a, "password"_a = 0, "timeout"_a = 5s,
+                "Write a file over FoE. The timeout applies to each exchange.");
     }
 }

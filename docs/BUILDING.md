@@ -82,6 +82,15 @@ The Python interpreter needs raw-socket capabilities to drive a bus:
 ./py_bindings/enable_raw_access.sh
 ```
 
+Examples live in `py_bindings/examples/`. `foe.py` transfers a file over FoE
+(`Bus.read_foe` / `Bus.write_foe`, `ErrorFoE` on failure); it runs against the
+simulator too:
+
+```bash
+./build/simulation/network_simulator -i tap:server -s simulation/slave_configs/ecat402-drive-foe.json &
+python py_bindings/examples/foe.py -i tap:client -c write -f firmware.bin
+```
+
 ### Multi-wheel (CI)
 
 This project uses cibuildwheel to generate wheels for all supported

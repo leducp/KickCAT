@@ -26,6 +26,16 @@ namespace kickcat
             using Bus::Bus;
             std::vector<uint8_t> io_buffer;
         };
+
+        // A Python None arrives as an empty std::function, which the C++ API would call
+        Bus::FoEProgress callable(Bus::FoEProgress const& progress)
+        {
+            if (progress)
+            {
+                return progress;
+            }
+            return [](uint32_t){};
+        }
     }
 
     void create_bus_python_bindings(nb::module_ &m)
@@ -200,6 +210,24 @@ namespace kickcat
                     buffer.resize(actual_size);
                     return nb::bytes(reinterpret_cast<const char*>(buffer.data()), actual_size);
                 })
+            .def("read_foe", [](PyBus &self, Slave& slave, std::string const& name, uint32_t password,
+                               std::chrono::nanoseconds timeout, Bus::FoEProgress const& progress)
+                {
+                    std::vector<uint8_t> file;
+                    self.readFoE(slave, name, password, file, timeout, callable(progress));
+                    return nb::bytes(reinterpret_cast<char const*>(file.data()), file.size());
+                }, "slave"_a, "name"_a, "password"_a = 0, "timeout"_a = 5s,
+                   "progress"_a = nb::none(),
+                "Read a file from the slave (FoE). The timeout applies to each exchange.")
+            .def("write_foe", [](PyBus &self, Slave& slave, std::string const& name, nb::bytes data, uint32_t password,
+                                std::chrono::nanoseconds timeout, Bus::FoEProgress const& progress)
+                {
+                    auto const* begin = reinterpret_cast<uint8_t const*>(data.c_str());
+                    self.writeFoE(slave, name, password, std::vector<uint8_t>(begin, begin + data.size()), timeout,
+                                  callable(progress));
+                }, "slave"_a, "name"_a, "data"_a, "password"_a = 0, "timeout"_a = 5s,
+                   "progress"_a = nb::none(),
+                "Write a file to the slave (FoE). The timeout applies to each exchange.")
             .def("read_object_description", [](PyBus &self, Slave& slave, uint16_t index) -> std::tuple<std::string, std::string>
                 {
                     char buffer[4096];
