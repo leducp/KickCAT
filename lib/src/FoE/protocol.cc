@@ -41,6 +41,7 @@ namespace kickcat::FoE
             case MessageStatus::FOE_UNEXPECTED_OPCODE:      { return "Unexpected FoE opcode";                }
             case MessageStatus::FOE_PACKET_NUMBER_WRONG:    { return "Unexpected FoE packet number";         }
             case MessageStatus::FOE_INVALID_REPLY:          { return "Invalid FoE reply";                    }
+            case MessageStatus::FOE_CANCELLED:              { return "FoE transfer cancelled";               }
             default:                                        { return "Unknown FoE error";                    }
         }
     }

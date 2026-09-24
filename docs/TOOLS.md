@@ -17,6 +17,7 @@ bus from the master side (`tools/kickui/`). It provides:
 - **SDO** read/write across data types (integers, reals, strings, raw hex).
 - **PDO** mapping inspection/editing and a real-time process-data view.
 - A **DS402 motor bench** (setpoints, units configuration).
+- **FoE** file push/pull with progress and cancel (while the bus is not cycling).
 - An event/error log and an embedded simulator launcher.
 
 Off by default; build it with:

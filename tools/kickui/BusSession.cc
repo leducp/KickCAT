@@ -10,6 +10,8 @@
 #include "kickcat/CoE/OD.h"
 #include "kickcat/CoE/protocol.h"
 #include "kickcat/Error.h"
+#include "kickcat/FoE/mailbox/request.h"
+#include "kickcat/FoE/protocol.h"
 #include "kickcat/Frame.h"
 #include "kickcat/Link.h"
 #include "kickcat/Mailbox.h"
@@ -175,6 +177,19 @@ namespace kickcat::kickui
                 case Event::Kind::StateActionResult:
                 {
                     state_errors_[ev.slave] = ev.message;   // empty = success (clears the error)
+                    break;
+                }
+                case Event::Kind::FoeProgress:
+                {
+                    foe_transfers_[ev.slave].transferred = static_cast<uint32_t>(ev.count);
+                    break;
+                }
+                case Event::Kind::FoeDone:
+                {
+                    auto& t = foe_transfers_[ev.slave];
+                    t.running = false;
+                    t.error   = ev.message;
+                    foe_files_[ev.slave] = std::move(ev.file);
                     break;
                 }
             }
@@ -811,6 +826,8 @@ namespace kickcat::kickui
         od_scans_.clear();
         pdo_scans_.clear();
         state_errors_.clear();
+        foe_transfers_.clear();
+        foe_files_.clear();
         LockGuard lock(mtx_);
         dropStagedConnection();   // an in-flight connect result dies with the session
         status_.clear();
@@ -1030,7 +1047,7 @@ namespace kickcat::kickui
         }
         rt_running_ = false;
 
-        // Fail any still-queued SDO requests so the UI stops polling them.
+        // Fail any still-queued SDO/FoE requests so the UI stops polling them.
         LockGuard lock(sdo_mtx_);
         for (auto& cmd : sdo_queue_)
         {
@@ -1039,6 +1056,12 @@ namespace kickcat::kickui
                 cmd.result->ok      = false;
                 cmd.result->message = "cancelled";
                 cmd.result->done    = true;
+            }
+            if ((cmd.kind == SdoCommand::Kind::FoeRead) or (cmd.kind == SdoCommand::Kind::FoeWrite))
+            {
+                auto& t = foe_transfers_[cmd.slave_index];   // the bus thread is joined: UI thread only
+                t.running = false;
+                t.error   = "cancelled";
             }
         }
         sdo_queue_.clear();
@@ -1672,6 +1695,16 @@ namespace kickcat::kickui
                             sdo_queue_.pop_front();
                             continue;
                         }
+                        if ((k == SdoCommand::Kind::FoeRead) or (k == SdoCommand::Kind::FoeWrite))
+                        {
+                            Event ev;
+                            ev.kind    = Event::Kind::FoeDone;
+                            ev.slave   = front.slave_index;
+                            ev.message = "FoE is not available while the cyclic loop runs";
+                            pushEvent(std::move(ev));
+                            sdo_queue_.pop_front();
+                            continue;
+                        }
                         // A state change for an operated slave is a per-drive transition
                         // serviced by this loop (no mailbox work, never rebuilds).
                         if (k == SdoCommand::Kind::State)
@@ -1836,6 +1869,8 @@ namespace kickcat::kickui
             case SdoCommand::Kind::ClearErrors: { diag_clear_pending_ = true; refreshDiagnostics(); break; }  // apply now, any phase
             case SdoCommand::Kind::Read:
             case SdoCommand::Kind::Write:       { executeSdo(cmd, cyclic); break; }
+            case SdoCommand::Kind::FoeRead:
+            case SdoCommand::Kind::FoeWrite:    { executeFoe(cmd, cyclic); break; }
             case SdoCommand::Kind::Motor:
             case SdoCommand::Kind::MotorUnits:  { break; }   // phase-local; handled before dispatch
         }
@@ -2158,6 +2193,86 @@ namespace kickcat::kickui
         return result;
     }
 
+    void BusSession::readFoE(int slave_index, std::string name, uint32_t password)
+    {
+        auto& t = foe_transfers_[slave_index];   // UI thread
+        if (t.running)
+        {
+            return;
+        }
+        t = FoeTransfer{};
+        foe_files_.erase(slave_index);
+        if (not foeAvailable())
+        {
+            t.error = "FoE unavailable (not connected, or the cyclic loop runs).";
+            return;
+        }
+        t.running = true;
+        int stale = slave_index;
+        foe_cancel_.compare_exchange_strong(stale, -1);   // a cancel that came after the previous transfer ended
+
+        SdoCommand cmd;
+        cmd.kind         = SdoCommand::Kind::FoeRead;
+        cmd.slave_index  = slave_index;
+        cmd.foe_name     = std::move(name);
+        cmd.foe_password = password;
+        enqueue(std::move(cmd));
+    }
+
+    void BusSession::writeFoE(int slave_index, std::string name, uint32_t password, std::vector<uint8_t> file)
+    {
+        auto& t = foe_transfers_[slave_index];   // UI thread
+        if (t.running)
+        {
+            return;
+        }
+        t = FoeTransfer{};
+        if (not foeAvailable())
+        {
+            t.error = "FoE unavailable (not connected, or the cyclic loop runs).";
+            return;
+        }
+        t.running = true;
+        int stale = slave_index;
+        foe_cancel_.compare_exchange_strong(stale, -1);   // a cancel that came after the previous transfer ended
+        t.total   = static_cast<uint32_t>(file.size());
+
+        SdoCommand cmd;
+        cmd.kind         = SdoCommand::Kind::FoeWrite;
+        cmd.slave_index  = slave_index;
+        cmd.foe_name     = std::move(name);
+        cmd.foe_password = password;
+        cmd.payload      = std::move(file);
+        enqueue(std::move(cmd));
+    }
+
+    void BusSession::cancelFoE(int slave_index)
+    {
+        foe_cancel_ = slave_index;
+    }
+
+    FoeTransfer BusSession::foeTransfer(int slave_index) const
+    {
+        auto it = foe_transfers_.find(slave_index);
+        if (it == foe_transfers_.end())
+        {
+            return FoeTransfer{};
+        }
+        return it->second;
+    }
+
+    std::vector<uint8_t> BusSession::takeFoeFile(int slave_index)
+    {
+        auto it = foe_files_.find(slave_index);
+        if (it == foe_files_.end())
+        {
+            return {};
+        }
+        std::vector<uint8_t> file = std::move(it->second);
+        foe_files_.erase(it);
+        return file;
+    }
+
     void BusSession::requestSlaveState(int slave_index, uint8_t state)
     {
         if (not sdoAvailable())
@@ -2329,6 +2444,87 @@ namespace kickcat::kickui
             cmd.result->message = e.what();
         }
         cmd.result->done = true;
+    }
+
+    void BusSession::executeFoe(SdoCommand& cmd, std::function<void()> const& cyclic)
+    {
+        namespace MessageStatus = mailbox::request::MessageStatus;
+        Event done;
+        done.kind  = Event::Kind::FoeDone;
+        done.slave = cmd.slave_index;
+        try
+        {
+            Bus* bus = bus_.get();
+            if (bus == nullptr)
+            {
+                THROW_ERROR("bus not available");
+            }
+            Slave& slave = bus->slaves().at(cmd.slave_index);
+
+            std::shared_ptr<mailbox::request::FoEMessage> msg;
+            if (cmd.kind == SdoCommand::Kind::FoeRead)
+            {
+                msg = slave.mailbox.createFoERead(cmd.foe_name, cmd.foe_password, 5s);
+            }
+            else
+            {
+                msg = slave.mailbox.createFoEWrite(cmd.foe_name, cmd.foe_password, std::move(cmd.payload), 5s);
+            }
+
+            uint32_t reported = 0;
+            while ((msg->status() == MessageStatus::RUNNING) and (not aborting()) and (foe_cancel_ != cmd.slave_index))
+            {
+                cyclic();
+                if (msg->bytesTransferred() != reported)
+                {
+                    reported = msg->bytesTransferred();
+                    Event progress;
+                    progress.kind  = Event::Kind::FoeProgress;
+                    progress.slave = cmd.slave_index;
+                    progress.count = static_cast<int>(reported);
+                    pushEvent(std::move(progress));
+                }
+            }
+
+            if (msg->status() == MessageStatus::RUNNING)
+            {
+                // Tell the slave: the error PDU needs a few more mailbox steps, bounded by the message timeout.
+                msg->cancel();
+                while ((msg->status() == MessageStatus::RUNNING) and (not bus_stop_))
+                {
+                    cyclic();
+                }
+            }
+
+            uint32_t status = msg->status();
+            if (status == MessageStatus::SUCCESS)
+            {
+                if (cmd.kind == SdoCommand::Kind::FoeRead)
+                {
+                    done.file = std::move(msg->file());
+                }
+            }
+            else if (status == MessageStatus::TIMEDOUT)
+            {
+                done.message = "timeout";
+            }
+            else
+            {
+                done.message = FoE::errorToString(status);
+                if (not msg->errorText().empty())
+                {
+                    done.message += ": " + msg->errorText();
+                }
+            }
+        }
+        catch (std::exception const& e)
+        {
+            done.message = e.what();
+        }
+
+        int cancelled = cmd.slave_index;
+        foe_cancel_.compare_exchange_strong(cancelled, -1);
+        pushEvent(std::move(done));
     }
 
     void BusSession::executeDiscover(int slave_index, std::function<void()> const& cyclic, int resume_from)
