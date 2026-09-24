@@ -5,65 +5,16 @@
 
 namespace kickcat::FoE
 {
-    struct Header   // ETG1000.6 chapter 5.8.x
+    struct Header   // ETG1000.6 chapter 5.8
     {
-        uint8_t opcode;
-        uint8_t reserved;
+        uint8_t  opcode;
+        uint8_t  reserved;
+        uint32_t value;     // READ, WRITE: password (0: unused). DATA, ACK: packet number (ACK 0: write accepted).
+                            // ERROR: error code. BUSY: done (low 16 bits) and entire (high 16 bits).
     } __attribute__((__packed__));
 
-    namespace read
-    {
-        struct Header   // ETG1000.6 chapter 5.8.1
-        {
-            uint16_t password;  // 0 == password unused
-        } __attribute__((__packed__));
-        // Followed by the file name in the data section
-    }
-
-    namespace write
-    {
-        struct Header   // ETG1000.6 chapter 5.8.2
-        {
-            uint16_t password;  // 0 == password unused
-        } __attribute__((__packed__));
-        // Followed by the file name in the data section
-    }
-
-    namespace data
-    {
-        struct Header   // ETG1000.6 chapter 5.8.3
-        {
-            uint16_t packet_number;  // 1 - 0xFFFFFFFF
-        } __attribute__((__packed__));
-        // Followed by a file chunk in the data section
-    }
-
-    namespace ack
-    {
-        struct Header   // ETG1000.6 chapter 5.8.4
-        {
-            uint16_t packet_number;  // 1 - 0xFFFFFFFF
-        } __attribute__((__packed__));
-    }
-
-    namespace error
-    {
-        struct Header   // ETG1000.6 chapter 5.8.5
-        {
-            uint16_t error_code;
-        } __attribute__((__packed__));
-        // Followed by an optional error string in the data section
-    }
-
-    namespace buys
-    {
-        struct Header   // ETG1000.6 chapter 5.8.6
-        {
-            uint16_t done;
-            uint16_t entire;
-        } __attribute__((__packed__));
-        // Followed by an optional busy string in the data section
-    }
+    // A mailbox of N bytes carries N - OVERHEAD bytes of file
+    constexpr uint16_t OVERHEAD = sizeof(mailbox::Header) + sizeof(Header);
 
     namespace opcode
     {
@@ -75,23 +26,34 @@ namespace kickcat::FoE
         constexpr uint8_t BUSY  = 0x06;
     }
 
-    namespace result
+    namespace result    // ETG1000.6 Table 93 and ETG.1020 Table 61
     {
-        constexpr uint16_t NOT_DEFINED         = 0x8000;
-        constexpr uint16_t NOT_FOUND           = 0x8001;
-        constexpr uint16_t ACCESS_DENIED       = 0x8002;
-        constexpr uint16_t DISK_FULL           = 0x8003;
-        constexpr uint16_t ILLEGAL             = 0x8004;
-        constexpr uint16_t PACKET_NUMBER_WRONG = 0x8005;
-        constexpr uint16_t ALREADY_EXISTS      = 0x8006;
-        constexpr uint16_t NO_USER             = 0x8007;
-        constexpr uint16_t BOOTSTRAP_ONLY      = 0x8008;
-        constexpr uint16_t NOT_BOOTSTRAP       = 0x8009;
-        constexpr uint16_t NO_RIGHTS           = 0x800A;
-        constexpr uint16_t PROGRAM_ERROR       = 0x800B;
-
-        char const* toString(uint16_t result);
+        constexpr uint32_t NOT_DEFINED            = 0x8000;
+        constexpr uint32_t NOT_FOUND              = 0x8001;
+        constexpr uint32_t ACCESS_DENIED          = 0x8002;
+        constexpr uint32_t DISK_FULL              = 0x8003;
+        constexpr uint32_t ILLEGAL                = 0x8004;
+        constexpr uint32_t PACKET_NUMBER_WRONG    = 0x8005;
+        constexpr uint32_t ALREADY_EXISTS         = 0x8006;
+        constexpr uint32_t NO_USER                = 0x8007;
+        constexpr uint32_t BOOTSTRAP_ONLY         = 0x8008;
+        constexpr uint32_t NOT_BOOTSTRAP          = 0x8009;
+        constexpr uint32_t NO_RIGHTS              = 0x800A;
+        constexpr uint32_t PROGRAM_ERROR          = 0x800B;
+        constexpr uint32_t CHECKSUM_WRONG         = 0x800C;
+        constexpr uint32_t FIRMWARE_DOES_NOT_FIT  = 0x800D;
+        constexpr uint32_t NO_FILE_TO_READ        = 0x800F;
+        constexpr uint32_t NO_FILE_HEADER         = 0x8010;
+        constexpr uint32_t FLASH_PROBLEM          = 0x8011;
+        constexpr uint32_t FILE_INCOMPATIBLE      = 0x8012;
     }
+
+    /// \brief Map TFTP style error codes (sent without the 0x8000 offset by some devices, cf. ETG.1020 18.3)
+    ///        to their FoE equivalent. Other codes are returned untouched.
+    uint32_t normalizeError(uint32_t code);
+
+    /// \brief Describe an FoE error code, or a local FoE message status (mailbox::request::MessageStatus::FOE_*)
+    char const* errorToString(uint32_t code);
 }
 
 #endif

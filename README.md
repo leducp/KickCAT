@@ -52,7 +52,8 @@ For exactly what is and isn't supported, see the
 
 ### Mailbox protocols
 
-CoE is fully supported on master and slave. FoE and EoE are planned. SoE, AoE,
+CoE is fully supported on master and slave. FoE is experimental on master and
+slave (file transfer in PRE-OP and above, Bootstrap state pending). EoE is planned. SoE, AoE,
 and VoE are not currently on the roadmap (no maintainer hardware to test
 against) -- contributions are welcome. See the
 [feature support matrix](docs/FEATURES.md) for the full breakdown.

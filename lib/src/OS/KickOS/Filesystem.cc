@@ -48,4 +48,14 @@ namespace kickcat::filesystem
     {
         THROW_ERROR("filesystem::writeFile() not implemented on KickOS");
     }
+
+    std::vector<uint8_t> readRegularFile(std::string const&)
+    {
+        THROW_ERROR("filesystem::readRegularFile() not implemented on KickOS");
+    }
+
+    void writeRegularFile(std::string const&, void const*, std::size_t)
+    {
+        THROW_ERROR("filesystem::writeRegularFile() not implemented on KickOS");
+    }
 }

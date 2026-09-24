@@ -6,9 +6,7 @@
 
 namespace kickcat::mailbox::response
 {
-    std::shared_ptr<AbstractMessage> createSDOMessage(
-            Mailbox *mbx,
-            std::vector<uint8_t>&& raw_message);
+    std::shared_ptr<AbstractMessage> createSDOMessage(Mailbox *mbx, std::vector<uint8_t>&& raw_message);
 
     class SDOMessage final : public AbstractMessage
     {

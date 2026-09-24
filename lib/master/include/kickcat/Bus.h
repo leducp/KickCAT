@@ -155,6 +155,20 @@ namespace kickcat
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void const* data, uint32_t data_size, nanoseconds timeout = 1s);
 
+        using FoEProgress = std::function<void(uint32_t bytes_transferred)>;
+
+        /// \brief Read a file from the slave (FoE upload). Throws ErrorFoE on an FoE error (see FoE::errorToString()).
+        /// \param timeout     Maximum time for each exchange with the slave, not for the whole transfer
+        /// \param progress    Called at each mailbox poll during the transfer
+        void readFoE (Slave& slave, std::string const& name, uint32_t password, std::vector<uint8_t>& file,
+                      nanoseconds timeout = 5s, FoEProgress const& progress = [](uint32_t){});
+
+        /// \brief Write a file to the slave (FoE download). Throws ErrorFoE on an FoE error (see FoE::errorToString()).
+        /// \param timeout     Maximum time for each exchange with the slave, not for the whole transfer
+        /// \param progress    Called at each mailbox poll during the transfer
+        void writeFoE(Slave& slave, std::string const& name, uint32_t password, std::vector<uint8_t> file,
+                      nanoseconds timeout = 5s, FoEProgress const& progress = [](uint32_t){});
+
         /// \brief  Add a gateway message to the bus
         /// \param  raw_message         A raw EtherCAT mailbox message
         /// \param  raw_message_size    Size of the mailbox message (shall be less or equal of the actual storage size)
@@ -197,7 +211,9 @@ namespace kickcat
         void fetchDL();
 
         // mailbox helpers
-        void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message);
+        /// \param on_poll Called after each mailbox poll while the message is running
+        void waitForMessage(std::shared_ptr<mailbox::request::AbstractMessage> message,
+                            std::function<void()> const& on_poll = [](){});
 
     protected: // for unit testing
         // helper with trivial bus management (write then read)

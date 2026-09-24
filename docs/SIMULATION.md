@@ -144,9 +144,22 @@ image -- `esi` or `eeprom`:
 | `revision_no`  | uint32 | With `esi`: pick the device by revision.                           |
 | `eeprom`       | string | Path to a raw EEPROM `.bin` (alternative to `esi`).                |
 | `coe_xml`      | string | With `eeprom`: optional CoE dictionary XML for the mailbox.        |
+| `foe_dir`      | string | Serve FoE from this directory (relative to the config dir). The SII must advertise FoE. |
+| `foe_password` | uint32 | With `foe_dir`: password required by every transfer; `0` (default) accepts any. |
+| `foe_read_only`| bool   | With `foe_dir`: reject FoE writes (default `false`).               |
+| `foe_max_size` | uint32 | With `foe_dir`: largest file accepted on write (default 64 MiB).   |
 
 When several `esi` device filters match, the first match is used. With `esi`,
 the CoE mailbox (if the device declares CoE) is built from the same device, so
 `coe_xml` is not needed.
+
+### FoE file backend
+
+With `foe_dir`, the slave serves FoE reads and writes from a flat host directory:
+the requested file name must be a plain file name (no `/`, `\`, `:`, `.` or `..`),
+so a transfer cannot reach anything outside the directory. A write is staged in
+memory and reaches the disk only once the last packet is acknowledged, so an
+aborted write never leaves a truncated file. `ecat402-drive-foe.json` serves
+`simulation/slave_configs/foe_files/`.
 
 Examples live in `simulation/slave_configs/`.

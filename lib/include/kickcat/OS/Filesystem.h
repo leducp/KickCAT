@@ -66,6 +66,19 @@ namespace kickcat::filesystem
     /// \brief Create or truncate a file and write it whole.
     void writeFile(std::string const& path, void const* data, std::size_t size);
     void writeFile(std::string const& path, std::string const& content);
+
+    // For a path whose last component someone else may control (e.g. a file name received from the network).
+
+    /// \brief readFile() that refuses a symbolic link, anything else than a regular file, and a file with several
+    ///        hard links (another name may be outside of the expected directory). The checks are made on the opened
+    ///        file, so swapping the file in between cannot defeat them.
+    std::vector<uint8_t> readRegularFile(std::string const& path);
+
+    /// \brief writeFile() through a temporary file renamed over path: the previous content stays until the new one is
+    ///        complete, and the rename replaces the name itself, never what a link points to. On Unix, a replaced
+    ///        regular file keeps its permission bits (set-user-ID and alike dropped); on Windows, the new file gets
+    ///        the permissions a new file of the directory gets.
+    void writeRegularFile(std::string const& path, void const* data, std::size_t size);
 }
 
 #endif

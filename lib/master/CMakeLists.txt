@@ -3,6 +3,7 @@ target_sources(kickcat PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/CiA/DS402/Drive.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/dc.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/FoE.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Gateway.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helpers.cc

@@ -8,14 +8,58 @@
 
 #include "kickcat/CoE/OD.h"
 #include "kickcat/ESC/EmulatedESC.h"
+#include "kickcat/FoE/mailbox/response.h"
 #include "kickcat/ESI/Parser.h"
 #include "kickcat/ESI/SIIBuilder.h"
 #include "kickcat/OS/Filesystem.h"
 #include "kickcat/SIIParser.h"
+#include "kickcat/simulation/DirectoryStorage.h"
 
 namespace kickcat::sim
 {
     using json = nlohmann::json;
+
+    void ensureMailbox(SimulatedSlave& sim)
+    {
+        if (sim.mailbox)
+        {
+            return;
+        }
+
+        // Two slots: an SDO request may arrive while an FoE transfer holds the first one.
+        sim.mailbox = std::make_unique<mailbox::response::Mailbox>(sim.esc.get(), 1024, 2);
+        sim.slave->setMailbox(sim.mailbox.get());
+    }
+
+    void configureFoE(SimulatedSlave& sim, json const& config, std::string const& config_dir,
+                      std::vector<uint8_t> const& eeprom_image)
+    {
+        if (not config.contains("foe_dir"))
+        {
+            return;
+        }
+
+        eeprom::SII sii;
+        sii.parse(eeprom_image);
+        if (not (sii.info.mailbox_protocol & eeprom::MailboxProtocol::FoE))
+        {
+            throw std::runtime_error("foe_dir is set but the device SII does not advertise FoE");
+        }
+
+        DirectoryStorage::Config foe_config;
+        foe_config.directory = filesystem::join(config_dir, config["foe_dir"].get<std::string>());
+        foe_config.password  = config.value("foe_password",  foe_config.password);
+        foe_config.max_size  = config.value("foe_max_size",  foe_config.max_size);
+        foe_config.read_only = config.value("foe_read_only", foe_config.read_only);
+        if (not filesystem::isDirectory(foe_config.directory))
+        {
+            throw std::runtime_error("FoE directory not found: " + foe_config.directory);
+        }
+
+        sim.foe = std::make_unique<DirectoryStorage>(std::move(foe_config));
+        ensureMailbox(sim);
+        sim.mailbox->enableFoE(*sim.foe);
+    }
 
     void configureDeviceDictionary(SimulatedSlave& sim, ESI::Device& device)
     {
@@ -29,9 +73,8 @@ namespace kickcat::sim
             const bool esi_coe_advertised = (device.mailbox and device.mailbox->coe);
             if (esi_coe_advertised)
             {
-                sim.mailbox = std::make_unique<mailbox::response::Mailbox>(sim.esc.get(), 1024);
+                ensureMailbox(sim);
                 sim.mailbox->enableCoE(*sim.dictionary);
-                sim.slave->setMailbox(sim.mailbox.get());
             }
         }
     }
@@ -65,6 +108,7 @@ namespace kickcat::sim
         sim.pdo   = std::make_unique<PDO>(sim.esc.get());
         sim.slave = std::make_unique<slave::Slave>(sim.esc.get(), sim.pdo.get());
 
+        std::vector<uint8_t> eeprom_image;
         if (config.contains("esi"))
         {
             // Build the EEPROM image (and CoE dictionary) from a selected ESI device.
@@ -83,7 +127,8 @@ namespace kickcat::sim
                 ESI::Parser parser;
                 ESI::Device device = parser.loadDevice(esi_full_path, filter);
                 CoE::materializeStorage(device.dictionary);
-                sim.esc->loadEeprom(ESI::buildEepromImage(device));
+                eeprom_image = ESI::buildEepromImage(device);
+                sim.esc->loadEeprom(eeprom_image);
                 configureDeviceDictionary(sim, device);
             }
             catch (std::exception const& e)
@@ -98,7 +143,7 @@ namespace kickcat::sim
             {
                 throw std::runtime_error("EEPROM file not found: " + eeprom_full_path);
             }
-            std::vector<uint8_t> eeprom_image = filesystem::readFile(eeprom_full_path);
+            eeprom_image = filesystem::readFile(eeprom_full_path);
             sim.esc->loadEeprom(eeprom_image);
 
             if (config.contains("coe_xml"))
@@ -126,6 +171,8 @@ namespace kickcat::sim
         {
             throw std::runtime_error("Config file " + config_path + " missing 'eeprom' or 'esi' field");
         }
+
+        configureFoE(sim, config, config_dir, eeprom_image);
 
         sim.input.resize(PDO_MAX_SIZE);
         std::iota(sim.input.begin(), sim.input.end(), 0);

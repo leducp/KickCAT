@@ -6,7 +6,7 @@ namespace kickcat
 {
     using namespace mailbox::request;
 
-    void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message)
+    void Bus::waitForMessage(std::shared_ptr<AbstractMessage> message, std::function<void()> const& on_poll)
     {
         auto error_callback_check = [](DatagramState const& state)
         {
@@ -22,12 +22,13 @@ namespace kickcat
         {
             checkMailboxes(error_callback_check);
             processMessages(error_callback_process);
+            on_poll();
             sleep(tiny_wait);
         }
 
         if (message->status() == MessageStatus::TIMEDOUT)
         {
-            THROW_ERROR("Error while reading SDO - Timeout");
+            THROW_ERROR("Error while waiting for a mailbox message - Timeout");
         }
     }
 

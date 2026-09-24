@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <functional>
+#include <string>
 
 #include "kickcat/protocol.h"
 #include "kickcat/AbstractESC.h"
@@ -15,6 +16,11 @@
 namespace kickcat
 {
     class AbstractESC;
+}
+
+namespace kickcat::FoE
+{
+    class AbstractStorage;
 }
 
 namespace kickcat::mailbox
@@ -44,7 +50,13 @@ namespace kickcat::mailbox::request
         constexpr uint32_t COE_UNKNOWN_SERVICE          = 0x102;
         constexpr uint32_t COE_CLIENT_BUFFER_TOO_SMALL  = 0x103;
         constexpr uint32_t COE_SEGMENT_BAD_TOGGLE_BIT   = 0x104;
+
+        constexpr uint32_t FOE_UNEXPECTED_OPCODE        = 0x201;
+        constexpr uint32_t FOE_PACKET_NUMBER_WRONG      = 0x202;
+        constexpr uint32_t FOE_INVALID_REPLY            = 0x203;
     }
+
+    class FoEMessage;
 
     class AbstractMessage
     {
@@ -64,6 +76,9 @@ namespace kickcat::mailbox::request
         /// \return CONTINUE if the message is related and operation requiered another loop (message shall be push again in sending queue)
         virtual ProcessingResult process(uint8_t const* received) = 0;
 
+        /// \brief Called by the mailbox when the message has been taken from the send queue to be written on the bus
+        virtual void sent() {}
+
         /// Handle address field. Address meaning depends on context (0 for local processing, slave address for gateway processing)
         void setAddress(uint16_t address) { header_->address = address; }
         uint16_t address() const { return header_->address; }
@@ -77,6 +92,9 @@ namespace kickcat::mailbox::request
         size_t size() const         { return data_.size(); }
 
     protected:
+        /// \brief Restart the timeout from now, for services whose timeout applies to each exchange
+        void rearmTimeout();
+
         std::vector<uint8_t> data_;     // data of the message (send and gateway rec)
         mailbox::Header* header_;       // pointer on the mailbox header in data
         uint32_t status_;               // message current status
@@ -84,6 +102,7 @@ namespace kickcat::mailbox::request
 
     private:
         nanoseconds timeout_;           // Max time to handle the message. Relative time before sending, absolute time after. 0 means no timeout
+        nanoseconds timeout_duration_;  // Relative timeout, as given at construction
     };
 
 
@@ -136,6 +155,13 @@ namespace kickcat::mailbox::request
                                                             nanoseconds timeout = 20ms);
         std::shared_ptr<AbstractMessage> createSDOInfoGetED(uint16_t index, uint8_t subindex, uint8_t value_info,
                                                             void* data, uint32_t* data_size, nanoseconds timeout = 20ms);
+
+        /// \brief FoE read (file upload from the slave). The timeout applies to each exchange.
+        std::shared_ptr<FoEMessage> createFoERead(std::string const& name, uint32_t password, nanoseconds timeout = 5s);
+
+        /// \brief FoE write (file download to the slave). The timeout applies to each exchange.
+        std::shared_ptr<FoEMessage> createFoEWrite(std::string const& name, uint32_t password, std::vector<uint8_t> file,
+                                                   nanoseconds timeout = 5s);
 
         // helper to get next message to send and transfer it to reception callbacks if required
         std::shared_ptr<AbstractMessage> send();
@@ -198,10 +224,15 @@ namespace kickcat::mailbox::response
         void enableCoE(CoE::Dictionary& dictionary);
         CoE::Dictionary& getDictionary(){return *dictionary_;}
 
+        // Non-owning: references an application-owned storage that must outlive the mailbox.
+        // A running FoE transfer holds one of the max_msgs slots until it ends.
+        void enableFoE(FoE::AbstractStorage& storage);
+        FoE::AbstractStorage& storage(){return *storage_;}
+
         // --- ESC-coupled methods (requires to pass the ESC to the constructor) ---
         int32_t configure();
         bool isConfigOk();
-        void activate(bool is_activated);
+        void activate(bool is_activated);  // Deactivating drops the pending messages and replies
         void receive();  // Try to receive a message from the ESC
         void send();     // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
 
@@ -233,6 +264,7 @@ namespace kickcat::mailbox::response
 
     private:
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code);
+        void enqueue(std::vector<uint8_t>&& message);
 
         AbstractESC* esc_;
         SyncManagerConfig mbx_in_{};
@@ -243,10 +275,12 @@ namespace kickcat::mailbox::response
 
         std::vector<std::function<std::shared_ptr<AbstractMessage>(Mailbox*, std::vector<uint8_t>&&)>> factories_;
         CoE::Dictionary* dictionary_{nullptr};         // application-owned, set by enableCoE
+        FoE::AbstractStorage* storage_{nullptr};       // application-owned, set by enableFoE
 
         std::list<std::shared_ptr<AbstractMessage>> to_process_;    /// Received messages, waiting to be processed
         std::queue<std::vector<uint8_t>> to_send_;                  /// Messages to send (replies from a received messages)
 
+        uint8_t counter_{0};                                        /// counter of the replies, from 1 to 7
         std::vector<uint8_t> last_sent_{};                          /// store the last sent message in case of repeat requested
         std::vector<uint8_t> repeat_{};                             /// 'real' repeat, a copy of last sent WHEN the master fetch the mailbox
     };
