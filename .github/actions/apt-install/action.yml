@@ -1,0 +1,30 @@
+name: "Install apt packages"
+description: "apt-get install, with the downloaded packages cached between runs"
+inputs:
+  packages:
+    description: "Space separated list of packages"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Cache key
+      id: key
+      shell: bash
+      # The runner image version renews the cache when the image packages move on
+      run: |
+        packages=$(echo "${{ inputs.packages }}" | tr ' ' '_')
+        echo "prefix=apt-${ImageOS}-$(uname -m)-${packages}-" >> "$GITHUB_OUTPUT"
+        echo "key=apt-${ImageOS}-$(uname -m)-${packages}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+    - name: Cache apt packages
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/apt-archives
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: ${{ steps.key.outputs.prefix }}
+    - name: Install
+      shell: bash
+      run: |
+        mkdir -p ~/.cache/apt-archives/partial
+        sudo apt-get update
+        sudo apt-get install -y -o Dir::Cache::Archives="$HOME/.cache/apt-archives" ${{ inputs.packages }}
+        sudo chown -R "$USER" ~/.cache/apt-archives

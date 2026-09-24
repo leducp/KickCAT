@@ -1,0 +1,36 @@
+name: "Setup simulation test"
+description: "Python, the AF_XDP runtime, the Linux build and the Python wheels of this run"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+
+    - name: Install AF_XDP runtime deps
+      uses: ./.github/actions/apt-install
+      with:
+        packages: "libxdp1 libbpf1"
+
+    - name: Download Build Artifacts
+      uses: actions/download-artifact@v8
+      with:
+        name: build-linux-full
+        path: build/
+
+    - name: Download Wheels
+      uses: actions/download-artifact@v8
+      with:
+        pattern: wheelhouse-kickcat-*
+        path: wheelhouse
+        merge-multiple: true
+
+    - name: Install KickCAT Wheel
+      shell: bash
+      run: pip install kickcat --no-index --find-links wheelhouse
+
+    - name: Restore executable bits
+      shell: bash
+      # Artifacts do not keep file modes
+      run: find build/simulation build/tools build/examples -type f ! -name '*.*' -exec chmod +x {} +

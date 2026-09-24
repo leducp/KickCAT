@@ -47,10 +47,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
+        with:
+          cache-id: ${{ matrix.preset || 'default' }}
 
       - name: Install system dependencies
         if: matrix.apt_packages
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ matrix.apt_packages }}
 
       - name: Setup build (Linux)
         if: runner.os == 'Linux'
@@ -115,9 +119,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
+        with:
+          cache-id: sanitizers
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libtinyxml2-dev
+        uses: ./.github/actions/apt-install
+        with:
+          packages: libtinyxml2-dev
 
       - name: Setup build
         run: |
@@ -148,10 +156,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
+        with:
+          cache-id: ${{ matrix.preset }}
 
       - name: Install system dependencies
         if: matrix.apt_packages
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
+        uses: ./.github/actions/apt-install
+        with:
+          packages: ${{ matrix.apt_packages }}
 
       - name: Setup build
         run: |
@@ -199,6 +211,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-conan-action
+        with:
+          cache-id: package
       - name: Download Build Artifacts
         uses: actions/download-artifact@v8
         with:
@@ -233,102 +247,30 @@ jobs:
       matrix:
         test_case:
           - name: easycat
-            example_bin: build/examples/master/easycat/easycat_example
-            slave_config: simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
+            run: simulation/ci/example.sh build/examples/master/easycat/easycat_example simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
           - name: easycat_py
-            example_bin: py_bindings/examples/easycat.py
-            slave_config: simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
+            run: simulation/ci/example.sh py_bindings/examples/easycat.py simulation/slave_configs/freedom-k64f.json simulation/slave_configs/xmc4800.json
           - name: freedom-k64f
-            example_bin: build/examples/master/freedom-k64f/freedom_k64f_static_map_example
-            slave_config: simulation/slave_configs/freedom-k64f.json
+            run: simulation/ci/example.sh build/examples/master/freedom-k64f/freedom_k64f_static_map_example simulation/slave_configs/freedom-k64f.json
           - name: freedom-k64f_py
-            example_bin: py_bindings/examples/freedom-k64f.py
-            slave_config: simulation/slave_configs/freedom-k64f.json
+            run: simulation/ci/example.sh py_bindings/examples/freedom-k64f.py simulation/slave_configs/freedom-k64f.json
           - name: wdc-foot
-            example_bin: build/examples/master/wdc_foot/wdc_foot_example
-            slave_config: simulation/slave_configs/xmc4800.json
+            run: simulation/ci/example.sh build/examples/master/wdc_foot/wdc_foot_example simulation/slave_configs/xmc4800.json
 
     steps:
       - uses: actions/checkout@v7
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install AF_XDP runtime deps
-        run: sudo apt-get update && sudo apt-get install -y libxdp1 libbpf1
-
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: build-linux-full
-          path: build/
-
-      - name: Download Wheels
-        uses: actions/download-artifact@v8
-        with:
-          pattern: wheelhouse-kickcat-*
-          path: wheelhouse
-          merge-multiple: true
-
-      - name: Install KickCAT Wheel
-        run: |
-          pip install kickcat --no-index --find-links wheelhouse
-
-      - name: Fix permissions
-        run: |
-          chmod +x build/simulation/network_simulator
-          chmod +x ${{ matrix.test_case.example_bin }}
+      - uses: ./.github/actions/setup-simulation
 
       - name: Run Simulation Test (${{ matrix.test_case.name }})
         shell: bash
-        run: |
-          # 1. Start simulator in background
-          ./build/simulation/network_simulator -i tap:server -s ${{ matrix.test_case.slave_config }} > simulator.log 2>&1 &
-          SIM_PID=$!
-
-          # 2. Wait a bit for simulator to start
-          sleep 2
-
-          # 3. Run example with timeout
-          timeout 15s ${{ matrix.test_case.example_bin }} -i tap:client > test_output.log 2>&1 || true
-
-          # 4. Stop simulator
-          kill $SIM_PID || true
-
-          # 5. Check results
-          echo "--- Summary of Test Output (last 20 lines) ---"
-          tail -n 20 test_output.log
-          echo "----------------------------------------------"
-
-          # Check OPERATIONAL reached
-          if grep -qi "operational" test_output.log; then
-              echo "SUCCESS: Reached OPERATIONAL state."
-          else
-              echo "FAILURE: Did NOT reach OPERATIONAL state."
-              exit 1
-          fi
-
-          # Check example actually ran (not exited immediately)
-          LINE_COUNT=$(wc -l < test_output.log)
-
-          if [ "$LINE_COUNT" -gt 15 ]; then
-              echo "SUCCESS: Runtime output detected."
-          else
-              echo "FAILURE: Output too short — example likely did not run."
-              exit 1
-          fi
-
-          echo "Test passed!"
+        run: ${{ matrix.test_case.run }}
 
       - name: Upload Simulation Logs
         uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: simulation-logs-${{ matrix.test_case.name }}
-          path: |
-            test_output.log
-            simulator.log
+          path: "*.log"
 
   # NuttX Builds
   build_NuttX:
@@ -382,7 +324,9 @@ jobs:
           path: "nuttxspace/apps"
           ref: "${{ matrix.nuttx.ref }}"
       - name: Install Kconfig dependencies
-        run: sudo apt-get update && sudo apt-get install -y kconfig-frontends
+        uses: ./KickCAT/.github/actions/apt-install
+        with:
+          packages: kconfig-frontends
       - name: Cache ARM GCC Toolchain
         id: cache-arm-none-eabi
         uses: actions/cache@v6
