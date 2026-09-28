@@ -30,6 +30,10 @@ namespace kickcat::mailbox::request
         /// Optional text sent by the slave along with its error code
         std::string const& errorText() const { return error_text_; }
 
+        /// \brief Abort the transfer: the next PDU sent is an FoE error, then the status becomes FOE_CANCELLED.
+        /// \details The mailbox shall keep being processed until the status leaves RUNNING.
+        void cancel() { cancelled_ = true; }
+
     private:
         ProcessingResult processRead (uint8_t opcode, uint32_t value, uint8_t const* payload, uint16_t payload_size);
         ProcessingResult processWrite(uint8_t opcode, uint32_t value);
@@ -50,6 +54,7 @@ namespace kickcat::mailbox::request
         uint32_t packet_{0};        // last packet number received (read) or sent (write)
         bool last_{false};          // write: the last data packet has been sent
         uint32_t pending_status_{MessageStatus::RUNNING}; // status to apply once the prepared PDU is sent
+        bool cancelled_{false};
         std::string error_text_;
     };
 }

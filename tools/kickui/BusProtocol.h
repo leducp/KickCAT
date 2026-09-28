@@ -163,6 +163,7 @@ namespace kickcat::kickui
             OdScanObject, OdScanProgress, OdScanDone,
             MappingResult,
             StateActionResult,   // per-slave; an empty message means success
+            FoeProgress, FoeDone // FoeDone: an empty message means success
         };
 
         Kind        kind  = Kind::OdScanObject;
@@ -170,9 +171,10 @@ namespace kickcat::kickui
         std::string message;
 
         OdObject   od_object;        // OdScanObject
-        int        count = 0;        // OdScanProgress
+        int        count = 0;        // OdScanProgress, FoeProgress (bytes)
         int        total = 0;
         PdoMapping mapping;          // MappingResult
+        std::vector<uint8_t> file;   // FoeDone: content read
     };
 
     // ---- bus actor -> UI (high-rate, lossy snapshot) ------------------------

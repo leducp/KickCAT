@@ -43,6 +43,15 @@ namespace kickcat::kickui
         std::string error;
     };
 
+    // Per-slave FoE transfer state.
+    struct FoeTransfer
+    {
+        bool        running     = false;
+        uint32_t    transferred = 0;
+        uint32_t    total       = 0;    // 0 when unknown (read)
+        std::string error;              // outcome of the last transfer, empty on success
+    };
+
     // Per-slave PDO-mapping read-back state.
     struct PdoScan
     {
@@ -118,8 +127,8 @@ namespace kickcat::kickui
     // BusSession's thread-safe paths (it never touches the live Bus directly).
     // Capabilities gate which panels apply. CoE gives SDO/OD; a CoE device whose
     // device-type is 402 is a DS402 motor (motor() handle). FoE/EoE are detected
-    // here too -- their behaviours/panels are planned and slot in as more methods
-    // on BusSession (this forwarding facade should not grow per capability).
+    // here too; their behaviours are methods on BusSession (this forwarding facade
+    // should not grow per capability).
     class Device
     {
     public:
@@ -316,6 +325,16 @@ namespace kickcat::kickui
         void discoverOD(int slave_index);
         OdScan odScan(int slave_index) const;
 
+        // --- FoE file transfer ---
+        // Idle phase only: a long transfer would hold the cyclic loop's single
+        // blocking-command slot and starve the motor commands.
+        bool foeAvailable() const { return connected_ and (not rt_running_); }
+        void readFoE(int slave_index, std::string name, uint32_t password);
+        void writeFoE(int slave_index, std::string name, uint32_t password, std::vector<uint8_t> file);
+        void cancelFoE(int slave_index);
+        FoeTransfer foeTransfer(int slave_index) const;
+        std::vector<uint8_t> takeFoeFile(int slave_index);   // content of the last successful read
+
     private:
         void joinWorker();
         // One bus-owning thread runs busActor(), which alternates between the idle
@@ -331,7 +350,7 @@ namespace kickcat::kickui
         struct SdoCommand
         {
             enum class Kind { Read, Write, Discover, State, ReadMapping, Topology, ClearErrors,
-                              Motor, MotorUnits };
+                              Motor, MotorUnits, FoeRead, FoeWrite };
             Kind     kind = Kind::Read;
             int      slave_index = 0;
             uint16_t index = 0;
@@ -343,6 +362,8 @@ namespace kickcat::kickui
             std::shared_ptr<SdoResult> result;
             MotorCmd                    motor;        // Kind::Motor: whole coherent command set
             CoE::CiA::DS402::UnitConfig motor_units;  // Kind::MotorUnits: live unit change
+            std::string                  foe_name;     // Kind::FoeRead/FoeWrite (payload: file to write)
+            uint32_t                     foe_password = 0;
         };
 
         void serviceLoop();      // idle phase; returns on operate_requested_ / bus_stop_
@@ -355,6 +376,7 @@ namespace kickcat::kickui
         bool driveMessage(std::shared_ptr<mailbox::request::AbstractMessage> const& msg,
                           std::function<void()> const& cyclic);
         void executeSdo(SdoCommand& cmd, std::function<void()> const& cyclic);
+        void executeFoe(SdoCommand& cmd, std::function<void()> const& cyclic);
         void executeDiscover(int slave_index, std::function<void()> const& cyclic, int resume_from = 0);
         void executeState(int slave_index, uint8_t state, std::function<void()> const& cyclic);
         void executeReadMapping(int slave_index, std::function<void()> const& cyclic);
@@ -443,6 +465,7 @@ namespace kickcat::kickui
         std::atomic<bool>         rt_running_{false};       // true while in the cyclic phase
         std::atomic<bool>         rt_stop_{false};          // leave the cyclic phase (backToPreOp)
         std::atomic<bool>         al_status_dirty_{false};  // set by the AL-event IRQ callback
+        std::atomic<int>          foe_cancel_{-1};          // slave whose FoE transfer shall stop
 
         // The operated set: UI-thread manages the vector (operate/stop), the RT
         // loop snapshots the shared_ptrs (and copies each config) at bring-up.
@@ -482,6 +505,8 @@ namespace kickcat::kickui
         std::map<int, std::string> state_errors_;   // last state-change error per slave
         std::map<int, PdoScan>     pdo_scans_;
         std::map<int, OdScan>      od_scans_;
+        std::map<int, FoeTransfer>          foe_transfers_;
+        std::map<int, std::vector<uint8_t>> foe_files_;
     };
 }
 

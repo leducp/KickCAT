@@ -54,6 +54,7 @@ namespace kickcat::mailbox::request
         constexpr uint32_t FOE_UNEXPECTED_OPCODE        = 0x201;
         constexpr uint32_t FOE_PACKET_NUMBER_WRONG      = 0x202;
         constexpr uint32_t FOE_INVALID_REPLY            = 0x203;
+        constexpr uint32_t FOE_CANCELLED                = 0x204;
     }
 
     class FoEMessage;

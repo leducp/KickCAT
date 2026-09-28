@@ -333,6 +333,47 @@ TEST_F(FoE_Request, write_wrong_ack)
     ASSERT_EQ(MessageStatus::FOE_PACKET_NUMBER_WRONG, foe->status());
 }
 
+TEST_F(FoE_Request, cancel_while_waiting_for_reply)
+{
+    auto foe = mailbox.createFoEWrite("fw.bin", 0, pattern(3 * CAPACITY));
+    mailbox.send();
+    exchange(FoE::opcode::ACK, 0);
+
+    foe->cancel();
+    ASSERT_EQ(MessageStatus::RUNNING, foe->status());
+
+    PDU error = exchange(FoE::opcode::ACK, 1);
+    ASSERT_EQ(FoE::opcode::ERROR, error.opcode);
+    ASSERT_EQ(FoE::result::NOT_DEFINED, error.value);
+    ASSERT_EQ(MessageStatus::FOE_CANCELLED, foe->status());
+    ASSERT_TRUE(mailbox.to_process.empty());
+}
+
+TEST_F(FoE_Request, cancel_while_queued)
+{
+    auto foe = mailbox.createFoERead("fw.bin", 0);
+    mailbox.send();
+    ASSERT_TRUE(mailbox.receive(reply(FoE::opcode::DATA, 1, pattern(CAPACITY))));
+
+    // The ACK is queued: the error goes out in its place
+    foe->cancel();
+    PDU error = decode(mailbox.send()->data());
+    ASSERT_EQ(FoE::opcode::ERROR, error.opcode);
+    ASSERT_EQ(MessageStatus::FOE_CANCELLED, foe->status());
+    ASSERT_TRUE(mailbox.to_process.empty());
+}
+
+TEST_F(FoE_Request, cancel_after_the_end_has_no_effect)
+{
+    auto foe = mailbox.createFoERead("fw.bin", 0);
+    mailbox.send();
+    exchange(FoE::opcode::DATA, 1, pattern(3));
+    ASSERT_EQ(MessageStatus::SUCCESS, foe->status());
+
+    foe->cancel();
+    ASSERT_EQ(MessageStatus::SUCCESS, foe->status());
+}
+
 TEST_F(FoE_Request, timeout_applies_to_each_exchange)
 {
     nanoseconds start = now();

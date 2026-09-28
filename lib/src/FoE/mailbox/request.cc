@@ -84,6 +84,13 @@ namespace kickcat::mailbox::request
 
     void FoEMessage::sent()
     {
+        if (cancelled_ and (status_ == MessageStatus::RUNNING))
+        {
+            // The PDU is written on the bus from data_ after this call: replace it by the error
+            prepare(FoE::opcode::ERROR, FoE::result::NOT_DEFINED, 0);
+            pending_status_ = MessageStatus::FOE_CANCELLED;
+        }
+
         if (pending_status_ != MessageStatus::RUNNING)
         {
             status_ = pending_status_;
@@ -120,6 +127,11 @@ namespace kickcat::mailbox::request
             status_ = FoE::normalizeError(value);
             error_text_.assign(reinterpret_cast<char const*>(payload), payload_size);
             return ProcessingResult::FINALIZE;
+        }
+
+        if (cancelled_)
+        {
+            return abort(FoE::result::NOT_DEFINED, MessageStatus::FOE_CANCELLED);
         }
 
         if (reading_)

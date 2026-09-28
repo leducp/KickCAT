@@ -21,6 +21,7 @@
 #include "BusSession.h"
 #include "EtherCATPanel.h"
 #include "EventLog.h"
+#include "FoePanel.h"
 #include "MotorPanel.h"
 #include "Panel.h"
 #include "PdoValuesPanel.h"
@@ -1376,6 +1377,7 @@ namespace kickcat::kickui
             panels.push_back(std::make_unique<EtherCATPanel>());
             panels.push_back(std::make_unique<PdoValuesPanel>());
             panels.push_back(std::make_unique<SdoPanel>());
+            panels.push_back(std::make_unique<FoePanel>());
             return panels;
         }
 

@@ -60,7 +60,7 @@ against) -- contributions are welcome. See the
 
 ### Tooling and GUIs
 
-- **KickUI** -- ImGui bus dashboard: topology view, SDO/PDO panels, DS402 motor bench
+- **KickUI** -- ImGui bus dashboard: topology view, SDO/PDO/FoE panels, DS402 motor bench
 - **EEPROM editor** -- ImGui structured SII/EEPROM editor
 - **eeprom** -- CLI to read/write slave EEPROM
 - **foe** -- CLI to read/write a file on a slave over FoE
