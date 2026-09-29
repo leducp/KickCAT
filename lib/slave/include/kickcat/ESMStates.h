@@ -40,6 +40,17 @@ namespace kickcat
             Context routineInternal(Context oldStatus, ALControl control) override;
         };
 
+        // Firmware update: only the bootstrap mailbox is active (ETG.1000.6 chapter 6.4.1)
+        class Boot final : public AbstractState
+        {
+        public:
+            Boot(AbstractESC& esc, PDO& pdo);
+            ~Boot() = default;
+
+            void onEntry(Context oldStatus, Context newStatus) override;
+            Context routineInternal(Context oldStatus, ALControl control) override;
+        };
+
         class OP final : public AbstractState
         {
         public:

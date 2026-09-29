@@ -57,12 +57,18 @@ authoritative source for "what works today"; the README only summarizes it.
 | File read / write (PRE-OP, SAFE-OP, OP)       | Experimental | Experimental |
 | Password                                      | Experimental | Experimental |
 | Busy (slave asks the master to wait)          | Experimental | Not supported |
-| Bootstrap state (firmware update)             | Planned      | Planned      |
+| Bootstrap state (firmware update)             | Experimental | Experimental |
 | Simulator file backend (`foe_dir`)            | Not applicable | Supported  |
 
 The master timeout applies to each exchange, not to the whole transfer. On the
 slave, the application provides the files through `FoE::AbstractStorage`
 (`mailbox::response::Mailbox::enableFoE`).
+
+Bootstrap: `Bus::enterBootstrap` / `Bus::exitBootstrap` move one slave between
+INIT and BOOT, switching its mailbox to the bootstrap layout declared in the SII.
+On the slave, `slave::Slave::setBootstrapMailbox` gives the mailbox served in
+BOOT (typically FoE only, with its own SyncManager layout); without one, BOOT is
+refused with AL status code 0x0013.
 
 ## Distributed Clocks (DC)
 

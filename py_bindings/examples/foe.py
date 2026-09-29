@@ -16,6 +16,7 @@ def main():
     parser.add_argument("-f", "--file", help="Local file", required=True)
     parser.add_argument("-n", "--name", help="Remote file name (default: local file name)", default="")
     parser.add_argument("-p", "--password", help="FoE password", type=lambda x: int(x, 0), default=0)
+    parser.add_argument("-b", "--boot", help="Transfer in the Bootstrap state (firmware update)", action="store_true")
     args = parser.parse_args()
 
     name = args.name or os.path.basename(args.file)
@@ -33,6 +34,9 @@ def main():
     def progress(transferred):
         print(f"\r{transferred} bytes", end="", flush=True)
 
+    if args.boot:
+        bus.enter_bootstrap(slave)
+
     try:
         if args.command == "read":
             data = bus.read_foe(slave, name, args.password, progress=progress)
@@ -45,6 +49,12 @@ def main():
     except kickcat.ErrorFoE as e:
         print(f"\nFoE transfer failed: {e}", file=sys.stderr)
         return 1
+    finally:
+        if args.boot:
+            try:
+                bus.exit_bootstrap(slave)
+            except Exception as e:  # expected when the device restarts to run a new firmware
+                print(f"\nWarning: the slave did not go back to PRE-OP ({e})", file=sys.stderr)
 
     print(f"\n{args.command}: {len(data)} bytes, remote name '{name}'")
     return 0

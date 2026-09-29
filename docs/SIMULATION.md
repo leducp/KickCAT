@@ -162,4 +162,8 @@ memory and reaches the disk only once the last packet is acknowledged, so an
 aborted write never leaves a truncated file. `ecat402-drive-foe.json` serves
 `simulation/slave_configs/foe_files/`.
 
+When the SII also declares a bootstrap mailbox (ESI `Eeprom/BootStrap`), the
+slave accepts the Bootstrap state and serves the same directory over FoE there,
+with the bootstrap mailbox layout; CoE is not served in that state.
+
 Examples live in `simulation/slave_configs/`.

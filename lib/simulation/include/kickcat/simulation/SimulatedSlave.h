@@ -26,6 +26,7 @@ namespace kickcat::sim
         std::unique_ptr<CoE::Dictionary>                      dictionary;  // ESI/coe_xml OD, if any
         std::unique_ptr<FoE::AbstractStorage>                 foe;         // foe_dir backend, if any
         std::unique_ptr<mailbox::response::Mailbox>           mailbox;     // only if CoE or FoE is served
+        std::unique_ptr<mailbox::response::Mailbox>           boot_mailbox;// FoE only, if the SII declares one
         std::unique_ptr<DeviceApp>                            device;      // behaviour (e.g. DS402), if any
         std::vector<uint8_t>                                  input;
         std::vector<uint8_t>                                  output;

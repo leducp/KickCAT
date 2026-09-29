@@ -36,6 +36,7 @@ namespace kickcat
 
         nb::enum_<State>(m, "State")
             .value("INIT",        State::INIT)
+            .value("BOOT",        State::BOOT)
             .value("PREOP",       State::PRE_OP)
             .value("SAFE_OP",     State::SAFE_OP)
             .value("OPERATIONAL", State::OPERATIONAL);

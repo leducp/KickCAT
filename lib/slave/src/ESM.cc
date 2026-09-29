@@ -16,6 +16,11 @@ namespace kickcat::ESM
         mbx_ = mbx;
     }
 
+    void AbstractState::setBootstrapMailbox(mailbox::response::Mailbox* mbx)
+    {
+        boot_mbx_ = mbx;
+    }
+
     void AbstractState::setDictionary(CoE::Dictionary* dictionary)
     {
         dictionary_ = dictionary;

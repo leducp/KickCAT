@@ -71,6 +71,11 @@ int main(int argc, char* argv[])
         .scan<'i', int>()
         .store_into(timeout_ms);
 
+    bool bootstrap = false;
+    program.add_argument("-b", "--boot")
+        .help("transfer in the Bootstrap state (firmware update), then go back to PRE-OP")
+        .store_into(bootstrap);
+
     try
     {
         program.parse_args(argc, argv);
@@ -172,6 +177,42 @@ int main(int argc, char* argv[])
     };
 
     nanoseconds timeout = timeout_ms * 1ms;
+
+    if (bootstrap)
+    {
+        try
+        {
+            bus.enterBootstrap(slave);
+        }
+        catch (ErrorAL const& e)
+        {
+            std::cerr << e.what() << ": " << ALStatus_to_string(e.code()) << std::endl;
+            return 1;
+        }
+        catch (std::exception const& e)
+        {
+            std::cerr << e.what() << std::endl;
+            return 1;
+        }
+    }
+
+    auto leaveBootstrap = [&]()
+    {
+        if (not bootstrap)
+        {
+            return;
+        }
+        try
+        {
+            bus.exitBootstrap(slave);
+        }
+        catch (std::exception const& e)
+        {
+            // Expected when the device restarts to run a new firmware
+            std::cerr << "Warning: the slave did not go back to PRE-OP (" << e.what() << ")" << std::endl;
+        }
+    };
+
     try
     {
         if (command == "read")
@@ -187,15 +228,18 @@ int main(int argc, char* argv[])
     {
         printf("\n");
         std::cerr << e.what() << ": " << FoE::errorToString(static_cast<uint32_t>(e.code())) << std::endl;
+        leaveBootstrap();
         return 1;
     }
     catch (std::exception const& e)
     {
         printf("\n");
         std::cerr << e.what() << std::endl;
+        leaveBootstrap();
         return 1;
     }
     printf("\n");
+    leaveBootstrap();
 
     if (command == "read")
     {

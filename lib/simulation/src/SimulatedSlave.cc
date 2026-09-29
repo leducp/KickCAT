@@ -1,5 +1,6 @@
 #include "kickcat/simulation/SimulatedSlave.h"
 
+#include <algorithm>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
@@ -59,6 +60,16 @@ namespace kickcat::sim
         sim.foe = std::make_unique<DirectoryStorage>(std::move(foe_config));
         ensureMailbox(sim);
         sim.mailbox->enableFoE(*sim.foe);
+
+        uint16_t boot_size = std::max(sii.info.bootstrap_recv_mbx_size, sii.info.bootstrap_send_mbx_size);
+        if ((sii.info.bootstrap_recv_mbx_size != 0) and (sii.info.bootstrap_send_mbx_size != 0))
+        {
+            // Same storage as the standard mailbox: each transfer keeps its own state
+            sim.boot_mailbox = std::make_unique<mailbox::response::Mailbox>(
+                sim.esc.get(), std::max<uint16_t>(1024, boot_size), 1);
+            sim.boot_mailbox->enableFoE(*sim.foe);
+            sim.slave->setBootstrapMailbox(sim.boot_mailbox.get());
+        }
     }
 
     void configureDeviceDictionary(SimulatedSlave& sim, ESI::Device& device)

@@ -16,6 +16,10 @@ namespace kickcat::ESM
         {
             mbx_->activate(false);
         }
+        if (boot_mbx_)
+        {
+            boot_mbx_->activate(false);
+        }
         pdo_.activateInput(false);
         pdo_.activateOutput(false);
     }
@@ -36,9 +40,10 @@ namespace kickcat::ESM
             return Context::build(currentStatus.al_status, currentStatus.al_status_code);
         }
 
-        // Unknown state request
+        // Unknown state request (OP and BOOT leave their state on it: handled by their own routine)
         auto requestedState = control.requestedState();
-        if (currentStatus.state() != State::OPERATIONAL and requestedState != State::BOOT
+        if (currentStatus.state() != State::OPERATIONAL and currentStatus.state() != State::BOOT
+            and requestedState != State::BOOT
             and requestedState != State::INIT and requestedState != State::PRE_OP and requestedState != State::SAFE_OP
             and requestedState != State::OPERATIONAL)
         {
@@ -75,13 +80,63 @@ namespace kickcat::ESM
             return Context::build(State::INIT, StatusCode::INVALID_REQUESTED_STATE_CHANGE);
         }
 
-        // BOOTSTRAP not supported yet. If implemented, need to check the SII to know if enabled.
         if (control.requestedState() == State::BOOT)
         {
-            return Context::build(id_, StatusCode::BOOTSTRAP_NOT_SUPPORTED);
+            if (not boot_mbx_)
+            {
+                return Context::build(id_, StatusCode::BOOTSTRAP_NOT_SUPPORTED);
+            }
+            if ((boot_mbx_->configure() == 0) and boot_mbx_->isConfigOk())
+            {
+                return Context::build(State::BOOT);
+            }
+            return Context::build(State::INIT, StatusCode::INVALID_MAILBOX_CONFIGURATION_BOOT);
         }
 
         return Context::build(State::INIT);
+    }
+
+    Boot::Boot(AbstractESC& esc, PDO& pdo)
+        : AbstractState(State::BOOT, esc, pdo)
+    {
+    }
+
+    void Boot::onEntry(Context, Context)
+    {
+        if (boot_mbx_)
+        {
+            boot_mbx_->activate(true);
+        }
+        pdo_.activateOutput(false);
+        pdo_.activateInput(false);
+    }
+
+    // ETG.1000.6 ESM state table, rows 51 to 58
+    Context Boot::routineInternal(Context, ALControl control)
+    {
+        if ((not boot_mbx_) or (not boot_mbx_->isConfigOk()))
+        {
+            // Row 56.1 specifies 0x16 here, not the 0x15 of the INIT -> BOOT transition
+            return Context::build(State::INIT, StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+        }
+
+        auto requested = control.requestedState();
+        if (requested == State::INIT)
+        {
+            return Context::build(State::INIT);
+        }
+
+        if (requested == State::BOOT)
+        {
+            return Context::build(id_);
+        }
+
+        if ((requested == State::PRE_OP) or (requested == State::SAFE_OP) or (requested == State::OPERATIONAL))
+        {
+            return Context::build(State::INIT, StatusCode::INVALID_REQUESTED_STATE_CHANGE);
+        }
+
+        return Context::build(State::INIT, StatusCode::UNKNOWN_REQUESTED_STATE);
     }
 
     PreOP::PreOP(AbstractESC& esc, PDO& pdo)

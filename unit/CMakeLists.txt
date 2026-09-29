@@ -24,6 +24,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/EmulatedNetwork-t.cc
                             src/ESM-t.cc
                             src/ESMStateOP-t.cc
+                            src/ESMStateBoot-t.cc
                             src/ESMStateInit-t.cc
                             src/ESMStatePreOP-t.cc
                             src/ESMStateSafeOP-t.cc

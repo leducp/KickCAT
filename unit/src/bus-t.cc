@@ -23,6 +23,13 @@ struct FoEAnswer
     uint8_t payload[4];
 } __attribute__((__packed__));
 
+struct ALStatusAnswer
+{
+    uint8_t  status;
+    uint8_t  reserved[3];
+    uint16_t code;
+} __attribute__((__packed__));
+
 FoEAnswer createFoEAnswer(uint8_t opcode, uint32_t value, uint16_t payload_size = 0)
 {
     FoEAnswer answer{};
@@ -649,6 +656,146 @@ TEST_F(BusTest, write_FoE_timeout)
     mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
 
     ASSERT_THROW(bus.writeFoE(slave, "fw.bin", 0, {1, 2, 3, 4}, 1ms), Error);
+}
+
+class BusBootstrapTest : public BusTest
+{
+public:
+    void SetUp() override
+    {
+        BusTest::SetUp();
+        auto& info = bus.slaves().at(0).sii.info;
+        info.bootstrap_recv_mbx_offset = 0x1800;
+        info.bootstrap_recv_mbx_size   = 0x0400;
+        info.bootstrap_send_mbx_offset = 0x1C00;
+        info.bootstrap_send_mbx_size   = 0x0400;
+    }
+
+    void addStateChange(uint8_t reached, uint16_t code = 0)
+    {
+        mock_link->handleProcess(Command::FPWR, uint16_t{0}, 1);   // AL control
+        mock_link->handleProcess(Command::FPRD, ALStatusAnswer{reached, {}, code}, 1);
+    }
+};
+
+TEST_F(BusBootstrapTest, enter_and_exit)
+{
+    auto& slave = bus.slaves().at(0);
+
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);        // bootstrap mailbox SM
+    addStateChange(State::BOOT);
+    bus.enterBootstrap(slave);
+
+    ASSERT_EQ(0x1800, slave.mailbox.recv_offset);
+    ASSERT_EQ(0x0400, slave.mailbox.recv_size);
+    ASSERT_EQ(0x1C00, slave.mailbox.send_offset);
+    ASSERT_EQ(0x0400, slave.mailbox.send_size);
+
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);        // standard mailbox SM
+    addStateChange(State::PRE_OP);
+    bus.exitBootstrap(slave);
+
+    ASSERT_EQ(0x1000, slave.mailbox.recv_offset);
+    ASSERT_EQ(0x0100, slave.mailbox.recv_size);
+    ASSERT_EQ(0x2000, slave.mailbox.send_offset);
+    ASSERT_EQ(0x0200, slave.mailbox.send_size);
+}
+
+TEST_F(BusBootstrapTest, drops_pending_messages)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.mailbox.createFoERead("fw.bin", 0);
+    slave.mailbox.send();                       // unfinished transfer, waiting for a reply
+    slave.mailbox.createFoERead("fw.bin", 0);   // queued
+    std::size_t handlers = slave.mailbox.to_process.size() - 1;
+
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    addStateChange(State::BOOT);
+    bus.enterBootstrap(slave);
+
+    ASSERT_TRUE(slave.mailbox.to_send.empty());
+    ASSERT_EQ(handlers, slave.mailbox.to_process.size());   // only the persistent handlers are left
+}
+
+TEST_F(BusBootstrapTest, mailbox_configuration_failure)
+{
+    auto& slave = bus.slaves().at(0);
+
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 0);        // bootstrap mailbox SM: no answer
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);        // standard mailbox SM back
+
+    ASSERT_THROW(bus.enterBootstrap(slave), Error);
+    ASSERT_EQ(0x1000, slave.mailbox.recv_offset);
+    ASSERT_EQ(0x0100, slave.mailbox.recv_size);
+    ASSERT_EQ(0x2000, slave.mailbox.send_offset);
+    ASSERT_EQ(0x0200, slave.mailbox.send_size);
+}
+
+TEST_F(BusBootstrapTest, failure_once_in_boot)
+{
+    auto& slave = bus.slaves().at(0);
+
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    addStateChange(State::BOOT | State::ERROR_ACK, StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+
+    // The slave is in BOOT: it is moved to INIT before its SyncManagers are rewritten
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+
+    ASSERT_THROW(bus.enterBootstrap(slave), ErrorAL);
+    ASSERT_EQ(0x1000, slave.mailbox.recv_offset);
+}
+
+TEST_F(BusBootstrapTest, recovery_not_confirmed)
+{
+    auto& slave = bus.slaves().at(0);
+
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);
+    addStateChange(State::BOOT | State::ERROR_ACK, StatusCode::INVALID_MAILBOX_CONFIGURATION_PREOP);
+    mock_link->handleProcess(Command::FPWR, uint16_t{0}, 0);       // INIT request lost: SMs left alone
+
+    ASSERT_THROW(bus.enterBootstrap(slave), ErrorAL);
+    ASSERT_EQ(0x1800, slave.mailbox.recv_offset);
+}
+
+TEST_F(BusBootstrapTest, not_declared)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.sii.info.bootstrap_recv_mbx_size = 0;
+    ASSERT_THROW(bus.enterBootstrap(slave), Error);
+}
+
+TEST_F(BusBootstrapTest, refused_by_slave)
+{
+    auto& slave = bus.slaves().at(0);
+
+    addStateChange(State::INIT);
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);        // bootstrap mailbox SM
+    addStateChange(State::INIT | State::ERROR_ACK, StatusCode::BOOTSTRAP_NOT_SUPPORTED);
+    addStateChange(State::INIT);                                   // recovery: INIT, then
+    mock_link->handleProcess(Command::FPWR, uint8_t{0}, 1);        // standard mailbox SM back
+
+    try
+    {
+        bus.enterBootstrap(slave);
+        FAIL() << "enterBootstrap shall throw";
+    }
+    catch (ErrorAL const& e)
+    {
+        ASSERT_EQ(StatusCode::BOOTSTRAP_NOT_SUPPORTED, e.code());
+    }
+
+    ASSERT_EQ(0x1000, slave.mailbox.recv_offset);
+    ASSERT_EQ(0x0100, slave.mailbox.recv_size);
+    ASSERT_EQ(0x2000, slave.mailbox.send_offset);
+    ASSERT_EQ(0x0200, slave.mailbox.send_size);
 }
 
 TEST_F(BusTest, read_SDO_emulated_complete_access_OK)

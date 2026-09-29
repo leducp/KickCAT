@@ -11,15 +11,24 @@ namespace kickcat
     void Slave::parseSII(uint8_t const* data, std::size_t size)
     {
         sii.parse(data, size);
+        selectMailboxLayout(false);
+    }
+
+    void Slave::selectMailboxLayout(bool bootstrap)
+    {
+        if (bootstrap)
+        {
+            mailbox.recv_offset = sii.info.bootstrap_recv_mbx_offset;
+            mailbox.recv_size   = sii.info.bootstrap_recv_mbx_size;
+            mailbox.send_offset = sii.info.bootstrap_send_mbx_offset;
+            mailbox.send_size   = sii.info.bootstrap_send_mbx_size;
+            return;
+        }
 
         mailbox.recv_offset = sii.info.standard_recv_mbx_offset;
         mailbox.recv_size   = sii.info.standard_recv_mbx_size;
         mailbox.send_offset = sii.info.standard_send_mbx_offset;
         mailbox.send_size   = sii.info.standard_send_mbx_size;
-        mailbox_bootstrap.recv_offset = sii.info.bootstrap_recv_mbx_offset;
-        mailbox_bootstrap.recv_size   = sii.info.bootstrap_recv_mbx_size;
-        mailbox_bootstrap.send_offset = sii.info.bootstrap_send_mbx_offset;
-        mailbox_bootstrap.send_size   = sii.info.bootstrap_send_mbx_size;
     }
 
     std::string Slave::name() const

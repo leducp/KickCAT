@@ -620,7 +620,14 @@ namespace kickcat
 
             switch (current)
             {
-                case State::BOOT: { break; }
+                case State::BOOT:
+                {
+                    if (before == State::INIT)
+                    {
+                        configureSMs();
+                    }
+                    break;
+                }
                 case State::INIT: { break; }
                 case State::PRE_OP:
                 {

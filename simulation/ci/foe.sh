@@ -1,5 +1,6 @@
 #!/bin/bash
-# FoE transfers against the simulator: write a file with the CLI, read it back with the CLI and with Python.
+# FoE transfers against the simulator: write a file with the CLI, read it back with the CLI and with Python,
+# then write it again in the Bootstrap state.
 # Logs: simulator.log, test_output.log in the current directory.
 set -eo pipefail
 
@@ -19,5 +20,9 @@ cmp payload.bin read_back.bin
 
 timeout 30s python py_bindings/examples/foe.py -i tap:client -c read -f read_back_py.bin -n payload.bin | tee -a test_output.log
 cmp payload.bin read_back_py.bin
+
+# Firmware update flow: the transfer runs in the Bootstrap state
+timeout 30s ./build/tools/foe -i tap:client -s 0 -c write -f payload.bin -n firmware.bin --boot | tee -a test_output.log
+cmp payload.bin simulation/slave_configs/foe_files/firmware.bin
 
 echo "Test passed!"

@@ -114,26 +114,32 @@ namespace kickcat
         checkMailboxes(error_callback);
         processMessages(error_callback);
 
-        // create callbacks reception for mailbox (that do not depends on a request initiated by the master)
         for (auto& slave : slaves_)
         {
-            if (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE)
-            {
-                // CoE emergency callback
-                auto emg = std::make_shared<mailbox::request::EmergencyMessage>(slave.mailbox);
-                slave.mailbox.to_process.push_back(emg);
-            }
+            addMailboxHandlers(slave);
+        }
+    }
 
-            if ((slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::EoE) or
-                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::FoE) or
-                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::SoE) or
-                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE) or
-                (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::AoE))
-            {
-                // check callback to display what's missing
-                auto chk = std::make_shared<mailbox::request::CheckMessage>(slave.mailbox);
-                slave.mailbox.to_process.push_back(chk);
-            }
+
+    void Bus::addMailboxHandlers(Slave& slave)
+    {
+        // create callbacks reception for mailbox (that do not depends on a request initiated by the master)
+        if (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE)
+        {
+            // CoE emergency callback
+            auto emg = std::make_shared<mailbox::request::EmergencyMessage>(slave.mailbox);
+            slave.mailbox.to_process.push_back(emg);
+        }
+
+        if ((slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::EoE) or
+            (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::FoE) or
+            (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::SoE) or
+            (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::CoE) or
+            (slave.sii.info.mailbox_protocol & eeprom::MailboxProtocol::AoE))
+        {
+            // check callback to display what's missing
+            auto chk = std::make_shared<mailbox::request::CheckMessage>(slave.mailbox);
+            slave.mailbox.to_process.push_back(chk);
         }
     }
 
@@ -385,7 +391,7 @@ namespace kickcat
     }
 
 
-    void Bus::configureMailboxes()
+    void Bus::addMailboxConfiguration(Slave& slave)
     {
         auto process = [](DatagramHeader const*, uint8_t const*, uint16_t wkc)
         {
@@ -401,13 +407,19 @@ namespace kickcat
             THROW_ERROR("Invalid working counter");
         };
 
+        SyncManager::Register SM[2];
+        slave.mailbox.generateSMConfig(SM);
+        link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER), SM, process, error);
+    }
+
+
+    void Bus::configureMailboxes()
+    {
         for (auto& slave : slaves_)
         {
             if (slave.sii.info.mailbox_protocol)
             {
-                SyncManager::Register SM[2];
-                slave.mailbox.generateSMConfig(SM);
-                link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::SYNC_MANAGER), SM, process, error);
+                addMailboxConfiguration(slave);
             }
         }
 

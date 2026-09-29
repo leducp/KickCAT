@@ -33,14 +33,17 @@ public:
     uint8_t SECOND_STATE_ID{1};
     uint8_t THIRD_STATE_ID{2};
     uint8_t FOURTH_STATE_ID{3};
+    uint8_t FIFTH_STATE_ID{4};
+    uint8_t UNKNOWN_STATE_ID{5};
     MockState firstState{FIRST_STATE_ID, esc_};
     MockState secondState{SECOND_STATE_ID, esc_};
     MockState thirdState{THIRD_STATE_ID, esc_};
     MockState fourthState{FOURTH_STATE_ID, esc_};
+    MockState fifthState{FIFTH_STATE_ID, esc_};
 
     void SetUp() override
     {
-        sm.reset(new StateMachine(esc_, {{&firstState, &secondState, &thirdState, &fourthState}}));
+        sm.reset(new StateMachine(esc_, {{&firstState, &secondState, &thirdState, &fourthState, &fifthState}}));
     }
 
     void expectAlControlRead(uint16_t alControlValue);
@@ -139,7 +142,7 @@ TEST_F(StateMachineTest, play_wrongState_goToDefaultState)
 
     EXPECT_CALL(esc_, write(reg::AL_STATUS, WrittenMatches(FIRST_STATE_ID), sizeof(uint16_t))).WillOnce(Return(0));
 
-    EXPECT_CALL(secondState, routine(_, _)).WillOnce(Return(Context::build(4)));
+    EXPECT_CALL(secondState, routine(_, _)).WillOnce(Return(Context::build(UNKNOWN_STATE_ID)));
 
     sm->play();
 }
