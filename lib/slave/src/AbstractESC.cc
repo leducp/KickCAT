@@ -7,10 +7,16 @@ namespace kickcat
 {
     std::tuple<uint8_t, SyncManager::Register> AbstractESC::findSm(uint16_t controlMode)
     {
-        for (uint8_t i = 0; i < reg::SM_STATS; i++)
+        for (uint8_t i = 0; i < reg::SYNC_MANAGER_MAX; i++)
         {
             SyncManager::Register sync{};
             read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * i, &sync, sizeof(SyncManager::Register));
+
+            // An empty SM has control 0, which would match a buffered input.
+            if (sync.length == 0)
+            {
+                continue;
+            }
             if ((sync.control & 0x0F) == (controlMode & 0x0F))
             {
                 return std::tuple(i, sync);

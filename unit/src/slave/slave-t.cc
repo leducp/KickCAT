@@ -516,7 +516,7 @@ TEST_F(SlaveTest, dictionary_without_mailbox_maps_pdo_on_sm0_and_binds)
     // EL1004-class: no mailbox, process input on SM0 (assignment object 0x1C10). The
     // application owns the OD and injects it via setDictionary; the slave still reaches
     // SAFE_OP, maps the entry, and bind() resolves - with no mailbox at all.
-    SyncManager::Register sm_in_sm0{PDO_IN_ADDR, sizeof(buffer_in_),
+    SyncManager::Register sm_in_sm0{PDO_IN_ADDR, sizeof(uint16_t),
         SM_CONTROL_MODE_BUFFERED | SM_CONTROL_DIRECTION_READ, 0, SM_ACTIVATE_ENABLE, 0};
     SyncManager::Register sm_empty{};
     auto setSm = [this](int idx, SyncManager::Register const& sm)

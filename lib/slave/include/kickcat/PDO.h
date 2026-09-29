@@ -24,6 +24,8 @@ namespace kickcat
         void updateInput();
         void updateOutput();
 
+        // A mapped dictionary must remain alive until the next successful mapping or until this PDO is destroyed.
+        // Its entries alias the process buffers until they are remapped.
         StatusCode configureMapping(CoE::Dictionary& dict);
 
         // Meaningful only after configure().
@@ -32,9 +34,21 @@ namespace kickcat
 
     private:
 
+        struct MappedEntry
+        {
+            CoE::Entry* entry;
+            uint16_t bit_offset;
+            uint8_t  bits;
+        };
+
+        bool isAssigned(CoE::Dictionary& dict, uint16_t assign_idx);
         std::vector<uint16_t> parseAssignment(CoE::Dictionary& dict, uint16_t assign_idx);
 
-        bool parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset, uint32_t max_size);
+        bool collectMapping(CoE::Dictionary& dict, uint16_t assign_idx, uint32_t max_size, uint32_t sm_length, std::vector<MappedEntry>& out);
+        bool parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, uint16_t& bit_offset, uint32_t max_size, std::vector<MappedEntry>& out);
+        void bindMapping(std::vector<MappedEntry> const& mapping, void* buffer);
+
+        void releaseMapping();
 
         AbstractESC* esc_;
         void* input_                = {nullptr};
@@ -44,6 +58,8 @@ namespace kickcat
         void* output_                = {nullptr};
         uint32_t output_size_        = 0;
         SyncManagerConfig sm_output_ = {};
+
+        std::vector<MappedEntry> bound_entries_;
     };
 }
 

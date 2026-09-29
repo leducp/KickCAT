@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "kickcat/PDO.h"
 #include "kickcat/debug.h"
 #include "kickcat/CoE/protocol.h"
@@ -8,9 +10,7 @@ namespace kickcat
 {
     int32_t PDO::configure()
     {
-        // A slave may have only inputs (e.g. a digital input terminal) or only
-        // outputs. findSm throws when a direction's SM is absent, so resolve each
-        // direction independently and leave the missing one Unused.
+        // A slave can lack either process data direction; findSm throws when its SM is absent.
         sm_input_  = SyncManagerConfig{0, 0, 0, 0, SyncManager::Unused};
         sm_output_ = SyncManagerConfig{0, 0, 0, 0, SyncManager::Unused};
 
@@ -114,6 +114,12 @@ namespace kickcat
         }
     }
 
+    bool PDO::isAssigned(CoE::Dictionary& dict, uint16_t assign_idx)
+    {
+        auto [obj, entry] = CoE::findObject(dict, assign_idx, 0);
+        return entry != nullptr;
+    }
+
     std::vector<uint16_t> PDO::parseAssignment(CoE::Dictionary& dict, uint16_t assign_idx)
     {
         std::vector<uint16_t> pdo_indices;
@@ -136,7 +142,7 @@ namespace kickcat
         return pdo_indices;
     }
 
-    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, void* buffer, uint16_t& bit_offset, uint32_t max_size)
+    bool PDO::parsePdoMap(CoE::Dictionary& dict, uint16_t pdo_idx, uint16_t& bit_offset, uint32_t max_size, std::vector<MappedEntry>& out)
     {
         auto [obj0, entry0] = CoE::findObject(dict, pdo_idx, 0);
         if (not entry0)
@@ -179,61 +185,107 @@ namespace kickcat
                 return false;
             }
 
-            // Aliasing logic
-            void* old_data = od_entry->data;
-            bool old_is_mapped = od_entry->is_mapped;
-
-            uint8_t* new_ptr = static_cast<uint8_t*>(buffer) + (bit_offset / 8);
-
-            od_entry->data = new_ptr;
-            od_entry->is_mapped = true;  // now aliases the process image; dtor must not free it
-
-            if (old_data)
-            {
-                std::memcpy(new_ptr, old_data, (bits + 7) / 8);  // sub-byte entries occupy 1 byte
-
-                if (not old_is_mapped) // if the old data was not mapped, we allocated it, so free it
-                {
-                    std::free(old_data);
-                }
-            }
-
+            out.push_back({od_entry, bit_offset, bits});
             bit_offset += bits;
         }
 
         return true;
     }
 
+    bool PDO::collectMapping(CoE::Dictionary& dict, uint16_t assign_idx, uint32_t max_size, uint32_t sm_length, std::vector<MappedEntry>& out)
+    {
+        uint16_t bit_offset = 0;
+        for (auto pdo : parseAssignment(dict, assign_idx))
+        {
+            if (not parsePdoMap(dict, pdo, bit_offset, max_size, out))
+            {
+                return false;
+            }
+        }
+        if (isAssigned(dict, assign_idx) and ((bit_offset + 7) / 8 != sm_length))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    void PDO::releaseMapping()
+    {
+        for (auto const& bound : bound_entries_)
+        {
+            CoE::Entry* entry = bound.entry;
+            if (not entry->is_mapped)
+            {
+                continue;   // The same OD entry can appear more than once.
+            }
+            std::size_t size = (entry->bitlen + 7) / 8;
+            if (size == 0)
+            {
+                size = 1;
+            }
+            std::size_t mapped_size = std::min<std::size_t>(size, (bound.bits + 7) / 8);
+            void* storage = std::calloc(1, size);
+            std::memcpy(storage, entry->data, mapped_size);
+            entry->data = storage;
+            entry->is_mapped = false;
+        }
+        bound_entries_.clear();
+    }
+
+    void PDO::bindMapping(std::vector<MappedEntry> const& mapping, void* buffer)
+    {
+        for (auto const& mapped : mapping)
+        {
+            CoE::Entry* od_entry = mapped.entry;
+            bound_entries_.push_back(mapped);
+            void* old_data = od_entry->data;
+            bool old_is_mapped = od_entry->is_mapped;
+
+            uint8_t* new_ptr = static_cast<uint8_t*>(buffer) + (mapped.bit_offset / 8);
+
+            od_entry->data = new_ptr;
+            od_entry->is_mapped = true;  // now aliases the process image; dtor must not free it
+
+            if (old_data)
+            {
+                std::memcpy(new_ptr, old_data, (mapped.bits + 7) / 8);  // sub-byte entries occupy 1 byte
+
+                if (not old_is_mapped)
+                {
+                    std::free(old_data);
+                }
+            }
+        }
+    }
+
     StatusCode PDO::configureMapping(CoE::Dictionary& dict)
     {
         // Assignment object is 0x1C10 + SM index (ETG.1000.6), not a fixed SM2/SM3:
         // a mailboxless terminal carries process data on SM0/SM1.
+        // Validate both directions before changing any dictionary entry.
+        std::vector<MappedEntry> inputs;
         if (hasInput())
         {
-            uint16_t bit_offset = 0;
             uint16_t assign_idx = static_cast<uint16_t>(0x1C10 + sm_input_.index);
-            for (auto pdo : parseAssignment(dict, assign_idx))
+            if (not collectMapping(dict, assign_idx, input_size_, sm_input_.length, inputs))
             {
-                if (not parsePdoMap(dict, pdo, input_, bit_offset, input_size_))
-                {
-                    return StatusCode::INVALID_INPUT_CONFIGURATION;
-                }
+                return StatusCode::INVALID_INPUT_CONFIGURATION;
             }
         }
 
+        std::vector<MappedEntry> outputs;
         if (hasOutput())
         {
-            uint16_t bit_offset = 0;
             uint16_t assign_idx = static_cast<uint16_t>(0x1C10 + sm_output_.index);
-            for (auto pdo : parseAssignment(dict, assign_idx))
+            if (not collectMapping(dict, assign_idx, output_size_, sm_output_.length, outputs))
             {
-                if (not parsePdoMap(dict, pdo, output_, bit_offset, output_size_))
-                {
-                    return StatusCode::INVALID_OUTPUT_CONFIGURATION;
-                }
+                return StatusCode::INVALID_OUTPUT_CONFIGURATION;
             }
         }
 
+        releaseMapping();
+        bindMapping(inputs, input_);
+        bindMapping(outputs, output_);
         return StatusCode::ECAT_NO_ERROR;
     }
 }

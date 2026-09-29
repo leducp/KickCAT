@@ -268,7 +268,8 @@ namespace kickcat
 
         constexpr uint16_t FMMU            = 0x600; // each FFMU entry is described in 16 bytes (6x0 to 6xF), up to 16 FMMU
 
-        constexpr uint16_t SYNC_MANAGER    = 0x800; // each SyncManager is described in 8 bytes, up to 8 Sync Manager
+        constexpr uint16_t SYNC_MANAGER    = 0x800; // 8 bytes per SyncManager
+        constexpr uint16_t SYNC_MANAGER_MAX = 16;
         constexpr uint16_t SYNC_MANAGER_0  = SYNC_MANAGER + 8 * 0;
         constexpr uint16_t SYNC_MANAGER_1  = SYNC_MANAGER + 8 * 1;
         constexpr uint16_t SYNC_MANAGER_2  = SYNC_MANAGER + 8 * 2;
