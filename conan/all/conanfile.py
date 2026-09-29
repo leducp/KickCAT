@@ -18,8 +18,8 @@ class KickCATRecipe(ConanFile):
     topics = ("ethercat")
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False], "fPIC": [True, False], "with_esi_parser": [True, False]}
-    default_options = {"shared": False, "fPIC": True, "with_esi_parser": False}
+    options = {"shared": [True, False], "fPIC": [True, False], "with_esi_parser": [True, False], "with_eni_parser": [True, False]}
+    default_options = {"shared": False, "fPIC": True, "with_esi_parser": False, "with_eni_parser": False}
 
     def export_sources(self):
         # This method is used for local development to copy sources into the recipe
@@ -61,13 +61,14 @@ class KickCATRecipe(ConanFile):
 
     def requirements(self):
         self.requires("argparse/3.2")
-        if self.options.with_esi_parser:
+        if self.options.with_esi_parser or self.options.with_eni_parser:
             self.requires("tinyxml2/11.0.0")
 
 
     def generate(self):
         tc = CMakeToolchain(self)
         tc.cache_variables["ENABLE_ESI_PARSER"] = bool(self.options.with_esi_parser)
+        tc.cache_variables["ENABLE_ENI_PARSER"] = bool(self.options.with_eni_parser)
         tc.cache_variables["BUILD_UNIT_TESTS"] = "OFF"
         tc.cache_variables["BUILD_MASTER_EXAMPLES"] = "OFF"
         tc.cache_variables["BUILD_SLAVE_EXAMPLES"] = "OFF"
