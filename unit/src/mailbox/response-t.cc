@@ -93,7 +93,7 @@ TEST(Mailbox_Reponse_configure, not_configured)
     MockESC esc;
     Mailbox mbx{&esc, RESP_MBX_SIZE};
 
-    for (uint8_t i = 0; i < reg::SM_STATS; ++i)
+    for (uint8_t i = 0; i < reg::SYNC_MANAGER_MAX; ++i)
     {
         EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * i, _, sizeof(SyncManager::Register))).WillOnce(Return(0));
     }
@@ -106,7 +106,7 @@ TEST(Mailbox_Reponse_configure, badly_configured)
     MockESC esc;
     Mailbox mbx{&esc, RESP_MBX_SIZE};
 
-    for (int i = 0; i < reg::SM_STATS; ++i)
+    for (int i = 0; i < reg::SYNC_MANAGER_MAX; ++i)
     {
         EXPECT_CALL(esc, read(reg::SYNC_MANAGER + sizeof(SyncManager::Register) * i, _, sizeof(SyncManager::Register)))
             .WillOnce(Invoke([&](uint16_t, void* data, uint16_t)
