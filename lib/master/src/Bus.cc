@@ -1385,6 +1385,10 @@ namespace kickcat
             {
                 // send one waiting message
                 auto message = slave.mailbox.send();
+                if (message == nullptr)
+                {
+                    continue;
+                }
                 link_->addDatagram(Command::FPWR, createAddress(slave.address, slave.mailbox.recv_offset), message->data(),
                                   static_cast<uint16_t>(message->size()), process, error);
             }

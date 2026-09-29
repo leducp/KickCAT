@@ -102,7 +102,7 @@ namespace kickcat::mailbox::response
 
     ProcessingResult FoEMessage::start(std::vector<uint8_t> const& raw_message)
     {
-        mailbox_size_ = raw_message.size();
+        request_size_ = raw_message.size();
 
         auto const* header = pointData<mailbox::Header>(raw_message.data());
         auto const* foe     = pointData<FoE::Header>(header);
@@ -189,7 +189,7 @@ namespace kickcat::mailbox::response
         }
         packet_ = value;
 
-        if (payload_size == capacity())
+        if (payload_size == (request_size_ - FoE::OVERHEAD))
         {
             reply(createPDU(FoE::opcode::ACK, packet_, 0));
             return ProcessingResult::FINALIZE_AND_KEEP;
@@ -210,14 +210,15 @@ namespace kickcat::mailbox::response
     {
         auto pdu = createPDU(FoE::opcode::DATA, packet_ + 1, 0);
         uint32_t size = 0;
-        uint32_t rc = reader_->read(pdu.data() + FoE::OVERHEAD, capacity(), size);
+        uint32_t const capacity = static_cast<uint32_t>(replySize() - FoE::OVERHEAD);
+        uint32_t rc = reader_->read(pdu.data() + FoE::OVERHEAD, capacity, size);
         if (rc != 0)
         {
             return fail(rc);
         }
 
         ++packet_;
-        last_ = (size < capacity());
+        last_ = (size < capacity);
         pointData<mailbox::Header>(pdu.data())->len = static_cast<uint16_t>(sizeof(FoE::Header) + size);
 
         reply(std::move(pdu));
@@ -243,7 +244,7 @@ namespace kickcat::mailbox::response
 
     std::vector<uint8_t> FoEMessage::createPDU(uint8_t opcode, uint32_t value, uint16_t payload_size)
     {
-        std::vector<uint8_t> pdu(mailbox_size_, 0);
+        std::vector<uint8_t> pdu(replySize(), 0);
         auto* header = pointData<mailbox::Header>(pdu.data());
         auto* foe    = pointData<FoE::Header>(header);
         header->len  = static_cast<uint16_t>(sizeof(FoE::Header) + payload_size);
@@ -251,11 +252,5 @@ namespace kickcat::mailbox::response
         foe->opcode  = opcode;
         foe->value   = value;
         return pdu;
-    }
-
-
-    uint32_t FoEMessage::capacity() const
-    {
-        return static_cast<uint32_t>(mailbox_size_ - FoE::OVERHEAD);
     }
 }

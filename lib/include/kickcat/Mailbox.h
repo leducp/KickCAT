@@ -164,8 +164,10 @@ namespace kickcat::mailbox::request
         std::shared_ptr<FoEMessage> createFoEWrite(std::string const& name, uint32_t password, std::vector<uint8_t> file,
                                                    nanoseconds timeout = 5s);
 
-        // helper to get next message to send and transfer it to reception callbacks if required
-        std::shared_ptr<AbstractMessage> send();
+        /// \brief Return the next unexpired message, or nullptr.
+        /// \details Messages awaiting a reply move to the receive queue.
+        /// \param current_time Time used for expiry checks.
+        std::shared_ptr<AbstractMessage> send(nanoseconds current_time = now());
 
         /// \brief Receive a message
         /// \param raw_message      Raw message read on the bus
@@ -204,11 +206,13 @@ namespace kickcat::mailbox::response
         size_t size() const         { return data_.size(); }
 
     protected:
+        std::size_t replySize() const { return reply_size_; }   // captured when the handler is created
         void reply(std::vector<uint8_t>&& reply); /// Enqueue a raw message to be sent in the mailbox
         void replyError(std::vector<uint8_t>&& raw_message, uint16_t code); // wrapper on mailbox replyError
 
         std::vector<uint8_t> data_;
         Mailbox* mailbox_;
+        std::size_t reply_size_;
     };
 
     /// \brief Response mailbox - it orchestrates the reception and the processing of messages (for slaves and gateway)
@@ -236,6 +240,9 @@ namespace kickcat::mailbox::response
         void activate(bool is_activated);  // Deactivating drops the pending messages and replies
         void receive();  // Try to receive a message from the ESC
         void send();     // Send a message in the to_send_ queue if any, keep it in the queue if the ESC is not ready yet
+
+        /// \brief Reply buffer size, set from the send mailbox or the latest standalone request.
+        std::size_t replySize() const { return reply_size_; }
 
         // --- Core methods (ESC-independent) ---
 
@@ -282,6 +289,7 @@ namespace kickcat::mailbox::response
         std::queue<std::vector<uint8_t>> to_send_;                  /// Messages to send (replies from a received messages)
 
         uint8_t counter_{0};                                        /// counter of the replies, from 1 to 7
+        std::size_t reply_size_;
         std::vector<uint8_t> last_sent_{};                          /// store the last sent message in case of repeat requested
         std::vector<uint8_t> repeat_{};                             /// 'real' repeat, a copy of last sent WHEN the master fetch the mailbox
     };

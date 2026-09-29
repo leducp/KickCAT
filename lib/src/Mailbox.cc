@@ -175,18 +175,32 @@ namespace kickcat::mailbox::request
     }
 
 
-    std::shared_ptr<AbstractMessage> Mailbox::send()
+    std::shared_ptr<AbstractMessage> Mailbox::send(nanoseconds current_time)
     {
-        auto message = to_send.front();
-        to_send.pop();
-        message->sent();
-
-        // add message to processing queue if needed
-        if (message->status() == MessageStatus::RUNNING)
+        auto expired = [&](auto const& message)
         {
-            to_process.push_back(message);
+            return (message->status(current_time) == MessageStatus::TIMEDOUT);
+        };
+        to_process.erase(std::remove_if(to_process.begin(), to_process.end(), expired), to_process.end());
+
+        while (not to_send.empty())
+        {
+            auto message = to_send.front();
+            to_send.pop();
+            if (expired(message))
+            {
+                continue;
+            }
+            message->sent();
+
+            // add message to processing queue if needed
+            if (message->status() == MessageStatus::RUNNING)
+            {
+                to_process.push_back(message);
+            }
+            return message;
         }
-        return message;
+        return nullptr;
     }
 
 
@@ -350,6 +364,7 @@ namespace kickcat::mailbox::response
         : esc_{esc}
         , max_allocated_ram_by_msg_{max_allocated_ram_by_msg}
         , max_msgs_{max_msgs}
+        , reply_size_{max_allocated_ram_by_msg}
     {
     }
 
@@ -366,13 +381,19 @@ namespace kickcat::mailbox::response
             auto [indexIn, mailboxIn]   = esc_->findSm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_READ);
             auto [indexOut, mailboxOut] = esc_->findSm(SM_CONTROL_MODE_MAILBOX | SM_CONTROL_DIRECTION_WRITE);
 
-            if (mailboxIn.length != mailboxOut.length or mailboxIn.length > max_allocated_ram_by_msg_)
+            // The master selects these lengths; each must hold an expedited SDO.
+            constexpr uint16_t MIN_SIZE = sizeof(mailbox::Header) + sizeof(CoE::Header) + sizeof(CoE::ServiceData) + 4;
+            for (uint16_t length : {mailboxIn.length, mailboxOut.length})
             {
-                return -EOVERFLOW;
+                if ((length < MIN_SIZE) or (length > max_allocated_ram_by_msg_))
+                {
+                    return -EOVERFLOW;
+                }
             }
 
             mbx_in_  = SYNC_MANAGER_MBX_IN(indexIn, mailboxIn.start_address, mailboxIn.length);
             mbx_out_ = SYNC_MANAGER_MBX_OUT(indexOut, mailboxOut.start_address, mailboxOut.length);
+            reply_size_ = mailboxIn.length;
         }
         catch (std::exception const& e)
         {
@@ -452,6 +473,11 @@ namespace kickcat::mailbox::response
         {
             replyError(std::move(raw_message), mailbox::Error::INVALID_SIZE);
             return;
+        }
+
+        if (esc_ == nullptr)
+        {
+            reply_size_ = raw_message.size();
         }
 
         for (auto it = to_process_.begin(); it != to_process_.end(); ++it)
@@ -660,6 +686,11 @@ namespace kickcat::mailbox::response
 
     void Mailbox::enqueue(std::vector<uint8_t>&& message)
     {
+        if (esc_ != nullptr)
+        {
+            // The ESC marks the mailbox full only after its last byte is written.
+            message.resize(reply_size_, 0);
+        }
         // Each reply is a new mailbox service: its counter is the slave one (ETG.1000.4, 0 is reserved)
         pointData<mailbox::Header>(message.data())->count = mailbox::nextCounter(counter_) & 0x7;
         to_send_.push(std::move(message));
@@ -667,6 +698,7 @@ namespace kickcat::mailbox::response
 
     AbstractMessage::AbstractMessage(Mailbox* mbx)
         : mailbox_{mbx}
+        , reply_size_{mbx->replySize()}
     {
 
     }

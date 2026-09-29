@@ -23,8 +23,7 @@ namespace kickcat::mailbox::response
 
         ProcessingResult download(CoE::Entry* entry);
         ProcessingResult downloadComplete(CoE::Object* object);
-        ProcessingResult downloadSegment(std::vector<uint8_t> const& raw_message,
-                                         mailbox::Header const* header, CoE::ServiceData const* sdo);
+        ProcessingResult downloadSegment(mailbox::Header const* header, CoE::ServiceData const* sdo);
 
         bool isUploadAuthorized(CoE::Entry* entry);
         bool isDownloadAuthorized(CoE::Entry* entry);
@@ -33,6 +32,8 @@ namespace kickcat::mailbox::response
 
         void beforeHooks(uint16_t access, CoE::Entry* entry);
         void afterHooks(uint16_t access, CoE::Entry* entry);
+
+        std::size_t request_size_;   // data_ may grow to fit the reply
 
         // Pointer on data_
         mailbox::Header* header_;

@@ -66,8 +66,10 @@ namespace kickcat::mailbox::response
 
     SDOMessage::SDOMessage(Mailbox* mbx, std::vector<uint8_t>&& raw_message)
         : AbstractMessage{mbx}
+        , request_size_{raw_message.size()}
     {
         data_ = std::move(raw_message);
+        data_.resize(std::max(request_size_, replySize()));
 
         header_  = pointData<mailbox::Header>(data_.data());
         coe_     = pointData<CoE::Header>(header_);
@@ -183,7 +185,7 @@ namespace kickcat::mailbox::response
 
         if (sdo->command == CoE::SDO::request::DOWNLOAD_SEGMENTED)
         {
-            return downloadSegment(raw_message, header, sdo);
+            return downloadSegment(header, sdo);
         }
 
         if (sdo->command != CoE::SDO::request::UPLOAD_SEGMENTED)
@@ -193,7 +195,7 @@ namespace kickcat::mailbox::response
 
         // header_/sdo_/payload_ are stale: data_ was moved out with the initiate reply. Build the
         // segment in a fresh buffer.
-        std::vector<uint8_t> resp(raw_message.size(), 0);
+        std::vector<uint8_t> resp(replySize(), 0);
         auto* rheader = pointData<mailbox::Header>(resp.data());
         auto* rcoe    = pointData<CoE::Header>(rheader);
         auto* rsdo    = pointData<CoE::ServiceData>(rcoe);
@@ -247,10 +249,9 @@ namespace kickcat::mailbox::response
         return ProcessingResult::FINALIZE_AND_KEEP;
     }
 
-    ProcessingResult SDOMessage::downloadSegment(std::vector<uint8_t> const& raw_message,
-                                                 mailbox::Header const* header, CoE::ServiceData const* sdo)
+    ProcessingResult SDOMessage::downloadSegment(mailbox::Header const* header, CoE::ServiceData const* sdo)
     {
-        std::vector<uint8_t> resp(raw_message.size(), 0);
+        std::vector<uint8_t> resp(replySize(), 0);
         auto* rheader = pointData<mailbox::Header>(resp.data());
         auto* rcoe    = pointData<CoE::Header>(rheader);
         auto* rsdo    = pointData<CoE::ServiceData>(rcoe);
@@ -340,7 +341,7 @@ namespace kickcat::mailbox::response
         sdo_->transfer_type = 0;
         std::memcpy(payload_, &size, sizeof(uint32_t)); // complete size
 
-        uint32_t const single_frame_max = static_cast<uint32_t>(data_.size()) - 16;
+        uint32_t const single_frame_max = static_cast<uint32_t>(replySize()) - 16;
         if (size <= single_frame_max)
         {
             // normal: complete size + all data in a single mailbox frame
@@ -374,7 +375,7 @@ namespace kickcat::mailbox::response
         uint32_t size = 0;
         uint8_t number_of_entries = *(uint8_t*)object->entries.at(0).data;
         uint16_t skip_offset = object->entries.at(sdo_->subindex).bitoff / 8;
-        std::size_t const payload_capacity = data_.size() - 16;  // bytes available after the headers
+        std::size_t const payload_capacity = replySize() - 16;
 
         for (uint32_t i = sdo_->subindex; i <= number_of_entries; ++i)
         {
@@ -478,7 +479,7 @@ namespace kickcat::mailbox::response
 
         uint32_t msg_size;
         std::memcpy(&msg_size, payload_, 4);
-        std::size_t const payload_capacity = data_.size() - 16;  // bytes available after the headers
+        std::size_t const payload_capacity = request_size_ - 16;
         if (msg_size > payload_capacity)
         {
             abort(CoE::SDO::abort::DATA_TYPE_LENGTH_TOO_HIGH);
@@ -521,7 +522,7 @@ namespace kickcat::mailbox::response
             // An inconsistent layout (entry_off < skip_offset, underflow) or a read that
             // runs past the mailbox buffer must not drive an out-of-bounds read.
             std::size_t read_pos = static_cast<std::size_t>(start_offset - data_.data()) + (entry_off - skip_offset);
-            if (entry_off < skip_offset or read_pos + entry_size > data_.size())
+            if (entry_off < skip_offset or read_pos + entry_size > request_size_)
             {
                 abort(CoE::SDO::abort::GENERAL_ERROR);
                 return ProcessingResult::FINALIZE;
@@ -564,6 +565,7 @@ namespace kickcat::mailbox::response
         : AbstractMessage{mbx}
     {
         data_ = std::move(raw_message);
+        data_.resize(std::max(data_.size(), replySize()));
 
         header_  = pointData<mailbox::Header>(data_.data());
         coe_     = pointData<CoE::Header>(header_);
@@ -573,7 +575,7 @@ namespace kickcat::mailbox::response
 
     ProcessingResult SDOInformationMessage::process()
     {
-        if (data_.size() < (sizeof(mailbox::Header) + CoE::SDO::information::responseSize(sdo_->opcode)))
+        if (replySize() < (sizeof(mailbox::Header) + CoE::SDO::information::responseSize(sdo_->opcode)))
         {
             replyError(std::move(data_), mailbox::Error::SIZE_TOO_SHORT);
             return ProcessingResult::FINALIZE;
@@ -609,7 +611,6 @@ namespace kickcat::mailbox::response
         auto& dictionary = mailbox_->getDictionary();
         auto fillList = [&](ListType list_type, uint16_t access_check)
         {
-            // 1. Compute answer
             std::vector<uint16_t> to_reply;
             to_reply.push_back(list_type);
             for (auto const& object : dictionary)
@@ -621,15 +622,14 @@ namespace kickcat::mailbox::response
                 }
             }
 
-            // 2. Compute required fragments
-            std::size_t total_size = to_reply.size() * sizeof(uint16_t);
-            uint16_t requiered_fragments = total_size / data_.size();
-            if (total_size % data_.size())
+            // Reserve header space in every fragment.
+            std::size_t const per_fragment = (replySize() - sizeof(mailbox::Header) - header_->len) / sizeof(uint16_t);
+            uint16_t requiered_fragments = static_cast<uint16_t>(to_reply.size() / per_fragment);
+            if (to_reply.size() % per_fragment)
             {
                 requiered_fragments += 1;
             }
 
-            // 3. Start replying the fragments
             std::size_t pos = 0;
             for (uint16_t fragment = 0; fragment < requiered_fragments; ++fragment)
             {
@@ -647,7 +647,7 @@ namespace kickcat::mailbox::response
                     sdo->incomplete = 1;
                 }
 
-                while ((header->len + sizeof(uint16_t) <= (data_.size() - sizeof(mailbox::Header))) and (pos < to_reply.size()))
+                while ((header->len + sizeof(uint16_t) <= (replySize() - sizeof(mailbox::Header))) and (pos < to_reply.size()))
                 {
                     std::memcpy(data, to_reply.data() + pos, sizeof(uint16_t));
                     pos += 1;
@@ -727,9 +727,9 @@ namespace kickcat::mailbox::response
         auto name = pointData<char>(desc);
         std::size_t const offset = static_cast<std::size_t>(reinterpret_cast<uint8_t*>(name) - data_.data());
         std::size_t room = 0;
-        if (offset < data_.size())
+        if (offset < replySize())
         {
-            room = data_.size() - offset;
+            room = replySize() - offset;
         }
         std::size_t name_len = object->name.size();
         if (name_len > room)
@@ -769,9 +769,9 @@ namespace kickcat::mailbox::response
         auto name = pointData<char>(desc);
         std::size_t const offset = static_cast<std::size_t>(reinterpret_cast<uint8_t*>(name) - data_.data());
         std::size_t room = 0;
-        if (offset < data_.size())
+        if (offset < replySize())
         {
-            room = data_.size() - offset;
+            room = replySize() - offset;
         }
         std::size_t desc_len = entry->description.size();
         if (desc_len > room)

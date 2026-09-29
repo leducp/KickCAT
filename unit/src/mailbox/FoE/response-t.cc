@@ -391,6 +391,21 @@ TEST_F(FoE_Response, stopped_mailbox_closes_the_transfer)
     ASSERT_EQ(1, storage.discarded);
 }
 
+TEST_F(FoE_Response, short_request_keeps_the_transfer_reply_size)
+{
+    storage.files["fw.bin"] = pattern(3 * CAPACITY);
+    auto data = decode(slave.processRequest(createRequest(FoE::opcode::READ, "fw.bin")));
+    ASSERT_EQ(CAPACITY, data.payload.size());
+
+    // Standalone requests may omit mailbox padding.
+    auto ack = createPDU(FoE::opcode::ACK, 1);
+    ack.resize(FoE::OVERHEAD);
+    data = decode(slave.processRequest(std::move(ack)));
+    ASSERT_EQ(FoE::opcode::DATA, data.opcode);
+    ASSERT_EQ(2, data.value);
+    ASSERT_EQ(CAPACITY, data.payload.size());
+}
+
 TEST_F(FoE_Response, too_short)
 {
     auto raw = createPDU(FoE::opcode::READ, 0);

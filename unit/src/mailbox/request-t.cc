@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "kickcat/Mailbox.h"
+#include "kickcat/FoE/mailbox/request.h"
 
 using namespace kickcat;
 using namespace kickcat::mailbox::request;
@@ -114,4 +115,28 @@ TEST_F(Mailbox_Request, gateway_reply_longer_than_the_send_mailbox_is_dropped)
 
     EXPECT_FALSE(mailbox.receive(reply.data()));
     EXPECT_EQ(MessageStatus::RUNNING, msg->status());
+}
+
+TEST_F(Mailbox_Request, timed_out_message_is_never_sent)
+{
+    // The first request expires before the mailbox can send it.
+    nanoseconds start = now();
+    mailbox.createFoEWrite("fw.bin", 0, std::vector<uint8_t>(4), 10ms);
+    auto next = mailbox.createFoERead("other.bin", 0, 1s);
+
+    ASSERT_EQ(next, mailbox.send(start + 50ms));
+    ASSERT_TRUE(mailbox.to_send.empty());
+    ASSERT_EQ(nullptr, mailbox.send(start + 50ms));
+}
+
+TEST_F(Mailbox_Request, timed_out_reply_waiters_are_released)
+{
+    nanoseconds start = now();
+    mailbox.createFoERead("fw.bin", 0, 10ms);
+    mailbox.send(start);
+    ASSERT_EQ(1, mailbox.to_process.size());
+
+    mailbox.createFoERead("other.bin", 0, 1s);
+    mailbox.send(start + 50ms);
+    ASSERT_EQ(1, mailbox.to_process.size());
 }
