@@ -122,6 +122,43 @@ TEST(Mailbox_Reponse_configure, badly_configured)
 }
 
 
+TEST_F(Mailbox_Response, configure_asymmetric)
+{
+    sm_in.length  = 96;     // slave to master
+    sm_out.length = 200;    // master to slave
+    ASSERT_EQ(0, mbx.configure());
+    ASSERT_EQ(96, mbx.replySize());
+}
+
+TEST_F(Mailbox_Response, configure_rejects_too_small_mailbox)
+{
+    sm_in.length = 8;
+    ASSERT_EQ(-EOVERFLOW, mbx.configure());
+
+    sm_in.length  = RESP_MBX_SIZE;
+    sm_out.length = RESP_MBX_SIZE + 1;
+    ASSERT_EQ(-EOVERFLOW, mbx.configure());
+}
+
+TEST_F(Mailbox_Response, reply_fills_the_send_mailbox)
+{
+    sm_in.length = 96;
+    ASSERT_EQ(0, mbx.configure());
+
+    mbx.handleMessage(buildRawSDORead(0x1018, 1));
+    mbx.process();
+    auto reply = mbx.popReply();
+    ASSERT_EQ(96, reply.size());
+
+    auto const* coe     = pointData<CoE::Header>(pointData<mailbox::Header>(reply.data()));
+    auto const* sdo     = pointData<CoE::ServiceData>(coe);
+    uint32_t value;
+    std::memcpy(&value, pointData<uint8_t>(sdo), sizeof(value));
+    ASSERT_EQ(CoE::Service::SDO_RESPONSE, coe->service);
+    ASSERT_EQ(0x6a5, value);
+}
+
+
 TEST_F(Mailbox_Response, receive_nothing_when_sm_empty)
 {
     SyncManager::Register sync{};

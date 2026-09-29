@@ -5,11 +5,13 @@
 #include <memory>
 #include <numeric>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "mocks/Time.h"
 
 #include "kickcat/Bus.h"
+#include "kickcat/CoE/mailbox/request.h"
 #include "kickcat/FoE/protocol.h"
 #include "kickcat/Link.h"
 #include "kickcat/LoopbackSocket.h"
@@ -23,6 +25,8 @@ namespace
 {
     constexpr char const* CONFIG = "foe_sim_test.json";
     constexpr char const* DIR    = "foe_sim_test_dir";
+    constexpr char const* ESI    = "ecat402-drive.xml";
+    constexpr char const* ASYMMETRIC_ESI = "foe_sim_test_asymmetric.xml";
 
     class FoESimTest : public testing::Test
     {
@@ -41,6 +45,7 @@ namespace
             loopback_.reset();
             sim_.reset();
             filesystem::removeFile(CONFIG);
+            filesystem::removeFile(ASYMMETRIC_ESI);
             for (auto const& entry : filesystem::list(DIR))
             {
                 filesystem::removeFile(filesystem::join(DIR, entry.name));
@@ -49,10 +54,9 @@ namespace
         }
 
         // The ESI fixture sits beside the binary, as does the config.
-        void start(std::string const& extra_params = "")
+        void start(std::string const& extra_params = "", std::string const& esi = ESI)
         {
-            filesystem::writeFile(CONFIG, std::string{"{\"esi\": \"ecat402-drive.xml\", \"foe_dir\": \""} + DIR + "\""
-                                          + extra_params + "}");
+            filesystem::writeFile(CONFIG, "{\"esi\": \"" + esi + "\", \"foe_dir\": \"" + DIR + "\"" + extra_params + "}");
 
             sim_ = std::make_unique<sim::SimulatedSlave>(sim::buildSlave(CONFIG));
             sim_->slave->start();
@@ -138,3 +142,53 @@ TEST_F(FoESimTest, missing_directory)
     filesystem::writeFile(CONFIG, "{\"esi\": \"ecat402-drive.xml\", \"foe_dir\": \"no_such_dir\"}");
     ASSERT_THROW(sim::buildSlave(CONFIG), std::runtime_error);
 }
+
+
+class FoESimAsymmetricTest : public FoESimTest, public testing::WithParamInterface<std::tuple<int, int>>
+{
+};
+
+TEST_P(FoESimAsymmetricTest, mailbox_sizes)
+{
+    auto [receive, send] = GetParam();
+
+    // Fixture: 128-byte receive/send mailboxes at 0x1000/0x1400.
+    std::vector<uint8_t> raw = filesystem::readFile(ESI);
+    std::string esi{raw.begin(), raw.end()};
+    auto resize = [&](std::string const& address, int size)
+    {
+        std::string const from = "DefaultSize=\"128\" StartAddress=\"" + address + "\"";
+        std::size_t pos = esi.find(from);
+        ASSERT_NE(std::string::npos, pos);
+        esi.replace(pos, from.size(), "DefaultSize=\"" + std::to_string(size) + "\" StartAddress=\"" + address + "\"");
+    };
+    resize("#x1000", receive);
+    resize("#x1400", send);
+    filesystem::writeFile(ASYMMETRIC_ESI, esi);
+
+    start("", ASYMMETRIC_ESI);
+    ASSERT_EQ(receive, slave().mailbox.recv_size);
+    ASSERT_EQ(send, slave().mailbox.send_size);
+
+    std::vector<uint8_t> file(700);
+    std::iota(file.begin(), file.end(), uint8_t{5});
+    bus_->writeFoE(slave(), "fw.bin", 0, file);
+    std::vector<uint8_t> read_back;
+    bus_->readFoE(slave(), "fw.bin", 0, read_back);
+    ASSERT_EQ(file, read_back);
+
+    uint32_t vendor_id = 0;
+    uint32_t size = sizeof(vendor_id);
+    bus_->readSDO(slave(), 0x1018, 1, Bus::Access::PARTIAL, &vendor_id, &size);
+    ASSERT_EQ(slave().sii.info.vendor_id, vendor_id);
+
+    std::vector<uint8_t> list(4096);
+    uint32_t list_size = static_cast<uint32_t>(list.size());
+    auto info = slave().mailbox.createSDOInfoGetODList(CoE::SDO::information::ListType::ALL, list.data(), &list_size, 1s);
+    bus_->waitForMessage(info);
+    ASSERT_EQ(mailbox::request::MessageStatus::SUCCESS, info->status());
+    ASSERT_GT(list_size, static_cast<uint32_t>(send));
+    ASSERT_EQ(sizeof(uint16_t) * (1 + sim_->dictionary->size()), list_size);
+}
+
+INSTANTIATE_TEST_SUITE_P(Sizes, FoESimAsymmetricTest, testing::Values(std::make_tuple(200, 96), std::make_tuple(96, 200)));

@@ -30,14 +30,13 @@ namespace kickcat::mailbox::response
         void endTransfer();
 
         std::vector<uint8_t> createPDU(uint8_t opcode, uint32_t value, uint16_t payload_size);
-        uint32_t capacity() const;
 
         FoE::AbstractStorage& storage_;
         std::unique_ptr<FoE::AbstractReader> reader_;   // read in progress
         std::unique_ptr<FoE::AbstractWriter> writer_;   // write in progress
         uint32_t packet_{0};            // last packet number sent (read) or received (write)
         bool last_{false};              // read: the last data packet has been sent
-        std::size_t mailbox_size_{0};
+        std::size_t request_size_{0};   // request buffer size used to detect full DATA packets
     };
 }
 
