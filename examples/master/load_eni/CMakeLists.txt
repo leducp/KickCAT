@@ -1,0 +1,5 @@
+if (ENABLE_ENI_PARSER)
+    add_executable(load_eni load_eni.cc)
+    target_link_libraries(load_eni kickcat argparse::argparse)
+    set_kickcat_properties(load_eni)
+endif ()
