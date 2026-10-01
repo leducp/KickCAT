@@ -49,13 +49,14 @@ if pkg-config --libs --static kickcat >/dev/null 2>&1; then
     "$CONSUMER_DIR/pkgconfig/consumer" >/dev/null
 else
     echo "[test_install] SKIP pkg-config link test: transitive pkg-config dep not on PKG_CONFIG_PATH"
-    echo "                 (e.g. install libtinyxml2-dev for the ESI_PARSER build)"
+    echo "                 (e.g. install libtinyxml2-dev for the ESI/ENI parser build)"
 fi
 
 echo "[test_install] KICKCAT_INSTALL=OFF configure"
 cmake -S "$ROOT_DIR" -B "$CONSUMER_DIR/install-off" \
     -DKICKCAT_INSTALL=OFF \
     -DENABLE_ESI_PARSER=OFF \
+    -DENABLE_ENI_PARSER=OFF \
     -DBUILD_MASTER_EXAMPLES=OFF \
     -DBUILD_SLAVE_EXAMPLES=OFF \
     -DBUILD_SIMULATION=OFF \
