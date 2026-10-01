@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="ISO8859-1"?>
+<!-- Hand-written ENI: one mailbox slave. Mimics TwinCAT quirks (no SerialNo, no AutoIncAddr, byte-swapped EtherType). -->
+<EtherCATConfig>
+  <Config>
+    <Master>
+      <Info>
+        <Name><![CDATA[Device 1 (RT-Ethernet)]]></Name>
+        <Destination>ffffffffffff</Destination>
+        <Source>0003474a3b99</Source>
+        <EtherType>a488</EtherType>
+      </Info>
+      <MailboxStates>
+        <StartAddr>#x09000000</StartAddr>
+        <Count>1</Count>
+      </MailboxStates>
+    </Master>
+    <Slave>
+      <Info>
+        <Name><![CDATA[Box 1 (BK1120)]]></Name>
+        <PhysAddr>1001</PhysAddr>
+        <VendorId>2</VendorId>
+        <ProductCode>73411618</ProductCode>
+        <RevisionNo>655097856</RevisionNo>
+      </Info>
+      <ProcessData>
+        <Send>
+          <BitStart>0</BitStart>
+          <BitLength>32</BitLength>
+        </Send>
+        <Recv>
+          <BitStart>0</BitStart>
+          <BitLength>32</BitLength>
+        </Recv>
+      </ProcessData>
+      <Mailbox DataLinkLayer="true">
+        <Send>
+          <Start>6144</Start>
+          <Length>264</Length>
+        </Send>
+        <Recv>
+          <Start>7168</Start>
+          <Length>264</Length>
+          <PollTime>20</PollTime>
+          <StatusBitAddr>0</StatusBitAddr>
+        </Recv>
+        <BootStrap>
+          <Send>
+            <Start>#x1000</Start>
+            <Length>#x200</Length>
+          </Send>
+          <Recv>
+            <Start>#x1200</Start>
+            <Length>#x200</Length>
+          </Recv>
+        </BootStrap>
+        <Protocol>EoE</Protocol>
+        <Protocol>CoE</Protocol>
+        <Protocol>FoE</Protocol>
+        <CoE>
+          <InitCmds>
+            <InitCmd>
+              <Transition>PS</Transition>
+              <Comment><![CDATA[IP address]]></Comment>
+              <Timeout>0</Timeout>
+              <Ccs>1</Ccs>
+              <Index>4369</Index>
+              <SubIndex>1</SubIndex>
+              <Data>e903fea9</Data>
+            </InitCmd>
+            <InitCmd Fixed="1" CompleteAccess="1">
+              <Transition>PS</Transition>
+              <Transition>IP</Transition>
+              <Comment>RxPDO assign</Comment>
+              <Timeout>500</Timeout>
+              <Ccs>1</Ccs>
+              <Index>#x1c12</Index>
+              <SubIndex>0</SubIndex>
+              <Data>01000016</Data>
+              <Disabled>0</Disabled>
+            </InitCmd>
+            <InitCmd>
+              <Transition>SO</Transition>
+              <Timeout>100</Timeout>
+              <Ccs>2</Ccs>
+              <Index>#x1018</Index>
+              <SubIndex>1</SubIndex>
+              <Disabled>true</Disabled>
+            </InitCmd>
+          </InitCmds>
+        </CoE>
+        <EoE>
+          <InitCmds>
+            <InitCmd>
+              <Transition>PS</Transition>
+              <Timeout>0</Timeout>
+              <Data>0102</Data>
+            </InitCmd>
+          </InitCmds>
+        </EoE>
+      </Mailbox>
+      <InitCmds>
+        <InitCmd>
+          <Transition>IP</Transition>
+          <Transition>IB</Transition>
+          <Comment><![CDATA[set sm 0 (mailbox out)]]></Comment>
+          <Cmd>5</Cmd>
+          <Adp>1001</Adp>
+          <Ado>2048</Ado>
+          <Data>0018080126000100</Data>
+          <Cnt>1</Cnt>
+          <Retries>3</Retries>
+        </InitCmd>
+        <InitCmd>
+          <Transition>II</Transition>
+          <Comment>wait</Comment>
+          <Cmd>0</Cmd>
+          <Ado>0</Ado>
+          <Timeout>50</Timeout>
+        </InitCmd>
+      </InitCmds>
+    </Slave>
+  </Config>
+</EtherCATConfig>
