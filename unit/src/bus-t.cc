@@ -45,6 +45,8 @@ struct BusAccessor : public Bus
 {
     using Bus::Bus;
     using Bus::pi_frames_;
+    using Bus::assignLogicalAddresses;
+    using Bus::bindProcessImage;
 };
 
 
@@ -1672,4 +1674,183 @@ TEST_F(BusTest, logical_mapping_shared_with_link_at_mapping)
     ASSERT_EQ(3, desc.entries[0].contribution); // 1 input + 2 outputs
     ASSERT_EQ(0, desc.entries[0].input_offset);
     ASSERT_EQ(32, desc.entries[0].input_size);
+}
+
+
+TEST_F(BusTest, mapProcessImage_throws_when_iomap_too_small)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.input.address = 0x10000;
+    slave.input.bsize = 16;
+
+    uint8_t too_small[8];
+    ASSERT_THROW(bus.mapProcessImage(too_small, sizeof(too_small)), Error);
+}
+
+
+TEST_F(BusTest2Slaves, mapProcessImage_disjoint_inputs_and_outputs_share_a_frame)
+{
+    auto& slave0 = bus.slaves().at(0);
+    auto& slave1 = bus.slaves().at(1);
+    slave0.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+    slave1.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+    slave0.output = {nullptr, 88, 11, 2, 0x10000};
+    slave1.output = {nullptr, 88, 11, 2, 0x1000B};
+    slave0.input  = {nullptr, 88, 11, 3, 0x10016};
+    slave1.input  = {nullptr, 88, 11, 3, 0x10021};
+
+    uint8_t iomap[44];
+    bus.mapProcessImage(iomap, sizeof(iomap));
+    ASSERT_TRUE(mock_link->pendingDatagrams().empty());
+
+    ASSERT_EQ(iomap,      slave0.input.data);
+    ASSERT_EQ(iomap + 11, slave1.input.data);
+    ASSERT_EQ(iomap + 22, slave0.output.data);
+    ASSERT_EQ(iomap + 33, slave1.output.data);
+
+    ASSERT_EQ(1u, bus.pi_frames_.size());
+    auto const& frame = bus.pi_frames_[0];
+    ASSERT_EQ(0x10000u, frame.description.address);
+    ASSERT_EQ(44, frame.description.logical_size);
+    ASSERT_EQ(6, frame.expected_lrw_wkc);
+    ASSERT_EQ(2u, frame.inputs.size());
+    ASSERT_EQ(22u, frame.inputs[0].offset);
+    ASSERT_EQ(33u, frame.inputs[1].offset);
+    ASSERT_EQ(2u, frame.outputs.size());
+    ASSERT_EQ(0u,  frame.outputs[0].offset);
+    ASSERT_EQ(11u, frame.outputs[1].offset);
+    ASSERT_EQ(1u, mock_link->logicalMapping().size());
+
+    for (uint8_t i = 0; i < 11; ++i)
+    {
+        slave0.output.data[i] = static_cast<uint8_t>(0xA0 + i);
+        slave1.output.data[i] = static_cast<uint8_t>(0xB0 + i);
+    }
+    bus.sendLogicalReadWrite([](DatagramState const&){});
+    ASSERT_EQ(1u, mock_link->pendingDatagrams().size());
+    auto const& lrw = mock_link->pendingDatagrams()[0];
+    ASSERT_EQ(Command::LRW, lrw.command);
+    ASSERT_EQ(0x10000u, lrw.address);
+    ASSERT_EQ(44, lrw.data_size);
+    ASSERT_EQ(0xA0, lrw.data[0]);
+    ASSERT_EQ(0xB0, lrw.data[11]);
+
+    std::array<uint8_t, 44> reply{};
+    reply[22] = 0x12;
+    reply[33] = 0x34;
+    mock_link->handleProcess(Command::LRW, reply, 6);
+    bus.processAwaitingFrames();
+    ASSERT_EQ(0x12, slave0.input.data[0]);
+    ASSERT_EQ(0x34, slave1.input.data[0]);
+}
+
+
+TEST_F(BusTest2Slaves, mapProcessImage_splits_distant_windows)
+{
+    auto& slave0 = bus.slaves().at(0);
+    auto& slave1 = bus.slaves().at(1);
+    slave0.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+    slave1.sii.info.mailbox_protocol = eeprom::MailboxProtocol::None;
+    slave0.input  = {nullptr, 112, 14, 3, 0x11000};
+    slave0.output = {nullptr, 0, 0, 0, 0};
+    slave1.input  = {nullptr, 0, 0, 0, 0};
+    slave1.output = {nullptr, 72, 9, 2, 0x12000};
+
+    uint8_t iomap[23];
+    bus.mapProcessImage(iomap, sizeof(iomap));
+
+    ASSERT_EQ(2u, bus.pi_frames_.size());
+    ASSERT_EQ(0x11000u, bus.pi_frames_[0].description.address);
+    ASSERT_EQ(14, bus.pi_frames_[0].description.logical_size);
+    ASSERT_EQ(1, bus.pi_frames_[0].expected_lrw_wkc);
+    ASSERT_EQ(1u, bus.pi_frames_[0].inputs.size());
+    ASSERT_TRUE(bus.pi_frames_[0].outputs.empty());
+
+    ASSERT_EQ(0x12000u, bus.pi_frames_[1].description.address);
+    ASSERT_EQ(9, bus.pi_frames_[1].description.logical_size);
+    ASSERT_EQ(2, bus.pi_frames_[1].expected_lrw_wkc);
+    ASSERT_TRUE(bus.pi_frames_[1].inputs.empty());
+    ASSERT_EQ(0u, bus.pi_frames_[1].outputs[0].offset);
+}
+
+
+TEST_F(BusTest2Slaves, createMapping_layout_splits_frames_at_payload_boundary)
+{
+    // createMapping layout: slave 1 overflows the first 1486-byte window and starts the next one;
+    // each mailbox slave gets its status bit in the frame holding its process data.
+    auto& slave0 = bus.slaves().at(0);
+    auto& slave1 = bus.slaves().at(1);
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK);
+    slave0.input  = {nullptr, 8000, 1000, 3, 0};
+    slave0.output = {nullptr, 6400, 800,  2, 0};
+    slave1.input  = {nullptr, 4800, 600,  3, 0};
+    slave1.output = {nullptr, 0,    0,    0, 0};
+
+    bus.assignLogicalAddresses();
+    std::vector<uint8_t> iomap(2400);
+    bus.bindProcessImage(iomap.data(), iomap.size());
+
+    ASSERT_EQ(0u,    slave0.input.address);
+    ASSERT_EQ(0u,    slave0.output.address);
+    ASSERT_EQ(1486u, slave1.input.address);
+
+    ASSERT_EQ(2u, bus.pi_frames_.size());
+    auto const& frame0 = bus.pi_frames_[0];
+    auto const& frame1 = bus.pi_frames_[1];
+    ASSERT_EQ(0u,    frame0.description.address);
+    ASSERT_EQ(1000,  frame0.description.pdo_size);
+    ASSERT_EQ(1004,  frame0.description.logical_size);   // 3-byte FMMU separation + 1 status byte
+    ASSERT_EQ(1486u, frame1.description.address);
+    ASSERT_EQ(600,   frame1.description.pdo_size);
+    ASSERT_EQ(604,   frame1.description.logical_size);
+
+    ASSERT_EQ(1u, frame0.mailbox_read_status.size());
+    ASSERT_EQ(&slave0, frame0.mailbox_read_status[0].slave);
+    ASSERT_EQ(1003u, frame0.mailbox_read_status[0].byte_offset);
+    ASSERT_EQ(1u, frame1.mailbox_read_status.size());
+    ASSERT_EQ(&slave1, frame1.mailbox_read_status[0].slave);
+    ASSERT_EQ(603u, frame1.mailbox_read_status[0].byte_offset);
+
+    ASSERT_EQ(3, frame0.expected_lrw_wkc);
+    ASSERT_EQ(1, frame1.expected_lrw_wkc);
+    ASSERT_EQ(iomap.data(),        slave0.input.data);
+    ASSERT_EQ(iomap.data() + 1000, slave1.input.data);
+    ASSERT_EQ(iomap.data() + 1600, slave0.output.data);
+}
+
+
+TEST_F(BusTest2Slaves, mapProcessImage_refuses_invalid_blocks)
+{
+    auto& slave0 = bus.slaves().at(0);
+    auto& slave1 = bus.slaves().at(1);
+    std::vector<uint8_t> iomap(4096);
+
+    slave0.input  = {nullptr, 0, 16, 3, 0};
+    slave0.output = {nullptr, 0, -8, 2, 0};
+    ASSERT_THROW(bus.mapProcessImage(iomap.data(), 8), Error);
+
+    slave0.output = {nullptr, 0, MAX_ETHERCAT_PAYLOAD_SIZE + 1, 2, 0x1000};
+    ASSERT_THROW(bus.mapProcessImage(iomap.data(), iomap.size()), Error);
+
+    slave0.output = {nullptr, 0, 16, 2, 0xFFFFFFF8};
+    ASSERT_THROW(bus.mapProcessImage(iomap.data(), iomap.size()), Error);
+
+    // Same-address input/output of slave 1 straddling the first 1486-byte window
+    slave0.input  = {nullptr, 0, 1400, 3, 0};
+    slave0.output = {nullptr, 0, 0,    0, 0};
+    slave1.input  = {nullptr, 0, 10,   3, 1400};
+    slave1.output = {nullptr, 0, 100,  2, 1400};
+    ASSERT_THROW(bus.mapProcessImage(iomap.data(), iomap.size()), Error);
+}
+
+
+TEST_F(BusTest, mapProcessImage_refuses_mailbox_status_check)
+{
+    auto& slave = bus.slaves().at(0);
+    slave.input  = {nullptr, 0, 16, 3, 0x10000};
+    slave.output = {nullptr, 0, 0,  0, 0};
+    bus.configureMailboxStatusCheck(MailboxStatusFMMU::READ_CHECK);
+
+    uint8_t iomap[16];
+    ASSERT_THROW(bus.mapProcessImage(iomap, sizeof(iomap)), Error);
 }
