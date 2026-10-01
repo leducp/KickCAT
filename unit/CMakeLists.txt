@@ -29,6 +29,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/ESMStatePreOP-t.cc
                             src/ESMStateSafeOP-t.cc
                             src/utils/math-t.cc
+                            src/utils/xsd-t.cc
                             src/Units-t.cc
                             src/Timer-t.cc
                             src/CoE/protocol-t.cc
