@@ -85,6 +85,10 @@ public:
             for (auto& drive : drives)
             {
                 drive->sl.routine();
+                if (outputs_valid and drive->sl.state() == State::SAFE_OP)
+                {
+                    drive->sl.validateOutputData();
+                }
             }
         };
         link = std::make_shared<Link>(std::make_shared<LoopbackSocket>(escs, tick), std::make_shared<SocketNull>(), [](){});
@@ -92,6 +96,21 @@ public:
         bus->configureWaitLatency(0ns, 0ns);
         seq = std::make_unique<ENI::Sequencer>(*bus, link, config);
         return *seq;
+    }
+
+    void cycle()
+    {
+        bus->processDataReadWrite([this](DatagramState const&) { ++cyclic_errors; });
+    }
+
+    void goToOperational()
+    {
+        sequencer().requestState(State::SAFE_OP);
+        iomap.assign(sequencer().processImageSize(), 0);
+        sequencer().mapProcessImage(iomap.data(), iomap.size());
+        cycle();
+        outputs_valid = true;
+        sequencer().requestState(State::OPERATIONAL, [this]() { cycle(); });
     }
 
     void removeInitCmds(ENI::Slave& slave, char const* comment)
@@ -125,19 +144,52 @@ public:
     std::shared_ptr<Link> link;
     std::unique_ptr<Bus> bus;
     std::unique_ptr<ENI::Sequencer> seq;
+    std::vector<uint8_t> iomap;
+    bool outputs_valid = false;
+    int cyclic_errors = 0;
 };
 
 
-TEST_F(ENISequencer, reaches_safe_op_from_the_eni)
+TEST_F(ENISequencer, reaches_operational_and_exchanges_process_data)
 {
-    sequencer().requestState(State::SAFE_OP);
-    ASSERT_EQ(State::SAFE_OP, sequencer().state());
+    goToOperational();
+    ASSERT_EQ(State::OPERATIONAL, sequencer().state());
     for (auto& drive : drives)
     {
-        ASSERT_EQ(State::SAFE_OP, drive->sl.state());
+        ASSERT_EQ(State::OPERATIONAL, drive->sl.state());
     }
-    ASSERT_EQ(1001, bus->slaves()[0].address);
-    ASSERT_EQ(1002, bus->slaves()[1].address);
+
+    // Layout programmed by the ENI: outputs then inputs, RxPDO 0x1601 (6 bytes), TxPDO 0x1A00 (11 bytes)
+    ASSERT_EQ(2 * (6 + 11), iomap.size());
+    std::vector<Slave>& slaves = bus->slaves();
+    ASSERT_EQ(0x10000u, slaves[0].output.address);
+    ASSERT_EQ(0x10006u, slaves[1].output.address);
+    ASSERT_EQ(0x1000Cu, slaves[0].input.address);
+    ASSERT_EQ(0x10017u, slaves[1].input.address);
+    ASSERT_EQ(1001, slaves[0].address);
+    ASSERT_EQ(1002, slaves[1].address);
+
+    for (std::size_t i = 0; i < drives.size(); ++i)
+    {
+        uint16_t status = static_cast<uint16_t>(0x1230 + i);
+        std::memcpy(drives[i]->inputs.data(), &status, sizeof(status));
+        uint16_t control = static_cast<uint16_t>(0x0F00 + i);
+        std::memcpy(slaves[i].output.data, &control, sizeof(control));
+    }
+    for (int i = 0; i < 5; ++i)
+    {
+        cycle();
+    }
+    for (std::size_t i = 0; i < drives.size(); ++i)
+    {
+        uint16_t status = 0;
+        std::memcpy(&status, slaves[i].input.data, sizeof(status));
+        uint16_t control = 0;
+        std::memcpy(&control, drives[i]->outputs.data(), sizeof(control));
+        EXPECT_EQ(0x1230 + i, status);
+        EXPECT_EQ(0x0F00 + i, control);
+    }
+    EXPECT_EQ(0, cyclic_errors);
 
     auto [obj, assign] = CoE::findObject(drives[0]->dev.dictionary, 0x1C12, 1);
     EXPECT_EQ(0x1601, *static_cast<uint16_t*>(assign->data));
@@ -145,27 +197,30 @@ TEST_F(ENISequencer, reaches_safe_op_from_the_eni)
 
 TEST_F(ENISequencer, goes_back_to_init_and_up_again)
 {
-    sequencer().requestState(State::SAFE_OP);
+    goToOperational();
     sequencer().requestState(State::INIT);
     ASSERT_EQ(State::INIT, sequencer().state());
     for (auto& drive : drives)
     {
         ASSERT_EQ(State::INIT, drive->sl.state());
     }
+    ASSERT_THROW(sequencer().processImageSize(), std::logic_error);
 
     std::size_t handlers = bus->slaves()[0].mailbox.to_process.size();
-    sequencer().requestState(State::SAFE_OP);
-    ASSERT_EQ(State::SAFE_OP, sequencer().state());
+    outputs_valid = false;
+    goToOperational();
+    ASSERT_EQ(State::OPERATIONAL, sequencer().state());
     ASSERT_EQ(handlers, bus->slaves()[0].mailbox.to_process.size());
 }
 
 TEST_F(ENISequencer, pairs_slaves_by_auto_increment_address)
 {
     std::swap(config.slaves[0], config.slaves[1]);
-    sequencer().requestState(State::SAFE_OP);
+    goToOperational();
     ASSERT_EQ(1001, bus->slaves()[0].address);
     ASSERT_EQ(1002, bus->slaves()[1].address);
     ASSERT_EQ("Drive 1 (EVS-NET-01)", sequencer().slaveAt(0).info.name);
+    ASSERT_EQ(0x10000u, bus->slaves()[0].output.address);
 }
 
 TEST_F(ENISequencer, refuses_inconsistent_configurations)
@@ -176,8 +231,23 @@ TEST_F(ENISequencer, refuses_inconsistent_configurations)
     duplicated.slaves[1].info.auto_inc_addr = 0;
     ASSERT_THROW(ENI::Sequencer(unused, nullptr, duplicated), std::invalid_argument);
 
-    ENI::Sequencer valid(unused, nullptr, config);
-    ASSERT_THROW(valid.requestState(State::BOOT), std::invalid_argument);
+    ENI::Config dc = config;
+    for (auto& slave : dc.slaves)
+    {
+        slave.dc = ENI::Dc{};
+        slave.dc->cycle_time0 = 1ms;
+        slave.dc->shift_time = 250us;
+    }
+    ENI::Sequencer with_dc(unused, nullptr, dc);
+    EXPECT_EQ(1ms, with_dc.cycleTime());
+    EXPECT_EQ(250us, with_dc.shiftTime());
+
+    dc.slaves[1].dc->shift_time = 0ns;
+    ASSERT_THROW(ENI::Sequencer(unused, nullptr, dc), std::invalid_argument);
+
+    ENI::Sequencer without_dc(unused, nullptr, config);
+    EXPECT_FALSE(without_dc.cycleTime().has_value());
+    ASSERT_THROW(without_dc.requestState(State::BOOT), std::invalid_argument);
 }
 
 TEST_F(ENISequencer, refuses_a_slave_count_mismatch)
@@ -217,6 +287,22 @@ TEST_F(ENISequencer, accepts_matching_explicit_identification)
     ASSERT_EQ(State::PRE_OP, sequencer().state());
 }
 
+TEST_F(ENISequencer, refuses_process_data_differing_from_the_eni)
+{
+    config.slaves[0].process_data.recv[0].bit_length = 80;
+    expectThrowContaining([this]() { sequencer().requestState(State::SAFE_OP); }, "programmed process data sizes differ from the ENI ProcessData");
+}
+
+TEST_F(ENISequencer, process_data_description_is_optional)
+{
+    for (auto& slave : config.slaves)
+    {
+        slave.process_data = {};
+    }
+    goToOperational();
+    ASSERT_EQ(2 * (6 + 11), iomap.size());
+}
+
 TEST_F(ENISequencer, reports_a_validate_timeout)
 {
     for (auto& cmd : config.slaves[0].init_cmds)
@@ -227,6 +313,13 @@ TEST_F(ENISequencer, reports_a_validate_timeout)
         }
     }
     expectThrowContaining([this]() { sequencer().requestState(State::PRE_OP); }, "'check device state for PREOP' validate timeout");
+}
+
+TEST_F(ENISequencer, process_image_needs_safe_op)
+{
+    sequencer().requestState(State::PRE_OP);
+    uint8_t buffer[64];
+    ASSERT_THROW(sequencer().mapProcessImage(buffer, sizeof(buffer)), std::logic_error);
 }
 
 TEST_F(ENISequencer, coe_sent_after_the_safe_op_request_is_refused_by_the_slave)

@@ -73,6 +73,23 @@ namespace kickcat::ENI
             position_of_eni_[i] = position;
         }
 
+        for (auto const& slave : config_.slaves)
+        {
+            if (not slave.dc or not slave.dc->cycle_time0)
+            {
+                continue;
+            }
+            nanoseconds shift = slave.dc->shift_time.value_or(0ns);
+            if (not cycle_time_)
+            {
+                cycle_time_ = slave.dc->cycle_time0;
+                shift_time_ = shift;
+            }
+            if ((*cycle_time_ != *slave.dc->cycle_time0) or (*shift_time_ != shift))
+            {
+                throw std::invalid_argument("ENI: " + slave.info.name + ": DC cycle or shift differs from the other DC slaves");
+            }
+        }
     }
 
 
@@ -102,6 +119,31 @@ namespace kickcat::ENI
         {
             transition(state_, nextStateUp(state_), background);
         }
+    }
+
+
+    std::size_t Sequencer::processImageSize() const
+    {
+        if (not layout_known_)
+        {
+            throw std::logic_error("ENI: the process data layout is known from SAFE_OP");
+        }
+        std::size_t size = 0;
+        for (auto const& slave : bus_.slaves())
+        {
+            size += static_cast<std::size_t>(slave.input.bsize + slave.output.bsize);
+        }
+        return size;
+    }
+
+
+    void Sequencer::mapProcessImage(uint8_t* iomap, std::size_t iomap_size)
+    {
+        if (not layout_known_)
+        {
+            throw std::logic_error("ENI: the process data layout is known from SAFE_OP");
+        }
+        bus_.mapProcessImage(iomap, iomap_size);
     }
 
 
@@ -181,6 +223,10 @@ namespace kickcat::ENI
         {
             sendCoE(t, background);
         }
+        if (t == transition::PS)
+        {
+            readProcessDataLayout();
+        }
 
         for (auto const& cmd : config_.master.init_cmds)
         {
@@ -191,6 +237,10 @@ namespace kickcat::ENI
         }
 
         state_ = to;
+        if (to < State::SAFE_OP)
+        {
+            layout_known_ = false;
+        }
     }
 
 
@@ -411,5 +461,91 @@ namespace kickcat::ENI
                 throw slaveError(eni.name, "explicit identification " + hex(value) + " differs from " + hex(eni.identification->value));
             }
         }
+    }
+
+
+    void Sequencer::readProcessDataLayout()
+    {
+        std::vector<kickcat::Slave>& slaves = bus_.slaves();
+        for (std::size_t position = 0; position < slaves.size(); ++position)
+        {
+            kickcat::Slave& slave = slaves[position];
+            ENI::Slave const& eni = slaveAt(position);
+            std::vector<uint8_t> fmmus = read(position, reg::FMMU, static_cast<uint16_t>(slave.esc.fmmus * sizeof(fmmu::Register)));
+            std::vector<uint8_t> sms   = read(position, reg::SYNC_MANAGER, static_cast<uint16_t>(slave.esc.syncManagers * sizeof(SyncManager::Register)));
+            slave.input  = {};
+            slave.output = {};
+
+            for (uint8_t f = 0; f < slave.esc.fmmus; ++f)
+            {
+                fmmu::Register fmmu;
+                std::memcpy(&fmmu, fmmus.data() + f * sizeof(fmmu::Register), sizeof(fmmu));
+                if (not (fmmu.activate & 1) or (fmmu.length == 0))
+                {
+                    continue;
+                }
+
+                int32_t sm_index = -1;
+                for (uint8_t n = 0; n < slave.esc.syncManagers; ++n)
+                {
+                    SyncManager::Register sm;
+                    std::memcpy(&sm, sms.data() + n * sizeof(sm), sizeof(sm));
+                    if ((sm.length > 0) and (sm.start_address == fmmu.physical_address))
+                    {
+                        sm_index = n;
+                    }
+                }
+                if (sm_index < 0)
+                {
+                    continue;   // not a process data FMMU, e.g. a mailbox status bit
+                }
+                if ((fmmu.logical_start_bit != 0) or (fmmu.logical_stop_bit != 7) or (fmmu.physical_start_bit != 0))
+                {
+                    throw slaveError(eni.info.name, "bit-wise process data mapping is not supported");
+                }
+
+                kickcat::Slave::PIMapping* mapping = nullptr;
+                if (fmmu.type == 1)
+                {
+                    mapping = &slave.input;
+                }
+                if (fmmu.type == 2)
+                {
+                    mapping = &slave.output;
+                }
+                if (mapping == nullptr)
+                {
+                    throw slaveError(eni.info.name, "read/write process data FMMUs are not supported");
+                }
+                if (mapping->bsize != 0)
+                {
+                    throw slaveError(eni.info.name, "more than one FMMU per direction is not supported");
+                }
+                mapping->address      = fmmu.logical_address;
+                mapping->bsize        = fmmu.length;
+                mapping->size         = fmmu.length * 8;
+                mapping->sync_manager = sm_index;
+            }
+
+            if (eni.process_data.send.empty() and eni.process_data.recv.empty())
+            {
+                continue;   // ProcessData is optional: the FMMUs are the only description
+            }
+            uint32_t in_bits = 0;
+            for (auto const& range : eni.process_data.recv)
+            {
+                in_bits += range.bit_length;
+            }
+            uint32_t out_bits = 0;
+            for (auto const& range : eni.process_data.send)
+            {
+                out_bits += range.bit_length;
+            }
+            if ((static_cast<uint32_t>(slave.input.size) != in_bits) or (static_cast<uint32_t>(slave.output.size) != out_bits))
+            {
+                throw slaveError(eni.info.name, "programmed process data sizes differ from the ENI ProcessData");
+            }
+        }
+        layout_known_ = true;
     }
 }
