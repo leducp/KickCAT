@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ENI for two ecat402-drive (simulation/slave_configs/ecat402-drive.xml) with the non-default RxPDO 0x1601. -->
+<EtherCATConfig Version="1.3">
+  <Config>
+    <Master>
+      <Info>
+        <Name>KickCAT ENI sequencer</Name>
+        <Destination>ffffffffffff</Destination>
+        <Source>020000000001</Source>
+        <EtherType>88a4</EtherType>
+      </Info>
+      <InitCmds>
+        <InitCmd><Transition>IP</Transition><BeforeSlave>1</BeforeSlave><Comment>read slave count</Comment><Requires>cycle</Requires><Cmd>7</Cmd><Adp>0</Adp><Ado>0</Ado><Data>0000</Data><Cnt>2</Cnt><Retries>0</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><BeforeSlave>1</BeforeSlave><Comment>clear fmmu</Comment><Cmd>8</Cmd><Adp>0</Adp><Ado>1536</Ado><DataLength>256</DataLength><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><BeforeSlave>1</BeforeSlave><Comment>clear sm</Comment><Cmd>8</Cmd><Adp>0</Adp><Ado>2048</Ado><DataLength>128</DataLength><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>check all in SAFEOP</Comment><Cmd>7</Cmd><Adp>0</Adp><Ado>304</Ado><Data>0000</Data><Cnt>2</Cnt><Retries>3</Retries></InitCmd>
+      </InitCmds>
+    </Master>
+    <Slave>
+      <Info>
+        <Name>Drive 1 (EVS-NET-01)</Name>
+        <PhysAddr>1001</PhysAddr>
+        <AutoIncAddr>0</AutoIncAddr>
+        <VendorId>668</VendorId>
+        <ProductCode>61935618</ProductCode>
+        <RevisionNo>327685</RevisionNo>
+      </Info>
+      <ProcessData>
+        <Send>
+          <BitStart>208</BitStart>
+          <BitLength>48</BitLength>
+        </Send>
+        <Recv>
+          <BitStart>304</BitStart>
+          <BitLength>88</BitLength>
+        </Recv>
+        <Sm2>
+          <Type>Outputs</Type>
+          <DefaultSize>6</DefaultSize>
+          <StartAddress>#x1800</StartAddress>
+          <ControlByte>#x64</ControlByte>
+          <Enable>1</Enable>
+          <Pdo>#x1601</Pdo>
+        </Sm2>
+        <Sm3>
+          <Type>Inputs</Type>
+          <DefaultSize>11</DefaultSize>
+          <StartAddress>#x1c00</StartAddress>
+          <ControlByte>#x20</ControlByte>
+          <Enable>1</Enable>
+          <Pdo>#x1a00</Pdo>
+        </Sm3>
+      </ProcessData>
+      <Mailbox DataLinkLayer="true">
+        <Send>
+          <Start>#x1000</Start>
+          <Length>128</Length>
+        </Send>
+        <Recv>
+          <Start>#x1400</Start>
+          <Length>128</Length>
+          <PollTime>10</PollTime>
+        </Recv>
+        <Protocol>CoE</Protocol>
+        <CoE>
+          <InitCmds>
+            <InitCmd><Transition>IP</Transition><Comment>operation mode CSP</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x6060</Index><SubIndex>0</SubIndex><Data>08</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>clear RxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c12</Index><SubIndex>0</SubIndex><Data>00</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>RxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c12</Index><SubIndex>1</SubIndex><Data>0116</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>RxPDO count</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c12</Index><SubIndex>0</SubIndex><Data>01</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>clear TxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c13</Index><SubIndex>0</SubIndex><Data>00</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>TxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c13</Index><SubIndex>1</SubIndex><Data>001a</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>TxPDO count</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c13</Index><SubIndex>0</SubIndex><Data>01</Data></InitCmd>
+          </InitCmds>
+        </CoE>
+      </Mailbox>
+      <InitCmds>
+        <InitCmd><Transition>PI</Transition><Transition>SI</Transition><Transition>OI</Transition><Comment>set device state to INIT</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1001</Adp><Ado>288</Ado><Data>1100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PI</Transition><Transition>SI</Transition><Transition>OI</Transition><Comment>check device state for INIT</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1001</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0100</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set device state to INIT</Comment><Requires>cycle</Requires><Cmd>2</Cmd><Adp>0</Adp><Ado>288</Ado><Data>1100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>check device state for INIT</Comment><Requires>cycle</Requires><Cmd>1</Cmd><Adp>0</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0100</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set physical address</Comment><Cmd>2</Cmd><Adp>0</Adp><Ado>16</Ado><Data>e903</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set sm 0 (mailbox out)</Comment><Cmd>5</Cmd><Adp>1001</Adp><Ado>2048</Ado><Data>0010800026000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set sm 1 (mailbox in)</Comment><Cmd>5</Cmd><Adp>1001</Adp><Ado>2056</Ado><Data>0014800022000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set device state to PREOP</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1001</Adp><Ado>288</Ado><Data>0200</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>check device state for PREOP</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1001</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0200</Data><DataMask>1f00</DataMask><Timeout>3000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set sm 2 (outputs)</Comment><Cmd>5</Cmd><Adp>1001</Adp><Ado>2064</Ado><Data>0018060064000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set sm 3 (inputs)</Comment><Cmd>5</Cmd><Adp>1001</Adp><Ado>2072</Ado><Data>001c0b0020000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set fmmu 0 (outputs)</Comment><Cmd>5</Cmd><Adp>1001</Adp><Ado>1536</Ado><Data>00000100060000070018000201000000</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set fmmu 1 (inputs)</Comment><Cmd>5</Cmd><Adp>1001</Adp><Ado>1552</Ado><Data>0c0001000b000007001c000101000000</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set device state to SAFEOP</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1001</Adp><Ado>288</Ado><Data>0400</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>check device state for SAFEOP</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1001</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0400</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>SO</Transition><Comment>set device state to OP</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1001</Adp><Ado>288</Ado><Data>0800</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>SO</Transition><Comment>check device state for OP</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1001</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0800</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+      </InitCmds>
+    </Slave>
+    <Slave>
+      <Info>
+        <Name>Drive 2 (EVS-NET-01)</Name>
+        <PhysAddr>1002</PhysAddr>
+        <AutoIncAddr>65535</AutoIncAddr>
+        <VendorId>668</VendorId>
+        <ProductCode>61935618</ProductCode>
+        <RevisionNo>327685</RevisionNo>
+      </Info>
+      <ProcessData>
+        <Send>
+          <BitStart>256</BitStart>
+          <BitLength>48</BitLength>
+        </Send>
+        <Recv>
+          <BitStart>392</BitStart>
+          <BitLength>88</BitLength>
+        </Recv>
+        <Sm2>
+          <Type>Outputs</Type>
+          <DefaultSize>6</DefaultSize>
+          <StartAddress>#x1800</StartAddress>
+          <ControlByte>#x64</ControlByte>
+          <Enable>1</Enable>
+          <Pdo>#x1601</Pdo>
+        </Sm2>
+        <Sm3>
+          <Type>Inputs</Type>
+          <DefaultSize>11</DefaultSize>
+          <StartAddress>#x1c00</StartAddress>
+          <ControlByte>#x20</ControlByte>
+          <Enable>1</Enable>
+          <Pdo>#x1a00</Pdo>
+        </Sm3>
+      </ProcessData>
+      <Mailbox DataLinkLayer="true">
+        <Send>
+          <Start>#x1000</Start>
+          <Length>128</Length>
+        </Send>
+        <Recv>
+          <Start>#x1400</Start>
+          <Length>128</Length>
+          <PollTime>10</PollTime>
+        </Recv>
+        <Protocol>CoE</Protocol>
+        <CoE>
+          <InitCmds>
+            <InitCmd><Transition>IP</Transition><Comment>operation mode CSP</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x6060</Index><SubIndex>0</SubIndex><Data>08</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>clear RxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c12</Index><SubIndex>0</SubIndex><Data>00</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>RxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c12</Index><SubIndex>1</SubIndex><Data>0116</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>RxPDO count</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c12</Index><SubIndex>0</SubIndex><Data>01</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>clear TxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c13</Index><SubIndex>0</SubIndex><Data>00</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>TxPDO assign</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c13</Index><SubIndex>1</SubIndex><Data>001a</Data></InitCmd>
+            <InitCmd><Transition>PS</Transition><Comment>TxPDO count</Comment><Timeout>1000</Timeout><Ccs>1</Ccs><Index>#x1c13</Index><SubIndex>0</SubIndex><Data>01</Data></InitCmd>
+          </InitCmds>
+        </CoE>
+      </Mailbox>
+      <InitCmds>
+        <InitCmd><Transition>PI</Transition><Transition>SI</Transition><Transition>OI</Transition><Comment>set device state to INIT</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1002</Adp><Ado>288</Ado><Data>1100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PI</Transition><Transition>SI</Transition><Transition>OI</Transition><Comment>check device state for INIT</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1002</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0100</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set device state to INIT</Comment><Requires>cycle</Requires><Cmd>2</Cmd><Adp>65535</Adp><Ado>288</Ado><Data>1100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>check device state for INIT</Comment><Requires>cycle</Requires><Cmd>1</Cmd><Adp>65535</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0100</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set physical address</Comment><Cmd>2</Cmd><Adp>65535</Adp><Ado>16</Ado><Data>ea03</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set sm 0 (mailbox out)</Comment><Cmd>5</Cmd><Adp>1002</Adp><Ado>2048</Ado><Data>0010800026000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set sm 1 (mailbox in)</Comment><Cmd>5</Cmd><Adp>1002</Adp><Ado>2056</Ado><Data>0014800022000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>set device state to PREOP</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1002</Adp><Ado>288</Ado><Data>0200</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>IP</Transition><Comment>check device state for PREOP</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1002</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0200</Data><DataMask>1f00</DataMask><Timeout>3000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set sm 2 (outputs)</Comment><Cmd>5</Cmd><Adp>1002</Adp><Ado>2064</Ado><Data>0018060064000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set sm 3 (inputs)</Comment><Cmd>5</Cmd><Adp>1002</Adp><Ado>2072</Ado><Data>001c0b0020000100</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set fmmu 0 (outputs)</Comment><Cmd>5</Cmd><Adp>1002</Adp><Ado>1536</Ado><Data>06000100060000070018000201000000</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set fmmu 1 (inputs)</Comment><Cmd>5</Cmd><Adp>1002</Adp><Ado>1552</Ado><Data>170001000b000007001c000101000000</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>set device state to SAFEOP</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1002</Adp><Ado>288</Ado><Data>0400</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>PS</Transition><Comment>check device state for SAFEOP</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1002</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0400</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+        <InitCmd><Transition>SO</Transition><Comment>set device state to OP</Comment><Requires>cycle</Requires><Cmd>5</Cmd><Adp>1002</Adp><Ado>288</Ado><Data>0800</Data><Cnt>1</Cnt><Retries>3</Retries></InitCmd>
+        <InitCmd><Transition>SO</Transition><Comment>check device state for OP</Comment><Requires>cycle</Requires><Cmd>4</Cmd><Adp>1002</Adp><Ado>304</Ado><Data>0000</Data><Cnt>1</Cnt><Retries>3</Retries><Validate><Data>0800</Data><DataMask>1f00</DataMask><Timeout>5000</Timeout></Validate></InitCmd>
+      </InitCmds>
+      <PreviousPort Selected="1">
+        <Port>D</Port>
+        <PhysAddr>1001</PhysAddr>
+      </PreviousPort>
+    </Slave>
+    <Cyclic>
+      <CycleTime>1000</CycleTime>
+      <Frame>
+        <Cmd>
+          <State>SAFEOP</State>
+          <State>OP</State>
+          <Comment>process data</Comment>
+          <Cmd>12</Cmd>
+          <Addr>65536</Addr>
+          <DataLength>34</DataLength>
+          <Cnt>6</Cnt>
+          <InputOffs>26</InputOffs>
+          <OutputOffs>26</OutputOffs>
+        </Cmd>
+        <Cmd>
+          <State>PREOP</State>
+          <State>SAFEOP</State>
+          <State>OP</State>
+          <Comment>AL status</Comment>
+          <Cmd>7</Cmd>
+          <Adp>0</Adp>
+          <Ado>304</Ado>
+          <DataLength>2</DataLength>
+          <Cnt>2</Cnt>
+          <InputOffs>72</InputOffs>
+        </Cmd>
+      </Frame>
+    </Cyclic>
+    <ProcessImage>
+      <Inputs>
+        <ByteSize>74</ByteSize>
+        <Variable><Name>Drive 1 (EVS-NET-01).Status Word</Name><DataType>UINT</DataType><BitSize>16</BitSize><BitOffs>304</BitOffs></Variable>
+        <Variable><Name>Drive 1 (EVS-NET-01).Actual position</Name><DataType>DINT</DataType><BitSize>32</BitSize><BitOffs>320</BitOffs></Variable>
+        <Variable><Name>Drive 1 (EVS-NET-01).Actual velocity</Name><DataType>DINT</DataType><BitSize>32</BitSize><BitOffs>352</BitOffs></Variable>
+        <Variable><Name>Drive 1 (EVS-NET-01).Operation mode display</Name><DataType>SINT</DataType><BitSize>8</BitSize><BitOffs>384</BitOffs></Variable>
+        <Variable><Name>Drive 2 (EVS-NET-01).Status Word</Name><DataType>UINT</DataType><BitSize>16</BitSize><BitOffs>392</BitOffs></Variable>
+        <Variable><Name>Drive 2 (EVS-NET-01).Actual position</Name><DataType>DINT</DataType><BitSize>32</BitSize><BitOffs>408</BitOffs></Variable>
+        <Variable><Name>Drive 2 (EVS-NET-01).Actual velocity</Name><DataType>DINT</DataType><BitSize>32</BitSize><BitOffs>440</BitOffs></Variable>
+        <Variable><Name>Drive 2 (EVS-NET-01).Operation mode display</Name><DataType>SINT</DataType><BitSize>8</BitSize><BitOffs>472</BitOffs></Variable>
+      </Inputs>
+      <Outputs>
+        <ByteSize>60</ByteSize>
+        <Variable><Name>Drive 1 (EVS-NET-01).Control Word</Name><DataType>UINT</DataType><BitSize>16</BitSize><BitOffs>208</BitOffs></Variable>
+        <Variable><Name>Drive 1 (EVS-NET-01).Position set-point</Name><DataType>DINT</DataType><BitSize>32</BitSize><BitOffs>224</BitOffs></Variable>
+        <Variable><Name>Drive 2 (EVS-NET-01).Control Word</Name><DataType>UINT</DataType><BitSize>16</BitSize><BitOffs>256</BitOffs></Variable>
+        <Variable><Name>Drive 2 (EVS-NET-01).Position set-point</Name><DataType>DINT</DataType><BitSize>32</BitSize><BitOffs>272</BitOffs></Variable>
+      </Outputs>
+    </ProcessImage>
+  </Config>
+</EtherCATConfig>
