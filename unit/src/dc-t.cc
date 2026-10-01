@@ -48,7 +48,7 @@ namespace
     class DropFilterSocket final : public AbstractSocket
     {
     public:
-        explicit DropFilterSocket(std::shared_ptr<AbstractSocket> inner)
+        DropFilterSocket(std::shared_ptr<AbstractSocket> inner)
             : inner_(std::move(inner))
         {
         }

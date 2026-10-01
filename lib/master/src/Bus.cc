@@ -569,66 +569,168 @@ namespace kickcat
 
     void Bus::createMapping(uint8_t* iomap, std::size_t iomap_size)
     {
-        // First we need to know:
-        // - how many bits to map per slave
-        // - which SM to use
-        // - logical offset in the frame
         detectMapping();
+        assignLogicalAddresses();
+        mapProcessImage(iomap, iomap_size);
 
-        // Second step: create 'block I/O' lists for read and write op
-        // Note A: offset computing will overlap input and output in the frame (better density and compatibility, more works for master)
-        // Note B: a frame cannot handle more than 1486 bytes
-        // Full reset: a previous mapping would otherwise leak its block IO lists into this one.
-        pi_frames_.clear();
-        pi_frames_.push_back(PIFrame{});
-        pi_frames_[0].description.address = 0;
-        std::vector<std::vector<Slave*>> frame_mbx_slaves(1);
+        configureFMMUs();
+        if (mailbox_status_fmmu_ != MailboxStatusFMMU::NONE)
+        {
+            configureMailboxFMMUs();
+        }
+    }
+
+
+    void Bus::assignLogicalAddresses()
+    {
+        // Inputs and outputs of a slave overlap in the frame (better density), and a frame
+        // cannot hold more than 1486 bytes: a slave that would overflow starts the next one.
         uint32_t address = 0;
+        uint32_t frame_end = MAX_ETHERCAT_PAYLOAD_SIZE;
         for (auto& slave : slaves_)
         {
-            // get the biggest one.
-            int32_t size = std::max(slave.input.bsize, slave.output.bsize);
-            if ((address + size) > (pi_frames_.size() * MAX_ETHERCAT_PAYLOAD_SIZE)) // do we overflow current frame ?
+            uint32_t size = static_cast<uint32_t>(std::max(slave.input.bsize, slave.output.bsize));
+            if ((address + size) > frame_end)
             {
-                auto& desc = pi_frames_.back().description;
-                desc.logical_size = address - desc.address; // frame size = current address - frame address
-
-                // current size will overflow the frame at the current offset: set in on the next frame
-                address = static_cast<uint32_t>(pi_frames_.size()) * MAX_ETHERCAT_PAYLOAD_SIZE;
-                PIFrame new_frame{};
-                new_frame.description.address = address;
-                pi_frames_.push_back(std::move(new_frame));
-                frame_mbx_slaves.push_back({});
+                address = frame_end;
+                frame_end += MAX_ETHERCAT_PAYLOAD_SIZE;
             }
-
-            // create block IO entries
-            PIFrame& current_frame = pi_frames_.back();
-            if (slave.input.bsize > 0)
-            {
-                current_frame.inputs.push_back ({nullptr, address - current_frame.description.address, slave.input.bsize,  &slave});
-            }
-
-            if (slave.output.bsize > 0)
-            {
-                current_frame.outputs.push_back({nullptr, address - current_frame.description.address, slave.output.bsize, &slave});
-            }
-
-            // save mapping offset (need to configure slave FMMU)
             slave.input.address  = address;
             slave.output.address = address;
-
-            // update offset
             address += size;
+        }
+    }
 
-            if (slave.sii.info.mailbox_protocol != 0)
+
+    void Bus::mapProcessImage(uint8_t* iomap, std::size_t iomap_size)
+    {
+        std::size_t required = 0;
+        for (auto const& slave : slaves_)
+        {
+            for (Slave::PIMapping const* mapping : {&slave.input, &slave.output})
             {
-                frame_mbx_slaves.back().push_back(&slave);
+                if ((mapping->bsize < 0) or (mapping->bsize > MAX_ETHERCAT_PAYLOAD_SIZE))
+                {
+                    THROW_ERROR("a process data block does not fit in a frame");
+                }
+                if ((static_cast<uint64_t>(mapping->address) + static_cast<uint64_t>(mapping->bsize)) > UINT32_MAX + uint64_t{1})
+                {
+                    THROW_ERROR("a process data block exceeds the logical address space");
+                }
+                required += static_cast<std::size_t>(mapping->bsize);
+            }
+        }
+        if (required > iomap_size)
+        {
+            THROW_ERROR("iomap buffer too small for the process image");
+        }
+
+        uint8_t* pos = iomap;
+        for (auto& slave : slaves_)
+        {
+            if (slave.input.bsize > 0)
+            {
+                slave.input.data = pos;
+                pos += slave.input.bsize;
+            }
+        }
+        for (auto& slave : slaves_)
+        {
+            if (slave.output.bsize > 0)
+            {
+                slave.output.data = pos;
+                pos += slave.output.bsize;
             }
         }
 
-        // update last frame size
-        auto& last_desc = pi_frames_.back().description;
-        last_desc.logical_size = address - last_desc.address;
+        buildFrames();
+    }
+
+
+    void Bus::buildFrames()
+    {
+        struct Block
+        {
+            Slave* slave;
+            Slave::PIMapping* mapping;
+            bool is_input;
+        };
+
+        std::vector<Block> blocks;
+        for (auto& slave : slaves_)
+        {
+            if (slave.input.bsize > 0)
+            {
+                blocks.push_back({&slave, &slave.input, true});
+            }
+            if (slave.output.bsize > 0)
+            {
+                blocks.push_back({&slave, &slave.output, false});
+            }
+        }
+        std::stable_sort(blocks.begin(), blocks.end(), [](Block const& a, Block const& b)
+        {
+            return a.mapping->address < b.mapping->address;
+        });
+
+        // Full reset: a previous mapping would otherwise leak its block IO lists into this one.
+        pi_frames_.clear();
+        pi_frames_.push_back(PIFrame{});
+        if (not blocks.empty())
+        {
+            pi_frames_[0].description.address = blocks.front().mapping->address;
+        }
+
+        std::vector<int32_t> frame_of_slave(slaves_.size(), -1);
+        for (auto const& block : blocks)
+        {
+            uint64_t end = static_cast<uint64_t>(block.mapping->address) + static_cast<uint64_t>(block.mapping->bsize);
+            if ((end - pi_frames_.back().description.address) > MAX_ETHERCAT_PAYLOAD_SIZE)
+            {
+                auto const& previous = pi_frames_.back().description;
+                if (block.mapping->address < previous.address + static_cast<uint32_t>(previous.logical_size))
+                {
+                    THROW_ERROR("overlapping process data blocks cannot be split into frames");
+                }
+                PIFrame new_frame{};
+                new_frame.description.address = block.mapping->address;
+                pi_frames_.push_back(std::move(new_frame));
+            }
+
+            PIFrame& frame = pi_frames_.back();
+            uint32_t offset = block.mapping->address - frame.description.address;
+            blockIO bio{block.mapping->data, offset, block.mapping->bsize, block.slave};
+            if (block.is_input)
+            {
+                frame.inputs.push_back(bio);
+            }
+            else
+            {
+                frame.outputs.push_back(bio);
+            }
+            frame.description.logical_size = std::max(frame.description.logical_size, static_cast<int32_t>(offset) + block.mapping->bsize);
+
+            std::ptrdiff_t position = block.slave - slaves_.data();
+            if (frame_of_slave[position] < 0)
+            {
+                frame_of_slave[position] = static_cast<int32_t>(pi_frames_.size() - 1);
+            }
+        }
+
+        // A mailbox slave without process data joins the frame of the slave before it
+        std::vector<std::vector<Slave*>> frame_mbx_slaves(pi_frames_.size());
+        int32_t current_frame = 0;
+        for (std::size_t i = 0; i < slaves_.size(); ++i)
+        {
+            if (frame_of_slave[i] >= 0)
+            {
+                current_frame = frame_of_slave[i];
+            }
+            if (slaves_[i].sii.info.mailbox_protocol != 0)
+            {
+                frame_mbx_slaves[current_frame].push_back(&slaves_[i]);
+            }
+        }
 
         // Set pdo_size for all frames (equals logical_size before mailbox status extension)
         for (auto& frame : pi_frames_)
@@ -761,48 +863,6 @@ namespace kickcat
             descriptions.push_back(frame.description);
         }
         link_->setLogicalMapping(descriptions);
-
-        // Validate the client buffer can hold the process image before writing into it.
-        std::size_t required = 0;
-        for (auto const& frame : pi_frames_)
-        {
-            for (auto const& bio : frame.inputs)  { required += bio.size; }
-            for (auto const& bio : frame.outputs) { required += bio.size; }
-        }
-        if (required > iomap_size)
-        {
-            THROW_ERROR("createMapping: iomap buffer too small for the process image");
-        }
-
-        // Third step: associate client buffer address to block IO and slaves
-        // Note: inputs are mapped first, outputs second
-        uint8_t* pos = iomap;
-        for (auto& frame : pi_frames_)
-        {
-            for (auto& bio : frame.inputs)
-            {
-                bio.iomap = pos;
-                bio.slave->input.data = pos;
-                pos += bio.size;
-            }
-        }
-        for (auto& frame : pi_frames_)
-        {
-            for (auto& bio : frame.outputs)
-            {
-                bio.iomap = pos;
-                bio.slave->output.data = pos;
-                pos += bio.size;
-            }
-        }
-
-        // Fourth step: program FMMUs and SyncManagers
-        configureFMMUs();
-
-        if (mailbox_status_fmmu_ != MailboxStatusFMMU::NONE)
-        {
-            configureMailboxFMMUs();
-        }
     }
 
 
