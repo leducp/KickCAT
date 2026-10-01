@@ -89,11 +89,18 @@ elseif (WIN32)
   set(OS_LIBRARIES npcap::npcap pthread)
 endif()
 
-if (ENABLE_ESI_PARSER)
+if (ENABLE_ESI_PARSER OR ENABLE_ENI_PARSER)
   find_package(tinyxml2 CONFIG REQUIRED)
+  list(APPEND OS_LIBRARIES tinyxml2::tinyxml2)
+endif()
+
+if (ENABLE_ESI_PARSER)
   list(APPEND KICKCAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/ESI/Parser.cc)
   list(APPEND KICKCAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/ESI/SIIBuilder.cc)
-  list(APPEND OS_LIBRARIES tinyxml2::tinyxml2)
+endif()
+
+if (ENABLE_ENI_PARSER)
+  list(APPEND KICKCAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/ENI/Parser.cc)
 endif()
 
 if (ENABLE_AF_XDP AND LINUX)
