@@ -43,6 +43,11 @@ namespace kickcat::ENI
             }
         }
 
+        uint16_t parseIndex(XMLElement* elem)
+        {
+            return numberOf<uint16_t>(elem);
+        }
+
         Transitions parseTransitions(XMLElement* parent)
         {
             Transitions out = 0;
@@ -324,6 +329,116 @@ namespace kickcat::ENI
             return mbx;
         }
 
+        uint16_t parseSmMask(XMLElement const* node)
+        {
+            uint16_t mask = 0;
+            for (int i = 0; i < 16; ++i)
+            {
+                std::string attr = "Sm" + std::to_string(i);
+                if (boolAttribute(node, attr.c_str()))
+                {
+                    mask |= static_cast<uint16_t>(1 << i);
+                }
+            }
+            return mask;
+        }
+
+        ProcessDataRange parseRange(XMLElement* node)
+        {
+            ProcessDataRange range;
+            range.bit_start  = requireNumber<uint32_t>(node, "BitStart");
+            range.bit_length = requireNumber<uint32_t>(node, "BitLength");
+            range.sm_mask    = parseSmMask(node);
+            return range;
+        }
+
+        SyncManagerSettings parseSm(XMLElement* node, uint8_t index)
+        {
+            SyncManagerSettings sm;
+            sm.index = index;
+
+            XMLElement* type = require(node, "Type");
+            try
+            {
+                SyncManager::fromString(textOf(type), sm.type);
+            }
+            catch (std::exception const& e)
+            {
+                fail(type, e.what());
+            }
+
+            sm.min_size      = optionalNumber<uint16_t>(node, "MinSize").value_or(0);
+            sm.max_size      = optionalNumber<uint16_t>(node, "MaxSize").value_or(0);
+            sm.default_size  = optionalNumber<uint16_t>(node, "DefaultSize").value_or(0);
+            sm.start_address = requireNumber<uint16_t>(node, "StartAddress");
+            sm.control_byte  = requireNumber<uint8_t>(node, "ControlByte");
+            XMLElement* enable = require(node, "Enable");
+            sm.enable        = parseBool(enable, textOf(enable));
+            sm.pdos = all(node, "Pdo", parseIndex);
+            return sm;
+        }
+
+        CoE::DataType parseDataType(XMLElement* node)
+        {
+            std::string text = textOf(node);
+            std::optional<CoE::DataType> type = CoE::dataTypeFromLabel(text);
+            if (not type)
+            {
+                fail(node, "unknown base data type '" + text + "'");
+            }
+            return *type;
+        }
+
+        CoE::PdoMappingEntry parsePdoEntry(XMLElement* node)
+        {
+            CoE::PdoMappingEntry entry{};
+            entry.index    = requireNumber<uint16_t>(node, "Index");
+            entry.subindex = optionalNumber<uint8_t>(node, "SubIndex").value_or(0);
+            entry.bitlen   = requireNumber<uint8_t>(node, "BitLen");
+            if (entry.index != 0)   // index 0 is a padding gap: no type
+            {
+                entry.type = parseDataType(require(node, "DataType"));
+            }
+            return entry;
+        }
+
+        Pdo parsePdo(XMLElement* node)
+        {
+            Pdo pdo;
+            pdo.index     = requireNumber<uint16_t>(node, "Index");
+            pdo.name      = optionalText(node, "Name");
+            pdo.fixed     = boolAttribute(node, "Fixed");
+            pdo.mandatory = boolAttribute(node, "Mandatory");
+            pdo.sm        = numberAttribute<uint8_t>(node, "Sm");
+            pdo.exclude   = all(node, "Exclude", parseIndex);
+            pdo.entries   = all(node, "Entry", parsePdoEntry);
+            return pdo;
+        }
+
+        ProcessData parseProcessData(XMLElement* slave)
+        {
+            ProcessData pd;
+            XMLElement* node = slave->FirstChildElement("ProcessData");
+            if (node == nullptr)
+            {
+                return pd;
+            }
+
+            pd.send = all(node, "Send", parseRange);
+            pd.recv = all(node, "Recv", parseRange);
+            for (int i = 0; i < 16; ++i)
+            {
+                std::string name = "Sm" + std::to_string(i);
+                if (XMLElement* sm = node->FirstChildElement(name.c_str()))
+                {
+                    pd.sms.push_back(parseSm(sm, static_cast<uint8_t>(i)));
+                }
+            }
+            pd.rx_pdos = all(node, "RxPdo", parsePdo);
+            pd.tx_pdos = all(node, "TxPdo", parsePdo);
+            return pd;
+        }
+
         SlaveInfo parseSlaveInfo(XMLElement* slave)
         {
             XMLElement* node = require(slave, "Info");
@@ -411,6 +526,7 @@ namespace kickcat::ENI
         {
             Slave slave;
             slave.info           = parseSlaveInfo(node);
+            slave.process_data   = parseProcessData(node);
             slave.mailbox        = parseMailbox(node);
             slave.init_cmds      = parseInitCmds(node);
             slave.previous_ports = parsePreviousPorts(node);
@@ -436,6 +552,84 @@ namespace kickcat::ENI
             return master;
         }
 
+        uint8_t parseStates(XMLElement* node)
+        {
+            uint8_t out = 0;
+            for (XMLElement* s = node->FirstChildElement("State"); s != nullptr; s = s->NextSiblingElement("State"))
+            {
+                std::string text = textOf(s);
+                if      (text == "INIT")   { out |= State::INIT;        }
+                else if (text == "PREOP")  { out |= State::PRE_OP;      }
+                else if (text == "SAFEOP") { out |= State::SAFE_OP;     }
+                else if (text == "OP")     { out |= State::OPERATIONAL; }
+                else
+                {
+                    fail(s, "unknown State '" + text + "'");
+                }
+            }
+            return out;
+        }
+
+        CyclicCmd parseCyclicCmd(XMLElement* node)
+        {
+            CyclicCmd cmd;
+            parseDatagram(node, cmd);
+            cmd.states      = parseStates(node);
+            cmd.input_offs  = optionalNumber<uint32_t>(node, "InputOffs");
+            cmd.output_offs = optionalNumber<uint32_t>(node, "OutputOffs");
+            return cmd;
+        }
+
+        Cyclic parseCyclic(XMLElement* node)
+        {
+            Cyclic cyclic;
+            cyclic.comment = optionalText(node, "Comment");
+            if (std::optional<uint32_t> cycle = optionalNumber<uint32_t>(node, "CycleTime"))
+            {
+                cyclic.cycle_time = microseconds{*cycle};
+            }
+            // Priority and TaskId schedule the master's own tasks: the application owns them.
+            if (std::optional<uint8_t> priority = optionalNumber<uint8_t>(node, "Priority"))
+            {
+                if ((*priority < 1) or (*priority > 62))
+                {
+                    fail(node->FirstChildElement("Priority"), "Priority must be within [1, 62]");
+                }
+            }
+
+            for (XMLElement* f = node->FirstChildElement("Frame"); f != nullptr; f = f->NextSiblingElement("Frame"))
+            {
+                Frame frame;
+                frame.comment = optionalText(f, "Comment");
+                frame.cmds = all(f, "Cmd", parseCyclicCmd);
+                cyclic.frames.push_back(std::move(frame));
+            }
+            return cyclic;
+        }
+
+        ProcessImageArea parseImageArea(XMLElement* node)
+        {
+            ProcessImageArea area;
+            if (node == nullptr)
+            {
+                return area;
+            }
+            area.byte_size = requireNumber<uint32_t>(node, "ByteSize");
+            for (XMLElement* v = node->FirstChildElement("Variable"); v != nullptr; v = v->NextSiblingElement("Variable"))
+            {
+                Variable var;
+                var.name      = textOf(require(v, "Name"));
+                if (XMLElement* type = v->FirstChildElement("DataType"))
+                {
+                    var.data_type = parseDataType(type);
+                }
+                var.bit_size  = requireNumber<uint32_t>(v, "BitSize");
+                var.bit_offs  = requireNumber<uint32_t>(v, "BitOffs");
+                area.variables.push_back(std::move(var));
+            }
+            return area;
+        }
+
         Config parseDocument(XMLDocument& doc)
         {
             XMLElement* root = doc.FirstChildElement("EtherCATConfig");
@@ -448,6 +642,14 @@ namespace kickcat::ENI
             Config config;
             config.master = parseMaster(require(node, "Master"));
             config.slaves = all(node, "Slave", parseSlave);
+            config.cyclic = all(node, "Cyclic", parseCyclic);
+            if (XMLElement* image = node->FirstChildElement("ProcessImage"))
+            {
+                ProcessImage pi;
+                pi.inputs  = parseImageArea(image->FirstChildElement("Inputs"));
+                pi.outputs = parseImageArea(image->FirstChildElement("Outputs"));
+                config.process_image = std::move(pi);
+            }
             return config;
         }
     }
