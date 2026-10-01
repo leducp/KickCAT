@@ -468,6 +468,13 @@ TEST_F(LinkTest, isRedundancyNeeded_no_interfaces)
     ASSERT_EQ(is_redundancy_activated, false);
 }
 
+TEST_F(LinkTest, addDatagram_larger_than_a_frame)
+{
+    std::vector<uint8_t> data(MAX_ETHERCAT_PAYLOAD_SIZE + 1);
+    ASSERT_THROW(link.addDatagram(Command::LWR, 0, data.data(), static_cast<uint16_t>(data.size()), nullptr, nullptr), Error);
+    ASSERT_EQ(sentFrames(), 0);
+}
+
 TEST_F(LinkTest, sendFrame_error_wrong_number_write)
 {
     link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, nullptr, nullptr);

@@ -96,6 +96,13 @@ namespace kickcat
         /// \brief Like createMapping(iomap), but throws if iomap_size cannot hold the process image.
         void createMapping(uint8_t* iomap, std::size_t iomap_size);
 
+        /// \brief Bind the slaves process data to iomap and build the cyclic frames, without touching the slaves.
+        /// \details Each slave input/output must hold its logical address and byte size: createMapping() sets them,
+        ///          or the slaves were configured by other means. The mailbox status check additionally needs the
+        ///          FMMUs createMapping() programs. Throws if a block does not fit in a frame or if iomap_size
+        ///          cannot hold the process image.
+        void mapProcessImage(uint8_t* iomap, std::size_t iomap_size);
+
         std::vector<Slave>& slaves() { return slaves_; }
 
         // asynchrone read/write/mailbox/state methods
@@ -244,6 +251,8 @@ namespace kickcat
 
         // mapping helpers
         void detectMapping();
+        void assignLogicalAddresses();
+        void buildFrames();
         void readMappedPDO(Slave& slave, uint16_t index);
         void configureFMMUs();
         void configureMailboxFMMUs();
