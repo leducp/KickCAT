@@ -105,6 +105,9 @@ namespace kickcat
 
         std::vector<Slave>& slaves() { return slaves_; }
 
+        // Attach the handlers of the messages a slave sends unsolicited (CoE emergencies, unknown messages)
+        void addMailboxHandlers(Slave& slave);
+
         // asynchrone read/write/mailbox/state methods
         // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
         void sendGetALStatus(Slave& slave, std::function<void(DatagramState const&)> const& error);
@@ -246,7 +249,6 @@ namespace kickcat
 
         void configureMailboxes();
         void addMailboxConfiguration(Slave& slave);
-        void addMailboxHandlers(Slave& slave);
         void switchMailboxLayout(Slave& slave, bool bootstrap);
 
         // mapping helpers
