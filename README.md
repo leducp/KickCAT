@@ -109,6 +109,7 @@ Where to go next:
 - Simulator and emulator -- [docs/SIMULATION.md](docs/SIMULATION.md)
 - Tools and GUIs -- [docs/TOOLS.md](docs/TOOLS.md)
 - Real-time performance tuning -- [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
+- ENI network configuration (experimental) -- [docs/ENI.md](docs/ENI.md)
 
 ## Platform support
 

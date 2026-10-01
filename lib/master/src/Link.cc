@@ -74,6 +74,10 @@ namespace kickcat
         {
             THROW_ERROR("Too many datagrams in flight. Max is 255");
         }
+        if (data_size > MAX_ETHERCAT_PAYLOAD_SIZE)
+        {
+            THROW_ERROR("Datagram data does not fit in a frame");
+        }
         link_info("Adding a datagram (already %d pending)\n", index_queue_);
 
         uint16_t const needed_space = datagram_size(data_size);

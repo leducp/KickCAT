@@ -8,6 +8,7 @@
 #include "kickcat/CoE/protocol.h"
 #include "kickcat/debug.h"
 #include "kickcat/ESI/Parser.h"
+#include "kickcat/utils/xsd.h"
 
 using namespace tinyxml2;
 
@@ -120,67 +121,23 @@ namespace
         return elem->GetText();
     }
 
-    int64_t parseHexDec(std::string text, std::string const& where = {})
+    int64_t parseHexDec(std::string const& text, std::string const& where = {})
     {
-        auto fail = [&](char const* msg)
+        try
+        {
+            return xsd::parseHexDec(text);
+        }
+        catch (std::invalid_argument const& e)
         {
             std::string what = "ESI: ";
-            what += msg;
-            what += " '";
-            what += text;
-            what += "'";
+            what += e.what();
             if (not where.empty())
             {
                 what += " in ";
                 what += where;
             }
             throw std::invalid_argument(what);
-        };
-
-        if (text.empty())
-        {
-            fail("empty numeric value");
         }
-
-        int base = 10;
-        if (text.rfind("#x", 0) == 0)
-        {
-            if (text.size() == 2) { fail("'#x' with no hex digits"); }
-            text[0] = '0';
-            base = 16;
-        }
-        else if (text.rfind("0x", 0) == 0 or text.rfind("0X", 0) == 0)
-        {
-            if (text.size() == 2) { fail("'0x' with no hex digits"); }
-            base = 16;
-        }
-
-        try
-        {
-            return std::stoll(text, nullptr, base);
-        }
-        catch (std::invalid_argument const&)
-        {
-            fail("invalid numeric value");
-        }
-        catch (std::out_of_range const&)
-        {
-            // Unsigned values in [2^63, 2^64): keep the 64-bit pattern, consumers
-            // (DefaultValue copy, narrowChecked) work on raw bits.
-            if (text[0] != '-')
-            {
-                try
-                {
-                    return static_cast<int64_t>(std::stoull(text, nullptr, base));
-                }
-                catch (std::exception const&)
-                {
-                    // fall through to the range error
-                }
-            }
-            fail("numeric value exceeds 64-bit range");
-        }
-        return 0;  // unreachable; fail() always throws
     }
 
     // Narrow an int64_t to T with bounds checking. For signed T, also accepts
@@ -262,15 +219,18 @@ namespace
         {
             return false;
         }
-        if (std::strcmp(raw, "true")  == 0 or std::strcmp(raw, "1") == 0) { return true;  }
-        if (std::strcmp(raw, "false") == 0 or std::strcmp(raw, "0") == 0) { return false; }
-
-        std::string what = "ESI: attribute '";
-        what += name;
-        what += "' is not a valid xs:boolean (got '";
-        what += raw;
-        what += "')";
-        throw std::invalid_argument(what);
+        try
+        {
+            return xsd::parseBoolean(raw);
+        }
+        catch (std::invalid_argument const& e)
+        {
+            std::string what = "ESI: attribute '";
+            what += name;
+            what += "': ";
+            what += e.what();
+            throw std::invalid_argument(what);
+        }
     }
 
     // xs:int attribute: signed decimal, no #x hex prefix. nullopt when truly
@@ -1676,38 +1636,18 @@ std::vector<uint8_t> Parser::loadHexBinary(XMLElement* node)
     {
         return {};
     }
-    std::string field = raw;
-    // Real ESI files wrap long hex payloads (e.g. <ConfigData>) across lines, so
-    // strip embedded whitespace before pairing nibbles.
-    field.erase(std::remove_if(field.begin(), field.end(),
-        [](unsigned char c){ return std::isspace(c) != 0; }), field.end());
-    if (field.size() % 2 != 0)
+    try
     {
-        throw std::invalid_argument("ESI: hex binary <" + std::string{node->Value()}
-            + "> has odd length (" + std::to_string(field.size()) + " chars)");
+        return xsd::parseHexBinary(raw);
     }
-    std::vector<uint8_t> data;
-    data.reserve(field.size() / 2);
-
-    for (std::size_t i = 0; i < field.size(); i += 2)
+    catch (std::invalid_argument const& e)
     {
-        char buf[3] = {field[i], field[i + 1], '\0'};
-        char* end = nullptr;
-        unsigned long byte = std::strtoul(buf, &end, 16);
-        if (end != buf + 2)
-        {
-            std::string what = "ESI: hex binary <";
-            what += node->Value();
-            what += "> contains non-hex pair '";
-            what += buf;
-            what += "' at byte ";
-            what += std::to_string(i / 2);
-            throw std::invalid_argument(what);
-        }
-        data.push_back(static_cast<uint8_t>(byte));
+        std::string what = "ESI: <";
+        what += node->Value();
+        what += ">: ";
+        what += e.what();
+        throw std::invalid_argument(what);
     }
-
-    return data;
 }
 
 
