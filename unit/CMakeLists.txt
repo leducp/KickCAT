@@ -69,6 +69,7 @@ set(KICKCAT_ESI_FIXTURES
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_sm_fmmu.xml
     ${CMAKE_SOURCE_DIR}/simulation/slave_configs/ecat402-drive.json
     ${CMAKE_SOURCE_DIR}/simulation/slave_configs/ecat402-drive.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_eni_test_io.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_eni_test_mailbox.xml
 )
 
