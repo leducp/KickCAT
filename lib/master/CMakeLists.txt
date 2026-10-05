@@ -1,4 +1,5 @@
 target_sources(kickcat PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/AbstractLink.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Bus.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CoE/CiA/DS402/Drive.cc

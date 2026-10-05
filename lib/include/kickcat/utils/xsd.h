@@ -9,6 +9,9 @@
 // Errors throw std::invalid_argument without context: callers add the element they were reading.
 namespace kickcat::xsd
 {
+    /// Strip the XML whitespace (space, tab, CR, LF) around text.
+    std::string_view trim(std::string_view text);
+
     /// HexDecValue: [+-]?[0-9]+ or #x (0x accepted) followed by hex digits, surrounding spaces ignored.
     /// Unsigned values up to 2^64 - 1 keep their bit pattern.
     int64_t parseHexDec(std::string_view text);

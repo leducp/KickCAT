@@ -4,6 +4,8 @@
 #include <array>
 #include <vector>
 #include <string>
+#include <string_view>
+#include <optional>
 #include <cstring>
 #include <cstdint>
 #include <tuple>
@@ -107,6 +109,9 @@ namespace kickcat::CoE
         DEFTYPE_FSOECOMMPAR    = 0x0286
     };
     char const* toString(enum DataType type);
+
+    // ETG.1020 base data type label as ESI and ENI files write it (e.g. "UINT", "BOOL").
+    std::optional<DataType> dataTypeFromLabel(std::string_view label);
 
     // Wire properties of a basic CoE data type, for code that interprets raw entry
     // bytes (the name is already available via toString). size 0 = string.
@@ -257,8 +262,8 @@ namespace kickcat::CoE
 
     struct Object   // ETG1000.5 6.1.4.2.1 Formal model
     {
-        uint16_t            index;
-        ObjectCode          code;
+        uint16_t            index = 0;
+        ObjectCode          code  = ObjectCode::NIL;
         std::string         name;
         std::vector<Entry>  entries;
     };

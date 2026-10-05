@@ -4,7 +4,6 @@
 #include <tinyxml2.h>
 #include <string>
 #include <tuple>
-#include <unordered_map>
 #include <vector>
 
 #include "kickcat/CoE/OD.h"
@@ -39,13 +38,7 @@ namespace kickcat::ESI
         static CoE::Object buildMappingObject   (Pdo const& pdo, bool is_rx);
         static CoE::Object buildAssignmentObject(std::vector<Pdo> const& pdos, uint16_t index, bool is_rx);
 
-        // Map an ESI basic-type label ("BOOL", "UINT", ...) to its CoE::DataType,
-        // whose value is the ETG SII data-type code. nullopt for unknown labels.
-        static std::optional<CoE::DataType> coeTypeFromLabel(std::string const& label);
-
     private:
-        static std::optional<uint32_t> readHexDecAttr(tinyxml2::XMLElement* node, char const* name);
-
         void openFile  (std::string const& file);
         void openString(std::string const& xml);
         void resolveTopLevel();
@@ -77,18 +70,16 @@ namespace kickcat::ESI
         // for objects that aren't already declared in <Dictionary>/<Objects>.
         void synthesizePdoMappingObjects(Device& device);
 
-        std::vector<uint8_t> loadHexBinary(tinyxml2::XMLElement* node);
-
-        void loadDefaultData(tinyxml2::XMLNode* node, CoE::Object& obj, CoE::Entry& entry);
-        uint16_t loadAccess(tinyxml2::XMLNode* node);
+        void loadDefaultData(tinyxml2::XMLElement* node, CoE::Object& obj, CoE::Entry& entry);
+        uint16_t loadAccess(tinyxml2::XMLElement* node);
 
         static constexpr int MAX_TYPE_DEPTH = 16;
 
-        std::tuple<CoE::DataType, uint16_t, uint16_t> parseType(tinyxml2::XMLNode* node);
+        std::tuple<CoE::DataType, uint16_t, uint16_t> parseType(tinyxml2::XMLElement* node);
         CoE::DataType         resolveType (std::string const& type_name, int depth = 0);
-        tinyxml2::XMLNode*    findNodeType(tinyxml2::XMLNode* node, std::string const& where);
+        tinyxml2::XMLElement* findNodeType(tinyxml2::XMLElement* node);
 
-        CoE::Object createObject(tinyxml2::XMLNode* node);
+        CoE::Object createObject(tinyxml2::XMLElement* node, uint16_t index);
 
         tinyxml2::XMLDocument doc_;
         tinyxml2::XMLElement* root_       = nullptr;
@@ -99,8 +90,6 @@ namespace kickcat::ESI
 
         std::string vendor_name_;
         std::string profile_no_;
-
-        static const std::unordered_map<std::string, CoE::DataType> BASIC_TYPES;
     };
 }
 

@@ -1,6 +1,5 @@
 #include "kickcat/Link.h"
 #include "kickcat/protocol.h"
-#include "kickcat/DebugHelpers.h"
 #include "kickcat/SocketNull.h"
 
 #include <iostream>
@@ -67,15 +66,15 @@ int main(int argc, char* argv[])
 
 
     // This register (0x800) has to be R/W on the device
-    sendWriteRegister<uint8_t>(*link, 0x00, 0x800, 0x0000);
+    writeRegister<uint8_t>(*link, 0x00, 0x800, 0x0000);
 
     uint16_t value_read;
-    sendGetRegister(*link, 0x00, 0x800, value_read);
+    readRegister(*link, 0x00, 0x800, value_read);
     printf("Value (initial) : %04x\n", value_read);
 
     uint8_t value_write = 0x000f;
-    sendWriteRegister<uint8_t>(*link, 0x00, 0x800, value_write);
+    writeRegister<uint8_t>(*link, 0x00, 0x800, value_write);
 
-    sendGetRegister(*link, 0x00, 0x800, value_read);
+    readRegister(*link, 0x00, 0x800, value_read);
     printf("Value (modified): %04x\n", value_read);
 }

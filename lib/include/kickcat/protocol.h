@@ -140,6 +140,34 @@ namespace kickcat
     char const* toString(State state);
     char const* toShortString(State state);
 
+    // ESM transitions as ESI (ETG.2000) and ENI (ETG.2100) InitCmds name them.
+    namespace transition
+    {
+        enum Type : uint16_t
+        {
+            NONE = 0,
+            IP   = 1 << 0,   // Init      -> PreOp
+            PS   = 1 << 1,   // PreOp     -> SafeOp
+            PI   = 1 << 2,   // PreOp     -> Init
+            SP   = 1 << 3,   // SafeOp    -> PreOp
+            SO   = 1 << 4,   // SafeOp    -> Op
+            SI   = 1 << 5,   // SafeOp    -> Init
+            OS   = 1 << 6,   // Op        -> SafeOp
+            OP   = 1 << 7,   // Op        -> PreOp
+            OI   = 1 << 8,   // Op        -> Init
+            IB   = 1 << 9,   // Init      -> Bootstrap
+            BI   = 1 << 10,  // Bootstrap -> Init
+            II   = 1 << 11,  // Init      -> Init
+            PP   = 1 << 12,  // PreOp     -> PreOp
+            SS   = 1 << 13,  // SafeOp    -> SafeOp
+            PO   = 1 << 14,  // PreOp     -> Op (ENI XSD only)
+        };
+        char const* toString(Type t);
+        Type fromString(std::string_view text);   // throws std::invalid_argument
+        Type between(State from, State to);       // NONE if no transition matches
+    }
+    using Transitions = uint16_t;   // OR of transition::Type
+
     char const* ALStatus_to_string(int32_t code);
 
     enum StatusCode : uint16_t

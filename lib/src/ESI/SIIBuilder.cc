@@ -40,7 +40,7 @@ namespace
                 pe.data_type = 0;
                 if (entry.index != 0)  // index 0 is a padding gap: no type/name
                 {
-                    auto type = Parser::coeTypeFromLabel(entry.data_type);
+                    auto type = CoE::dataTypeFromLabel(entry.data_type);
                     if (type)
                     {
                         pe.data_type = static_cast<uint8_t>(*type);

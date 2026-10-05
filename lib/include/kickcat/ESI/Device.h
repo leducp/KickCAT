@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "kickcat/CoE/OD.h"
+#include "kickcat/CoE/protocol.h"
 #include "kickcat/protocol.h"
 
 namespace kickcat::ESI
@@ -45,22 +46,6 @@ namespace kickcat::ESI
         bool  op_only = false;
     };
 
-    // ETG.2000 InitCmd Transition: ESM transitions during which the InitCmd applies.
-    namespace transition
-    {
-        enum Type : uint8_t
-        {
-            IP = 0,  // Init   -> PreOp
-            PS = 1,  // PreOp  -> SafeOp
-            SO = 2,  // SafeOp -> Op
-            SP = 3,  // SafeOp -> PreOp
-            OP = 4,  // Op     -> PreOp
-            OS = 5,  // Op     -> SafeOp
-        };
-        char const* toString(Type const& t);
-        void fromString(std::string_view text, Type& out);
-    }
-
     struct Mailbox
     {
         bool data_link_layer = false;
@@ -68,16 +53,10 @@ namespace kickcat::ESI
 
         struct CoE
         {
-            struct InitCmd
+            struct InitCmd : kickcat::CoE::InitCmd
             {
-                std::vector<transition::Type> transitions;
-                uint16_t    index    = 0;
-                uint8_t     subindex = 0;
-                std::vector<uint8_t> data;
-                bool        adapt_automatically   = false;
-                bool        complete_access       = false;
-                bool        overwritten_by_module = false;
-                std::string comment;
+                bool adapt_automatically   = false;
+                bool overwritten_by_module = false;
             };
 
             bool        sdo_info                   = false;
@@ -97,7 +76,7 @@ namespace kickcat::ESI
         {
             struct InitCmd
             {
-                std::vector<transition::Type> transitions;
+                Transitions transitions = 0;
                 int32_t     type = 0;
                 std::vector<uint8_t> data;
                 std::string comment;
@@ -115,7 +94,7 @@ namespace kickcat::ESI
         {
             struct InitCmd
             {
-                std::vector<transition::Type> transitions;
+                Transitions transitions = 0;
                 int32_t     idn     = 0;
                 int32_t     channel = 0;
                 std::vector<uint8_t> data;
@@ -131,7 +110,7 @@ namespace kickcat::ESI
         {
             struct InitCmd
             {
-                std::vector<transition::Type> transitions;
+                Transitions transitions = 0;
                 std::vector<uint8_t> data;
                 std::string comment;
             };

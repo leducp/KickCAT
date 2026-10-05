@@ -108,6 +108,55 @@ namespace kickcat::CoE
         }
     }
 
+    std::optional<DataType> dataTypeFromLabel(std::string_view label)
+    {
+        struct Label
+        {
+            std::string_view text;
+            DataType type;
+        };
+        constexpr std::array<Label, 29> LABELS = {{
+            {"BOOL",   DataType::BOOLEAN    },
+            {"BYTE",   DataType::BYTE       },
+            {"WORD",   DataType::WORD       },
+            {"DWORD",  DataType::DWORD      },
+            {"SINT",   DataType::INTEGER8   },
+            {"INT",    DataType::INTEGER16  },
+            {"INT24",  DataType::INTEGER24  },
+            {"DINT",   DataType::INTEGER32  },
+            {"INT40",  DataType::INTEGER40  },
+            {"INT48",  DataType::INTEGER48  },
+            {"INT56",  DataType::INTEGER56  },
+            {"LINT",   DataType::INTEGER64  },
+            {"USINT",  DataType::UNSIGNED8  },
+            {"UINT",   DataType::UNSIGNED16 },
+            {"UINT24", DataType::UNSIGNED24 },
+            {"UDINT",  DataType::UNSIGNED32 },
+            {"UINT40", DataType::UNSIGNED40 },
+            {"UINT48", DataType::UNSIGNED48 },
+            {"UINT56", DataType::UNSIGNED56 },
+            {"ULINT",  DataType::UNSIGNED64 },
+            {"REAL",   DataType::REAL32     },
+            {"LREAL",  DataType::REAL64     },
+            {"BIT2",   DataType::BIT2       },
+            {"BIT3",   DataType::BIT3       },
+            {"BIT4",   DataType::BIT4       },
+            {"BIT5",   DataType::BIT5       },
+            {"BIT6",   DataType::BIT6       },
+            {"BIT7",   DataType::BIT7       },
+            {"BIT8",   DataType::BIT8       },
+        }};
+
+        for (auto const& l : LABELS)
+        {
+            if (l.text == label)
+            {
+                return l.type;
+            }
+        }
+        return std::nullopt;
+    }
+
     std::string Entry::dataToString() const
     {
         if (data == nullptr)

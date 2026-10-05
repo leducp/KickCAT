@@ -25,6 +25,32 @@ TEST(Protocol, State_to_string)
 }
 
 
+TEST(Protocol, transition_string_round_trip)
+{
+    for (uint16_t bit = 0; bit < 15; ++bit)
+    {
+        transition::Type t = static_cast<transition::Type>(1 << bit);
+        ASSERT_EQ(transition::fromString(transition::toString(t)), t);
+    }
+    ASSERT_STREQ(transition::toString(transition::SO), "SO");
+    ASSERT_STREQ(transition::toString(transition::NONE), "NONE");
+    ASSERT_THROW(transition::fromString("XX"), std::invalid_argument);
+    ASSERT_THROW(transition::fromString(""),   std::invalid_argument);
+}
+
+
+TEST(Protocol, transition_between_states)
+{
+    ASSERT_EQ(transition::between(State::INIT,        State::PRE_OP),      transition::IP);
+    ASSERT_EQ(transition::between(State::PRE_OP,      State::SAFE_OP),     transition::PS);
+    ASSERT_EQ(transition::between(State::SAFE_OP,     State::OPERATIONAL), transition::SO);
+    ASSERT_EQ(transition::between(State::OPERATIONAL, State::INIT),        transition::OI);
+    ASSERT_EQ(transition::between(State::INIT,        State::BOOT),        transition::IB);
+    ASSERT_EQ(transition::between(State::BOOT,        State::PRE_OP),      transition::NONE);
+    ASSERT_EQ(transition::between(State::INIT,        State::OPERATIONAL), transition::NONE);
+}
+
+
 TEST(Protocol, Command_to_string)
 {
     for (uint8_t i = 0; i < UINT8_MAX; ++i) // Command code is defined on 8bits

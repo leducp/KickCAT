@@ -5,6 +5,14 @@
 
 using namespace kickcat;
 
+TEST(XSD, trim)
+{
+    EXPECT_EQ(xsd::trim(" \t\r\nUINT \n"), "UINT");
+    EXPECT_EQ(xsd::trim("a b"),             "a b");
+    EXPECT_EQ(xsd::trim(" \n "),            "");
+    EXPECT_EQ(xsd::trim("\vx\f"),           "\vx\f");
+}
+
 TEST(XSD, hexdec)
 {
     EXPECT_EQ(xsd::parseHexDec("42"),      42);
