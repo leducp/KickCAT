@@ -2,9 +2,21 @@
 #define KICKCAT_COE_PROTOCOL_H
 
 #include "kickcat/CoE/OD.h"
+#include "kickcat/protocol.h"
 
 namespace kickcat::CoE
 {
+    // SDO access a configuration file (ESI or ENI) asks for during ESM transitions.
+    struct InitCmd
+    {
+        Transitions transitions = 0;
+        uint16_t index = 0;
+        uint8_t  subindex = 0;
+        std::vector<uint8_t> data;
+        bool complete_access = false;
+        std::string comment;
+    };
+
     constexpr uint16_t SM_COM_TYPE       = 0x1C00; // each sub-entry described SM[x] com type (mailbox in/out, PDO in/out, not used)
     constexpr uint16_t SM_CHANNEL        = 0x1C10; // each entry is associated with the mapped PDOs (if in used)
 
@@ -16,6 +28,7 @@ namespace kickcat::CoE
         uint16_t index;
         uint8_t  subindex;
         uint8_t  bitlen;
+        DataType type = DataType::UNKNOWN;  // not part of the mapping word
     };
 
     constexpr uint32_t toMappingWord(PdoMappingEntry entry)

@@ -85,6 +85,26 @@ namespace kickcat
         /// \brief Register a callback to be called when an EtherCAT IRQ event is detected.
         virtual void attachEcatEventCallback(enum EcatEvent event, std::function<void()> callback) = 0;
     };
+
+    /// \brief Read size bytes at reg_address of the slave at slave_address (FPRD), waiting for the answer.
+    /// \details Throws unless exactly one slave answered.
+    void readRegister(AbstractLink& link, uint16_t slave_address, uint16_t reg_address, void* value, uint16_t size);
+
+    /// \brief Write size bytes at reg_address of the slave at slave_address (FPWR), waiting for the answer.
+    /// \details Throws unless exactly one slave answered.
+    void writeRegister(AbstractLink& link, uint16_t slave_address, uint16_t reg_address, void const* value, uint16_t size);
+
+    template<typename T>
+    void readRegister(AbstractLink& link, uint16_t slave_address, uint16_t reg_address, T& value)
+    {
+        readRegister(link, slave_address, reg_address, &value, sizeof(T));
+    }
+
+    template<typename T>
+    void writeRegister(AbstractLink& link, uint16_t slave_address, uint16_t reg_address, T const& value)
+    {
+        writeRegister(link, slave_address, reg_address, &value, sizeof(T));
+    }
 }
 
 #endif

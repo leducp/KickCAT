@@ -35,19 +35,19 @@ namespace kickcat::xsd
             }
             return value;
         }
+    }
 
-        std::string_view trim(std::string_view text)
+    std::string_view trim(std::string_view text)
+    {
+        while (not text.empty() and isSpace(text.front()))
         {
-            while (not text.empty() and isSpace(text.front()))
-            {
-                text.remove_prefix(1);
-            }
-            while (not text.empty() and isSpace(text.back()))
-            {
-                text.remove_suffix(1);
-            }
-            return text;
+            text.remove_prefix(1);
         }
+        while (not text.empty() and isSpace(text.back()))
+        {
+            text.remove_suffix(1);
+        }
+        return text;
     }
 
     int64_t parseHexDec(std::string_view raw)

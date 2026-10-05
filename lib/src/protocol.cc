@@ -131,6 +131,80 @@ namespace kickcat
     }
 
 
+    namespace transition
+    {
+        namespace
+        {
+            struct Entry
+            {
+                Type transition;
+                char const* name;
+                State from;
+                State to;
+            };
+
+            constexpr Entry TABLE[] =
+            {
+                {IP, "IP", INIT,        PRE_OP     },
+                {PS, "PS", PRE_OP,      SAFE_OP    },
+                {PI, "PI", PRE_OP,      INIT       },
+                {SP, "SP", SAFE_OP,     PRE_OP     },
+                {SO, "SO", SAFE_OP,     OPERATIONAL},
+                {SI, "SI", SAFE_OP,     INIT       },
+                {OS, "OS", OPERATIONAL, SAFE_OP    },
+                {OP, "OP", OPERATIONAL, PRE_OP     },
+                {OI, "OI", OPERATIONAL, INIT       },
+                {IB, "IB", INIT,        BOOT       },
+                {BI, "BI", BOOT,        INIT       },
+                {II, "II", INIT,        INIT       },
+                {PP, "PP", PRE_OP,      PRE_OP     },
+                {SS, "SS", SAFE_OP,     SAFE_OP    },
+                {PO, "PO", PRE_OP,      OPERATIONAL},
+            };
+        }
+
+        char const* toString(Type t)
+        {
+            if (t == NONE)
+            {
+                return "NONE";
+            }
+            for (auto const& entry : TABLE)
+            {
+                if (entry.transition == t)
+                {
+                    return entry.name;
+                }
+            }
+            return "unknown";
+        }
+
+        Type fromString(std::string_view text)
+        {
+            for (auto const& entry : TABLE)
+            {
+                if (text == entry.name)
+                {
+                    return entry.transition;
+                }
+            }
+            throw std::invalid_argument("unknown Transition '" + std::string{text} + "'");
+        }
+
+        Type between(State from, State to)
+        {
+            for (auto const& entry : TABLE)
+            {
+                if ((entry.from == from) and (entry.to == to))
+                {
+                    return entry.transition;
+                }
+            }
+            return NONE;
+        }
+    }
+
+
     char const* toString(Command cmd)
     {
         switch (cmd)

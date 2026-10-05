@@ -1,6 +1,7 @@
 #include "mocks/Sockets.h"
 
 #include "kickcat/Link.h"
+#include "kickcat/SocketNull.h"
 
 using ::testing::Return;
 using ::testing::_;
@@ -1727,5 +1728,44 @@ TEST_F(LRWMergeTest, wkc_inside_a_contribution_attributes_started_slave_to_prefi
                                   0x24, 0x25, 0x26, 0x27,
                                   0x28 | 0xB8, 0x29 | 0xB9};
     ASSERT_EQ(0, std::memcmp(nominal, expected, sizeof(expected)));
+}
+
+TEST(Link, readRegister)
+{
+    std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
+    std::shared_ptr<SocketNull> io_redundancy{ std::make_shared<SocketNull>() };
+    Link link{io_nominal, io_redundancy, nullptr};
+    std::vector<DatagramCheck<uint8_t>> expected(1, {Command::FPRD, 0, false});
+
+    uint16_t value = 1;
+    io_nominal->checkSendFrame(expected);
+    EXPECT_CALL(*io_nominal, setTimeout(_));
+    io_nominal->handleReply<uint16_t>({0xFF}, 1);
+    readRegister(link, 0x00, 0x110, value);
+    ASSERT_EQ(value, 0xFF);
+
+    io_nominal->checkSendFrame(expected);
+    EXPECT_CALL(*io_nominal, setTimeout(_));
+    io_nominal->handleReply<uint16_t>({0xFF}, 2);
+    ASSERT_THROW(readRegister(link, 0x00, 0x110, value), Error);
+}
+
+TEST(Link, writeRegister)
+{
+    std::shared_ptr<MockSocket> io_nominal{ std::make_shared<MockSocket>() };
+    std::shared_ptr<SocketNull> io_redundancy{ std::make_shared<SocketNull>() };
+    Link link{io_nominal, io_redundancy, nullptr};
+    std::vector<DatagramCheck<uint8_t>> expected(1, {Command::FPWR, 0, false});
+
+    uint16_t value = 0;
+    io_nominal->checkSendFrame(expected);
+    EXPECT_CALL(*io_nominal, setTimeout(_));
+    io_nominal->handleReply<uint8_t>({0}, 1);
+    writeRegister(link, 0x00, 0x110, value);
+
+    io_nominal->checkSendFrame(expected);
+    EXPECT_CALL(*io_nominal, setTimeout(_));
+    io_nominal->handleReply<uint16_t>({0xFF}, 2);
+    ASSERT_THROW(writeRegister(link, 0x00, 0x110, value), Error);
 }
 }

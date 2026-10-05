@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <cstring>
 
 #include "kickcat/ESI/Parser.h"
 #include "kickcat/CoE/EsiParser.h"
@@ -779,8 +780,7 @@ TEST(ESIParser, loadDevice_parses_mailbox)
     ASSERT_EQ(coe.init_cmds.size(), 2u);
 
     auto const& coe_ic0 = coe.init_cmds[0];
-    ASSERT_EQ(coe_ic0.transitions.size(), 1u);
-    ASSERT_EQ(coe_ic0.transitions[0], ESI::transition::PS);
+    ASSERT_EQ(coe_ic0.transitions, transition::PS);
     ASSERT_EQ(coe_ic0.index,    0x1C12);
     ASSERT_EQ(coe_ic0.subindex, 0x00);
     ASSERT_EQ(coe_ic0.data.size(), 2u);
@@ -796,9 +796,7 @@ TEST(ESIParser, loadDevice_parses_mailbox)
     ASSERT_TRUE(eoe.mac);
     ASSERT_FALSE(eoe.time_stamp);
     ASSERT_EQ(eoe.init_cmds.size(), 1u);
-    ASSERT_EQ(eoe.init_cmds[0].transitions.size(), 2u);
-    ASSERT_EQ(eoe.init_cmds[0].transitions[0], ESI::transition::IP);
-    ASSERT_EQ(eoe.init_cmds[0].transitions[1], ESI::transition::PS);
+    ASSERT_EQ(eoe.init_cmds[0].transitions, transition::IP | transition::PS);
     ASSERT_EQ(eoe.init_cmds[0].type, 5);
 
     ASSERT_TRUE(mailbox.aoe.has_value());
@@ -829,6 +827,32 @@ TEST(ESIParser, mailbox_absent_when_block_missing)
     ESI::Device device = parser.loadDevice("kickcat_esi_test_multi_device.xml");
 
     ASSERT_FALSE(device.mailbox.has_value());
+}
+
+TEST(ESIParser, mailbox_throws_on_eni_only_transition)
+{
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Mailbox><CoE><InitCmd>
+                    <Transition>PI</Transition><Index>#x1000</Index><SubIndex>#x00</SubIndex><Data>00</Data>
+                </InitCmd></CoE></Mailbox>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    try
+    {
+        (void) parser.loadString(xml);
+        FAIL() << "expected invalid_argument";
+    }
+    catch (std::invalid_argument const& e)
+    {
+        std::string msg = e.what();
+        ASSERT_NE(msg.find("'PI' is not allowed"), std::string::npos) << msg;
+    }
 }
 
 TEST(ESIParser, mailbox_throws_on_unknown_transition)
@@ -2063,6 +2087,54 @@ TEST(ESIParser, array_subitem_with_inconsistent_arrayinfo_uses_base_type_size)
     ASSERT_NE(last, nullptr);
     ASSERT_EQ(last->bitlen, 8u);
     ASSERT_EQ(last->bitoff, 16u + 5u * 8u);
+}
+
+TEST(ESIParser, object_typed_by_a_standard_array_is_a_value)
+{
+    // Beckhoff EJ6xxx 0x10F2: the object type is the array itself, not a record holding it.
+    char const* xml = R"(<?xml version="1.0"?>
+        <EtherCATInfo>
+            <Vendor><Id>#x1</Id><Name>V</Name></Vendor>
+            <Descriptions><Devices><Device>
+                <Type ProductCode="#x1" RevisionNo="#x1">T</Type>
+                <Profile><ProfileNo>0</ProfileNo>
+                    <Dictionary>
+                        <DataTypes>
+                            <DataType>
+                                <Name>ARRAY [0..3] OF BYTE</Name><BaseType>BYTE</BaseType><BitSize>32</BitSize>
+                                <ArrayInfo><LBound>0</LBound><Elements>4</Elements></ArrayInfo>
+                            </DataType>
+                            <DataType>
+                                <Name>ARRAY [0..1] OF INT</Name><BaseType>INT</BaseType><BitSize>32</BitSize>
+                                <ArrayInfo><LBound>0</LBound><Elements>2</Elements></ArrayInfo>
+                            </DataType>
+                        </DataTypes>
+                        <Objects>
+                            <Object>
+                                <Index>#x10F2</Index><Name>Backup</Name><Type>ARRAY [0..3] OF BYTE</Type><BitSize>32</BitSize>
+                                <Info><DefaultData>01020304</DefaultData></Info>
+                            </Object>
+                            <Object><Index>#x2000</Index><Name>Ints</Name><Type>ARRAY [0..1] OF INT</Type><BitSize>32</BitSize></Object>
+                        </Objects>
+                    </Dictionary>
+                </Profile>
+            </Device></Devices></Descriptions>
+        </EtherCATInfo>)";
+
+    ESI::Parser parser;
+    auto dictionary = parser.loadString(xml);
+    auto [backup, value] = findObject(dictionary, 0x10F2, 0);
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(backup->code, CoE::ObjectCode::VAR);
+    EXPECT_EQ(backup->entries.size(), 1u);
+    EXPECT_EQ(value->type, CoE::DataType::OCTET_STRING);
+    EXPECT_EQ(value->bitlen, 32u);
+    ASSERT_NE(value->data, nullptr);
+    EXPECT_EQ(std::memcmp(value->data, "\x01\x02\x03\x04", 4), 0);
+
+    auto [ints, ints_value] = findObject(dictionary, 0x2000, 0);
+    ASSERT_NE(ints_value, nullptr);
+    EXPECT_EQ(ints_value->type, CoE::DataType::ARRAY_OF_INT);
 }
 
 TEST(ESIParser, throws_on_eeprom_data_and_byte_size_both_present)

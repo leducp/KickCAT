@@ -3,7 +3,6 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/bus-t.cc
                             src/SoftPll-t.cc
                             src/dc-t.cc
-                            src/debughelpers-t.cc
                             src/diagnostics-t.cc
                             src/error-t.cc
                             src/Filesystem-t.cc
@@ -30,6 +29,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
                             src/ESMStateSafeOP-t.cc
                             src/utils/math-t.cc
                             src/utils/xsd-t.cc
+                            src/utils/xml-t.cc
                             src/Units-t.cc
                             src/Timer-t.cc
                             src/CoE/protocol-t.cc

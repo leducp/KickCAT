@@ -33,6 +33,18 @@ TEST(CoE, data_type_to_string)
     }
 }
 
+TEST(CoE, data_type_from_label)
+{
+    ASSERT_EQ(dataTypeFromLabel("BOOL"),  DataType::BOOLEAN);
+    ASSERT_EQ(dataTypeFromLabel("UINT"),  DataType::UNSIGNED16);
+    ASSERT_EQ(dataTypeFromLabel("DINT"),  DataType::INTEGER32);
+    ASSERT_EQ(dataTypeFromLabel("LREAL"), DataType::REAL64);
+    ASSERT_EQ(dataTypeFromLabel("BIT8"),  DataType::BIT8);
+    ASSERT_FALSE(dataTypeFromLabel("uint").has_value());
+    ASSERT_FALSE(dataTypeFromLabel("STRING(8)").has_value());
+    ASSERT_FALSE(dataTypeFromLabel("").has_value());
+}
+
 TEST(CoE, access_to_string)
 {
     {
