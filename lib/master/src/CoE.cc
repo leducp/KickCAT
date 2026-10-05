@@ -83,6 +83,37 @@ namespace kickcat
     }
 
 
+    void Bus::readSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, std::vector<uint8_t>& data, nanoseconds timeout)
+    {
+        auto upload = [&](uint8_t sub, bool complete, std::vector<uint8_t>& destination)
+        {
+            auto sdo = slave.mailbox.createSDOUpload(index, sub, complete, destination, timeout);
+            waitForMessage(sdo);
+            if (sdo->status() != MessageStatus::SUCCESS)
+            {
+                THROW_ERROR_CODE("Error while reading SDO", error::category::CoE, sdo->status());
+            }
+        };
+
+        if ((CA == Access::PARTIAL) or (CA == Access::COMPLETE))
+        {
+            upload(subindex, CA == Access::COMPLETE, data);
+            return;
+        }
+
+        // emulate complete access
+        std::vector<uint8_t> count;
+        upload(0, false, count);
+        data.clear();
+        for (uint16_t i = 1; (not count.empty()) and (i <= count[0]); ++i)
+        {
+            std::vector<uint8_t> entry;
+            upload(static_cast<uint8_t>(i), false, entry);
+            data.insert(data.end(), entry.begin(), entry.end());
+        }
+    }
+
+
     void Bus::writeSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void const* data, uint32_t data_size, nanoseconds timeout)
     {
         if ((CA == Access::PARTIAL) or (CA == Access::COMPLETE))

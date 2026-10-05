@@ -10,6 +10,9 @@ namespace kickcat::mailbox::request
     {
     public:
         SDOMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint16_t index, uint8_t subindex, bool CA, uint8_t request, void* data, uint32_t* data_size, nanoseconds timeout);
+
+        /// \brief Upload into data, resized to the object size the server announces.
+        SDOMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint16_t index, uint8_t subindex, bool CA, std::vector<uint8_t>& data, nanoseconds timeout);
         virtual ~SDOMessage() = default;
 
         ProcessingResult process(uint8_t const* received) override;
@@ -20,13 +23,16 @@ namespace kickcat::mailbox::request
         ProcessingResult processDownload         (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
         ProcessingResult processDownloadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
         void prepareDownloadSegment();
+        void fitGrowable(uint32_t size);
 
         CoE::Header* coe_;
         CoE::ServiceData* sdo_;
         uint8_t* payload_;
+        std::vector<uint8_t>* growable_{nullptr};  // upload destination sized by the server, if any
+        uint32_t growable_size_{0};                // data size of growable_, before client_buffer_size_ reads it
         uint8_t* client_data_;
         uint32_t* client_data_size_;
-        uint32_t client_buffer_size_{0};   // original client buffer capacity, fixed at construction
+        uint32_t client_buffer_size_{0};   // client buffer capacity: fixed at construction, or announced for growable_
         uint32_t download_remaining_{0};   // bytes still to send for a segmented download
     };
 

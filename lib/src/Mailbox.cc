@@ -65,6 +65,19 @@ namespace kickcat::mailbox::request
     }
 
 
+    std::shared_ptr<AbstractMessage> Mailbox::createSDOUpload(uint16_t index, uint8_t subindex, bool CA, std::vector<uint8_t>& data, nanoseconds timeout)
+    {
+        if (recv_size == 0)
+        {
+            THROW_ERROR("This mailbox is inactive");
+        }
+        auto sdo = std::make_shared<SDOMessage>(recv_size, send_size, index, subindex, CA, data, timeout);
+        sdo->setCounter(nextCounter());
+        to_send.push(sdo);
+        return sdo;
+    }
+
+
     std::shared_ptr<GatewayMessage> Mailbox::createGatewayMessage(uint8_t const* raw_message, int32_t raw_message_size, uint16_t gateway_index, nanoseconds timeout)
     {
         if (raw_message_size < static_cast<int32_t>(sizeof(mailbox::Header)))

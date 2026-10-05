@@ -268,6 +268,59 @@ TEST_F(CoE_Request, SDO_upload_segmented_OK)
     ASSERT_EQ(0, std::memcmp(data, expected, sizeof(data)));
 }
 
+TEST_F(CoE_Request, SDO_upload_into_a_vector_takes_the_announced_size)
+{
+    std::vector<uint8_t> data;
+    auto message = mailbox.createSDOUpload(0x1018, 1, false, data);
+    mailbox.send();
+
+    // Initiate Upload Response: segmented, 9 bytes announced
+    uint8_t* seg_data = reinterpret_cast<uint8_t*>(sdo) + 1;
+    header->type        = mailbox::Type::CoE;
+    header->len         = 10;
+    coe->service        = CoE::Service::SDO_RESPONSE;
+    sdo->command        = CoE::SDO::response::UPLOAD;
+    sdo->transfer_type  = 0;
+    sdo->size_indicator = 1;
+    sdo->index          = 0x1018;
+    sdo->subindex       = 1;
+    *static_cast<uint32_t*>(payload) = 9;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    mailbox.send();
+
+    // One segment of 9 bytes, the last one
+    uint8_t const expected[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    header->len          = 3 + 9;
+    sdo->command         = CoE::SDO::response::UPLOAD_SEGMENTED;
+    sdo->complete_access = 0;
+    sdo->size_indicator  = 1;
+    std::memcpy(seg_data, expected, sizeof(expected));
+    ASSERT_TRUE(mailbox.receive(raw_message));
+
+    ASSERT_EQ(MessageStatus::SUCCESS, message->status());
+    ASSERT_EQ(std::vector<uint8_t>(expected, expected + sizeof(expected)), data);
+}
+
+TEST_F(CoE_Request, SDO_upload_into_a_vector_expedited)
+{
+    std::vector<uint8_t> data(64, 0xFF);
+    auto message = mailbox.createSDOUpload(0x1018, 1, false, data);
+    mailbox.send();
+
+    header->type       = mailbox::Type::CoE;
+    coe->service       = CoE::Service::SDO_RESPONSE;
+    sdo->transfer_type = 1;
+    sdo->block_size    = 2;   // 2 bytes
+    sdo->command       = CoE::SDO::request::UPLOAD;
+    sdo->index         = 0x1018;
+    sdo->subindex      = 1;
+    *static_cast<uint16_t*>(payload) = 0xBEEF;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+
+    ASSERT_EQ(MessageStatus::SUCCESS, message->status());
+    ASSERT_EQ((std::vector<uint8_t>{0xEF, 0xBE}), data);
+}
+
 
 TEST_F(CoE_Request, SDO_download_expedited_OK)
 {

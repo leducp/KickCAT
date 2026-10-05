@@ -68,6 +68,26 @@ namespace kickcat::mailbox::request
     }
 
 
+    SDOMessage::SDOMessage(uint16_t mbx_recv_size, uint16_t mbx_send_size, uint16_t index, uint8_t subindex, bool CA, std::vector<uint8_t>& data, nanoseconds timeout)
+        : SDOMessage(mbx_recv_size, mbx_send_size, index, subindex, CA, CoE::SDO::request::UPLOAD, nullptr, &growable_size_, timeout)
+    {
+        growable_ = &data;
+    }
+
+
+    void SDOMessage::fitGrowable(uint32_t size)
+    {
+        if (growable_ == nullptr)
+        {
+            return;
+        }
+        growable_->resize(size);
+        client_data_        = growable_->data();
+        client_buffer_size_ = size;
+        *client_data_size_  = size;
+    }
+
+
     ProcessingResult SDOMessage::process(uint8_t const* received)
     {
         auto const* header  = pointData<mailbox::Header>(received);
@@ -149,6 +169,7 @@ namespace kickcat::mailbox::request
         {
             // expedited transfer
             uint32_t size = 4 - sdo->block_size;
+            fitGrowable(size);
             if(*client_data_size_ < size)
             {
                 status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
@@ -173,6 +194,7 @@ namespace kickcat::mailbox::request
         std::memcpy(&complete_size, payload, sizeof(uint32_t));
         payload += 4;
 
+        fitGrowable(complete_size);
         if (*client_data_size_ < complete_size)
         {
             status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
@@ -241,6 +263,10 @@ namespace kickcat::mailbox::request
         // More Follows (size_indicator, bit 0): 0x01 marks the last segment.
         if (sdo->size_indicator)
         {
+            if (growable_ != nullptr)
+            {
+                growable_->resize(*client_data_size_);
+            }
             status_ = MessageStatus::SUCCESS;
             return ProcessingResult::FINALIZE;
         }
