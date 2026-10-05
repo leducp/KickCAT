@@ -105,6 +105,9 @@ namespace kickcat
 
         std::vector<Slave>& slaves() { return slaves_; }
 
+        // Attach the handlers of the messages a slave sends unsolicited (CoE emergencies, unknown messages)
+        void addMailboxHandlers(Slave& slave);
+
         // asynchrone read/write/mailbox/state methods
         // It enable users to do one or multiple operations in a row, process something, and process all awaiting frames.
         void sendGetALStatus(Slave& slave, std::function<void(DatagramState const&)> const& error);
@@ -160,6 +163,8 @@ namespace kickcat
         // Note: timeout is used on a per message basis: if complete access is emulated,
         // global call timeout will be at most N * timeout (with N the number of subindex to reached)
         void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, void* data, uint32_t* data_size, nanoseconds timeout = 1s);
+        // Read an object whatever its size: data takes the size the slave announces.
+        void readSDO (Slave& slave, uint16_t index, uint8_t subindex, Access CA, std::vector<uint8_t>& data, nanoseconds timeout = 1s);
         void writeSDO(Slave& slave, uint16_t index, uint8_t subindex, Access CA, void const* data, uint32_t data_size, nanoseconds timeout = 1s);
 
         using FoEProgress = std::function<void(uint32_t bytes_transferred)>;
@@ -246,7 +251,6 @@ namespace kickcat
 
         void configureMailboxes();
         void addMailboxConfiguration(Slave& slave);
-        void addMailboxHandlers(Slave& slave);
         void switchMailboxLayout(Slave& slave, bool bootstrap);
 
         // mapping helpers
