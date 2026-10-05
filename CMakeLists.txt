@@ -14,7 +14,7 @@ else()
   set(KICKCAT_INSTALL_DEFAULT OFF)
 endif()
 
-# Host-only components (tests, simulation, GUI tools, ESI parser, master examples) need desktop
+# Host-only components (tests, simulation, GUI tools, ESI/ENI parsers, master examples) need desktop
 # deps and default ON for Linux/Windows only; embedded targets get the library + their slave example.
 if (UNIX OR WIN32)
   set(KICKCAT_HOST ON)
@@ -28,6 +28,7 @@ option(BUILD_UNIT_TESTS        "Build unit tests" OFF)
 option(BUILD_SIMULATION        "Build simulation" ${KICKCAT_HOST})
 option(BUILD_TOOLS             "Build tools" ${KICKCAT_HOST})
 option(ENABLE_ESI_PARSER       "Enable ESI XML parser" ${KICKCAT_HOST})
+option(ENABLE_ENI_PARSER       "Enable ENI XML parser" ${KICKCAT_HOST})
 option(ENABLE_AF_XDP           "Enable AF_XDP socket for improved performance (requires libxdp, libbpf, clang)" OFF)
 option(ENABLE_CODE_COVERAGE    "Enable code coverage (requires gcovr)" OFF)
 option(ENABLE_ASAN             "Build with AddressSanitizer" OFF)
