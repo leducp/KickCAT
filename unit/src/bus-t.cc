@@ -607,7 +607,7 @@ TEST_F(BusTest, read_FoE_error)
 
     mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
     mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
-    mock_link->handleProcess(Command::FPRD, createFoEAnswer(FoE::opcode::ERROR, FoE::result::NOT_FOUND), 1);
+    mock_link->handleProcess(Command::FPRD, createFoEAnswer(FoE::opcode::ERR, FoE::result::NOT_FOUND), 1);
 
     std::vector<uint8_t> file;
     try

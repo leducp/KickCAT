@@ -5,6 +5,7 @@
 
 namespace kickcat::EoE
 {
+    KICKCAT_PACKED_BEGIN
     struct Header        // ETG1000.6 chapter 5.7.1 EoE
     {
         uint8_t type : 4,
@@ -16,9 +17,11 @@ namespace kickcat::EoE
         uint16_t fragment_number: 6,
                  offset:          6,
                  frame_number:    4;
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(Header) == 4);
     std::string toString(Header const* header); // Stringify the whole message, not just the header
 
+    KICKCAT_PACKED_BEGIN
     struct Parameter      // ETG1000.6 chapter 5.7.4 Set IP Parameter
     {
         uint32_t mac_address:     1,
@@ -28,7 +31,8 @@ namespace kickcat::EoE
                  dns_server_ip:   1,
                  dns_name:        1,
                  reserved:        26;
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(Parameter) == 4);
 
     // NOTE: for request SET_IP, all theses fields are mandatory
     using MAC = uint8_t[6];     // MAC address according to ISO/IEC 8802-3

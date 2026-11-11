@@ -47,14 +47,17 @@ namespace kickcat::CoE
         };
     }
 
+    KICKCAT_PACKED_BEGIN
     struct Header
     {
         uint16_t number : 9,
                 reserved : 3,
                 service : 4; // i.e. request, response
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(Header) == 2);
     std::string toString(Header const* header); // Stringify the whole message, not just the header
 
+    KICKCAT_PACKED_BEGIN
     struct ServiceData      // ETG1000.6 chapter 5.6.2 SDO
     {
         uint8_t size_indicator : 1,
@@ -64,7 +67,8 @@ namespace kickcat::CoE
                 command : 3; // i.e. upload
         uint16_t index;
         uint8_t subindex;
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(ServiceData) == 4);
 
     // SDO segment header (ETG.1000.6 Tables 33/39): SegData Size (bits 1..3) records how many of the
     // 7 compact data octets are unused, and is only meaningful when the mailbox length is 0x0A.
@@ -73,20 +77,24 @@ namespace kickcat::CoE
     uint32_t segmentDataLength(uint16_t mailbox_len, ServiceData const* sdo); // octets of data in a segment
     uint16_t setSegmentLength(ServiceData* sdo, uint32_t chunk);              // encode chunk -> mailbox length
 
+    KICKCAT_PACKED_BEGIN
     struct ServiceDataInfo // ETG1000.6 chapter 5.6.3 SDO Information
     {
         uint16_t opcode : 7,
                     incomplete : 1,
                     reserved : 8;
         uint16_t fragments_left;
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(ServiceDataInfo) == 4);
 
+    KICKCAT_PACKED_BEGIN
     struct Emergency        // ETG1000.6 chapter 5.6.4 Emergency
     {
         uint16_t error_code;
         uint8_t  error_register;
         uint8_t  data[5];
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(Emergency) == 8);
     std::string toString(Emergency const& emg);
 
     enum Service
@@ -165,22 +173,27 @@ namespace kickcat::CoE
                 std::string toString(uint8_t value_info);
             }
 
+            KICKCAT_PACKED_BEGIN
             struct EntryDescriptionRequest
             {
                 uint16_t index;
                 uint8_t  subindex;
                 uint8_t  value_info;
-            } __attribute__((__packed__));
+            } KICKCAT_PACKED_END;
+            static_assert(sizeof(EntryDescriptionRequest) == 4);
 
+            KICKCAT_PACKED_BEGIN
             struct ObjectDescription
             {
                 uint16_t index;
                 DataType data_type;
                 uint8_t  max_subindex;
                 ObjectCode object_code;
-            } __attribute__((__packed__));
+            } KICKCAT_PACKED_END;
+            static_assert(sizeof(ObjectDescription) == 6);
             std::string toString(ObjectDescription const& object_description);
 
+            KICKCAT_PACKED_BEGIN
             struct EntryDescription
             {
                 uint16_t  index;
@@ -189,7 +202,8 @@ namespace kickcat::CoE
                 DataType  data_type;
                 uint16_t  bit_length;
                 uint16_t  access;
-            } __attribute__((__packed__));
+            } KICKCAT_PACKED_END;
+            static_assert(sizeof(EntryDescription) == 10);
             std::string toString(EntryDescription const& entry_description);
 
             /// \brief Size of the CoE service a response to this opcode occupies, headers included.

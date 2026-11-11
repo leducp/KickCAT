@@ -5,13 +5,15 @@
 
 namespace kickcat::FoE
 {
+    KICKCAT_PACKED_BEGIN
     struct Header   // ETG1000.6 chapter 5.8
     {
         uint8_t  opcode;
         uint8_t  reserved;
         uint32_t value;     // READ, WRITE: password (0: unused). DATA, ACK: packet number (ACK 0: write accepted).
                             // ERROR: error code. BUSY: done (low 16 bits) and entire (high 16 bits).
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(Header) == 6);
 
     // A mailbox of N bytes carries N - OVERHEAD bytes of file
     constexpr uint16_t OVERHEAD = sizeof(mailbox::Header) + sizeof(Header);
@@ -22,7 +24,7 @@ namespace kickcat::FoE
         constexpr uint8_t WRITE = 0x02;
         constexpr uint8_t DATA  = 0x03;
         constexpr uint8_t ACK   = 0x04;
-        constexpr uint8_t ERROR = 0x05;
+        constexpr uint8_t ERR   = 0x05;     // not ERROR: collides with a macro of the Windows API (wingdi.h)
         constexpr uint8_t BUSY  = 0x06;
     }
 

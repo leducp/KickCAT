@@ -7,6 +7,7 @@
 #include <array>
 #include <tuple>
 
+#include "kickcat/packed.h"
 #include "kickcat/Units.h"
 #include "kickcat/Error.h"
 #include "kickcat/OS/Time.h"
@@ -35,12 +36,14 @@ namespace kickcat
     constexpr int32_t  MAC_SIZE = 6;
     using MAC = uint8_t[MAC_SIZE];
 
+    KICKCAT_PACKED_BEGIN
     struct EthernetHeader
     {
         MAC dst;
         MAC src;
         uint16_t type;
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(EthernetHeader) == 14);
 
     constexpr int32_t  ETH_MTU_SIZE = 1500;
 #ifndef ETH_FCS_SIZE
@@ -65,12 +68,14 @@ namespace kickcat
         MAILBOX  = 0x5              // EtherCAT gateway
     };
 
+    KICKCAT_PACKED_BEGIN
     struct EthercatHeader
     {
         uint16_t len : 11;
         int16_t reserved : 1;
         int16_t type : 4;
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(EthercatHeader) == 2);
 
     // Ethercat command types
     enum class Command : uint8_t
@@ -93,6 +98,7 @@ namespace kickcat
     };
     char const* toString(Command cmd);
 
+    KICKCAT_PACKED_BEGIN
     struct DatagramHeader
     {
         enum Command command;
@@ -103,7 +109,8 @@ namespace kickcat
                  circulating : 1,
                  multiple : 1; // multiple EtherCAT datagram (0 if last, 1 otherwise)
         uint16_t irq;
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(DatagramHeader) == 10);
     std::string toString(DatagramHeader const& header);
 
 
@@ -343,6 +350,7 @@ namespace kickcat
 
     namespace ESC
     {
+        KICKCAT_PACKED_BEGIN
         struct Description
         {
             uint8_t type;
@@ -353,7 +361,8 @@ namespace kickcat
             uint8_t ram_size;
             uint8_t ports;
             uint16_t features;
-        }__attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Description) == 10);
 
         namespace feature
         {
@@ -372,6 +381,7 @@ namespace kickcat
         }
     }
 
+    KICKCAT_PACKED_BEGIN
     struct DLStatus
     {
         uint16_t  PDI_op : 1,
@@ -395,10 +405,12 @@ namespace kickcat
         bool physicalLink(int port) const;
         bool communication(int port) const;
         bool loop(int port) const;
-    }__attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(DLStatus) == 2);
 
     std::string toString(DLStatus const& counters);
 
+    KICKCAT_PACKED_BEGIN
     struct ErrorCounters
     {
         struct RX
@@ -412,12 +424,14 @@ namespace kickcat
         uint8_t pdi;
         uint16_t pdi_error_code; // 0x30E:0x30F - interpretation depends on the PDI type
         uint8_t lost_link[4];    // 0x310:0x313
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
+    static_assert(sizeof(ErrorCounters) == 20);
 
     std::string toString(ErrorCounters const& counters);
 
     namespace SyncManager
     {
+        KICKCAT_PACKED_BEGIN
         struct Register
         {
             uint16_t start_address;
@@ -426,7 +440,8 @@ namespace kickcat
             uint8_t  status;
             uint8_t  activate;
             uint8_t  pdi_control;
-        } __attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Register) == 8);
     }
 
 
@@ -481,6 +496,7 @@ namespace kickcat
         char const* toString(Type const& type);
         void fromString(std::string_view text, Type& out);
 
+        KICKCAT_PACKED_BEGIN
         struct Register
         {
             uint32_t logical_address;
@@ -492,7 +508,8 @@ namespace kickcat
             uint8_t  type;
             uint8_t  activate;
             uint8_t  reserved[3];
-        } __attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Register) == 16);
     }
 
     constexpr uint16_t addressSM(uint8_t index) { return static_cast<uint16_t>(reg::SYNC_MANAGER + index * sizeof(SyncManager::Register)); };
@@ -500,12 +517,14 @@ namespace kickcat
     namespace eeprom // addresses are in words!
     {
         // eeprom request
+        KICKCAT_PACKED_BEGIN
         struct Request
         {
             uint16_t command;
             uint16_t addressLow;
             uint16_t addressHigh;
-        } __attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Request) == 6);
 
         constexpr uint16_t ESC_INFO            = 0x00;
         constexpr uint16_t ESC_PDI_CONTROL     = 0;
@@ -577,6 +596,7 @@ namespace kickcat
             End       = 0xFFFF
         };
 
+        KICKCAT_PACKED_BEGIN
         struct InfoEntry
         {
             // Config data
@@ -618,8 +638,10 @@ namespace kickcat
             uint16_t reserved4[33];
             uint16_t size;
             uint16_t version;
-        }__attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(InfoEntry) == 128);
 
+        KICKCAT_PACKED_BEGIN
         struct GeneralEntry
         {
             uint8_t group_info_id;
@@ -649,8 +671,10 @@ namespace kickcat
                      port_3 : 4;
             uint16_t physical_memory_address;
             uint8_t reserved_C[12];
-        } __attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(GeneralEntry) == 32);
 
+        KICKCAT_PACKED_BEGIN
         struct SyncManagerEntry
         {
             uint16_t start_address;
@@ -659,8 +683,10 @@ namespace kickcat
             uint8_t  status_register;
             uint8_t  enable;
             uint8_t  type;
-        } __attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(SyncManagerEntry) == 8);
 
+        KICKCAT_PACKED_BEGIN
         struct PDOEntry
         {
             uint16_t index;
@@ -669,7 +695,8 @@ namespace kickcat
             uint8_t  data_type;
             uint8_t  bitlen;
             uint16_t flags;
-        } __attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(PDOEntry) == 8);
     }
 
     std::string toString(eeprom::GeneralEntry const& general_entry);
@@ -688,6 +715,7 @@ namespace kickcat
         };
         char const* toString(Type code);
 
+        KICKCAT_PACKED_BEGIN
         struct Header
         {
             uint16_t len;
@@ -697,16 +725,19 @@ namespace kickcat
             uint8_t  type : 4, // type of the mailbox, i.e. CoE
                     count: 3,  // handle of the message
                     reserved : 1;
-        } __attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Header) == 6);
 
         /// ETG.1000.4 chapter 5.6 EtherCAT mailbox structure
         namespace Error
         {
+            KICKCAT_PACKED_BEGIN
             struct ServiceData
             {
                 uint16_t type;
                 uint16_t detail;
-            } __attribute__((__packed__));
+            } KICKCAT_PACKED_END;
+            static_assert(sizeof(ServiceData) == 4);
 
             constexpr uint16_t SYNTAX                   = 0x01;
             constexpr uint16_t UNSUPPORTED_PROTOCOL     = 0x02;

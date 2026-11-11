@@ -328,14 +328,14 @@ TEST_F(FoE_Response, data_without_transfer)
 {
     auto reply = decode(slave.processRequest(createPDU(FoE::opcode::DATA, 1, pattern(2))));
     ASSERT_EQ(mailbox::Type::FoE, reply.type);
-    ASSERT_EQ(FoE::opcode::ERROR, reply.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, reply.opcode);
     ASSERT_EQ(FoE::result::PACKET_NUMBER_WRONG, reply.value);
 
     reply = decode(slave.processRequest(createPDU(FoE::opcode::ACK, 1)));
-    ASSERT_EQ(FoE::opcode::ERROR, reply.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, reply.opcode);
 
     // An unsolicited error has nothing to abort
-    ASSERT_TRUE(slave.processRequest(createPDU(FoE::opcode::ERROR, FoE::result::NOT_DEFINED)).empty());
+    ASSERT_TRUE(slave.processRequest(createPDU(FoE::opcode::ERR, FoE::result::NOT_DEFINED)).empty());
 }
 
 TEST_F(FoE_Response, write_wrong_packet_number)
@@ -345,7 +345,7 @@ TEST_F(FoE_Response, write_wrong_packet_number)
     ASSERT_EQ(0, reply.value);
 
     reply = decode(slave.processRequest(createPDU(FoE::opcode::DATA, 2, pattern(CAPACITY))));
-    ASSERT_EQ(FoE::opcode::ERROR, reply.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, reply.opcode);
     ASSERT_EQ(FoE::result::PACKET_NUMBER_WRONG, reply.value);
     ASSERT_EQ(1, storage.discarded);
     ASSERT_EQ(0, storage.open);
@@ -357,7 +357,7 @@ TEST_F(FoE_Response, read_unexpected_opcode)
     slave.processRequest(createRequest(FoE::opcode::READ, "fw.bin"));
 
     auto reply = decode(slave.processRequest(createPDU(FoE::opcode::DATA, 1, pattern(2))));
-    ASSERT_EQ(FoE::opcode::ERROR, reply.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, reply.opcode);
     ASSERT_EQ(FoE::result::ILLEGAL, reply.value);
     ASSERT_EQ(0, storage.open);
 }
@@ -367,7 +367,7 @@ TEST_F(FoE_Response, master_abort)
     slave.processRequest(createRequest(FoE::opcode::WRITE, "fw.bin"));
     slave.processRequest(createPDU(FoE::opcode::DATA, 1, pattern(CAPACITY)));
 
-    ASSERT_TRUE(slave.processRequest(createPDU(FoE::opcode::ERROR, FoE::result::NOT_DEFINED)).empty());
+    ASSERT_TRUE(slave.processRequest(createPDU(FoE::opcode::ERR, FoE::result::NOT_DEFINED)).empty());
     ASSERT_EQ(1, storage.discarded);
     ASSERT_EQ(0, storage.files.count("fw.bin"));
 }

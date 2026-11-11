@@ -49,14 +49,16 @@ namespace kickcat
 
 
     constexpr uint8_t CSR_CMD_HEADER_SIZE = 3;
+    KICKCAT_PACKED_BEGIN
     struct InternalRegisterControl
     {
         uint8_t  instruction;               // Read / write // TODO enum full.
         uint16_t LAN9252_register_address;  // address of SYSTEM CONTROL AND STATUS REGISTERS
         uint8_t  payload[64];             // Max payload size is 64 bytes (fifo).
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
 
 
+    KICKCAT_PACKED_BEGIN
     struct CSR_CMD
     {
         static constexpr uint8_t ESC_WRITE = 0x80;
@@ -65,7 +67,7 @@ namespace kickcat
         uint16_t ethercat_register_address;
         uint8_t  ethercat_register_size; // only size 1,2,4 allowed (ECAT_CSR_CMD specification)
         uint8_t  ethercat_register_operation; // read / write
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
 
 
     class Lan9252 final : public AbstractESC
