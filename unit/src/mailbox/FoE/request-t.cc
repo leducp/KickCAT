@@ -175,7 +175,7 @@ TEST_F(FoE_Request, read_wrong_packet_number)
     mailbox.send();
 
     PDU error = exchange(FoE::opcode::DATA, 2, pattern(3));
-    ASSERT_EQ(FoE::opcode::ERROR, error.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, error.opcode);
     ASSERT_EQ(FoE::result::PACKET_NUMBER_WRONG, error.value);
     ASSERT_EQ(MessageStatus::FOE_PACKET_NUMBER_WRONG, foe->status());
     ASSERT_TRUE(mailbox.to_process.empty());
@@ -187,7 +187,7 @@ TEST_F(FoE_Request, read_unexpected_opcode)
     mailbox.send();
 
     PDU error = exchange(FoE::opcode::ACK, 0);
-    ASSERT_EQ(FoE::opcode::ERROR, error.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, error.opcode);
     ASSERT_EQ(FoE::result::ILLEGAL, error.value);
     ASSERT_EQ(MessageStatus::FOE_UNEXPECTED_OPCODE, foe->status());
 }
@@ -198,7 +198,7 @@ TEST_F(FoE_Request, slave_error)
     mailbox.send();
 
     std::string text = "no such file";
-    ASSERT_TRUE(mailbox.receive(reply(FoE::opcode::ERROR, FoE::result::NOT_FOUND, {text.begin(), text.end()})));
+    ASSERT_TRUE(mailbox.receive(reply(FoE::opcode::ERR, FoE::result::NOT_FOUND, {text.begin(), text.end()})));
     ASSERT_EQ(FoE::result::NOT_FOUND, foe->status());
     ASSERT_EQ(text, foe->errorText());
     ASSERT_TRUE(mailbox.to_process.empty());
@@ -210,7 +210,7 @@ TEST_F(FoE_Request, slave_error_tftp_code)
     auto foe = mailbox.createFoEWrite("fw.bin", 0, pattern(4));
     mailbox.send();
 
-    ASSERT_TRUE(mailbox.receive(reply(FoE::opcode::ERROR, 0x2)));
+    ASSERT_TRUE(mailbox.receive(reply(FoE::opcode::ERR, 0x2)));
     ASSERT_EQ(FoE::result::ACCESS_DENIED, foe->status());
 }
 
@@ -328,7 +328,7 @@ TEST_F(FoE_Request, write_wrong_ack)
     exchange(FoE::opcode::ACK, 0);
 
     PDU error = exchange(FoE::opcode::ACK, 0);
-    ASSERT_EQ(FoE::opcode::ERROR, error.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, error.opcode);
     ASSERT_EQ(FoE::result::PACKET_NUMBER_WRONG, error.value);
     ASSERT_EQ(MessageStatus::FOE_PACKET_NUMBER_WRONG, foe->status());
 }
@@ -343,7 +343,7 @@ TEST_F(FoE_Request, cancel_while_waiting_for_reply)
     ASSERT_EQ(MessageStatus::RUNNING, foe->status());
 
     PDU error = exchange(FoE::opcode::ACK, 1);
-    ASSERT_EQ(FoE::opcode::ERROR, error.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, error.opcode);
     ASSERT_EQ(FoE::result::NOT_DEFINED, error.value);
     ASSERT_EQ(MessageStatus::FOE_CANCELLED, foe->status());
     ASSERT_TRUE(mailbox.to_process.empty());
@@ -358,7 +358,7 @@ TEST_F(FoE_Request, cancel_while_queued)
     // The ACK is queued: the error goes out in its place
     foe->cancel();
     PDU error = decode(mailbox.send()->data());
-    ASSERT_EQ(FoE::opcode::ERROR, error.opcode);
+    ASSERT_EQ(FoE::opcode::ERR, error.opcode);
     ASSERT_EQ(MessageStatus::FOE_CANCELLED, foe->status());
     ASSERT_TRUE(mailbox.to_process.empty());
 }

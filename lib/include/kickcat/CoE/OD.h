@@ -11,6 +11,12 @@
 #include <tuple>
 #include <functional>
 
+#ifdef _MSC_VER
+// The <math.h> of MSVC defines the legacy matherr() macro DOMAIN
+#include <cmath>
+#undef DOMAIN
+#endif
+
 namespace kickcat::CoE
 {
     // ETG 1000.5 chapter 5 Data type ASE (Application Service Element) and ETG 1020 Base Data Types

@@ -94,7 +94,7 @@ if (ENABLE_ESI_PARSER AND BUILD_SIMULATION)
     target_link_libraries(kickcat_unit kickcat_simulation)
 endif()
 
-if (WIN32)
+if (WIN32 AND NOT MSVC)
     # The exe died at load with STATUS_ENTRYPOINT_NOT_FOUND: it links against the import libraries
     # of the toolchain that built it, while the loader searches the exe's directory and PATH first
     # and can find an older libstdc++-6.dll there. Carrying those two in the binary removes the skew.

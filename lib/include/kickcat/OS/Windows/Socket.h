@@ -16,7 +16,7 @@ namespace kickcat
             close();
         }
 
-        void open(std::string const& interface) override;
+        void open(std::string const& ifname) override;
         void setTimeout(nanoseconds timeout) override;
         void close() noexcept override;
         int32_t read(void* frame, int32_t frame_size) override;

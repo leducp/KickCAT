@@ -18,9 +18,9 @@ namespace kickcat
         close();
     }
 
-    void TapSocket::open(std::string const& interface)
+    void TapSocket::open(std::string const& ifname)
     {
-        shm_.open(interface, 512_KiB);
+        shm_.open(ifname, 512_KiB);
 
         struct Metadata* metadata = reinterpret_cast<struct Metadata*>(shm_.address());
         Mutex mutex(&metadata->mutex);

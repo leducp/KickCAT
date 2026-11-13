@@ -9,6 +9,7 @@ using ::testing::_;
 using namespace kickcat;
 using namespace kickcat::mailbox::request;
 
+KICKCAT_PACKED_BEGIN
 struct Request
 {
     EthercatHeader  header;
@@ -16,7 +17,7 @@ struct Request
     CoE::Header coe;
     CoE::ServiceData sdo;
     int32_t data;
-} __attribute__((__packed__));
+} KICKCAT_PACKED_END;
 
 class GatewayTest : public testing::Test
 {

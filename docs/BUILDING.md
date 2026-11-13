@@ -133,11 +133,12 @@ testing.
 Requirements:
 
 - Conan for Windows (tested with 2.9.1)
-- gcc for Windows (tested with w64devkit 2.0.0)
+- gcc for Windows (tested with w64devkit 2.0.0) or MSVC (tested with Visual Studio 2022 and 2026)
 - npcap (driver 1.80 + SDK 1.70)
 
 Follow the manual build instructions above, using the appropriate Windows paths
-and the `conan/profile_windows_x86_64.txt` profile.
+and the `conan/profile_windows_x86_64.txt` profile (gcc) or the
+`conan/profile_windows_msvc_x86_64.txt` profile (MSVC).
 
 ## PikeOS
 

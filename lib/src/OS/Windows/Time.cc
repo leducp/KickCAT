@@ -1,6 +1,10 @@
 #include "OS/Time.h"
 #include "Error.h"
 
+#ifdef _MSC_VER
+#include <thread>
+#endif
+
 namespace kickcat
 {
     // MSVC/mingw's steady_clock is QueryPerformanceCounter-backed and
@@ -15,6 +19,13 @@ namespace kickcat
         return duration_cast<nanoseconds>(system_clock::now().time_since_epoch());
     }
 
+#ifdef _MSC_VER
+    // MSVC provides no clock_nanosleep()
+    void sleep(nanoseconds ns)
+    {
+        std::this_thread::sleep_for(ns);
+    }
+#else
     void sleep(nanoseconds ns)
     {
         // convert chrono to OS timespec
@@ -43,4 +54,5 @@ namespace kickcat
             THROW_SYSTEM_ERROR("clock_nanosleep()");
         }
     }
+#endif
 }

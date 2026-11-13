@@ -6,7 +6,7 @@
 #include "OS/KickOS/types/os_types.h"
 #elif defined(__unix__) || defined(__NuttX__)
 #include "OS/Unix/types/os_types.h"
-#elif defined(__MINGW64__ )
+#elif defined(__MINGW64__ ) || defined(_MSC_VER)
 #include "OS/Windows/types/os_types.h"
 #elif __PikeOS__
 #include "OS/PikeOS/types/os_types.h"

@@ -15,7 +15,7 @@ namespace kickcat
         AbstractSocket() = default;
         virtual ~AbstractSocket() = default;
 
-        virtual void open(std::string const& interface) = 0;
+        virtual void open(std::string const& ifname) = 0;
 
         /// Set the timeout to receive a frame. If negative, the timeout is infinite (blocking call).
         virtual void setTimeout(nanoseconds timeout) = 0;

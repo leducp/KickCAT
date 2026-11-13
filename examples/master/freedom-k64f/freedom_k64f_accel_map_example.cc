@@ -34,24 +34,27 @@ namespace pdo
 
 namespace freedom
 {
+    KICKCAT_PACKED_BEGIN
     struct fxos8700cq_accel_only
     {
         int16_t accelerometerX; // mapped 0x6000
         int16_t accelerometerY; // mapped 0x6001
         int16_t accelerometerZ; // mapped 0x6002
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 
+    KICKCAT_PACKED_BEGIN
     struct Input
     {
         fxos8700cq_accel_only sensor;
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 
+    KICKCAT_PACKED_BEGIN
     struct Output
     {
         uint8_t LED_R; // mapped 0x7000
         uint8_t LED_G; // mapped 0x7001
         uint8_t LED_B; // mapped 0x7002
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 }
 
 int main(int argc, char* argv[])

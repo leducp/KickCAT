@@ -12,6 +12,7 @@ using namespace kickcat;
 
 namespace foot
 {
+    KICKCAT_PACKED_BEGIN
     struct imu
     {
         int16_t accelerometerX; // raw data
@@ -23,8 +24,9 @@ namespace foot
         int16_t gyroscopeZ;
 
         int16_t temperature; // Celsius degrees
-    }__attribute__((packed));
+    }KICKCAT_PACKED_END;
 
+    KICKCAT_PACKED_BEGIN
     struct Input
     {
         uint16_t watchdog_counter;
@@ -38,12 +40,13 @@ namespace foot
         uint16_t force_sensor_Vref;
 
         uint16_t boardStatus;
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 
+    KICKCAT_PACKED_BEGIN
     struct Output
     {
         uint16_t watchdog_counter;
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 }
 
 

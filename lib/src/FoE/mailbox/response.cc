@@ -77,7 +77,7 @@ namespace kickcat::mailbox::response
                 endTransfer();
                 return start(raw_message);
             }
-            case FoE::opcode::ERROR:
+            case FoE::opcode::ERR:
             {
                 endTransfer();
                 return ProcessingResult::FINALIZE;
@@ -135,7 +135,7 @@ namespace kickcat::mailbox::response
                 reply(createPDU(FoE::opcode::ACK, 0, 0));
                 return ProcessingResult::FINALIZE_AND_KEEP;
             }
-            case FoE::opcode::ERROR:
+            case FoE::opcode::ERR:
             {
                 return ProcessingResult::FINALIZE;
             }
@@ -229,7 +229,7 @@ namespace kickcat::mailbox::response
     ProcessingResult FoEMessage::fail(uint32_t code)
     {
         endTransfer();
-        reply(createPDU(FoE::opcode::ERROR, code, 0));
+        reply(createPDU(FoE::opcode::ERR, code, 0));
         return ProcessingResult::FINALIZE;
     }
 

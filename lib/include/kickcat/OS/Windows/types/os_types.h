@@ -4,6 +4,17 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#ifdef _MSC_VER
+// MSVC has no POSIX layer: native primitives
+namespace kickcat
+{
+    using os_file   = int;
+    using os_mutex  = SRWLOCK;
+    using os_cond   = CONDITION_VARIABLE;
+    using os_shm    = HANDLE;
+    using os_socket = int;
+}
+#else
 // We still use POSIX API whenever possible on Windows for now
 #include <pthread.h>
 #include <semaphore.h>
@@ -20,5 +31,6 @@ namespace kickcat
     using os_thread = pthread_t;
     using os_pid    = pid_t;
 }
+#endif
 
 #endif

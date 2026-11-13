@@ -8,27 +8,30 @@
 
 using namespace kickcat;
 
+KICKCAT_PACKED_BEGIN
 struct SDOAnswer
 {
     mailbox::Header header;
     CoE::Header coe;
     CoE::ServiceData sdo;
     uint8_t payload[4];
-} __attribute__((__packed__));
+} KICKCAT_PACKED_END;
 
+KICKCAT_PACKED_BEGIN
 struct FoEAnswer
 {
     mailbox::Header header;
     FoE::Header foe;
     uint8_t payload[4];
-} __attribute__((__packed__));
+} KICKCAT_PACKED_END;
 
+KICKCAT_PACKED_BEGIN
 struct ALStatusAnswer
 {
     uint8_t  status;
     uint8_t  reserved[3];
     uint16_t code;
-} __attribute__((__packed__));
+} KICKCAT_PACKED_END;
 
 FoEAnswer createFoEAnswer(uint8_t opcode, uint32_t value, uint16_t payload_size = 0)
 {
@@ -404,13 +407,14 @@ TEST_F(BusTest, description_entries_built_at_mapping)
 TEST_F(BusTest, AL_status_error)
 {
     auto& slave = bus.slaves().at(0);
+    KICKCAT_PACKED_BEGIN
     struct Feedback
     {
         uint8_t status;
         uint8_t padding[3];
         uint16_t error;
 
-    } __attribute__((__packed__));
+    } KICKCAT_PACKED_END;
     Feedback al{0x11, {}, 0x0020};
 
     mock_link->handleProcess(Command::FPRD, al, 1);
@@ -607,7 +611,7 @@ TEST_F(BusTest, read_FoE_error)
 
     mock_link->handleProcess(Command::FPRD, uint8_t{0}, 1);
     mock_link->handleProcess(Command::FPRD, uint8_t{0x08}, 1);
-    mock_link->handleProcess(Command::FPRD, createFoEAnswer(FoE::opcode::ERROR, FoE::result::NOT_FOUND), 1);
+    mock_link->handleProcess(Command::FPRD, createFoEAnswer(FoE::opcode::ERR, FoE::result::NOT_FOUND), 1);
 
     std::vector<uint8_t> file;
     try
@@ -1331,7 +1335,8 @@ TEST_F(BusTest, mailbox_status_fmmu_both_LRW)
     // Write status: byte 11, bit 0
     // LRW WKC = 1 (read) + 1*2 (write) = 3 (slave has TxPDO so adjust = 0)
 
-    struct Response { uint8_t data[12]; } __attribute__((__packed__));
+    KICKCAT_PACKED_BEGIN
+    struct Response { uint8_t data[12]; } KICKCAT_PACKED_END;
     Response resp{};
     resp.data[7]  = 0x01; // read check: SM1 full -> can_read = true
     resp.data[11] = 0x00; // write check: SM0 empty -> can_write = !0 = true

@@ -75,7 +75,7 @@ namespace kickcat::mailbox::request
 
     ProcessingResult FoEMessage::abort(uint32_t code, uint32_t status)
     {
-        prepare(FoE::opcode::ERROR, code, 0);
+        prepare(FoE::opcode::ERR, code, 0);
         pending_status_ = status;
         rearmTimeout();
         return ProcessingResult::CONTINUE;
@@ -87,7 +87,7 @@ namespace kickcat::mailbox::request
         if (cancelled_ and (status_ == MessageStatus::RUNNING))
         {
             // The PDU is written on the bus from data_ after this call: replace it by the error
-            prepare(FoE::opcode::ERROR, FoE::result::NOT_DEFINED, 0);
+            prepare(FoE::opcode::ERR, FoE::result::NOT_DEFINED, 0);
             pending_status_ = MessageStatus::FOE_CANCELLED;
         }
 
@@ -122,7 +122,7 @@ namespace kickcat::mailbox::request
         uint8_t const* payload = pointData<uint8_t>(foe);
         uint16_t payload_size  = static_cast<uint16_t>(header->len - sizeof(FoE::Header));
 
-        if (foe->opcode == FoE::opcode::ERROR)
+        if (foe->opcode == FoE::opcode::ERR)
         {
             status_ = FoE::normalizeError(value);
             error_text_.assign(reinterpret_cast<char const*>(payload), payload_size);

@@ -5,6 +5,7 @@
 #include <limits>
 
 #include "kickcat/CoE/CiA/DS402/StateMachine.h"
+#include "kickcat/packed.h"
 
 namespace kickcat
 {
@@ -46,6 +47,7 @@ namespace kickcat::CoE::CiA::DS402
         // members at even offsets, avoiding unaligned access traps on
         // strict-alignment targets. Either PaddingStyle produces the same
         // 2-byte-per-mode wire layout, so it matches these structs.
+        KICKCAT_PACKED_BEGIN
         struct Input
         {
             uint16_t status_word;                // 0x6041, off 0
@@ -55,8 +57,10 @@ namespace kickcat::CoE::CiA::DS402
             int32_t  actual_velocity;            // 0x606C, off 8
             int16_t  actual_torque;              // 0x6077, off 12
             uint16_t error_code;                 // 0x603F, off 14
-        } __attribute__((packed));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Input) == 16);
 
+        KICKCAT_PACKED_BEGIN
         struct Output
         {
             uint16_t control_word;        // 0x6040, off 0
@@ -65,7 +69,8 @@ namespace kickcat::CoE::CiA::DS402
             int32_t  target_position;     // 0x607A, off 4
             int32_t  target_velocity;     // 0x60FF, off 8
             int16_t  target_torque;       // 0x6071, off 12
-        } __attribute__((packed));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Output) == 14);
 
         Drive(Bus& bus, Slave& slave);
 

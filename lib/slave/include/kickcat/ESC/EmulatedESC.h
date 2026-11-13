@@ -60,6 +60,7 @@ namespace kickcat
         nanoseconds localSystemTime() const;
 
     private:
+        KICKCAT_PACKED_BEGIN
         struct Memory
         {
             uint8_t type;
@@ -181,7 +182,8 @@ namespace kickcat
             uint8_t user_ram[128];
 
             uint8_t process_data_ram[0xf000];   // 60KB max following documentation
-        }__attribute__((__packed__));
+        } KICKCAT_PACKED_END;
+        static_assert(sizeof(Memory) == 0x10000);
 
         Memory memory_;
         std::vector<uint16_t> eeprom_;      // EEPPROM addressing is word/16 bits
