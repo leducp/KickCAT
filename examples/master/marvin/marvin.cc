@@ -1,7 +1,7 @@
-#include <iostream>
-#include <memory>
 #define _USE_MATH_DEFINES // needed for M_PI on Windows
 #include <cmath>
+#include <iostream>
+#include <memory>
 #include <vector>
 
 #include "kickcat/Bus.h"

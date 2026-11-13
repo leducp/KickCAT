@@ -12,6 +12,7 @@ using namespace kickcat;
 
 namespace freedom
 {
+    KICKCAT_PACKED_BEGIN
     struct fxos8700cq
     {
         int16_t accelerometerX; // mapped 0x6000
@@ -21,19 +22,21 @@ namespace freedom
         int16_t magnetometerX;  // mapped 0x6003
         int16_t magnetometerY;  // mapped 0x6004
         int16_t magnetometerZ;  // mapped 0x6005
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 
+    KICKCAT_PACKED_BEGIN
     struct Input
     {
         fxos8700cq sensor;
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 
+    KICKCAT_PACKED_BEGIN
     struct Output
     {
         uint8_t LED_R; // mapped 0x7000
         uint8_t LED_G; // mapped 0x7001
         uint8_t LED_B; // mapped 0x7002
-    } __attribute__((packed));
+    } KICKCAT_PACKED_END;
 }
 
 

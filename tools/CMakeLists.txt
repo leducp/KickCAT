@@ -17,6 +17,7 @@ set_kickcat_properties(foe)
 if (ENABLE_ESI_PARSER)
     add_executable(od_generator od_generator.cc)
     target_link_libraries(od_generator kickcat argparse::argparse)
+    target_compile_features(od_generator PRIVATE cxx_std_17)
 endif()
 
 
