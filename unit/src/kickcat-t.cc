@@ -1,3 +1,4 @@
+#include <array>
 #include <gtest/gtest.h>
 #include "kickcat/KickCAT.h"
 
