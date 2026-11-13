@@ -11,7 +11,7 @@
 #endif
 #elif __PikeOS__
     #include "kickcat/OS/PikeOS/Socket.h"
-#elif __MINGW64__
+#elif __MINGW64__ || _MSC_VER
 #include "kickcat/OS/Windows/Socket.h"
 #elif __NuttX__
 #include "kickcat/OS/NuttX/Socket.h"

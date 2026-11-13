@@ -1,4 +1,8 @@
-set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicated-cond -Wshadow -Wmissing-noreturn")
+if (MSVC)
+  set(WARNINGS_FLAGS "/W4")
+else()
+  set(WARNINGS_FLAGS "-Wall -Wextra -pedantic -Wcast-qual -Wcast-align -Wduplicated-cond -Wshadow -Wmissing-noreturn")
+endif()
 
 macro(set_kickcat_properties binary)
     set_target_properties(${binary} PROPERTIES
