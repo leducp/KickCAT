@@ -11,9 +11,11 @@
 #include <tuple>
 #include <functional>
 
-// Some C libraries (e.g. MSVC) define the legacy matherr() macro DOMAIN in <math.h>
+#ifdef _MSC_VER
+// The <math.h> of MSVC defines the legacy matherr() macro DOMAIN
 #include <cmath>
 #undef DOMAIN
+#endif
 
 namespace kickcat::CoE
 {
