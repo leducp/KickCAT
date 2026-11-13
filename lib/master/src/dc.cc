@@ -194,14 +194,14 @@ namespace kickcat
         for (auto& slave : slaves_)
         {
             dc_info("Received times %d\n", slave.address);
-            dc_info(  "Port 0: %ld\n", slave.dc_received_time[0].count());
-            dc_info(  "Port 1: %ld\n", slave.dc_received_time[1].count());
-            dc_info(  "Port 2: %ld\n", slave.dc_received_time[2].count());
-            dc_info(  "Port 3: %ld\n", slave.dc_received_time[3].count());
-            dc_info(  "EPU:    %ld\n", slave.dc_ecat_received_time.count());
+            dc_info(  "Port 0: %" PRId64 "\n", slave.dc_received_time[0].count());
+            dc_info(  "Port 1: %" PRId64 "\n", slave.dc_received_time[1].count());
+            dc_info(  "Port 2: %" PRId64 "\n", slave.dc_received_time[2].count());
+            dc_info(  "Port 3: %" PRId64 "\n", slave.dc_received_time[3].count());
+            dc_info(  "EPU:    %" PRId64 "\n", slave.dc_ecat_received_time.count());
 
             nanoseconds delta = slave.dc_received_time[1] - slave.dc_received_time[0];
-            dc_info("  T1 - T0 = %ld\n",delta.count());
+            dc_info("  T1 - T0 = %" PRId64 "\n",delta.count());
         }
     }
 
@@ -463,7 +463,7 @@ namespace kickcat
         {
             if (slave.isDCSupport())
             {
-                dc_info("DC slave %d delay is %ld from DC ref\n", slave.address, slave.delay.count());
+                dc_info("DC slave %d delay is %" PRId64 " from DC ref\n", slave.address, slave.delay.count());
                 auto error = [](DatagramState const& state)
                 {
                     THROW_ERROR_DATAGRAM("Error while applying slave DC delay", state);
@@ -511,7 +511,7 @@ namespace kickcat
                 continue;
             }
             int64_t raw_dc_time_diff = slave.dc_time_offset.count();
-            dc_info("DC slave %d time offset is %ld from DC ref\n", slave.address, slave.dc_time_offset.count());
+            dc_info("DC slave %d time offset is %" PRId64 " from DC ref\n", slave.address, slave.dc_time_offset.count());
             link_->addDatagram(Command::FPWR, createAddress(slave.address, reg::DC_SYSTEM_TIME_OFFSET), &raw_dc_time_diff, sizeof(raw_dc_time_diff), process, error);
         }
         link_->processDatagrams();
@@ -611,13 +611,13 @@ namespace kickcat
             nanoseconds drift = nanoseconds(sync.time_diff_raw & 0x7FFFFFFF);
             if (drift > threshold)
             {
-                dc_warning("DC slave %d NOT synchronized: drift = %ld ns (threshold = %ld ns)\n",
+                dc_warning("DC slave %d NOT synchronized: drift = %" PRId64 " ns (threshold = %" PRId64 " ns)\n",
                            sync.slave->address, drift.count(), threshold.count());
                 synchronized = false;
             }
             else if (log_all)
             {
-                dc_info("DC slave %d synchronized: drift = %ld ns\n",
+                dc_info("DC slave %d synchronized: drift = %" PRId64 " ns\n",
                         sync.slave->address, drift.count());
             }
         }
