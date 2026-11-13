@@ -17,7 +17,7 @@ namespace kickcat
         TapSocket(bool init=false);
         virtual ~TapSocket();
 
-        void open(std::string const& interface) override;
+        void open(std::string const& ifname) override;
         void close() noexcept override;
 
         /// Set the timeout to receive a frame. If negative, the timeout is infinite (blocking call).
