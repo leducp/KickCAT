@@ -43,6 +43,9 @@ jobs:
             test_install: true
           - os: windows-latest
             coverage: false
+          - os: windows-latest
+            preset: msvc
+            coverage: false
 
     steps:
       - uses: actions/checkout@v7
@@ -64,7 +67,7 @@ jobs:
         shell: bash
 
       - name: Setup build (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.preset != 'msvc'
         run: |
           conan install conan/conanfile.py -of=build/ -pr:b conan/profile_windows_x86_64.txt -pr:h conan/profile_windows_x86_64.txt -o "&:unit_tests=True" --build=missing -s build_type=${{env.BUILD_TYPE}}
           mkdir -p ${{github.workspace}}/build
@@ -72,6 +75,14 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
             -DBUILD_UNIT_TESTS=ON \
             -G "MinGW Makefiles"
+        shell: bash
+
+      - name: Setup build (Windows - MSVC)
+        if: matrix.preset == 'msvc'
+        run: |
+          conan install conan/conanfile.py -of=build/ -pr:b conan/profile_windows_msvc_x86_64.txt -pr:h conan/profile_windows_msvc_x86_64.txt -o "&:unit_tests=True" --build=missing -s build_type=${{env.BUILD_TYPE}}
+          # No generator given: CMake selects the installed Visual Studio
+          cmake -B build -DCMAKE_PREFIX_PATH="$PWD/build" -DBUILD_UNIT_TESTS=ON
         shell: bash
 
       - name: Build
@@ -83,7 +94,7 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ] && [ "${{ matrix.coverage }}" == "true" ]; then
             make coverage_xml
           else
-            ctest . --output-on-failure
+            ctest . -C ${{env.BUILD_TYPE}} --output-on-failure
           fi
         shell: bash
 

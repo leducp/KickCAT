@@ -1,0 +1,14 @@
+[settings]
+os=Windows
+arch=x86_64
+compiler=msvc
+compiler.version=195
+compiler.runtime=dynamic
+compiler.cppstd=17
+build_type=Release
+
+[options]
+
+[tool_requires]
+
+[buildenv]
