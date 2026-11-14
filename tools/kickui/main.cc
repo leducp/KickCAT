@@ -1,6 +1,7 @@
 #include <cfloat>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -98,7 +99,17 @@ namespace kickcat::kickui
     class Shell
     {
     public:
-        Shell() = default;
+        // Preload a scene for "Launch Simulator"; path from $KICKCAT_SIM_SCENE, else
+        // the default below. A missing file falls back to the built-in 1-slave default.
+        Shell()
+        {
+            if (char const* env = std::getenv("KICKCAT_SIM_SCENE"); env != nullptr and env[0] != '\0')
+            {
+                std::snprintf(sim_scene_path_, sizeof(sim_scene_path_), "%s", env);
+            }
+            std::string msg;
+            scene_.load(sim_scene_path_, msg);
+        }
 
         ~Shell()
         {
@@ -515,13 +526,16 @@ namespace kickcat::kickui
 
         void renderSidebar()
         {
-            // Reserve a fixed footer so the operation controls (Apply mapping /
-            // Back to PRE-OP) stay reachable no matter how long the slave list
-            // grows on a short window.
+            // Reserve a fixed footer so the operation controls stay reachable.
             float footer_h = 0.0f;
             if (session_.isConnected())
             {
-                footer_h = ImGui::GetFrameHeightWithSpacing() * 3.0f;
+                // the pinned footer holds SeparatorText("Operation") + a status
+                // line + the Apply/Back button. 3 frame-heights under-reserved it (the
+                // theme's SeparatorText padding tips it over), so the button spilled past
+                // the window bottom and was unreachable. Reserve generously (~5 lines) so
+                // it always fits; extra slack just shrinks the slave-list scroll area.
+                footer_h = ImGui::GetFrameHeightWithSpacing() * 5.0f;
             }
             ImGui::BeginChild("##sidebar_scroll", ImVec2(0.0f, -footer_h), false);
 
@@ -755,14 +769,29 @@ namespace kickcat::kickui
             else
             {
                 ImGui::TextDisabled("PRE-OP \xe2\x80\x94 include drives, then apply the mapping");
+                // Include every mappable slave, map, and run -- whole bus to OP in one click.
+                if (ImGui::Button("All slaves \xe2\x86\x92 OP"))
+                {
+                    for (auto& d : session_.devices())
+                    {
+                        if ((d.has_coe or d.sii_pdo) and not d.isConfigured()) { d.includeSlave(); }
+                    }
+                    session_.applyMapping();
+                }
+                if (ImGui::IsItemHovered())
+                {
+                    ImGui::SetTooltip("Include every mappable slave, map them, and drive the\n"
+                                      "whole bus to OPERATIONAL in one step.");
+                }
+                ImGui::SameLine();
                 if (ImGui::Button("Apply mapping"))
                 {
                     session_.applyMapping();
                 }
                 if (ImGui::IsItemHovered())
                 {
-                    ImGui::SetTooltip("Map every included drive at once and start the cyclic loop.\n"
-                                      "Each drive is then brought to SAFE-OP/OP independently.");
+                    ImGui::SetTooltip("Map only the slaves you ticked and start the cyclic loop.\n"
+                                      "Generic slaves go to OP; DS402 drives stop at SAFE-OP.");
                 }
             }
         }
@@ -1394,7 +1423,7 @@ namespace kickcat::kickui
         BusSession session_;
         std::unordered_map<int, std::vector<std::unique_ptr<Panel>>> device_panels_;
         int  iface_index_ = 0;
-        bool dc_enable_   = false;
+        bool dc_enable_   = false;  // DC sync is opt-in -- tick "DC sync (SYNC0)" before Connect
         int  cycle_ms_    = 1;
         bool detect_was_running_ = false;   // edge: auto-select once when a probe ends
 
@@ -1404,6 +1433,9 @@ namespace kickcat::kickui
         // The simulator: editor scene (all platforms) + child process (Linux).
         SimScene    scene_;
         std::string sim_error_;
+        // Default scene path (relative). Set $KICKCAT_SIM_SCENE to point "Launch
+        // Simulator" at another scene file without a rebuild, or pick one via
+        // Browse. Load is one-time in Shell().
         char        sim_scene_path_[256] = "sim_scene.txt";  // save/load the editor scene
         std::string sim_scene_msg_;
         bool        sim_scene_ok_ = true;   // last save/load outcome (colors the message)
