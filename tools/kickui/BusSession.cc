@@ -261,8 +261,15 @@ namespace kickcat::kickui
                 {
                     if ((e.code().value() == EPERM) or (e.code().value() == EACCES))
                     {
+                        // startup auto-scan can't open raw NIC sockets without
+                        // CAP_NET_RAW. Record it in the status line (`denied`) but do NOT
+                        // raise the privilege modal here: a sim/tap user never needs caps,
+                        // and granting them setcaps the binary, which the user then runs
+                        // for the tap (shared-memory) path where raw caps are irrelevant.
+                        // The real connect path (line ~690) still offers privilege if the
+                        // user actually connects to a raw NIC. Upgrade path: a "scan real
+                        // NICs" button that opts into the prompt explicitly.
                         denied = true;
-                        needs_privilege_ = true;
                     }
                 }
                 catch (std::exception const&)
@@ -1174,7 +1181,10 @@ namespace kickcat::kickui
                 // defaults); live UI changes then arrive via the command queue.
                 r.cmd.mode         = static_cast<int>(r.config.mode);
                 r.cmd.source       = static_cast<int>(SetpointSource::Manual);
-                r.cmd.target_state = static_cast<int>(State::SAFE_OP);
+                // A DS402 drive stops at SAFE-OP for its enable sequencer; a generic
+                // slave has none, so drive it straight to OP. Per-slave buttons override.
+                if (r.is_drive) { r.cmd.target_state = static_cast<int>(State::SAFE_OP);     }
+                else            { r.cmd.target_state = static_cast<int>(State::OPERATIONAL); }
                 if (r.is_drive)
                 {
                     r.drive = std::make_unique<Drive>(*bus, slave);
@@ -1615,16 +1625,25 @@ namespace kickcat::kickui
                     if (target_state == r.current_state) { continue; }
 
                     Slave& slave = bus->slaves().at(r.control->slave_index_);
+                    // PRE-OP -> OP is an invalid direct transition; step via SAFE-OP
+                    // first, which also starts process data flowing.
+                    int step_state = target_state;
+                    if ((target_state == static_cast<int>(State::OPERATIONAL))
+                     and (r.current_state == static_cast<int>(State::PRE_OP)))
+                    {
+                        step_state = static_cast<int>(State::SAFE_OP);
+                    }
+
                     std::string transition_error;
                     try
                     {
-                        bus->requestState(slave, static_cast<State>(target_state));
-                        bus->waitForState(slave, static_cast<State>(target_state), 1000ms, rt_cyclic);
-                        r.current_state = target_state;
-                        setSlaveState(r.control->slave_index_, static_cast<uint8_t>(target_state));
+                        bus->requestState(slave, static_cast<State>(step_state));
+                        bus->waitForState(slave, static_cast<State>(step_state), 1000ms, rt_cyclic);
+                        r.current_state = step_state;
+                        setSlaveState(r.control->slave_index_, static_cast<uint8_t>(step_state));
 
-                        bool pd_now = (target_state == static_cast<int>(State::SAFE_OP))
-                                   or (target_state == static_cast<int>(State::OPERATIONAL));
+                        bool pd_now = (step_state == static_cast<int>(State::SAFE_OP))
+                                   or (step_state == static_cast<int>(State::OPERATIONAL));
                         if (not r.seeded and pd_now and r.drive)
                         {
                             double seed = 0.0;
