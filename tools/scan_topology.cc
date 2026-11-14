@@ -322,6 +322,13 @@ int main(int argc, char* argv[])
         .help("clear the slaves error counters once the report is printed")
         .store_into(clear_errors);
 
+    int timeout_ms = 2;
+    program.add_argument("--timeout")
+        .help("Link read timeout in milliseconds (raise for a slow software bus over a real NIC)")
+        .default_value(2)
+        .scan<'i', int>()
+        .store_into(timeout_ms);
+
     try
     {
         program.parse_args(argc, argv);
@@ -365,6 +372,7 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
+    link->setTimeout(std::chrono::milliseconds(timeout_ms));
     link->checkRedundancyNeeded();
 
     Bus bus(link);
