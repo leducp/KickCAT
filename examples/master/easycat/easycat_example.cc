@@ -1,3 +1,4 @@
+#include <csignal>
 #include <iostream>
 #include <fstream>
 #include <argparse/argparse.hpp>
@@ -11,8 +12,17 @@
 
 using namespace kickcat;
 
+// Clean shutdown on Ctrl-C: break the loop so main returns and the socket
+// destructor runs, releasing the TAP slot (otherwise the next run sees
+// "Socket is full" until the server is restarted).
+namespace { volatile std::sig_atomic_t g_running = 1; }
+static void onSignal(int) { g_running = 0; }
+
 int main(int argc, char* argv[])
 {
+    std::signal(SIGINT, onSignal);
+    std::signal(SIGTERM, onSignal);
+
     argparse::ArgumentParser program("easycat_example");
 
     std::string nom_interface_name;
@@ -26,6 +36,29 @@ int main(int argc, char* argv[])
         .help("redundancy network interface name")
         .default_value(std::string{""})
         .store_into(red_interface_name);
+
+    // Timeouts default to hardware values; raise them for a slow software bus
+    // over a real NIC (network_simulator / Windows pcap).
+    int read_timeout_ms = 2;
+    program.add_argument("--timeout")
+        .help("Link read timeout for enumeration/init, in milliseconds")
+        .default_value(2)
+        .scan<'i', int>()
+        .store_into(read_timeout_ms);
+
+    int rt_timeout_ms = 10;
+    program.add_argument("--rt-timeout")
+        .help("Link read timeout in the cyclic loop, in milliseconds")
+        .default_value(10)
+        .scan<'i', int>()
+        .store_into(rt_timeout_ms);
+
+    int watchdog_ms = 100;
+    program.add_argument("--watchdog")
+        .help("PDIO watchdog passed to Bus::init, in milliseconds (0 disables)")
+        .default_value(100)
+        .scan<'i', int>()
+        .store_into(watchdog_ms);
 
     try
     {
@@ -58,7 +91,7 @@ int main(int argc, char* argv[])
     };
 
     std::shared_ptr<Link> link = std::make_shared<Link>(socket_nominal, socket_redundancy, report_redundancy);
-    link->setTimeout(2ms);
+    link->setTimeout(std::chrono::milliseconds(read_timeout_ms));
     link->checkRedundancyNeeded();
 
     Bus bus(link);
@@ -76,7 +109,11 @@ int main(int argc, char* argv[])
     try
     {
         printf("Initializing Bus...\n");
-        bus.init(100ms);  // to adapt to your use case
+        // PDIO watchdog (--watchdog). 100 ms is too tight for a software bus over a
+        // real NIC: one PDO cycle across many slaves can exceed it and the slaves trip
+        // "Sync manager watchdog" at the OP transition. Raise it (e.g. --watchdog 1000)
+        // for that case; 0 disables.
+        bus.init(std::chrono::milliseconds(watchdog_ms));
 
         printf("Init done\n");
         printf("Detected slaves: %zu\n", bus.slaves().size());
@@ -120,8 +157,13 @@ int main(int argc, char* argv[])
     {
         printf("Switching to SAFE_OP...\n");
         bus.requestState(State::SAFE_OP);
-        bus.waitForState(State::SAFE_OP, 1s);
-        print_current_state();
+        // Feed process data while waiting. On a slow software bus (network_simulator
+        // over a real NIC) the slaves' SyncManager watchdog expires unless a process-
+        // data frame keeps arriving through the transition; otherwise the slave drops
+        // out and OP is rejected with "Sync manager watchdog". Likewise, don't insert
+        // slow per-slave state reads (print_current_state) between SAFE_OP and the
+        // first cyclic exchange - that gap alone tripped the watchdog over Windows pcap.
+        bus.waitForState(State::SAFE_OP, 1s, cyclic_process_data);
 
         // Set valid output for all slaves to exit safe op
         for (auto& slave : bus.slaves())
@@ -136,6 +178,7 @@ int main(int argc, char* argv[])
         printf("Switching to OPERATIONAL...\n");
         bus.requestState(State::OPERATIONAL);
         bus.waitForState(State::OPERATIONAL, 1s, cyclic_process_data);
+        print_current_state();
         
         printf("After OPERATIONAL - Slave info:\n");
         for (auto& slave : bus.slaves())
@@ -156,7 +199,7 @@ int main(int argc, char* argv[])
     }
 
     auto callback_error = [](DatagramState const&){ THROW_ERROR("something bad happened"); };
-    link->setTimeout(10ms); // Adapt to your use case (RT loop)
+    link->setTimeout(std::chrono::milliseconds(rt_timeout_ms));
     MailboxSequencer mailbox_sequencer(bus);
 
     printf("Running loop...\n");
@@ -164,7 +207,7 @@ int main(int argc, char* argv[])
     Timer timer{1ms};
     timer.start();
 
-    while (true)
+    while (g_running)
     {
         timer.wait_next_tick();
 
