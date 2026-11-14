@@ -145,6 +145,13 @@ namespace kickcat
         {
             THROW_SYSTEM_ERROR("bind()");
         }
+
+        // A raw PF_PACKET socket is echoed a PACKET_OUTGOING copy of each frame it
+        // sends; drop those so reads return only real replies (sockopt: Linux >= 4.20).
+#ifdef PACKET_IGNORE_OUTGOING
+        int const ignore_outgoing = 1;
+        setsockopt(fd_, SOL_PACKET, PACKET_IGNORE_OUTGOING, &ignore_outgoing, sizeof(ignore_outgoing));
+#endif
     }
 
     void Socket::setTimeout(nanoseconds timeout)
@@ -178,7 +185,10 @@ namespace kickcat
         nanoseconds deadline = now() + timeout_;
         do
         {
-            ssize_t read_size = ::recv(fd_, frame, frame_size, flags_);
+            struct sockaddr_ll from;
+            socklen_t from_len = sizeof(from);
+            ssize_t read_size = ::recvfrom(fd_, frame, frame_size, flags_,
+                                           reinterpret_cast<struct sockaddr*>(&from), &from_len);
             if (read_size < 0)
             {
                 if (errno == EAGAIN)
@@ -190,6 +200,12 @@ namespace kickcat
                 {
                     return -errno;
                 }
+            }
+
+            // Skip our own echoed outgoing frames (see bind()); keep only real replies.
+            if (from.sll_pkttype == PACKET_OUTGOING)
+            {
+                continue;
             }
 
             return static_cast<int32_t>(read_size);
