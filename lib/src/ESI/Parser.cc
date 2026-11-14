@@ -1214,9 +1214,43 @@ CoE::Dictionary Parser::buildDictionary(XMLElement* profile, std::vector<SmInfo>
 
     // Synthesize CoE object 0x1C00 (Sync Manager Communication Type) from the
     // device's <Sm> declarations so callers of loadFile/loadString still get an
-    // SM-type array in their CoE::Dictionary. An explicit 0x1C00 in the ESI wins.
+    // SM-type array in their CoE::Dictionary. An explicit 0x1C00 in the ESI wins,
+    // but many vendor ESIs (e.g. Lenze) declare the object with no default values:
+    // backfill any SM-type subindex left without storage from <Sm>, so the master
+    // can still detect the process-data SyncManagers. An explicit value is kept.
     if (dictionaryContains(out, 0x1C00))
     {
+        for (auto& obj : out)
+        {
+            if (obj.index != 0x1c00)
+            {
+                continue;
+            }
+            uint8_t count = 0;
+            for (auto& entry : obj.entries)
+            {
+                if (entry.subindex == 0)
+                {
+                    continue;
+                }
+                ++count;
+                if (entry.data != nullptr or entry.subindex > sms.size())
+                {
+                    continue;
+                }
+                uint8_t type = static_cast<uint8_t>(sms[entry.subindex - 1].type);
+                entry.data = std::malloc(1);
+                std::memcpy(entry.data, &type, 1);
+            }
+            for (auto& entry : obj.entries)
+            {
+                if (entry.subindex == 0 and entry.data == nullptr)
+                {
+                    entry.data = std::malloc(1);
+                    std::memcpy(entry.data, &count, 1);
+                }
+            }
+        }
         return out;
     }
     if (sms.size() > 0xFF)
