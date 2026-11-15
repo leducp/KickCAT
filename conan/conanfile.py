@@ -12,6 +12,7 @@ class KickCATDev(ConanFile):
     options = {
         "unit_tests":       [True, False],
         "esi_parser":       [True, False],
+        "eni_parser":       [True, False],
         "simulation":       [True, False],
         "tools":            [True, False],
         "master_examples":  [True, False],
@@ -21,6 +22,7 @@ class KickCATDev(ConanFile):
     default_options = {
         "unit_tests":       False,
         "esi_parser":       True,
+        "eni_parser":       True,
         "simulation":       True,
         "tools":            True,
         "master_examples":  True,
@@ -34,7 +36,7 @@ class KickCATDev(ConanFile):
         if self.options.unit_tests:
             self.requires("gtest/1.15.0")
 
-        if self.options.esi_parser:
+        if self.options.esi_parser or self.options.eni_parser:
             self.requires("tinyxml2/11.0.0")
 
         if self.options.simulation:
