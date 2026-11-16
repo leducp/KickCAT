@@ -289,7 +289,6 @@ jobs:
   build_NuttX:
     needs: py_lint
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.nuttx.label == 'master' }}
     strategy:
       fail-fast: false
       matrix:
@@ -297,12 +296,8 @@ jobs:
           - xmc4800-relax
           - arduino-due
           - freedom-k64f
-        nuttx:
-          - label: stable
-            ref: nuttx-12.12.0
-          - label: master
-            ref: master
     env:
+      nuttx_ref: nuttx-12.12.0
       arm_none_eabi_version: 13.2.Rel1/binrel/arm-gnu-toolchain-13.2.Rel1-x86_64-arm-none-eabi
 
     steps:
@@ -315,27 +310,27 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/nuttxspace/nuttx
-          key: nuttx_${{ matrix.nuttx.ref }}
+          key: nuttx_${{ env.nuttx_ref }}
       - if: ${{ steps.cache-nuttx.outputs.cache-hit != 'true' }}
-        name: Checkout NuttX (${{ matrix.nuttx.label }})
+        name: Checkout NuttX (${{ env.nuttx_ref }})
         uses: actions/checkout@v7
         with:
           repository: apache/nuttx
           path: "nuttxspace/nuttx"
-          ref: "${{ matrix.nuttx.ref }}"
+          ref: "${{ env.nuttx_ref }}"
       - name: Cache NuttX Apps
         id: cache-nuttx-apps
         uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/nuttxspace/apps
-          key: nuttx-apps_${{ matrix.nuttx.ref }}
+          key: nuttx-apps_${{ env.nuttx_ref }}
       - if: ${{ steps.cache-nuttx-apps.outputs.cache-hit != 'true' }}
-        name: Checkout NuttX Apps (${{ matrix.nuttx.label }})
+        name: Checkout NuttX Apps (${{ env.nuttx_ref }})
         uses: actions/checkout@v7
         with:
           repository: apache/nuttx-apps
           path: "nuttxspace/apps"
-          ref: "${{ matrix.nuttx.ref }}"
+          ref: "${{ env.nuttx_ref }}"
       - name: Install Kconfig dependencies
         uses: ./KickCAT/.github/actions/apt-install
         with:
@@ -358,10 +353,10 @@ jobs:
           KickCAT/scripts/build_slave_bin.sh \
             ${{ matrix.board }} \
             ${{ github.workspace }}/nuttxspace/nuttx
-      - name: Upload firmware binary for ${{ matrix.board }} (nuttx ${{ matrix.nuttx.label }})
+      - name: Upload firmware binary for ${{ matrix.board }}
         uses: actions/upload-artifact@v7
         with:
-          name: firmware-${{ matrix.board }}-nuttx-${{ matrix.nuttx.label }}
+          name: firmware-${{ matrix.board }}-nuttx-stable
           path: KickCAT/build_${{ matrix.board }}/*.bin
           if-no-files-found: error
           retention-days: 1
