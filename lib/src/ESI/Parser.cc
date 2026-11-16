@@ -1234,7 +1234,10 @@ CoE::Dictionary Parser::buildDictionary(XMLElement* profile, std::vector<SmInfo>
                     continue;
                 }
                 ++count;
-                if (entry.data != nullptr or entry.subindex > sms.size())
+                // 0x1C00 SM-type subindices are UNSIGNED8 by spec; only backfill
+                // single-byte storage. Skip a malformed wider entry so the malloc(1)
+                // below can never undersize it.
+                if (entry.data != nullptr or entry.bitlen != 8 or entry.subindex > sms.size())
                 {
                     continue;
                 }

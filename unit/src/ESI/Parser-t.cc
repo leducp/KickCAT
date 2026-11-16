@@ -349,6 +349,40 @@ TEST(ESIParser, load_basic_with_bit_types_and_no_info)
     }
 }
 
+// The ESI declares object 0x1C00 but gives no <Info>/<DefaultData>, so its
+// subindices parse with null storage. buildDictionary must backfill each SM-type
+// subindex from the <Sm> declarations (MBoxOut/MBoxIn/Outputs/Inputs -> 1/2/3/4)
+// and set subindex 0 to the count, otherwise the master detects 0 process-data SMs.
+TEST(ESIParser, backfills_1C00_sm_types_when_esi_omits_defaults)
+{
+    ESI::Parser parser;
+    auto dictionary = parser.loadFile("kickcat_esi_test_1c00_backfill.xml");
+
+    auto [object, sub0] = findObject(dictionary, 0x1C00, 0);
+    ASSERT_NE(object, nullptr);
+    ASSERT_NE(sub0,   nullptr);
+    ASSERT_EQ(object->entries.size(), 5);
+
+    // subindex 0 == backfilled array length (4 sync managers)
+    ASSERT_NE(sub0->data, nullptr);
+    uint8_t count = 0;
+    std::memcpy(&count, sub0->data, 1);
+    ASSERT_EQ(count, 4);
+
+    // every SM-type subindex got single-byte storage holding the <Sm> type
+    uint8_t const expected[4] = {1, 2, 3, 4}; // MailboxOut, MailboxIn, Output, Input
+    for (uint8_t sub = 1; sub <= 4; ++sub)
+    {
+        auto [obj, entry] = findObject(dictionary, 0x1C00, sub);
+        ASSERT_NE(entry, nullptr);
+        ASSERT_EQ(entry->bitlen, 8);
+        ASSERT_NE(entry->data, nullptr);
+        uint8_t type = 0;
+        std::memcpy(&type, entry->data, 1);
+        ASSERT_EQ(type, expected[sub - 1]);
+    }
+}
+
 TEST(ESIParser, loadDevice_populates_aggregate)
 {
     ESI::Parser parser;

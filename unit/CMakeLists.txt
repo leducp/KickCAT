@@ -63,6 +63,7 @@ add_executable(kickcat_unit src/adler32_sum-t.cc
 set(KICKCAT_ESI_FIXTURES
     ${CMAKE_SOURCE_DIR}/examples/slave/xmc4800/wdc_foot/nuttx/foot.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_basic.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_1c00_backfill.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_complex.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_multi_device.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_esi_test_sm_fmmu.xml
