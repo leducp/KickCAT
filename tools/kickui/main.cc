@@ -769,19 +769,23 @@ namespace kickcat::kickui
             else
             {
                 ImGui::TextDisabled("PRE-OP \xe2\x80\x94 include drives, then apply the mapping");
-                // Include every mappable slave, map, and run -- whole bus to OP in one click.
+                // Map every mappable slave (DS402 drives get their motor config,
+                // generic slaves a plain include), map, and run -- in one click.
                 if (ImGui::Button("All slaves \xe2\x86\x92 OP"))
                 {
                     for (auto& d : session_.devices())
                     {
-                        if ((d.has_coe or d.sii_pdo) and not d.isConfigured()) { d.includeSlave(); }
+                        if (d.isConfigured() or not (d.has_coe or d.sii_pdo)) { continue; }
+                        if (d.isMotor()) { d.configureSlave(defaultMotorConfig()); }
+                        else             { d.includeSlave(); }
                     }
                     session_.applyMapping();
                 }
                 if (ImGui::IsItemHovered())
                 {
                     ImGui::SetTooltip("Include every mappable slave, map them, and drive the\n"
-                                      "whole bus to OPERATIONAL in one step.");
+                                      "whole bus to OPERATIONAL in one step.\n"
+                                      "Generic slaves reach OP; DS402 drives stop at SAFE-OP.");
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Apply mapping"))
