@@ -16,6 +16,7 @@ nav = [
   { "Simulation" = "SIMULATION.md" },
   { "Tools" = "TOOLS.md" },
   { "Performance" = "PERFORMANCE.md" },
+  { "ENI" = "ENI.md" },
   { "Architecture" = "architecture.md" },
 ]
 

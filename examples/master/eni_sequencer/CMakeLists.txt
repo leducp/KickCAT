@@ -1,0 +1,5 @@
+if (ENABLE_ENI_PARSER AND ENABLE_ESI_PARSER)
+    add_executable(eni_sequencer eni_sequencer.cc)
+    target_link_libraries(eni_sequencer kickcat argparse::argparse)
+    set_kickcat_properties(eni_sequencer)
+endif ()

@@ -41,4 +41,5 @@ Then run a master against an emulated slave -- no hardware, single process:
 - [Simulation and emulation](SIMULATION.md) -- software ESC and network emulator
 - [Tools and GUIs](TOOLS.md) -- KickUI, EEPROM editor, CLI utilities
 - [Real-time performance tuning](PERFORMANCE.md) -- Linux RT setup
+- [ENI network configuration (experimental)](ENI.md)
 - [Architecture overview](architecture.md)
