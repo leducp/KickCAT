@@ -17,6 +17,8 @@ nav = [
   { "Tools" = "TOOLS.md" },
   { "Performance" = "PERFORMANCE.md" },
   { "Architecture" = "architecture.md" },
+  { "Contributing" = "CONTRIBUTING.md" },
+  { "Release procedure" = "RELEASE.md" },
 ]
 
 [project.theme]
