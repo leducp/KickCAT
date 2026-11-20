@@ -1,0 +1,56 @@
+[project]
+site_name = "KickCAT"
+site_description = "A lightweight, efficient EtherCAT master/slave stack for embedded and real-time systems"
+site_url = "https://leducp.github.io/KickCAT/"
+repo_url = "https://github.com/leducp/KickCAT"
+repo_name = "leducp/KickCAT"
+edit_uri = "edit/master/docs/"
+docs_dir = "docs"
+site_dir = "build/docs-site"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Features" = "FEATURES.md" },
+  { "Building" = "BUILDING.md" },
+  { "Hardware" = "HARDWARE.md" },
+  { "Simulation" = "SIMULATION.md" },
+  { "Tools" = "TOOLS.md" },
+  { "Performance" = "PERFORMANCE.md" },
+  { "Architecture" = "architecture.md" },
+]
+
+[project.theme]
+name = "material"
+logo = "kickCAT_logo_dark_mode.png"
+favicon = "kickCAT_logo_light_mode.png"
+features = [
+  "navigation.top",
+  "navigation.footer",
+  "search.suggest",
+  "search.highlight",
+  "content.code.copy",
+  "content.action.edit",
+]
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.highlight = {}
+pymdownx.inlinehilite = {}
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
