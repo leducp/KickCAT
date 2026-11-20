@@ -72,6 +72,7 @@ set(KICKCAT_ESI_FIXTURES
     ${CMAKE_SOURCE_DIR}/simulation/slave_configs/ecat402-drive.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_eni_test_io.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_eni_test_mailbox.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/kickcat_eni_test_drives.xml
 )
 
 set(KICKCAT_ESI_FIXTURES_COPIED "")
@@ -92,6 +93,10 @@ target_link_libraries(kickcat_unit kickcat GTest::gmock_main)
 
 if (ENABLE_ENI_PARSER)
     target_sources(kickcat_unit PRIVATE src/ENI/Parser-t.cc)
+endif()
+
+if (ENABLE_ENI_PARSER AND ENABLE_ESI_PARSER)
+    target_sources(kickcat_unit PRIVATE src/ENI/Sequencer-t.cc)
 endif()
 
 # Simulation-support tests. lib/simulation is processed after unit/, so gate on
