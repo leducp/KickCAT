@@ -136,6 +136,14 @@ Reference boards: NXP Freedom K64F (LAN9252), Arduino Due with EasyCAT shield
 
 ## Documentation
 
+The documentation is published at <https://leducp.github.io/KickCAT/>. It is
+built with [Zensical](https://zensical.org/); preview it locally from the
+repository root:
+
+```bash
+uvx zensical serve
+```
+
 - [Feature support matrix](docs/FEATURES.md)
 - [Building and installing](docs/BUILDING.md)
 - [Hardware guide](docs/HARDWARE.md)
