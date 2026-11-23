@@ -242,7 +242,16 @@ namespace kickcat
 
         int32_t error_count = 0;
         error_count += write_read(socket_nominal_, socket_redundancy_, PRIMARY_IF_MAC);
-        error_count += write_read(socket_redundancy_, socket_nominal_, SECONDARY_IF_MAC);
+        if (socket_redundancy_->isPresent())
+        {
+            error_count += write_read(socket_redundancy_, socket_nominal_, SECONDARY_IF_MAC);
+        }
+        else
+        {
+            // Nothing leaves an absent interface: reading the nominal one a second time would
+            // wait out the timeout, or take a late frame for the answer.
+            ++error_count;
+        }
 
         if (error_count > 1)
         {

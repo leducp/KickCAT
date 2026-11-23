@@ -30,6 +30,10 @@ namespace kickcat
         /// \param  frame_size  size of the frame to write on the network
         /// \return Number of bytes written or a negative errno code otherwise
         virtual int32_t write(void const* frame, int32_t frame_size) = 0;
+
+        /// \return false for the placeholder of an absent interface (SocketNull): nothing written
+        ///         to it reaches a network, so no answer follows.
+        virtual bool isPresent() const { return true; }
     };
 
 

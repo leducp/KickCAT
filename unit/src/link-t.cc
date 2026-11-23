@@ -300,6 +300,44 @@ TEST_F(LinkTest, writeThenRead_NOK)
     ASSERT_THROW(link.writeThenRead(frame), std::system_error);
 }
 
+TEST(LinkWithoutRedundancy, writeThenRead_reads_nominal_once)
+{
+    // Without redundancy interface nothing is sent a second time: the nominal interface is not
+    // read again, which would wait out the timeout.
+    auto io_nominal = std::make_shared<MockSocket>();
+    Link link{io_nominal, std::make_shared<SocketNull>(), [](){}};
+    Frame frame;
+
+    EXPECT_CALL(*io_nominal, setTimeout(_))
+        .WillRepeatedly(Return());
+
+    EXPECT_CALL(*io_nominal, write(_,_))
+    .WillOnce(Return(ETH_MIN_SIZE));
+
+    EXPECT_CALL(*io_nominal, read(_,_))
+    .WillOnce(Return(ETH_MIN_SIZE));
+
+    link.writeThenRead(frame);
+}
+
+TEST(LinkWithoutRedundancy, writeThenRead_NOK)
+{
+    auto io_nominal = std::make_shared<MockSocket>();
+    Link link{io_nominal, std::make_shared<SocketNull>(), [](){}};
+    Frame frame;
+
+    EXPECT_CALL(*io_nominal, setTimeout(_))
+        .WillRepeatedly(Return());
+
+    EXPECT_CALL(*io_nominal, write(_,_))
+    .WillOnce(Return(ETH_MIN_SIZE));
+
+    EXPECT_CALL(*io_nominal, read(_,_))
+    .WillOnce(Return(0));
+
+    ASSERT_THROW(link.writeThenRead(frame), std::system_error);
+}
+
 TEST_F(LinkTest, writeThenRead_error_frame_type)
 {
     Frame frame;
