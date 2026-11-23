@@ -63,7 +63,7 @@ uvx zensical serve
 - [Simulation and emulation](docs/SIMULATION.md)
 - [Tools and GUIs](docs/TOOLS.md)
 - [Real-time performance tuning](docs/PERFORMANCE.md)
-- [Architecture overview](docs/architecture.md)
+- [Developer guide](docs/guide/README.md)
 - [Release procedure](docs/RELEASE.md)
 - [Contributing](docs/CONTRIBUTING.md)
 
