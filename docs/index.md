@@ -73,8 +73,8 @@ See [docs/SIMULATION.md](SIMULATION.md).
 
 ## Platform support
 
-The master runs as a host OS process; the slave runs the stack on an RTOS
-against an EtherCAT Slave Controller (ESC).
+The master runs as a host OS process; the slave runs the stack against an
+EtherCAT Slave Controller (ESC).
 
 **Master (host OS):**
 
@@ -84,28 +84,34 @@ against an EtherCAT Slave Controller (ESC).
 | PikeOS 5.1 | ARMv8        | Production                                   |
 | Windows    | x86-64       | Tools and testing only (not real-time)       |
 
-**Slave (NuttX RTOS + ESC):**
+**Slave (OS + ESC):**
+
+| OS     | Status       | Reference board                                    |
+|--------|--------------|----------------------------------------------------|
+| NuttX  | Production   | Freedom K64F (LAN9252), Arduino Due (EasyCAT, LAN9252), XMC4800 Relax Kit |
+| Linux  | Production   | Raspberry Pi (LAN9252 over SPI)                     |
+| KickOS | Experimental | Freedom K64F                                       |
 
 | ESC      | Interface  | Status                   |
 |----------|------------|--------------------------|
 | LAN9252  | SPI        | Production               |
 | XMC4800  | Integrated | Production; CTT validated |
 
-Reference boards: NXP Freedom K64F (LAN9252), Arduino Due with EasyCAT shield
-(LAN9252), Infineon XMC4800 Relax Kit (XMC4800). See the
-[hardware guide](HARDWARE.md).
+See the [hardware guide](HARDWARE.md).
 
 ## Getting started
 
 Build the stack and tools (Linux):
 
 ```bash
+source .venv/bin/activate   # provides Conan, see the building guide
 ./scripts/configure.sh build --with=unit_tests
 ./scripts/setup_build.sh build
-cd build && make -j
+make -C build -j
 ```
 
-Then run a master against an emulated slave -- no hardware, single process:
+Then, from the repository root, run a master against an emulated slave -- no
+hardware, single process:
 
 ```bash
 ./build/examples/master/simulated_bus/simulated_bus \

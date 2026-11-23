@@ -33,7 +33,9 @@ namespace kickcat::CoE::CiA::DS402
     // Usage:
     //   Drive drive(bus, slave);                       // PRE_OP
     //   drive.configure(POSITION_CYCLIC);              // SDO + mapPDO
-    //   bus.createMapping(iomap);                      // -> SAFE_OP
+    //   bus.createMapping(iomap, sizeof(iomap));
+    //   bus.requestState(State::SAFE_OP);
+    //   bus.waitForState(State::SAFE_OP, 1s);
     //   drive.attach();                                // capture PDO buffer
     //   // setpoints must be set before enabling, else PDO sends zeros:
     //   drive.setTargetPositionRaw(drive.actualPositionRaw());
