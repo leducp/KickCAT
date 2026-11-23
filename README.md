@@ -31,12 +31,14 @@ For exactly what is and isn't supported, see the
 Build the stack and tools (Linux):
 
 ```bash
+source .venv/bin/activate   # provides Conan, see the building guide
 ./scripts/configure.sh build --with=unit_tests
 ./scripts/setup_build.sh build
-cd build && make -j
+make -C build -j
 ```
 
-Then run a master against an emulated slave -- no hardware, single process:
+Then, from the repository root, run a master against an emulated slave -- no
+hardware, single process:
 
 ```bash
 ./build/examples/master/simulated_bus/simulated_bus \

@@ -138,9 +138,11 @@ The Python interpreter needs raw-socket capabilities:
 
 Located in `examples/slave/<pdi-chip>/<board>/<os>/`. Supported boards:
 
-- **XMC4800** (Infineon XMC4800 Relax Kit)
-- **Arduino Due** (with EasyCAT shield + LAN9252)
-- **Freedom K64F** (NXP Kinetis with LAN9252)
+- **XMC4800** (Infineon XMC4800 Relax Kit, NuttX)
+- **Arduino Due** (with EasyCAT shield + LAN9252, NuttX)
+- **Freedom K64F** (NXP Kinetis with LAN9252, NuttX; KickOS is experimental)
+- **Raspberry Pi** (LAN9252 over SPI, Linux; built with the CMake option `RPI`,
+  which requires the bcm2835 library)
 
 ---
 
@@ -162,7 +164,7 @@ Located in `examples/slave/<pdi-chip>/<board>/<os>/`. Supported boards:
 
 **Freedom K64F**
 
-- Standard OpenOCD flashing supported.
+- Use the provided flashing script in the board directory (J-Link).
 
 **XMC4800**
 
@@ -172,7 +174,7 @@ Located in `examples/slave/<pdi-chip>/<board>/<os>/`. Supported boards:
 
 ## Building and deploying slave firmware
 
-All slave examples use NuttX. Use the automated build script:
+The NuttX slave examples are built with the automated build script:
 
 ```bash
 ./scripts/build_slave_bin.sh <board-name> <nuttx-src-path> [build-name]
