@@ -1,43 +1,36 @@
 # What is EtherCAT?
 
-> What problem does EtherCAT solve, and why does it solve it so fast?
+> How does Ethernet for Control Automation Technology (EtherCAT) exchange machine data?
 >
 > You will learn:
 >
-> - what a fieldbus does in a machine
-> - what a master, a slave and a cycle are
-> - how one frame serves every device on the network
-> - the example board that the rest of Part 0 follows
+> - what a fieldbus does
+> - what a master, a slave, and a cycle are
+> - how one frame serves many devices
+> - which board the examples use
 
 ## The problem: one controller, many devices, every millisecond
 
-A machine such as a robot arm or a packaging line has one central computer and many
-small devices around it. Some devices measure: a position encoder, a temperature
-sensor, a push button. Others act: a motor drive, a valve, a light. The central
-computer reads every sensor, computes what to do, and writes a command to every
-actuator. Then it does the same again, and again, at a fixed rate.
+In a robot arm or packaging line, a central computer reads devices such as position
+encoders, temperature sensors, and push buttons. It calculates commands and sends
+them to actuators such as motor drives, valves, and lights. It repeats these steps
+at a fixed rate.
 
-Two things matter in that loop:
+The controller has two timing requirements.
 
-- **Speed.** A motor drive may need a new position every millisecond, or faster.
-- **Determinism.** The data must arrive at the same moment in every loop. A command
-  that is late by a random amount is almost as bad as a wrong command. Determinism
-  means that the timing is predictable, not only that it is fast on average.
+- **Speed.** A motor drive may need a new position at least once per millisecond.
+- **Determinism.** Data must arrive at a predictable point in each cycle. A high
+  average speed alone does not guarantee this.
 
-A **fieldbus** is the network that carries this data between the central computer
-and the devices. EtherCAT (Ethernet for Control Automation Technology) is one
-fieldbus. It uses standard Ethernet cables and Ethernet frames, but it uses them in
-an unusual way.
+A **fieldbus** connects the controller to the devices. EtherCAT is a fieldbus that
+uses standard Ethernet cables and frames.
 
 ## Master, slaves and the cycle
 
-EtherCAT gives the two sides fixed roles.
-
-- The **master** is the central computer. It is the only device that sends frames.
-  It is usually an ordinary PC or an embedded computer with a standard Ethernet
+- The **master** is the central computer. Only the master starts a frame exchange.
+  It is usually a personal computer or an embedded computer with a standard Ethernet
   port.
-- A **slave** is a device on the network. A slave never starts a transfer. It only
-  answers the frames that the master sends.
+- A **slave** is a device that responds to the master's frames.
 
 The master repeats the same exchange at a fixed rate. One repetition is a **cycle**,
 and its duration is the **cycle time**. Machines often run cycle times between 100
@@ -45,28 +38,22 @@ microseconds and a few milliseconds. In each cycle, the master sends its outputs
 (commands for the actuators) and collects its inputs (measurements from the
 sensors).
 
-The words "input" and "output" are always seen from the master. An output goes from
+Inputs and outputs are named from the master's point of view. An output goes from
 the master to a slave. An input goes from a slave to the master.
 
 ## How one frame serves every device
 
-A naive design would send one Ethernet frame to each device and wait for each
-answer. With fifty devices, that is fifty frames and fifty replies per cycle, and
-each one adds its own delay. A switch between the devices would add more delay, and
-that delay would vary.
+Sending a separate request to each of 50 devices would take 50 frames and 50 replies
+per cycle. Each adds delay. A switch could add a delay that varies between frames.
 
-EtherCAT does something else. The slaves are connected one after the other, usually
-in a line. The master sends **one frame**, and that frame passes through every
-slave in turn. Each slave has a dedicated chip that reads the data meant for it and
-writes its own data into the frame **while the frame passes**. The chip does not
-store the frame and forward it later. It delays the frame by a small, fixed amount,
-much less than a microsecond per slave. This is called **processing on the fly**.
+EtherCAT slaves usually connect in a line. The master sends one frame through the
+slaves in order. As the frame passes, a chip in each slave reads the data addressed
+to it and writes its data into the frame. The chip forwards the frame without
+storing it first. Each slave adds a small, fixed delay of much less than a
+microsecond. This is called **processing on the fly**.
 
-The last slave in the line has nothing connected after it. It sends the frame back,
-and the frame returns to the master through the same cables. When it arrives, it
-holds the inputs of every slave.
-
-The diagram below shows one frame going out through three slaves and coming back.
+The last slave returns the frame through the same cables. The master receives the
+inputs from all the slaves.
 
 ```mermaid
 flowchart LR
@@ -78,39 +65,31 @@ flowchart LR
     S1 -.-> M
 ```
 
-This design has three consequences:
+- **Frame size.** One frame can carry up to 1500 bytes of data for many devices.
+  This reduces the time spent on headers and gaps between frames.
+- **Timing.** Each slave adds the same delay each cycle. No switch queues the
+  frames, so the round-trip time is almost constant.
+- **Hardware.** The master uses a standard Ethernet port. Only the slaves need
+  special hardware.
 
-- **It is fast.** One frame of up to 1500 bytes of data serves many devices. The
-  network spends its time carrying data, not headers and gaps between frames.
-- **It is deterministic.** Each slave adds the same delay in every cycle, and there
-  is no switch that queues frames. The time a frame takes to go around is almost
-  constant.
-- **It is cheap on the master side.** The master needs no special hardware. A
-  standard Ethernet port sends and receives the frame. The special hardware is in the
-  slaves.
-
-The chip in each slave is the **EtherCAT Slave Controller (ESC)**. [Chapter
-0.3](inside-a-slave.md) looks inside it.
+Each slave uses an **EtherCAT Slave Controller (ESC)** to process frames. See
+[Chapter 0.3](inside-a-slave.md).
 
 ## The example this guide follows
 
-Part 0 follows one small slave from start to end: the **Freedom K64F board**. It is
-a development board with an NXP K64F microcontroller, connected to a LAN9252 ESC.
-The board has:
+The **Freedom K64F board** has an NXP K64F microcontroller connected to a LAN9252
+ESC. The examples use these parts of the board.
 
-- an RGB light, with one byte each for red, green and blue: **3 bytes of outputs**
-- an accelerometer and a magnetometer, each giving x, y and z as 16-bit signed
-  integers: **12 bytes of inputs**
-- a mailbox, a channel for messages that are not part of the cycle, which [Chapter
-  0.6](mailboxes.md) describes
+- A light uses **3 output bytes**, one each for red, green, and blue.
+- An accelerometer and a magnetometer provide **12 input bytes**. Each sensor
+  returns three signed 16-bit values for the x, y, and z axes.
+- A mailbox carries messages outside the cyclic exchange. See [Chapter 0.6](mailboxes.md).
 
-In every cycle, the master wants to do two things with this board: write the 3
-colour bytes, and read the 12 sensor bytes. The next chapters show how EtherCAT
-places those 15 bytes in a frame, where the board stores them, and what must
-happen before the board accepts them.
+Each cycle, the master writes the 3 color bytes and reads the 12 sensor bytes. The
+next chapters explain the frame layout, where the board stores the data, and when it
+accepts outputs.
 
-You do not need the board to follow the guide. KickCAT can emulate it in software,
-and [Chapter 2](../architecture.md) runs that emulation.
+You can run the example with an emulated board. See [Chapter 2](../architecture.md).
 
 ## Summary
 
@@ -124,9 +103,8 @@ and [Chapter 2](../architecture.md) runs that emulation.
 
 ## In KickCAT
 
-KickCAT provides both sides: a master that runs on a host operating system, and a
-slave stack that runs on a microcontroller next to an ESC. [Chapter
-1](principles.md) describes both.
+The KickCAT master runs on a host operating system. The slave stack runs on a
+microcontroller connected to an ESC. See [Chapter 1](principles.md).
 
 ## Where to go next
 

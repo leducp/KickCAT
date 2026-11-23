@@ -1,160 +1,132 @@
 # Overview and principles
 
-> What is KickCAT for, and what rules does every part of it follow?
+> Which design rules does KickCAT follow?
 >
 > You will learn:
 >
-> - what KickCAT sets out to be
-> - the principles every later chapter applies, and why
-> - which chapters develop each one
+> - where KickCAT runs
+> - why the stack follows these rules
+> - where each rule applies in the code
 
 ## What KickCAT is
 
-KickCAT is an EtherCAT stack for both sides of the bus. The master stack runs
-as a process on a host operating system (OS), such as Linux or PikeOS. The slave
-stack runs on a microcontroller, next to an EtherCAT Slave Controller (ESC).
-KickCAT also ships a software ESC and a software network, so a master can run
-against slaves that exist only in memory.
+KickCAT implements the master and slave sides of EtherCAT. The master runs as a
+process on a host operating system (OS), such as Linux or PikeOS. The slave stack
+runs on a microcontroller with an EtherCAT Slave Controller (ESC). A software ESC
+and network let the master communicate with emulated slaves.
 
-KickCAT is a library, not a framework. It is meant to be embedded in a larger
-program: a robot controller, a test bench, a firmware. That program already has
-its own main loop, its own threads and its own memory plan. KickCAT must fit
-into them, and not the reverse.
-
-The principles below follow from that aim.
+Applications such as robot controllers, test benches, and device firmware use
+KickCAT as a library. Each application controls its main loop, threads, and memory.
 
 ## The application owns the loop and the thread
 
-**Why.** A real-time program decides exactly what runs, when, and on which
-core. A library that starts its own thread takes that decision away: it adds a
-thread with its own priority and its own timing, and the program must now share
-the CPU with it.
+A real-time application decides which code runs, when it runs, and on which
+processor core. A library thread would compete for processor time with its own
+priority and schedule.
 
-**What KickCAT chose.** The stack starts no thread. Nothing happens on the bus
-until the application calls the stack. The application decides when frames
-leave, when replies are processed and how long it waits. On the master, it calls
-the `Bus` in its cycle. On the slave, it calls `routine()` in its main loop.
+The stack runs only when the application calls it. The application controls when it
+sends frames, processes replies, and stops waiting. The master application calls
+`Bus` in its cycle. The slave application calls `routine()` in its main loop.
 
-The price is that the application must call the stack often enough. A mailbox
-reply does not arrive by itself: someone must send the frame that fetches it.
-Helpers exist for the common cases, such as a function that keeps the process
-data moving while it waits for a state change.
+The application must call the stack often enough to receive data. For example, the
+master must send a frame to read a mailbox reply. A helper can continue exchanging
+process data while the master waits for a state change.
 
-**Where it is developed.** [Chapter 3](master.md) shows the master's cyclic loop.
-[Chapter 6](slave.md) shows the slave's main loop.
+[Chapter 3](master.md) describes the master's cyclic loop. [Chapter 6](slave.md)
+describes the slave's main loop.
 
 ## The caller owns the memory
 
-**Why.** Embedded and real-time programs control their memory. Some forbid
-allocation once the cycle starts. Some place buffers in a specific RAM region.
-A stack that allocates its own buffers makes these choices for them.
+Some real-time applications forbid memory allocation after the cycle starts. Others
+need buffers in a specific area of random-access memory (RAM).
 
-**What KickCAT chose.** The data that the application reads and writes every
-cycle lives in memory the application gives. On the master, the process image is
-a buffer the application passes to `createMapping()`. On the slave, the input
-and output buffers and the object dictionary belong to the application, and the
-stack only keeps pointers to them. The application must keep this memory alive
-as long as the stack uses it.
+The application provides the memory for cyclic data. On the master, it passes its
+process image buffer to `createMapping()`. On the slave, it provides the input and
+output buffers and the object dictionary. The stack keeps pointers to them, so the
+memory must remain valid while the stack uses it.
 
-**Where it is developed.** [Chapter 3](master.md) shows the layout of the
+[Chapter 3](master.md) shows the layout of the
 master's process image. [Chapter 6](slave.md) shows how the slave binds its
 buffers to the object dictionary.
 
 ## An asynchronous core, with blocking helpers on top
 
-**Why.** A cyclic program cannot stop and wait for one slave to answer. It must
-send its frame, do its work, and collect the answers later. A simple tool, on
-the other hand, wants to call "read this value" and get the value back.
+A cyclic application must be able to do other work while a slave processes a
+request. A setup tool can wait for a reply before continuing.
 
-**What KickCAT chose.** The core of the master is asynchronous. The application
-adds datagrams, each with a callback for the answer and a callback for errors,
-then sends them and later processes what comes back. Mailbox messages work the
-same way: the application queues a message and checks its status later.
+The master queues datagrams with callbacks for replies and errors. The application
+sends them, then processes the replies later. It can also queue a mailbox message
+and check its status later.
 
-Blocking functions, such as reading one CoE value, are built on top of this
-core. They are convenient during setup and in tools. In a real-time cycle, use
-the asynchronous calls.
+Blocking helpers use the same asynchronous operations. For example, a setup tool can
+read one CANopen over EtherCAT (CoE) value and wait for the reply. Use asynchronous
+calls in a real-time cycle.
 
-**Where it is developed.** [Chapter 4](transport.md) follows one datagram and
-its callbacks. [Chapter 5](mailbox-implementation.md) shows a mailbox message from
-queue to answer.
+[Chapter 4](transport.md) describes datagram callbacks. [Chapter
+5](mailbox-implementation.md) describes mailbox requests and replies.
 
 ## Swappable hardware boundaries
 
-**Why.** The stack must run on many network cards, many slave controllers and
-many operating systems. It must also run with no hardware at all, in tests and
-in the simulator.
+KickCAT supports different network cards, slave controllers, and operating systems.
+Tests and simulations must also run without EtherCAT hardware.
 
-**What KickCAT chose.** Each place where the stack touches hardware is a small
-abstract interface. The master sends frames through an `AbstractSocket`. The
-slave reads and writes its controller through an `AbstractESC`, and a controller
-on a serial bus uses an `AbstractSPI`. FoE (File over EtherCAT) reads and writes
-files through an `FoE::AbstractStorage`. Everything above these interfaces is
-the same on every target.
+The master sends frames through an `AbstractSocket`. The slave uses `AbstractESC` to
+access its controller. A controller on a Serial Peripheral Interface (SPI) bus uses
+`AbstractSPI`. File over EtherCAT (FoE) uses `FoE::AbstractStorage` for file access.
+Higher-level code uses the same interfaces on all targets.
 
-This choice is what makes the simulator honest. The emulator replaces the
-controller and the wire, and nothing else. The master talks to the real slave
-stack, the same code that runs in firmware.
+The emulator replaces the controller and network. The master communicates with the
+same slave stack that runs in firmware.
 
-**Where it is developed.** [Chapter 4](transport.md) lists the sockets,
+[Chapter 4](transport.md) lists the sockets,
 [Chapter 6](slave.md) the controllers, [Chapter 8](simulation.md) the emulator,
 and [Chapter 10](os-and-porting.md) the OS layer.
 
 ## One protocol codebase for both sides
 
-**Why.** The master and the slave must agree on every byte. If each side has its
-own definition of a frame or a mailbox header, the two can drift apart, and a bug
-on one side hides a bug on the other.
+The master and slave must use the same byte layout. Separate frame and mailbox
+definitions can become inconsistent. Matching errors in the two definitions can also
+hide a bug.
 
-**What KickCAT chose.** The protocol definitions are written once and used by
-both stacks: the frame and datagram headers, the EEPROM layout, the CoE and FoE
-messages and the object dictionary. The master builds requests and the slave
-builds responses, but they share the types that describe the wire.
+Both stacks use the same frame and datagram headers, electrically erasable
+programmable read-only memory (EEPROM) layout, mailbox messages for CoE and FoE, and
+object dictionary types. The master builds requests and the slave builds responses
+from these types.
 
-**Where it is developed.** [Chapter 5](mailbox-implementation.md) puts the
-request and response sides next to each other. [Chapter 9](from-xml-to-bytes.md)
-shows one device description feeding both sides.
+[Chapter 5](mailbox-implementation.md) describes requests and responses. [Chapter
+9](from-xml-to-bytes.md) explains how both stacks use the same device description.
 
 ## Check the configuration once, then trust it
 
-**Why.** Checks cost time and code size, and a microcontroller has little of
-both. A check that runs on every access is also a check that can fail in the
-middle of the cycle, where there is no good way to recover.
+Repeated checks take time and increase code size on a microcontroller. A cyclic
+application may have no way to recover from a configuration error during a cycle.
 
-**What KickCAT chose.** Configuration is checked when it is built, not when it
-is used. The object dictionary generator refuses an invalid dictionary. The
-master checks that the process image fits in the buffer when it creates the
-mapping. After that, the stack trusts the configuration and does not check it
-again at run time.
+KickCAT checks the configuration during setup. The object dictionary generator
+rejects an invalid dictionary. The master checks that the process image fits when it
+creates the mapping. The stack then uses the configuration without repeating these
+checks.
 
-**Where it is developed.** [Chapter 6](slave.md) and
-[Chapter 9](from-xml-to-bytes.md) for the object dictionary,
-[Chapter 3](master.md) for the process image.
+See [Chapter 6](slave.md) and [Chapter 9](from-xml-to-bytes.md) for the object
+dictionary and [Chapter 3](master.md) for the process image.
 
 ## Errors: exceptions on the master, status codes on the slave
 
-**Why.** The two sides run in different worlds. The master runs on a host OS,
-where exceptions are cheap to use and hard to ignore. The slave runs on a
-microcontroller, and EtherCAT already defines how a slave reports a problem: it
-refuses a state change and gives an Application Layer (AL) status code.
+The master runs on a host OS where it can use exceptions. The slave runs on a
+microcontroller. EtherCAT defines how a slave can refuse a state change and report
+the reason with an Application Layer (AL) status code.
 
-**What KickCAT chose.** The master reports errors with exceptions, and with
-error callbacks for datagrams in the cyclic path. The slave reports errors to
-the master the EtherCAT way, with AL status codes.
+The master reports errors with exceptions. It uses error callbacks for cyclic
+datagrams. The slave reports errors to the master with AL status codes.
 
-**Where it is developed.** [Chapter 3](master.md) and [Chapter 4](transport.md)
-for the master, [Chapter 6](slave.md) for the slave.
+See [Chapter 3](master.md) and [Chapter 4](transport.md) for master errors and
+[Chapter 6](slave.md) for slave errors.
 
 ## A low barrier to entry
 
-**Why.** A stack that is hard to start with does not get used. EtherCAT already
-has a lot to learn, and the stack should not add to it.
-
-**What KickCAT chose.** A working master is a short `main`: create a socket, a
-link and a bus, call `init()`, map the process image, and loop. A working slave
-is the same size. The simulator lets you run both with no hardware. The
-`simulated_bus` example, walked in [Chapter 2](../architecture.md), is the whole
-of it.
+A master needs only a short `main`. It creates a socket, a link, and a bus, calls
+`init()`, maps the process image, and starts the cyclic loop. A slave needs a
+similar amount of code. The `simulated_bus` example runs both without hardware. See
+[Chapter 2](../architecture.md).
 
 ## Summary
 
@@ -169,6 +141,5 @@ of it.
 
 ## Where to go next
 
-- Where each part lives, and one example read from top to bottom:
-  [Chapter 2](../architecture.md).
-- The master, from discovery to OP: [Chapter 3](master.md).
+- Source directories and an example program: [Chapter 2](../architecture.md).
+- Master startup through the operational state (OP): [Chapter 3](master.md).

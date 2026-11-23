@@ -1,14 +1,14 @@
 # Topology, redundancy and clocks
 
-> How does a frame find its way through the slaves, what happens when a cable
-> breaks, and how do slaves agree on the time?
+> How does EtherCAT handle frame
+> routing, broken cables, and clock synchronization?
 >
 > You will learn:
 >
-> - what the ports of a slave are, and in which order a frame visits them
-> - how a line and a tree of slaves are wired
-> - how a ring with cable redundancy survives a broken cable
-> - how distributed clocks give every slave the same time
+> - in what order a frame passes through the slave ports
+> - how slaves connect in a line or a tree
+> - how a ring maintains communication after a cable break
+> - how distributed clocks (DC) keep a common time
 
 ## Ports: how a frame travels
 
@@ -16,16 +16,13 @@ A slave controller has up to four **ports**, numbered 0 to 3. Each port is one
 Ethernet connection. Port 0 faces the master. The other ports lead to the next
 slaves.
 
-Ethernet is **full duplex**: a cable carries data in both directions at once, on
-separate wires. EtherCAT uses this. A frame goes out on one direction of each
-cable and comes back on the other direction of the same cable.
+Ethernet is **full duplex**. Each cable carries data in both directions at once on
+separate wires. The EtherCAT frame returns to the master through the same cables.
 
-Inside the slave controller, the frame entering port 0 goes through the
-**EtherCAT processing unit**, the part that reads and writes the datagrams. It
-then leaves through the next port. When a port has no link, it is **closed**: the
-slave controller does not send the frame on it, and loops it back inside itself
-to the next port at once. The order is fixed by the hardware. With four ports it
-is:
+A frame entering port 0 passes through the **EtherCAT processing unit**, which reads
+and writes datagrams. The controller then forwards the frame to the next port. A
+port without a link is **closed**. The controller skips it and forwards the frame
+internally to the next port. With four ports, the hardware uses this order.
 
 **0 -> processing unit -> 3 -> 1 -> 2 -> 0**
 
@@ -34,10 +31,9 @@ processed a second time.
 
 ## Line and tree
 
-In a **line**, each slave uses port 0 toward the master and port 1 toward the next
-slave. The last slave has nothing on port 1, so the port is closed and the frame
-turns back there. The frame visits every slave on the way out, and the way back
-is pure forwarding.
+In a **line**, port 0 faces the master and port 1 connects to the next slave. On the
+last slave, port 1 is closed. The frame returns through the line. Each slave
+processes it on the outward path and only forwards it on the return path.
 
 ```mermaid
 flowchart LR
@@ -49,72 +45,57 @@ flowchart LR
     S1 -. back .-> M
 ```
 
-The frame goes out through slaves 1, 2 and 3, turns back at the closed port of
-slave 3, and returns to the master through the same cables.
-
 A **tree** uses slaves with three or four ports, called **junctions**. Each extra
-port starts a branch. The frame visits each branch fully, in the port order
-above, before it moves on to the next one. The topology changes where a slave is
-in the frame order, so the master reads the link status of every port at startup
-to learn the real shape of the network.
+port starts a branch. The frame passes through each branch in port order before
+entering the next branch. The master reads each port's link status at startup to
+determine the network layout and slave order.
 
 ## Cable redundancy: a ring
 
-A line has a weak point: if one cable breaks, every slave after it is lost. With
-**cable redundancy**, the master has two network ports, and the last slave's port
-1 is wired back to the master's second port. The slaves form a **ring**.
+In a line, a broken cable disconnects every slave beyond the break. For **cable
+redundancy**, the master uses two network ports. A cable connects port 1 of the last
+slave to the master's second port to form a **ring**.
 
 Each cycle, the master sends the frame on both of its ports:
 
-- When the ring is whole, the frame from the first port visits every slave and
-  arrives at the second port. The copy from the second port is only forwarded
-  through the slaves, back to the first port.
-- When a cable breaks, the slaves on each side of the break see that their port
-  lost its link, and close it. The ring splits into two lines. The frame from the
-  first port is processed by the slaves before the break, and turns back there.
-  The copy from the second port is processed by the slaves after the break, and
-  turns back at the other side of the break.
+- With an intact ring, all slaves process the frame from the first port. It arrives
+  at the second port. The slaves forward the other copy to the first port without
+  processing it.
+- After a cable break, the slave port on each side of the break closes. Each master
+  port now serves one line. Each frame passes through the slaves on its line and
+  returns to the port that sent it.
 
-Every slave is still reached, by one frame or the other. The master merges the two
-returned frames into one result. The machine keeps running, and the master can
-report where the break is.
+The two frames together reach all slaves. The master combines the results and can
+report the location of the break while the machine runs.
 
 ## Distributed clocks: why time matters
 
-Some machines need actions at the same instant on several slaves: two motor axes
-that must move together, or inputs that must be sampled at the same moment. The
-frame cannot do that, because it reaches each slave at a different time. On a
-long line, the last slave sees the frame many microseconds after the first one.
+Two motor axes may need to move together, or sensors may need to sample inputs at
+the same time. The frame reaches each slave at a different time. On a long line, it
+can reach the last slave many microseconds after the first.
 
-**Distributed clocks (DC)** solve this. Each slave controller that supports DC
-has its own 64-bit clock that counts nanoseconds. The goal is that all these
-clocks show the same **system time**, counted from 1 January 2000. One slave
-holds the **reference clock**, usually the first DC slave after the master. Every
-other clock is set to follow it.
+Each slave controller that supports **DC** has its own clock that counts
+nanoseconds, 32 or 64 bits wide. The clocks share a **system time** measured from
+January 1, 2000. One slave supplies the **reference clock**, usually the first DC
+slave after the master. The other clocks follow it.
 
-Three differences must be removed:
+Clock setup and synchronization account for three timing differences.
 
-1. **Propagation delay.** A frame takes time to travel to each slave. The master
-   sends one broadcast write to a special register. Each slave controller
-   **latches**, that is records, the local time at which that frame passed each
-   of its ports, on the way out and on the way back. From these times, the master
-   computes the delay between the reference clock and each slave.
-2. **Offset.** Each clock started at its own power-on, so each one shows a
-   different time. The master computes the difference to the reference clock and
-   writes it into each slave as an offset.
-3. **Drift.** No two quartz crystals run at exactly the same speed. To correct
-   that, the master sends a special datagram every cycle. In an **ARMW** (Auto
-   increment Read Multiple Write) or **FRMW** (configured address Read Multiple
-   Write) datagram, the addressed slave, here the reference clock, puts its time into
-   the datagram, and every slave after it reads that time as a write. A small
-   control loop in each slave controller then speeds up or slows down its clock a
-   little.
+1. **Propagation delay.** The master broadcasts a register write. Each controller
+   records the local time when the frame passes each port on its outward and return
+   paths. The master uses these times to calculate the delay from the reference
+   clock to each slave.
+2. **Offset.** The clocks start at different times. The master calculates each
+   clock's difference from the reference and writes the offset to the slave.
+3. **Drift.** Quartz crystals run at slightly different frequencies. Each cycle, the
+   master sends an auto-increment read multiple write (ARMW) or configured address
+   read multiple write (FRMW) datagram. The reference clock writes its time into the
+   datagram. Each following slave receives that value and adjusts its clock rate.
 
-When the clocks agree, each slave controller can produce **SYNC0** pulses: a
-signal that starts at a chosen system time and repeats at a chosen cycle time.
-The slave's application acts on each pulse. Because all the clocks agree, all the
-slaves act at the same instant, within much less than a microsecond on typical
-hardware.
+Once synchronized, each slave controller can generate **SYNC0** pulses. The pulses
+start at a configured system time and repeat at a configured interval. An
+application can act on each pulse. On typical hardware, the timing difference
+between slaves is much less than a microsecond.
 
 ```mermaid
 sequenceDiagram
@@ -132,12 +113,11 @@ sequenceDiagram
     Note over R,S: SYNC0 pulses at the same instant everywhere
 ```
 
-The master first measures the delays and sets the offsets once, then sends the
-reference time to the other clocks every cycle.
+The master measures delays and sets offsets at startup. It sends the reference time
+every cycle.
 
-One question remains: the master's own cycle. Its computer has another clock. The
-master either writes its own time to the reference clock, or makes its cycle
-follow the reference clock. Both are found in practice.
+The master's computer has its own clock. The master can write its time to the
+reference clock or adjust its cycle to follow the reference clock.
 
 ## Summary
 
@@ -152,11 +132,11 @@ follow the reference clock. Both are found in practice.
 
 ## In KickCAT
 
-KickCAT supports cable redundancy on the master. Its master DC support is
-experimental: the master lets the reference clock run on its own, and keeps its
-cycle in step with it. [Chapter 4](transport.md) covers redundancy, and
-[Chapter 7](distributed-clocks.md) covers the clocks. The emulator models ports,
-topologies, broken cables and DC clocks, see [Chapter 8](simulation.md).
+KickCAT supports cable redundancy. Its experimental master DC support adjusts the
+master's cycle to follow the reference clock. See [Chapter 4](transport.md) for
+redundancy and [Chapter 7](distributed-clocks.md) for clock setup. The emulator
+models ports, network layouts, broken cables, and DC. See [Chapter
+8](simulation.md).
 
 ## Where to go next
 

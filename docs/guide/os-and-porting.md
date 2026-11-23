@@ -1,98 +1,91 @@
 # Operating systems and porting
 
-> What does KickCAT need from the operating system, and what must a new platform provide?
+> What does KickCAT need from a new operating system (OS) or driver?
 >
 > You will learn:
 >
-> - why KickCAT has an OS layer, and how small it is kept
+> - which OS services KickCAT uses
 > - what each supported platform provides
-> - how time works, on a target and in the unit tests
-> - what a new OS, a new network backend or a new SPI driver must implement
+> - how targets and unit tests measure time
+> - which interfaces to implement for a new OS, network backend, or Serial
+>   Peripheral Interface (SPI) driver
 
 ## The problem: one stack, many systems
 
-The master runs as a process on a host operating system (OS): Linux, PikeOS, or
-Windows for tools and tests. The slave runs on a microcontroller with NuttX or
-KickOS, or on a Raspberry Pi with Linux. These systems do not agree on how to
-read a clock, how to send a raw Ethernet frame, or how to talk to an SPI
-peripheral.
+The master runs on Linux and PikeOS. It also runs on Windows for tools and tests.
+The slave runs on NuttX or KickOS on a microcontroller, or on Linux on a Raspberry
+Pi. Each system provides different calls for clocks, raw Ethernet frames, and SPI
+devices.
 
-The protocol code must not care. A state machine or an SDO transfer is the same
-on every system. If the protocol code called the OS directly, each port would add
-`#ifdef` blocks to it, and each port would behave a little differently.
+The EtherCAT state machine and Service
+Data Object (SDO) transfers work the same way on each system. Direct OS calls in
+this code would require `#ifdef` blocks and introduce platform-specific behavior.
 
 ## The ways to support several systems
 
-One way is to pick a portable library, such as POSIX, and require it everywhere.
-This fails here: Windows and PikeOS are not POSIX, and a small RTOS (Real-Time
-Operating System) may only offer part of it.
+One option is to require a common interface such as the Portable Operating System
+Interface (POSIX). Windows and PikeOS do not provide POSIX, and a small real-time OS
+may implement only part of it.
 
-Another way is a large abstraction layer that wraps every OS service. That is a
-lot of code to port, and most of it is not needed by an EtherCAT stack.
+Another option is to wrap every OS service. This adds porting work for services the
+stack never uses.
 
-**KickCAT keeps a small OS layer with only what the stack and its tools need, and
-selects one implementation per OS when the project is configured.**
+KickCAT provides only the OS services the stack and its tools need.
 
-The protocol code calls `now()`, writes to an `AbstractSocket` or to an
-`AbstractESC`, and never names an OS. The OS layer is a set of small headers with
-one source file per OS behind each of them. CMake picks the sources for the
-target OS. There is no runtime switch, and no `#ifdef` in the protocol code.
+Protocol code calls `now()` and uses `AbstractSocket` and `AbstractESC` to access
+the network and the EtherCAT Slave Controller (ESC). Each OS interface has a header
+and platform-specific source files. CMake selects the implementation at configure
+time. Protocol code needs no runtime platform check or `#ifdef`.
 
 ## What the layer contains
 
-The headers live in `kickcat/OS/`. Each one is small.
+The OS headers are in `kickcat/OS/`.
 
 | Header | What it gives |
 |---|---|
 | `Time.h` | `now()`, a monotonic clock in nanoseconds, `since_unix_epoch()`, `sleep()`, and helpers built on them. |
-| `Timer.h` | A periodic deadline for a cyclic loop, with overrun detection. It also owns the soft PLL that follows a distributed clock. |
-| `SoftPll.h` | The software Phase-Locked Loop (PLL) used by `Timer` to stay in phase with the reference clock. |
+| `Timer.h` | A periodic deadline for a cyclic loop, with overrun detection. It also owns the software phase-locked loop (PLL) that follows a distributed clock. |
+| `SoftPll.h` | The PLL used by `Timer` to stay in phase with the reference clock. |
 | `Thread.h` | A thread wrapper with a name and a scheduling priority. |
 | `Mutex.h`, `ConditionVariable.h` | Locking and waiting between threads. |
 | `SharedMemory.h` | A named memory segment shared between processes. |
 | `Filesystem.h` | A few file operations, used by the simulator and the tools. |
 
-The stack itself starts no thread (see [Chapter 1](principles.md)). `Thread`,
-`Mutex` and `ConditionVariable` are there for the applications, the tools and the
-simulator, which do run threads. A target that runs only the slave stack does not
-need them.
+Applications, tools, and the simulator can use `Thread`, `Mutex`, and
+`ConditionVariable`. The stack starts no threads (see [Chapter 1](principles.md)). A
+slave-only target can omit these services.
 
-`types.h` selects the OS types (`os_mutex`, `os_socket`, `os_shm` and so on) from
-a small `os_types.h` per OS, so the class layouts do not change their shape
-between systems.
+`types.h` selects types such as `os_mutex`, `os_socket`, and `os_shm` from the
+target's `os_types.h`. This lets the classes use the same declarations on each
+system.
 
 ## Time
 
-**All timeouts, deadlines and watchdogs use `now()`, a monotonic clock.** A
-monotonic clock never goes backwards, even when the wall clock is set. A
-timeout computed from the wall clock could end early or never end. The wall
-clock, `since_unix_epoch()`, is only used where EtherCAT needs an absolute time:
-the distributed clock system time.
+Timeouts, deadlines, and watchdogs use `now()`. This clock is monotonic, so changing
+the wall clock cannot move it backward or change a timeout. KickCAT uses the wall
+clock, `since_unix_epoch()`, for absolute EtherCAT distributed clock time.
 
-Times are `std::chrono` durations, mostly `nanoseconds`. A duration carries its
-unit in its type, so `100ms` and `100us` cannot be confused.
+Times use `std::chrono` durations, usually `nanoseconds`. Each type specifies its
+unit, including the units in `100ms` and `100us`.
 
-The unit tests replace the time source. They link their own `Time.cc` in place
-of the real one. In it, `now()` moves forward by 1 ms at each call, and `sleep()`
-returns at once. A test that waits for a 100 ms timeout then runs in a few calls,
-with the same result every time.
+Unit tests link a test `Time.cc`. Each `now()` call advances time by 1 ms, and
+`sleep()` returns immediately. A test can exercise a 100 ms timeout without waiting
+100 ms.
 
 ## Platforms
 
-Each platform takes only the parts it needs.
-
 | Platform | Role | Raw frame backend | Notes |
 |---|---|---|---|
-| Linux | Master, simulator, tools. Slave on a Raspberry Pi. | `AF_PACKET` raw socket. Optional `AF_XDP` socket. | Full layer. RT-PREEMPT kernel recommended for real time. |
+| Linux | Master, simulator, tools. Slave on a Raspberry Pi. | `AF_PACKET` raw socket. Optional eXpress Data Path socket (`AF_XDP`). | Full layer. A kernel with real-time preemption (RT-PREEMPT) is recommended for real-time use. |
 | Windows | Master for tools and tests | Npcap (`pcap`) | Full layer. Not real time. |
-| PikeOS 5.1 | Master (ARMv8) | PikeOS shared buffer I/O (`vm_io_sbuf`) | Time, socket and error codes. |
-| NuttX | Slave | none | Shares the Unix time backend. The slave talks to its ESC, not to a network card. |
-| KickOS | Slave (experimental) | none | Real time source. Mutex, condition variable and shared memory are placeholders that throw if used. |
+| PikeOS 5.1 | Master (ARMv8) | PikeOS shared buffer input/output (I/O) (`vm_io_sbuf`) | Time, socket and error codes. |
+| NuttX | Slave | none | Shares the Unix time backend. The slave accesses the network through its ESC. |
+| KickOS | Slave (experimental) | none | Platform time source. Mutex, condition variable and shared memory are placeholders that throw if used. |
 
-The KickOS build is an out-of-tree consumer: an example application finds an
-installed KickOS package and builds KickCAT with the KickOS backend.
+The KickOS example builds outside the KickOS source tree. It finds the installed
+KickOS package and builds KickCAT with the KickOS backend.
 
-On Linux, the master picks the backend from the interface name:
+On Linux, the master selects the backend from the interface name:
 
 - `eth0` opens a raw `AF_PACKET` socket.
 - `xdp:eth0` opens an `AF_XDP` socket, which skips most of the kernel network
@@ -102,19 +95,18 @@ On Linux, the master picks the backend from the interface name:
 
 ## Endianness and packed frames
 
-EtherCAT is little-endian, and **KickCAT supports little-endian hosts only.**
-This lets the stack describe frames, datagram headers and registers as packed C++
-structures, and read them in place, with no conversion.
+EtherCAT uses little-endian byte order. KickCAT supports little-endian hosts and
+reads packed C++ structures for frames, datagram headers, and registers directly
+without byte-order conversion.
 
-A packed structure has no padding, so some of its fields are not aligned.
-Reading them in place is an unaligned access. This is intended. It is safe on
-every supported target, and the packed attribute tells the compiler to generate
-the right code. For this reason the Continuous Integration (CI) sanitizer build
-turns off the alignment check of UBSan (the undefined behaviour sanitizer). Do
-not "fix" these accesses by copying every field.
+Packed structures have no padding, so some fields can be unaligned. Supported
+targets can read them in place. The packed attribute tells the compiler how to
+access them. The continuous integration (CI) build disables the alignment check in
+the Undefined Behavior Sanitizer (UBSan) for this reason. Keep these in-place
+accesses when changing the code.
 
-`packed.h` hides the compiler difference: GCC and Clang use an attribute, and
-MSVC uses `#pragma pack`.
+`packed.h` selects the compiler syntax. The GNU Compiler Collection (GCC) and Clang
+use an attribute. Microsoft Visual C++ (MSVC) uses `#pragma pack`.
 
 ## Porting
 
@@ -132,18 +124,16 @@ A new OS needs:
    still links.
 4. A branch in `lib/CMakeLists.txt` that lists these sources.
 
-Start by copying the closest backend. NuttX shows how little a slave-only target
-needs. Unix shows a full one.
+Start with the existing backend closest to your target. NuttX provides a slave-only
+example. Unix provides a full implementation.
 
 ### A new network backend for the master
 
-Implement `AbstractSocket`: `open()` an interface, `setTimeout()`, `read()` one
-frame, `write()` one frame and `close()`. A read or a write returns the number
-of bytes, or a negative `errno` code, for instance when no frame arrived before
-the timeout. The `Link` above it handles
-datagrams, frame indexes, lost frames and redundancy, so a socket only moves
-whole Ethernet frames. Then give the socket a name prefix in `createSockets()`,
-so that programs can select it from the command line.
+Implement `AbstractSocket` with `open()`, `setTimeout()`, `read()`, `write()`, and
+`close()`. Each read or write handles one frame and returns a byte count or a
+negative `errno` code. A timeout is one possible error. `Link` handles datagrams,
+frame indexes, lost frames, and redundancy. Register a prefix in `createSockets()`
+so applications can select the socket by name.
 
 ### A new SPI driver for a slave
 
@@ -172,11 +162,13 @@ interface implements `AbstractESC` directly (see [Chapter 6](slave.md)).
 - `lib/src/OS/`: the sources shared by every OS, and one directory per backend
   (`Unix`, `Linux`, `Windows`, `PikeOS`, `NuttX`, `KickOS`, and `Test` for the
   unit test clock).
-- `lib/include/kickcat/types.h` and `lib/include/kickcat/OS/*/types/os_types.h`: the OS types.
+- `lib/include/kickcat/types.h` and `lib/include/kickcat/OS/*/types/os_types.h`: the
+  OS types.
 - `lib/CMakeLists.txt`: the backend selection.
 - `lib/include/kickcat/AbstractSocket.h`: the master network interface.
 - `lib/master/src/helpers.cc`: `createSockets()`, which maps an interface name to a socket.
-- `lib/slave/include/kickcat/AbstractSPI.h` and `lib/slave/driver/`: the SPI interface and drivers.
+- `lib/slave/include/kickcat/AbstractSPI.h` and `lib/slave/driver/`: the SPI
+  interface and drivers.
 - `lib/include/kickcat/packed.h`: the packed structure macros.
 - Example to read: `examples/slave/lan9252/rpi/linux/main.cc`, a slave on Linux
   that uses the Raspberry Pi SPI driver.

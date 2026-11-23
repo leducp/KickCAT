@@ -1,111 +1,94 @@
 # Simulation internals
 
-> How can a master talk to slaves that do not exist, and still test real code?
+> How can a master test EtherCAT
+> devices without hardware?
 >
 > You will learn:
 >
-> - why KickCAT emulates the hardware and not the protocol
-> - what the emulated ESC and the emulated network do
-> - how a frame travels through the emulator, in one process or in two
-> - how the simulator builds a slave from a JSON file, and where to add a new device
+> - why KickCAT emulates the hardware
+> - how the emulated EtherCAT Slave Controller (ESC) and network process frames
+> - how to run a simulation in one or two processes
+> - how to configure slaves with JavaScript Object Notation (JSON) files and add a device
 
 ## The problem: EtherCAT without hardware
 
-An EtherCAT bus needs a network card, cables and slaves. A developer who changes
-the master wants to run it many times a day. A Continuous Integration (CI) job
-must run it on a machine with no EtherCAT port at all. A test of cable redundancy
-needs a cable that breaks on demand. Real hardware is slow to set up, and it does
-not break on command.
-
-So KickCAT needs slaves in software. The question is which part of a slave to
-write in software.
+Master development needs repeatable tests. A continuous integration (CI) job may run
+on a computer without an EtherCAT port. Redundancy tests need to break a connection
+at a known point. Physical cards, cables, and slaves take time to set up for these
+tests.
 
 ## The ways to fake a slave
 
-There are three levels at which a slave can be faked.
+A test can replace different parts of a slave.
 
-1. **Fake the answers.** A test script returns the bytes the master expects. This
-   is quick to write, but it only proves that the master agrees with the script.
-   Nothing checks that a real slave would answer the same way.
-2. **Fake the protocol.** A model of a slave answers SDO requests, state changes
-   and process data. This is more complete, but it is a second implementation of
-   the slave protocol. It can disagree with the real slave stack, and both must be
-   kept in step.
-3. **Fake the hardware.** Emulate the EtherCAT Slave Controller (ESC) and the
-   wire, and run the real slave stack on top of the emulated ESC. The master then
-   talks to the same protocol code that runs on a microcontroller.
+1. **Return fixed replies.** A script returns the bytes the master expects. It tests
+   the master against the script. It cannot check whether a real slave would give
+   the same reply.
+2. **Model the protocol.** A model handles Service Data Object (SDO) requests, state
+   changes, and process data. This requires a second protocol implementation that
+   must be kept consistent with the slave stack.
+3. **Emulate the hardware.** A software ESC and network run the same slave stack as
+   the microcontroller.
 
-**KickCAT emulates the hardware, and runs the real slave stack on top of it.**
+KickCAT uses hardware emulation.
 
-This choice follows from a principle of [Chapter 1](principles.md): the hardware
-boundaries are interfaces. The slave stack reaches its ESC through
-`AbstractESC`, so a software ESC can take the place of a LAN9252 or an XMC4800.
-The master reaches the wire through `AbstractSocket`, so a software network can
-take the place of a network card. Everything between those two interfaces is the
-production code.
+The slave uses `AbstractESC`, so an emulated ESC can replace a LAN9252 or XMC4800.
+The master uses `AbstractSocket`, so a software network can replace a network card.
+The protocol code between them runs unchanged. See [Chapter 1](principles.md).
 
-The cost of this choice is the emulator itself. It must model the ESC registers
-closely enough for the slave stack, and the wire closely enough for the master.
-The benefit is that one emulator tests both stacks, and every protocol feature
-added to the slave stack works in simulation at once.
+The emulator must model the registers used by the slave stack and the network
+behavior seen by the master. The same emulator can then test both stacks, including
+new slave protocol features.
 
 ## The emulated ESC
 
-`EmulatedESC` is a software ESC. It implements `AbstractESC`, the same interface
-the slave stack uses for real chips, and it holds a copy of the ESC memory map:
-the registers and the process data memory.
+`EmulatedESC` implements `AbstractESC`. It stores the ESC registers and process data memory.
 
-It has two sides, like a real ESC.
+The emulator provides two interfaces.
 
-- **The EtherCAT side.** `processDatagram()` takes one datagram from a frame. It
-  applies the command (a physical read or write, a broadcast, or a logical
-  read or write through the FMMUs) and increments the working counter, as an ESC
-  does when a frame passes through it.
-- **The PDI side.** `read()` and `write()` are the Process Data Interface (PDI)
-  accesses of the slave stack. They go through the SyncManagers, so the mailbox
-  and buffered modes behave as on a real chip.
+- **EtherCAT.** `processDatagram()` applies a physical read or write, a broadcast,
+  or a logical read or write through the fieldbus memory management units (FMMUs).
+  It updates the working counter (WKC).
+- **Process Data Interface (PDI).** The slave stack calls `read()` and `write()`.
+  The SyncManagers provide the same mailbox and buffered modes as a physical ESC.
 
-Around this core, it models what a master can observe:
+The emulator models the following parts of the controller.
 
-- the SyncManagers and the FMMUs (8 of each are advertised)
-- the AL control and AL status registers that carry the state machine
-- the EEPROM, loaded from a raw image or from an image built from an ESI file
-- a distributed clock with a configurable drift and jitter, receive times and SYNC0
-- the PDI and process data watchdogs.
+- eight SyncManagers and eight FMMUs
+- the Application Layer (AL) control and status registers used by the state machine
+- electrically erasable programmable read-only memory (EEPROM) loaded from a raw
+  image or built from an EtherCAT Slave Information (ESI) file
+- a distributed clock with configurable drift and jitter, receive times, and SYNC0 pulses
+- the PDI and process data watchdogs
 
 It does not emulate interrupts. The slave stack polls the ESC, so it does not
 need them.
 
 ## The emulated network
 
-One ESC is not a network. `EmulatedNetwork` wires several emulated ESCs together
-through their ports, as cables would. It routes each frame through the slaves in
-the real EtherCAT order: a slave forwards from port 0 to port 3, then 1, then 2,
-and a branch is followed to its end before the frame comes back. An open port, or
-a broken wire, sends the frame back the way it came.
+`EmulatedNetwork` connects emulated ESC ports and routes frames in EtherCAT port
+order. From port 0, the forwarding order is port 3, port 1, then port 2. It travels
+to the end of each branch before returning. A port with no link, or a broken
+connection, sends the frame back.
 
-The network has one or two master injection points. The head is where the
-nominal master port is plugged in. The tail, when it is set, is where the
-redundant master port closes the ring.
+The master connects at one or two points. Its nominal port connects at the head of
+the network. Its optional redundancy port connects at the tail to close the ring.
 
 The default topology is a line: each slave port 1 is wired to the next slave
 port 0. A test or a topology file can replace it with any tree, through
 `connect()`, `setInjection()` and `setRedundancyInjection()`.
 
-`setLinkState()` breaks or heals the wire between two slaves while frames flow.
-This is fault injection: it lets a test cut the ring and check that the master
-still reaches every slave from both ends.
+`setLinkState()` breaks or restores a connection between slaves while the network is
+running. A test can break the ring and check that the master's two ports still reach
+all slaves.
 
-The topology changes rarely, but frames pass every cycle. So the network computes
-the processing order, the DL status of each port and the DC receive time offsets
-once, and only recomputes them when a link changes. Routing a frame is then a
-flat walk over a precomputed list.
+The network calculates the processing order, data link (DL) status of each port, and
+distributed clocks (DC) receive time offsets. It repeats this calculation only when
+a link changes. Each frame then follows the stored order.
 
 ## Two ways to plug a master in
 
-The master does not know it talks to an emulator. It only sees an
-`AbstractSocket`. KickCAT provides two sockets for the emulator, one for each way
-of running it.
+The master uses `AbstractSocket` in both simulation modes.
 
 ```mermaid
 flowchart LR
@@ -125,44 +108,38 @@ flowchart LR
     end
 ```
 
-The diagram shows that only the socket changes between the two modes: the master
-stack above it and the emulator below it are the same.
+**In one process.** `LoopbackSocket` owns an `EmulatedNetwork`. A write routes the
+frame immediately and calls the application's `tick` function. That function calls
+`slave::Slave::routine()` and runs any application work needed between frames. The
+next read returns the processed frame. Each write advances the simulation once. No
+separate thread or timer schedules the steps, so the run is repeatable and can be
+stepped through in a debugger.
 
-**In one process.** `LoopbackSocket` holds an `EmulatedNetwork`. When the master
-writes a frame, the socket routes it through the network at once, then calls a
-`tick` function given by the application. The tick runs the slave stack:
-`slave::Slave::routine()`, and whatever the application wants to do between
-frames. The next read returns the processed frame. One master write is one
-simulator iteration. There is no thread and no timing, so a run is repeatable and
-easy to step through in a debugger.
+**In two processes.** `TapSocket` provides two shared memory queues for interprocess
+communication. It is independent of a Linux network tap (TAP) device. The master
+opens `tap:client` and `network_simulator` opens `tap:server`. The same master
+program can run on a physical network.
 
-**In two processes.** `TapSocket` is a pair of frame queues in shared memory.
-The simulator opens it as the server, and the master opens it as the client. It is
-an IPC channel between two host processes, not a Linux TAP device. The master
-selects it with the interface name `tap:client`, and the `network_simulator`
-program with `tap:server`. This mode runs an unmodified master program, as it
-would run on a real network.
-
-The sequence below follows one frame through the in-process mode.
+The following sequence shows the order in one process.
 
 ```mermaid
 sequenceDiagram
     participant Bus
     participant Link
-    participant Loop as LoopbackSocket
+    participant LS as LoopbackSocket
     participant Net as EmulatedNetwork
     participant ESC as EmulatedESC
     participant App as tick (slave stack)
     Bus->>Link: queue datagrams, finalize
-    Link->>Loop: write(frame)
-    Loop->>Net: route(frame)
+    Link->>LS: write(frame)
+    LS->>Net: route(frame)
     loop each ESC in port order
         Net->>ESC: processDatagram(header, data, wkc)
     end
-    Loop->>App: tick()
+    LS->>App: tick()
     App->>ESC: routine(): PDI read/write
-    Link->>Loop: read(frame)
-    Loop-->>Link: processed frame
+    Link->>LS: read(frame)
+    LS-->>Link: processed frame
     Link-->>Bus: datagram callbacks
 ```
 
@@ -171,74 +148,70 @@ prepares what the master will read on the next frame.
 
 ## The network simulator
 
-`network_simulator` is a small program built on these parts. Its loop does the
-work that the tick does in the in-process mode, for every slave:
+For each slave, the `network_simulator` loop performs the work of the in-process tick.
 
 1. Read a frame from the master socket, and from the redundant socket if there is
    one.
 2. Route it through the network. Send it back on the opposite master port when
    the ring is intact, or on the same port when the ring is broken.
 3. Apply pending control commands (see below).
-4. Run each slave: `routine()`, output validation in SAFE-OP, then the device
-   behaviour, or a rolling test pattern on the inputs if the slave has none.
+4. Run each slave: `routine()`, output validation in the safe-operational state
+   (SAFE-OP), then the device behavior, or a rolling test pattern on the inputs if
+   the slave has none.
 
-The loop never sleeps. It waits on the socket read, with a timeout, so that it can
-stop on a signal.
+The loop waits for a socket read with a timeout so it can check for a stop signal.
+It does not sleep between iterations.
 
 ## Building a slave from a file
 
-The library `kickcat_simulation` (in `lib/simulation`) holds the code that turns a
-configuration into a running slave. `sim::buildSlave()` reads one JSON file and
-returns a `SimulatedSlave`: the ESC, the PDO, the slave stack, the dictionary,
-the mailboxes, the FoE storage, the device behaviour and the process data
-buffers, all in one owned object.
+The `kickcat_simulation` library in `lib/simulation` builds slaves from
+configuration files. `sim::buildSlave()` reads one JSON file and returns a
+`SimulatedSlave`. This object owns the ESC, process data object (PDO) handler, slave
+stack, dictionary, mailboxes, File over EtherCAT (FoE) storage, device behavior, and
+process data buffers.
 
 The slave image comes from one of two sources:
 
-- an ESI file and a device filter. The ESI parser builds the EEPROM image and the
-  CoE object dictionary from the same device, so they always agree.
-- a raw EEPROM image, with an optional CoE dictionary in XML.
+- With an ESI file and device filter, the parser builds the EEPROM image and CANopen
+  over EtherCAT (CoE) dictionary from the same device description.
+- With a raw EEPROM image, the configuration can also supply a CoE dictionary in
+  Extensible Markup Language (XML).
 
-If the SII declares FoE and the configuration names a directory,
-`DirectoryStorage` serves files from it. It implements `FoE::AbstractStorage`,
-the interface a real device would implement on flash. It keeps a write in memory
-and only writes the file when the last packet has arrived, so a failed transfer
-never leaves half a file. If the SII also declares a bootstrap mailbox, the slave
-gets a second mailbox, used in the BOOT state.
+If the Slave Information Interface (SII) declares FoE and the configuration
+specifies a directory, `DirectoryStorage` serves files from that directory. It
+implements the same `FoE::AbstractStorage` interface as a device using flash. It
+buffers received data in memory and writes the file only after the last packet. If
+the SII declares a bootstrap mailbox, the slave uses a second mailbox in the
+bootstrap state (BOOT).
 
 The configuration keys are listed in the [simulation user guide](../SIMULATION.md).
 
 ## Device behaviour
 
-The ESC and the slave stack make a correct EtherCAT slave, but a slave with no
-application. Its inputs never change. A motor drive must also answer its control
-word and move its position.
+The ESC and slave stack can exchange data without a device application, but the
+input values stay fixed. A simulated motor drive also needs to process its control
+word and update its position.
 
-`sim::DeviceApp` is that application. It has one method, `step()`, called once per
-cyclic frame. `Ds402Motor` is the one device today: it runs the CiA 402 drive
-state machine and a small motor model, so a master sees a following error and a
-finite bandwidth, and not a perfect drive.
+`sim::DeviceApp` defines a `step()` method that runs once per cyclic frame. The
+existing device, `Ds402Motor`, implements the CAN in Automation (CiA) 402 drive
+state machine and a motor model with following error and limited bandwidth.
 
-`sim::makeDeviceApp()` picks the device from the JSON configuration. **To add a
-simulated device, write a `DeviceApp` subclass and add one case to
-`makeDeviceApp()`.** The simulator core does not name any device profile, so
-nothing else changes.
+`sim::makeDeviceApp()` selects the device from the JSON configuration. To add a
+device, implement a `DeviceApp` subclass and add a case to `makeDeviceApp()`. The
+rest of the simulator uses the common interface.
 
 ## Topology and control
 
-A JSON topology file, given with `--topology`, describes a tree instead of the
-default line. It names the master injection point, the slave-to-slave links, and
-an optional redundancy injection point. `sim::parseTopology()` checks every node
-and port index first, and `sim::applyTopology()` then wires the network. The two
-steps are separate so that the checks can be tested without a network.
+Use `--topology` to supply a JSON file describing a tree. It lists the master
+connection, links between slaves, and an optional redundancy connection.
+`sim::parseTopology()` checks the node and port indexes. `sim::applyTopology()`
+connects the ports. Tests can check the indexes without building a network.
 
-A control channel lets another program change the network while it runs. It is
-a pair of queues in shared memory, off the EtherCAT wire, so that frame routing
-stays a pure model of the cable. The host side (in `SimulatorControl.h`) sends
-commands: break or heal a link, or add jitter to a slave clock.
-`SimulatorControlServer` in the simulator applies them between two frames, and
-sends back an acknowledgement and frame timing statistics. KickUI uses this
-channel to break cables from its interface.
+A pair of shared memory queues carries control commands separately from EtherCAT
+frames. The host uses `SimulatorControl.h` to break or restore a link or add slave
+clock jitter. `SimulatorControlServer` applies commands between frames and returns
+an acknowledgment and frame timing statistics. KickUI uses this channel to simulate
+cable breaks.
 
 ## Summary
 
@@ -249,7 +222,7 @@ channel to break cables from its interface.
 | How do I run everything in one program? | `LoopbackSocket` and a tick function. |
 | How do I run an unmodified master? | `network_simulator` with `tap:server`, the master with `tap:client`. |
 | Where does a slave come from? | `sim::buildSlave()`, from an ESI file or an EEPROM image. |
-| How do I add a device behaviour? | A `DeviceApp` subclass and one case in `makeDeviceApp()`. |
+| How do I add a device behavior? | A `DeviceApp` subclass and one case in `makeDeviceApp()`. |
 | What is not emulated? | Interrupts. |
 
 ## In the code
@@ -262,8 +235,9 @@ channel to break cables from its interface.
   `devices/Ds402Motor.h`, `Topology.h`, `DirectoryStorage.h`, `SimulatorControlServer.h`.
 - `lib/include/kickcat/SimulatorControl.h`: the control channel messages.
 - `simulation/network_simulator.cc`: the two-process runner.
-- Example to read: `examples/master/simulated_bus/simulated_bus.cc` builds one
-  slave by hand, with the same steps as `sim::buildSlave()`, and drives it to OP.
+- Example to read: `examples/master/simulated_bus/simulated_bus.cc` builds one slave
+  by hand, with the same steps as `sim::buildSlave()`, and requests the operational
+  state (OP).
 
 ## Where to go next
 

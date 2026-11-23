@@ -1,60 +1,58 @@
 # Testing a change
 
-> Which test proves that a change works, and where does it go?
+> Which test should you write for a change to the EtherCAT stack?
 >
 > You will learn:
 >
-> - how KickCAT tests are organized, from one class to a full bus
-> - which test double replaces which hardware boundary
-> - how the emulator lets a test run the master and the slave together
-> - what the Continuous Integration (CI) checks beyond the unit tests
+> - how the tests are organized
+> - which mock to use for each interface
+> - how to test both stacks with the emulator
+> - what continuous integration (CI) checks
 
 ## The problem: a stack between two kinds of hardware
 
-KickCAT sits between a network card and an EtherCAT Slave Controller (ESC). A
-test cannot rely on either one. It must run on any developer machine and in CI,
-with no EtherCAT port. It must also be fast and give the same result every time,
-or nobody will trust it.
+Master tests need control over network frames. Slave tests need access to an
+EtherCAT Slave Controller (ESC). Developers and CI must be able to run both types of
+tests quickly and repeatably without EtherCAT hardware.
 
-Yet the behaviours that matter often cross several layers. A lost frame starts
-in the socket, is handled by the link, and must end as an error callback in the
-bus. A state change starts in the master, crosses the wire, and is decided by
-the slave state machine.
+Some operations involve several layers. For a lost frame, the socket reports the
+loss, the link handles it, and the bus receives an error callback. For a state
+change, the master sends the request and the slave state machine accepts or refuses
+it.
 
 ## The ways to test
 
-Two styles pull in opposite directions.
+The scope of a test affects what a failure tells you.
 
-- **Isolate one class**, and replace its neighbours with test doubles. The test is
-  small and fast, and a failure points to one place. But the doubles encode an
-  assumption about the neighbours, and the assumption can be wrong.
-- **Run the whole system.** The test proves the parts work together. But it is
-  slower, and a failure can come from anywhere.
+- **Test one class.** Replace its dependencies with test doubles. These tests run
+  quickly and help locate failures. Their results depend on whether the doubles
+  accurately represent the dependencies.
+- **Test the system.** Run the parts together to check how they interact. These
+  tests take longer, and a failure can be harder to locate.
 
-**KickCAT tests a behaviour at the lowest layer that shows it, and uses the real
-stacks through the emulator when a behaviour crosses the master and the slave.**
+Test a behavior at the lowest layer where you can observe it. Use both stacks with
+the emulator when a test needs both master and slave behavior.
 
-The hardware boundaries described in [Chapter 1](principles.md) make both styles
-cheap. Each boundary is an interface, so a test can replace it with a mock. The
-emulator implements the same interfaces, so a test can also replace the
-hardware with a software ESC and a software network, and keep all the real code.
+The hardware interfaces described in [Chapter 1](principles.md) support both
+approaches. A unit test can replace one interface with a mock. An integration test
+can run the stacks with a software ESC and network.
 
 ## The unit test binary
 
-All unit tests build into one GoogleTest program, `kickcat_unit`. A source file
-is named after what it tests, with a `-t.cc` suffix, under `unit/src/`.
-Subdirectories group an area: `slave/`, `mailbox/CoE/`, `mailbox/FoE/`, `CoE/`,
-`ESI/`, `ENI/` and `utils/`. Small XML fixtures for the parsers sit in `unit/`.
+The GoogleTest program `kickcat_unit` contains all unit tests. Test files in
+`unit/src/` take the name of the subject and the suffix `-t.cc`. The directories
+`slave/`, `mailbox/CoE/`, `mailbox/FoE/`, `CoE/`, `ESI/`, `ENI/`, and `utils/` group
+related tests. Small Extensible Markup Language (XML) parser fixtures are in
+`unit/`.
 
 The commands to build it, run it and filter tests are in
 [Building KickCAT](../BUILDING.md).
 
 ### A deterministic clock
 
-The unit test program links its own time source in place of the real one. Its
-`now()` moves forward by 1 ms on each call, and `sleep()` returns at once. So a
-test that waits for a timeout runs in a few calls and never depends on the load
-of the machine. A test can reset this clock with `resetMockClock()`.
+The test program links its own clock. Each call to `now()` advances it by 1 ms, and
+`sleep()` returns immediately. Timeout tests therefore run independently of host
+load. `resetMockClock()` resets the clock.
 
 ### Test doubles
 
@@ -63,59 +61,56 @@ The mocks in `unit/mocks/` each replace one boundary.
 | Mock | Replaces | Use it to test |
 |---|---|---|
 | `MockLink` | `AbstractLink` | The `Bus`: it queues the datagrams the bus sends and returns the answers the test prepared. |
-| `MockSocket` | `AbstractSocket` | The `Link`: it checks each frame written and forges the frame read back, including lost and corrupted frames. |
-| `MockESC` | `AbstractESC` | The slave stack: the state machine, the PDO and the mailbox, register by register. |
-| `MockSPI` | `AbstractSPI` | An SPI ESC driver such as the LAN9252. |
+| `MockSocket` | `AbstractSocket` | The `Link`: it checks outgoing frames and simulates replies, loss, and corruption. |
+| `MockESC` | `AbstractESC` | The slave stack: the state machine, process data object (PDO) handling and the mailbox, register by register. |
+| `MockSPI` | `AbstractSPI` | A Serial Peripheral Interface (SPI) driver for an ESC such as the LAN9252. |
 | `ESMStateTest` | (a fixture) | One state of the slave state machine, with a mock ESC and its SyncManagers ready. |
 | `PhysicalSocket` | a master cable | Redundancy: it routes a frame through an emulated network and returns it on the right master port, or not at all when the cable is cut. |
 
 ## Tests with the real stacks
 
-Some behaviours only make sense with a master and a slave together:
-distributed clocks, FoE file transfers, redundancy, a simulated drive. For these,
-a test builds emulated slaves and a real `Bus`, and connects them with a
-`LoopbackSocket` (see [Chapter 8](simulation.md)). It is the same assembly as the
-`simulated_bus` example, inside a test.
+Use both stacks to test distributed clocks, File over EtherCAT (FoE) transfers,
+redundancy, or a simulated drive. Connect a `Bus` to emulated slaves with a
+`LoopbackSocket` (see [Chapter 8](simulation.md)). The `simulated_bus` example uses
+the same setup.
 
-Such a test runs in one thread and in one process. Each master frame passes
-through the emulated network, then the slave stack runs once. So the test is
-still repeatable, and a debugger can follow a frame from the master to the slave
-and back.
+Each frame passes through the emulated network before the slave stack runs once. The
+test uses one thread in one process, so the order is repeatable. You can follow a
+frame through both stacks in a debugger.
 
 ## Integration programs
 
-The programs in `test/integration/bench/` go beyond one test case.
+The integration programs are in `test/integration/bench/`.
 
-- `esi_boot` takes an ESI catalog, builds an emulated slave for each device, and
-  drives each one to OP through a loopback. Reaching OP is the proof that the ESI
-  parser, the EEPROM builder, the dictionary and both stacks agree on the device.
-- `esi_validate` is a faster, static check. It runs the slave mapping resolution
-  on each device, without changing states.
-- `hw_test_bench` runs on real hardware for a long time. It counts working
-  counter errors and lost frames, and fails when they exceed a calibrated
-  baseline. It is part of the hardware qualification of a release.
+- `esi_boot` reads an EtherCAT Slave Information (ESI) catalog. It builds an
+  emulated slave for each device and requests the operational state (OP) through a
+  loopback socket. Reaching OP checks that the ESI parser, electrically erasable
+  programmable read-only memory (EEPROM) image builder, dictionary, and both stacks
+  agree on the device.
+- `esi_validate` checks each device's process data mapping without requesting state changes.
+- `hw_test_bench` runs long tests on hardware. It counts working counter (WKC)
+  errors and lost frames. It fails if the counts exceed a calibrated baseline. It is
+  part of release qualification.
 
-`scripts/test_install.sh` checks the installed package: it builds a small
-consumer with CMake `find_package` and with pkg-config.
+`scripts/test_install.sh` checks the installed package by building a small
+application with CMake `find_package` and with pkg-config.
 
 ## What CI runs
 
 Beyond `kickcat_unit` on each platform, CI runs:
 
-- **Sanitizers.** A Debug build with ASan, LSan and UBSan (the address, leak and
-  undefined behaviour sanitizers) runs all unit tests. The UBSan alignment check
-  is off on purpose: packed frames are read in place (see
-  [Chapter 10](os-and-porting.md)).
-- **Coverage.** A change must not lower the code coverage (see
+- **Sanitizers.** A debug build runs all unit tests with AddressSanitizer (ASan),
+  LeakSanitizer (LSan), and Undefined Behavior Sanitizer (UBSan). It disables the
+  UBSan alignment check because the code reads packed frames in place (see [Chapter
+  10](os-and-porting.md)).
+- **Coverage.** Changes must maintain or increase code coverage (see
   [Contributing](../CONTRIBUTING.md)).
-- **Simulation tests.** Master examples, in C++ and in Python, run against
-  `network_simulator` through the shared memory socket. A separate case runs an
-  FoE round trip.
-- **Install test**, slave firmware builds for the NuttX boards, and the
-  documentation build.
+- **Simulation.** C++ and Python master examples use `network_simulator` through a
+  shared memory socket. A separate test checks a FoE round trip.
+- **Builds and installation.** CI checks the installed package and builds the NuttX
+  board firmware and documentation.
 
-Real hardware is not in CI. It is tested before a release (see the
-[release procedure](../RELEASE.md)).
+Hardware tests run before a release (see the [release procedure](../RELEASE.md)).
 
 ## Choosing a test
 
@@ -126,11 +121,11 @@ Real hardware is not in CI. It is tested before a release (see the
 | Redundancy or a split ring | a test with `PhysicalSocket` on an emulated ring | `unit/src/redundancy-t.cc` |
 | A slave state transition | an `ESMStateTest` case | `unit/src/ESMStateSafeOP-t.cc` and the other states |
 | Slave process data mapping | a unit test with `MockESC` | `unit/src/slave/PDO-t.cc` |
-| A mailbox message (CoE, FoE) | a request or response unit test | `unit/src/mailbox/` |
-| Behaviour across master and slave | a loopback test with emulated slaves | `unit/src/FoE-sim-t.cc`, `unit/src/dc-t.cc` |
+| A CANopen over EtherCAT (CoE) or FoE message | a request or response unit test | `unit/src/mailbox/` |
+| Behavior across master and slave | a loopback test with emulated slaves | `unit/src/FoE-sim-t.cc`, `unit/src/dc-t.cc` |
 | The emulated ESC or network | a unit test on the emulator | `unit/src/EmulatedESC-t.cc`, `unit/src/EmulatedNetwork-t.cc` |
-| A simulated device behaviour | a unit test on the device | `unit/src/Ds402Motor-t.cc` |
-| The ESI, SII or ENI parsers | a parser test with an XML fixture | `unit/src/ESI/`, `unit/src/ENI/` |
+| A simulated device behavior | a unit test on the device | `unit/src/Ds402Motor-t.cc` |
+| The ESI, Slave Information Interface (SII), or EtherCAT Network Information (ENI) parser | a parser test with an XML fixture | `unit/src/ESI/`, `unit/src/ENI/` |
 | A time-dependent algorithm | a unit test on the deterministic clock | `unit/src/SoftPll-t.cc`, `unit/src/Timer-t.cc` |
 
 ## Summary
@@ -140,7 +135,7 @@ Real hardware is not in CI. It is tested before a release (see the
 | Where do unit tests go? | `unit/src/`, one `-t.cc` file per subject, all in `kickcat_unit`. |
 | Why are timeouts fast in tests? | The test clock advances 1 ms per call and `sleep()` does nothing. |
 | How do I replace hardware? | With the mock of its interface, or with the emulator. |
-| When do I use the emulator? | When the behaviour crosses the master and the slave. |
+| When do I use the emulator? | When the behavior crosses the master and the slave. |
 | What runs on real hardware? | `hw_test_bench`, before a release. |
 
 ## In the code

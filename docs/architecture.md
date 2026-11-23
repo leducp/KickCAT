@@ -1,27 +1,29 @@
 # A map of the code
 
-> Where does each part of KickCAT live, and how do the parts fit together?
+> Where are the master and slave implementations of EtherCAT?
 >
 > You will learn:
 >
-> - how one library holds the master, the slave and the code they share
-> - why there are two classes named `Slave`, and which one you want
-> - where each directory of the repository fits
-> - how one short example uses the whole stack, from top to bottom
+> - which parts of the library the master and slave share
+> - how the two classes named `Slave` differ
+> - where to find each part of the stack
+> - how to run the example and follow its main calls
 
 ## One library, two stacks
 
-KickCAT is a **master** stack and a **slave** stack in one codebase. Both speak
-the same protocol, so most of the protocol code is written once and shared:
-frame and datagram definitions, the EEPROM (SII) parser, the CoE object
-dictionary, the mailbox messages and the OS layer.
+The master and slave are part of one codebase. They share frame and datagram
+definitions, mailbox messages for protocols such as File over EtherCAT (FoE), and
+the operating system (OS) layer. They also share
+the CANopen over EtherCAT (CoE) object dictionary and the parser for the Slave
+Information Interface (SII) data in electrically erasable programmable read-only
+memory (EEPROM).
 
-The build produces one library, `kickcat`. It always contains the shared code
-and the slave stack. It also contains the master stack, except in a KickOS
-build, which only needs the slave. A host build adds a second library,
-`kickcat_simulation`. It holds what the simulator needs on top of the slave
-stack: building a slave from a JSON file, device behaviours such as a motor, and
-topology files.
+The slave stack includes the EtherCAT state machine (ESM), process data object
+(PDO) handling, and EtherCAT Slave Controller (ESC) drivers. The `kickcat` library
+contains the shared code and the slave stack. It includes the master stack on all
+targets except KickOS. Host builds also produce
+`kickcat_simulation`. This library creates slaves from JavaScript Object Notation
+(JSON) files, models devices such as motors, and reads network topology files.
 
 ```mermaid
 flowchart TB
@@ -42,19 +44,14 @@ flowchart TB
     sim --> slave
 ```
 
-The master application uses the master stack and the slave firmware uses the
-slave stack. Both rest on the same shared protocol code. The simulation library
-builds on the slave stack.
-
 ## Two classes named Slave
 
-The name `Slave` appears twice, and the two classes have nothing in common
-except the protocol.
+The two `Slave` classes have different roles.
 
 | Class | Side | What it is |
 |---|---|---|
-| `kickcat::Slave` | Master | The master's record of one remote slave: its addresses, the content of its EEPROM, its mailbox queue, and where its inputs and outputs sit in the process image. It is a plain structure owned by the `Bus`. |
-| `kickcat::slave::Slave` | Slave | The slave stack itself, running on the device: it drives the EtherCAT state machine, the process data and the mailbox of one EtherCAT Slave Controller (ESC). |
+| `kickcat::Slave` | Master | A structure owned by the `Bus`. It holds one remote slave's addresses, EEPROM contents, mailbox queue, and process image offsets. |
+| `kickcat::slave::Slave` | Slave | Runs on the device. It manages the ESM, process data, and mailbox for one ESC. |
 
 When you write a master application, you read `kickcat::Slave` entries from
 `bus.slaves()`. When you write slave firmware, you create one
@@ -66,11 +63,11 @@ When you write a master application, you read `kickcat::Slave` entries from
 |---|---|
 | `kickcat` | The master stack (`Bus`, `Link`, `Slave`), sockets, frames, the OS layer, and the slave hardware abstractions (`AbstractESC`, `PDO`) |
 | `kickcat::slave`, `kickcat::ESM` | The slave stack and its state machine |
-| `kickcat::mailbox::request` | Mailbox messages as the master sends them |
-| `kickcat::mailbox::response` | Mailbox messages as a slave answers them |
-| `kickcat::CoE`, `kickcat::FoE` | CANopen over EtherCAT and File over EtherCAT: protocol definitions, the object dictionary, file storage |
-| `kickcat::CoE::CiA::DS402` | The CiA 402 drive profile, with a ready-made `Drive` helper on the master |
-| `kickcat::ESI`, `kickcat::ENI` | Parsers for the device description (ESI) and network description (ENI) XML files |
+| `kickcat::mailbox::request` | Mailbox requests sent by the master |
+| `kickcat::mailbox::response` | Mailbox responses sent by a slave |
+| `kickcat::CoE`, `kickcat::FoE` | CoE and FoE protocol definitions, the object dictionary, and file storage |
+| `kickcat::CoE::CiA::DS402` | The CAN in Automation (CiA) 402 drive profile, with a `Drive` helper on the master |
+| `kickcat::ESI`, `kickcat::ENI` | Parsers for EtherCAT Slave Information (ESI) and EtherCAT Network Information (ENI) files in Extensible Markup Language (XML) |
 | `kickcat::sim` | The simulation library |
 
 ## The repository
@@ -80,29 +77,28 @@ When you write a master application, you read `kickcat::Slave` entries from
 | `lib/include/kickcat/` | Public headers of the shared code |
 | `lib/src/` | Shared code: frames, SII parser, CoE, FoE, ESI and ENI parsers, OS backends |
 | `lib/master/` | Master stack, with its own `include/` |
-| `lib/slave/` | Slave stack, ESC drivers and SPI drivers, with their own `include/` |
+| `lib/slave/` | Slave stack, ESC drivers and Serial Peripheral Interface (SPI) drivers, with their own `include/` |
 | `lib/simulation/` | The `kickcat_simulation` library |
 | `lib/py_bindings/`, `py_bindings/` | Python bindings of the master |
 | `examples/master/` | Master applications, one per device or use case |
 | `examples/slave/` | Slave firmware, sorted by ESC, board and OS |
 | `simulation/` | The `network_simulator` program and ready-made slave configurations |
-| `tools/` | Command-line tools and the GUIs (KickUI, EEPROM editor) |
+| `tools/` | Command-line tools and graphical tools (KickUI, EEPROM editor) |
 | `unit/` | Unit tests (GoogleTest) and their mocks |
-| `test/integration/` | Integration benches: booting a whole ESI catalog, hardware tests |
+| `test/integration/` | Integration tests for ESI catalog startup and hardware |
 | `scripts/`, `conan/`, `cmake/` | Build wrappers, dependency profiles, CMake helpers |
 
-Every header that the package installs is public API, including its protected
-members.
+All installed headers are part of the public application programming interface
+(API). This includes protected members.
 
 ## One example, top to bottom
 
-The `simulated_bus` example puts a real master and a real slave in one process.
-It is about one hundred lines long, and it touches every layer. The later
-chapters use it as their running example, with the device description of the
-Freedom K64F board: three output bytes that drive an RGB LED, and twelve input
-bytes from an accelerometer and a magnetometer.
+The `simulated_bus` example runs the master and slave stacks in one process in about
+100 lines of code. It uses the Freedom K64F device description. Three output bytes
+set red, green, and blue levels on a light-emitting diode (LED). An accelerometer
+and a magnetometer supply 12 input bytes.
 
-Run it from the repository root once the build is done:
+After building, run this command from the repository root.
 
 ```bash
 ./build/examples/master/simulated_bus/simulated_bus \
@@ -111,25 +107,24 @@ Run it from the repository root once the build is done:
 
 The program has five steps.
 
-1. **Read the device description.** The ESI parser loads the `Board` device from
-   the XML file. It produces the content of the slave's EEPROM and its CoE object
-   dictionary. [Chapter 9](guide/from-xml-to-bytes.md) follows this step.
-2. **Build the slave.** An `EmulatedESC` plays the role of the slave controller
-   chip and receives the EEPROM image. A `PDO` object and a `slave::Slave` sit on
-   top of it, exactly as they would in firmware. A mailbox serves CoE from the
-   object dictionary. The application gives the input and output buffers.
-   [Chapter 6](guide/slave.md) explains these classes.
-3. **Wire the master to the slave.** A `LoopbackSocket` replaces the network
-   card. Each frame the master writes goes through the emulated slave, and the
-   slave runs one `routine()` per frame. A `Link` wraps the socket, and a `Bus`
-   wraps the link. [Chapter 4](guide/transport.md) covers the link and the
-   sockets, and [Chapter 8](guide/simulation.md) the emulator.
-4. **Bring the bus to OP.** `bus.init()` finds the slave and brings it to
-   PRE-OP. `bus.createMapping()` lays out the process image. The application then
-   asks for SAFE-OP, writes its first outputs, and asks for OP while it keeps the
-   process data moving. [Chapter 3](guide/master.md) walks this sequence.
-5. **Exchange process data.** Each cycle reads the inputs and writes the
-   outputs.
+1. **Read the device description.** The ESI parser loads `Board` from the XML file
+   and builds the EEPROM image and CoE object dictionary. See [Chapter
+   9](guide/from-xml-to-bytes.md).
+2. **Build the slave.** An `EmulatedESC` uses the EEPROM image. A `PDO` object
+   manages process data, and `slave::Slave` runs the same stack as
+   the firmware. The mailbox serves CoE requests from the dictionary. The
+   application provides the input and output buffers. See [Chapter
+   6](guide/slave.md).
+3. **Connect the master.** A `LoopbackSocket` passes each frame to the emulated
+   slave. The slave runs `routine()` once per frame. A `Link` uses the socket, and a
+   `Bus` uses the link. See [Chapter 4](guide/transport.md) for transport and
+   [Chapter 8](guide/simulation.md) for the emulator.
+4. **Start the bus.** `bus.init()` finds the slave and brings it to the
+   pre-operational state (PRE-OP). `bus.createMapping()` sets up the process image.
+   The application requests the safe-operational state (SAFE-OP), writes its first
+   outputs, and requests the operational state (OP). It continues exchanging process
+   data while it waits. See [Chapter 3](guide/master.md).
+5. **Exchange process data.** The master reads inputs and writes outputs each cycle.
 
 ```mermaid
 sequenceDiagram
@@ -153,13 +148,12 @@ sequenceDiagram
     App->>Bus: requestState(OPERATIONAL), waitForState(OPERATIONAL, cyclic)
 ```
 
-The application only talks to the `Bus`. The frame goes down through the link
-and the socket, through the emulated controller, and back up as callbacks.
+The application calls the `Bus`. The link sends the frame through the socket to the
+emulated controller. Callbacks process the returning data.
 
-On real hardware, two things change. The socket is a raw Ethernet socket on a
-network card, and the slave side runs on its own board, with a `Lan9252` or
-`XMC4800` driver in place of the `EmulatedESC`. The master code and the slave
-code stay the same.
+On hardware, the master uses a raw Ethernet socket on a network card. The slave runs
+on a separate board with a `Lan9252` or `XMC4800` driver in place of `EmulatedESC`.
+Both use the same stack code as the example.
 
 ## Where to go next
 

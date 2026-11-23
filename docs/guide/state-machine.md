@@ -1,39 +1,38 @@
 # The EtherCAT state machine
 
-> In which order does a slave become ready, who decides when it is ready, and what
-> happens when something goes wrong?
+> How does a slave start, change state, and report errors in Ethernet for Control
+> Automation Technology (EtherCAT)?
 >
 > You will learn:
 >
-> - the five states of a slave: INIT, PRE-OP, SAFE-OP, OP and BOOT
-> - what the master configures in each state, and what each state allows
-> - how the master requests a state and how the slave answers
-> - how a slave reports an error, and how it falls back on its own
+> - the initialization (INIT), pre-operational (PRE-OP), safe-operational (SAFE-OP),
+>   operational (OP), and bootstrap (BOOT) states
+> - what the master configures and what the slave allows in each state
+> - how the master requests a state change and checks the result
+> - how a slave reports an error and returns to a lower state
 
 ## The problem: start a machine safely
 
-A slave that drives a motor must not move it with outputs that nobody has checked.
-Before the first cycle, the master must give each slave an address, set up its
-mailbox, choose which data it exchanges, and program its SyncManagers and FMMUs.
-Each step depends on the previous one. If the slave started to use its outputs
-before the configuration was complete, a half-configured machine could move.
+A motor must stay in a safe state until its outputs have been checked. Before the
+first cycle, the master sets the station address, configures the mailbox, and
+selects the process data. It also configures the SyncManagers and fieldbus memory
+management units (FMMUs). Each step depends on the previous one.
 
-EtherCAT solves this with a **state machine**: every slave is always in one of a few
-states, and each state allows a little more than the one before it. A slave moves up
-only when the master asks and the slave agrees that its configuration is valid.
+The EtherCAT **state machine** controls when the slave can use each function. To
+advance, the master must request the next state and the slave must accept the
+configuration.
 
 ## The five states
 
 | State | Mailbox | Inputs | Outputs | What the master does here |
 |---|---|---|---|---|
-| **INIT** | No | No | No | Sets the station address, reads the EEPROM, configures the mailbox SyncManagers. |
-| **PRE-OP** (pre-operational) | Yes | No | No | Configures the process data: the mapping, the process data SyncManagers and the FMMUs. |
-| **SAFE-OP** (safe-operational) | Yes | Yes | No, held in a safe state | Starts the cycle, so that valid outputs reach the slave. |
-| **OP** (operational) | Yes | Yes | Yes | Runs the machine. |
-| **BOOT** (bootstrap) | Bootstrap mailbox only | No | No | Updates the firmware, see [Chapter 0.6](mailboxes.md). |
+| **INIT** | No | No | No | Sets the station address, reads the electrically erasable programmable read-only memory (EEPROM), configures the mailbox SyncManagers. |
+| **PRE-OP** | Yes | No | No | Configures the process data: the mapping, the process data SyncManagers and the FMMUs. |
+| **SAFE-OP** | Yes | Yes | No, held in a safe state | Starts the cycle, so that valid outputs reach the slave. |
+| **OP** | Yes | Yes | Yes | Runs the machine. |
+| **BOOT** | Bootstrap mailbox only | No | No | Updates the firmware, see [Chapter 0.6](mailboxes.md). |
 
-The diagram below shows the allowed transitions. Moving up goes one state at a time.
-Moving down can skip states.
+A slave advances one state at a time. It can skip states when returning to a lower state.
 
 ```mermaid
 stateDiagram-v2
@@ -51,18 +50,16 @@ stateDiagram-v2
     BOOT --> INIT
 ```
 
-A request that skips a state on the way up, such as INIT to SAFE-OP, is refused. BOOT
-can only be entered from INIT and only left toward INIT.
+The slave refuses a request to skip a state on startup, such as INIT to SAFE-OP. It
+can enter BOOT only from INIT and can leave BOOT only for INIT.
 
-**SAFE-OP is the key state.** In SAFE-OP, the slave already sends real inputs, so the
-master can read the machine and compute its first outputs. The slave also receives
-those outputs, but it does not apply them yet: its actuators stay in a safe state. Only
-when the master has sent valid outputs does it request OP, and only then does the
-slave apply them.
+In SAFE-OP, the slave sends inputs so the master can calculate its first outputs.
+The slave receives the outputs and keeps its actuators in a safe state. Once the
+master sends valid outputs, it requests OP. The slave applies the outputs in OP.
 
 ## The running example
 
-For the Freedom K64F board, start-up goes like this:
+The Freedom K64F board starts in this order.
 
 1. **INIT.** The master counts the slaves and finds one. It gives the board the station
    address 1001, reads the EEPROM, finds product code 0x00DEFEDE and a mailbox, and
@@ -70,25 +67,23 @@ For the Freedom K64F board, start-up goes like this:
 2. **PRE-OP.** The mailbox works. The master learns that the board has 3 output bytes
    and 12 input bytes, programs SyncManagers 2 and 3, and programs two FMMUs.
 3. **SAFE-OP.** Each cycle now brings back the 12 sensor bytes. The master writes the 3
-   colour bytes, but the light does not change yet.
-4. **OP.** The light follows the colour bytes that the master writes in each cycle.
+   color bytes, but the light does not change yet.
+4. **OP.** The light follows the color bytes that the master writes in each cycle.
 
 ## Request and answer
 
-Three ESC registers carry the conversation:
+The master and slave use three Application Layer (AL) registers in the EtherCAT
+Slave Controller (ESC).
 
-- **AL Control** (Application Layer control, at 0x0120): the master writes the state it
+- **AL Control** (at 0x0120): the master writes the state it
   wants.
 - **AL Status** (at 0x0130): the slave writes the state it is in.
 - **AL Status Code** (at 0x0134): the slave writes why it refused a request or left a
   state.
 
-The master requests, but the slave decides. The application on the slave sees the
-request, checks its configuration, and then either moves to the new state or stays
-where it is. The master knows the result only by reading AL Status, so it polls that
-register until the state changes or a timeout expires.
-
-The diagram below shows one request that succeeds.
+The slave application checks the configuration before accepting the request. If it
+refuses, it stays in its current state. The master polls AL Status until the state
+changes or the request times out.
 
 ```mermaid
 sequenceDiagram
@@ -117,11 +112,12 @@ The master reads the code to report the cause. To clear the error, the master wr
 AL Control again with the **error acknowledge** bit set. The slave then clears the
 error indication bit.
 
-The most common fall is caused by the process data watchdog of [Chapter
-0.3](inside-a-slave.md). When the master stops sending outputs while the slave is in
-OP, the watchdog expires. The slave goes back to SAFE-OP with the code 0x001B (sync
-manager watchdog), and its outputs return to their safe state. A lost cable or a
-crashed master can therefore not leave a motor running on old commands.
+The most common reason for a return to a lower state is a timeout on the process
+data watchdog described in [Chapter 0.3](inside-a-slave.md). When the master stops
+sending outputs while the slave is in OP, the watchdog expires. The slave goes back
+to SAFE-OP with the code 0x001B (sync manager watchdog), and its outputs return to
+their safe state. With the watchdog enabled, a lost cable or a crashed master does
+not leave a motor running on old commands.
 
 ## Summary
 
@@ -144,5 +140,4 @@ the slave side.
 
 - What the master configures between PRE-OP and SAFE-OP: Chapter 0.5, [Process
   data](process-data.md).
-- What the mailbox carries once PRE-OP is reached: Chapter 0.6, [Mailboxes: CoE and
-  FoE](mailboxes.md).
+- Mailbox services available in PRE-OP: Chapter 0.6, [Mailbox protocols](mailboxes.md).

@@ -1,52 +1,46 @@
 # Mailboxes in KickCAT
 
-> How does KickCAT send a mailbox message and wait for its answer, on both sides of the wire?
+> How do the master and slave handle mailbox requests in Ethernet for Control
+> Automation Technology (EtherCAT)?
 >
 > You will learn:
 >
-> - why the master and the slave each have their own mailbox class
-> - how a message object carries one exchange from request to answer
-> - how the master spreads mailbox work over its cyclic loop
-> - how the slave serves requests from its object dictionary and its files
-> - what to add to support a new mailbox protocol
+> - why the master and slave have separate mailbox classes
+> - how a message object tracks a request
+> - how the master schedules mailbox work in the cyclic loop
+> - how the slave handles dictionary and file requests
+> - how to add a mailbox protocol
 
-[Chapter 0.6](mailboxes.md) explained what a mailbox is: a pair of
-SyncManagers that carry messages which are not cyclic, such as Service Data
-Objects (SDOs), emergencies and files. This chapter shows how KickCAT builds
-that exchange in code.
+A mailbox uses two SyncManagers to exchange messages outside the regular process
+data cycle. Examples include Service Data Object (SDO) transfers, emergency
+messages, and files. See [Chapter 0.6](mailboxes.md).
 
 ## The problem: one exchange, many cycles
 
-A mailbox exchange is slow compared to a process data cycle. The master writes a
-request into the slave's receive mailbox. Later, the slave application reads
-it, does the work, and writes an answer into its send mailbox. Later again, the
-master sees that the send mailbox is full and reads the answer. A segmented
-transfer repeats this loop once per segment.
+A mailbox exchange can take several process data cycles. The master writes a request
+to the slave's receive mailbox. The slave reads it, processes it, and writes a reply
+to its send mailbox. The master reads the reply when that mailbox is full. A
+segmented transfer repeats these steps for each segment.
 
-So one exchange spans many cycles, and several exchanges can be open at the
-same time on different slaves. Something must remember where each exchange is,
-match an answer to the request that caused it, and give up when the slave does
-not answer.
+Several slaves can have requests pending at the same time. The master tracks each
+request, matches each reply, and checks for timeouts.
 
-There are two common ways to write this:
+There are two common ways to handle a pending request.
 
-- **A blocking call.** The function sends the request, then waits in a loop
-  until the answer arrives. It is simple to read, but it holds the thread, and
-  the cyclic process data stops while it waits.
-- **A state object.** Each exchange is an object that knows its own state. The
-  cyclic loop gives it each received message, and the object decides if the
-  message is its answer and what to send next. It never blocks, but the caller
-  must check the object for completion.
+- **Blocking call.** The function sends a request and waits for the reply. This is
+  simple to use, but the calling thread cannot exchange process data while it waits.
+- **State object.** An object tracks one exchange. The cyclic loop passes replies to
+  it. The object checks for a match and decides what to send next. The caller checks
+  for completion.
 
-**KickCAT keeps the state object at the core and builds the blocking call on
-top of it.** This follows the principle in [Chapter 1](principles.md): the
-application owns the loop, and blocking helpers are a convenience.
+KickCAT uses state objects for both interfaces. A blocking helper waits for the
+object to finish. The application controls the loop (see [Chapter
+1](principles.md)).
 
 ## Two sides, one protocol codebase
 
-The master and the slave see the same mailbox from opposite sides. The master
-sends requests and processes answers. The slave receives requests and sends
-answers. KickCAT puts both sides in one header, in two namespaces:
+The master sends requests and processes replies. The slave handles requests and
+builds replies. One header defines both interfaces in separate namespaces.
 
 - `mailbox::request` is the master side. Its `Mailbox` belongs to one remote
   slave, and its messages are requests waiting for an answer.
@@ -54,9 +48,8 @@ answers. KickCAT puts both sides in one header, in two namespaces:
   EtherCAT Slave Controller (ESC), and its messages are handlers that build
   answers.
 
-Both sides share the protocol definitions: the mailbox header, the CoE and FoE
-headers, the SDO command codes and the abort codes. A protocol is written once,
-and each side implements its own half of the exchange.
+The two sides share mailbox headers, CANopen over EtherCAT (CoE) and File over
+EtherCAT (FoE) headers, SDO command codes, and abort codes.
 
 ```mermaid
 classDiagram
@@ -109,37 +102,34 @@ classDiagram
     ResponseMailbox --> AbstractStorage
 ```
 
-The diagram shows the two hierarchies: each side has a mailbox that holds message objects, one subclass per service.
+Each mailbox holds message objects with one subclass per service.
 
 ## The master side
 
 ### A message is one exchange
 
-On the master, each slave record owns a `mailbox::request::Mailbox`. The
-mailbox is a factory: `createSDO`, `createSDOInfoGetOD`, `createFoERead`,
-`createFoEWrite` and `createGatewayMessage` build a message, put it in the
-`to_send` queue, and return a shared pointer to it. The caller keeps that
-pointer and reads `status()` to know where the exchange is: `RUNNING`,
-`SUCCESS`, `TIMEDOUT`, or an error code of the service.
+Each master-side slave record owns a `mailbox::request::Mailbox`. Its factory
+methods are `createSDO`, `createSDOInfoGetOD`, `createFoERead`, `createFoEWrite`,
+and `createGatewayMessage`. Each creates a message, adds it to `to_send`, and
+returns a shared pointer. The caller reads `status()` through this pointer. The
+result is `RUNNING`, `SUCCESS`, `TIMEDOUT`, or a service error code.
 
 When the bus writes a message to the slave, the mailbox moves it to the
 `to_process` list. When the bus reads an answer, the mailbox offers it to each
 message in `to_process`, in order. Each message returns one of four results:
 
-| Result | Meaning |
+| Result | Action |
 |---|---|
-| `NOOP` | The answer is not mine. Offer it to the next message. |
-| `CONTINUE` | The answer is mine, and I have another request to send. Put me back in `to_send`. |
-| `FINALIZE` | The answer is mine, and the exchange is over. Remove me. |
-| `FINALIZE_AND_KEEP` | The answer is mine, but keep me for the next one. |
+| `NOOP` | The reply does not match. Try the next message. |
+| `CONTINUE` | The reply matches. Return the message to `to_send` for the next request. |
+| `FINALIZE` | The reply completes the exchange. Remove the message. |
+| `FINALIZE_AND_KEEP` | The reply matches. Keep the handler for later replies. |
 
-`CONTINUE` is how a segmented transfer works: the same object sends the next
-segment request. `FINALIZE_AND_KEEP` is how a listener works. After
-initialization, the bus adds an `EmergencyMessage` to every slave that supports
-CoE. It catches every CoE emergency the slave sends, stores it in the
-mailbox's `emergencies` list, and stays in place. A `CheckMessage` also stays
-in place: it logs and drops the messages of protocols that the master does not
-handle, and the SDO requests that a slave should not send.
+For a segmented transfer, `CONTINUE` lets the same object request the next segment.
+A persistent listener uses `FINALIZE_AND_KEEP`. After initialization, the bus adds
+an `EmergencyMessage` to each CoE slave. It stores incoming CoE emergencies in the
+`emergencies` list and remains active. A persistent `CheckMessage` logs and discards
+unsupported protocol messages and unexpected SDO requests from slaves.
 
 The timeout of a message is checked each time the mailbox sends or receives.
 An FoE message restarts its timeout at each exchange, so a long file transfer
@@ -147,8 +137,7 @@ does not time out as long as the slave keeps answering.
 
 ### The bus moves the bytes
 
-The mailbox does not touch the network. The `Bus` does, in four steps, each a
-set of datagrams for all slaves that have a mailbox:
+The `Bus` handles network access. Each step queues datagrams for slaves with mailboxes.
 
 1. `sendMailboxesReadChecks` reads the status of the slave's send mailbox. It
    sets `can_read` when an answer is waiting.
@@ -162,18 +151,16 @@ These calls only queue datagrams. The frames leave and the callbacks run when
 the application calls `finalizeDatagrams` and `processAwaitingFrames`, as for
 process data (see [Chapter 4](transport.md)).
 
-The status checks can also ride in the cyclic process data frame. With
-`configureMailboxStatusCheck`, the bus maps the mailbox status bits of each
-slave into the logical frame with extra Fieldbus Memory Management Units
-(FMMUs), so steps 1 and 3 come for free with each cycle.
+`configureMailboxStatusCheck` uses extra fieldbus memory management units (FMMUs) to
+map the mailbox status bits into the cyclic frame. The master can then read them
+without separate datagrams for steps 1 and 3.
 
 ### Two ways to drive it
 
-**From the cyclic loop.** `MailboxSequencer` runs one of the four steps per
-call, in a round robin. Reads come before writes, so the answer is freed from
-the slave before the next request arrives. A period lets the application run a
-step only every N cycles. When the status checks are mapped in the cyclic
-frame, the sequencer skips them.
+**From the cyclic loop.** `MailboxSequencer` runs the four steps in order, one per
+call. Reading first frees the slave's send mailbox before the next request. A
+configurable period sets the number of cycles between steps. The sequencer skips
+status checks already mapped into the cyclic frame.
 
 ```cpp
 auto sdo = slave.mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &value, &size);
@@ -192,17 +179,16 @@ while (true)
 }
 ```
 
-**With a blocking helper.** `Bus::readSDO`, `writeSDO`, `readFoE` and
-`writeFoE` create the message, then loop on the four steps until the status
-leaves `RUNNING`. They throw on failure, as the master does for every error.
-They are right during configuration, in PRE-OP, when nothing else runs. During
-OP, they would hold the thread that must send process data, so use the
-sequencer instead.
+**With a blocking helper.** `Bus::readSDO`, `writeSDO`, `readFoE`, and `writeFoE`
+create a message and repeat the four steps until its status changes from `RUNNING`.
+They throw on failure. Use these helpers during configuration in the pre-operational
+state (PRE-OP). Use the sequencer in the operational state (OP) so the cyclic thread
+can keep sending process data.
 
 ### A segmented SDO upload
 
-The sequence shows one blocking `readSDO` of an object too large for one
-mailbox message. On the slave, the dictionary answers in segments.
+In this example, a blocking `readSDO` reads an object too large for one mailbox
+message. The slave returns it in segments.
 
 ```mermaid
 sequenceDiagram
@@ -232,16 +218,16 @@ sequenceDiagram
     Bus-->>App: data and size
 ```
 
-An abort from the slave at any step ends the exchange: the request message
-returns `FINALIZE` with the abort code as its status, and `readSDO` throws.
+If the slave aborts a transfer, the request returns `FINALIZE` and sets its status
+to the abort code. The blocking `readSDO` then throws.
 
 ## The slave side
 
 ### Receive, process, send
 
-On the slave, `mailbox::response::Mailbox` is built on an `AbstractESC` and a
-memory budget: the largest message it accepts, and how many exchanges may be
-open at once. It knows no protocol until the application enables one:
+The slave creates a `mailbox::response::Mailbox` with an `AbstractESC`, a maximum
+message size, and a limit on simultaneous exchanges. The application enables each
+protocol it needs.
 
 - `enableCoE(dictionary)` serves SDO and SDO information requests from the
   object dictionary.
@@ -257,46 +243,43 @@ and they must outlive the mailbox.
 2. `process` lets the open handlers do their work and queue answers.
 3. `send` writes the next answer into the send mailbox, if it is empty.
 
-A new request is first offered to the open handlers, so a segment reaches the
-handler of its transfer. If no handler claims it, each enabled protocol has a
-factory that may build a new handler. If no factory accepts it, the mailbox
-answers with a mailbox error, `UNSUPPORTED_PROTOCOL`. If too many exchanges are
-open, it answers with `NO_MORE_MEMORY`. The mailbox also handles the repeat
-request of the protocol: if the master lost an answer, the slave writes it
-again.
+The mailbox first passes a request to active handlers so that segments reach the
+handler for their transfer. If none accepts it, the mailbox tries each enabled
+protocol's factory. If no factory accepts it, the mailbox returns
+`UNSUPPORTED_PROTOCOL`. If the exchange limit is reached, it returns
+`NO_MORE_MEMORY`. The slave can also repeat its last reply if the master requests it
+after a loss.
 
-The slave does not check its dictionary at run time. The dictionary is
-validated once, when it is built (see [Chapter 9](from-xml-to-bytes.md)), and
-then trusted.
+The object dictionary is validated when it is built. The slave uses it without
+repeating that validation at runtime (see [Chapter 9](from-xml-to-bytes.md)).
 
 ### Files: the storage interface
 
-FoE asks the application for files through `FoE::AbstractStorage`. It has two
-calls, `openRead` and `openWrite`, which take a file name and a password and
-return an error code and a reader or a writer. A writer receives the data packet
-by packet, and `commit` is called when the last packet arrives. If the writer is
-destroyed without a commit, the transfer failed and the data must be dropped.
+FoE accesses files through `FoE::AbstractStorage`. The `openRead` and `openWrite`
+calls take a file name and password. They return an error code and a reader or
+writer. The writer receives one packet at a time. The handler calls `commit` after
+the last packet. If the writer is destroyed before commit, it must discard the
+incomplete data.
 
-This is a hardware boundary, like the socket and the ESC. The firmware can store
-a file in flash, the simulator stores it in a host directory, and the FoE
-handlers do not change. FoE is experimental on both sides, see
-[FEATURES](../FEATURES.md).
+Firmware can store files in flash. The simulator uses a host directory. Both use the
+same FoE handlers. FoE is experimental on the master and slave (see
+[FEATURES](../FEATURES.md)).
 
 ### The bootstrap mailbox
 
-In the BOOT state, a slave uses a second mailbox layout, declared in its
-EEPROM, usually to receive new firmware over FoE. On the slave, the application
-gives a second mailbox with `setBootstrapMailbox`. Without one, the slave
-refuses BOOT. On the master, `Bus::enterBootstrap` moves the slave to INIT,
-clears its pending messages, switches the mailbox to the bootstrap layout and
-requests BOOT. `exitBootstrap` does the reverse and returns to PRE-OP.
+In the bootstrap state (BOOT), the slave uses a second mailbox layout from its
+electrically erasable programmable read-only memory (EEPROM), usually for FoE
+firmware updates. The slave application provides a second mailbox with
+`setBootstrapMailbox`. Without it, the slave refuses BOOT. `Bus::enterBootstrap`
+requests the initialization state (INIT), clears pending messages, switches to the
+bootstrap mailbox layout, and requests BOOT. `exitBootstrap` reverses the change and
+returns the slave to PRE-OP.
 
 ## The mailbox gateway
 
-The EtherCAT Technology Group document ETG.8200 defines a mailbox gateway: a
-tool outside the master, for example a configuration tool on another computer,
-sends raw mailbox messages to the master over UDP, and the master forwards
-them to the right slave.
+EtherCAT Technology Group specification ETG.8200 defines a mailbox gateway. An
+external tool sends raw mailbox messages to the master over the User Datagram
+Protocol (UDP). The master forwards them to the addressed slave.
 
 `Gateway` reads requests from an `AbstractDiagSocket` (`UdpDiagSocket` on
 Linux) and passes them to `Bus::addGatewayMessage`. The bus reads the address
@@ -304,26 +287,25 @@ in the mailbox header. A slave address queues a `GatewayMessage` in that
 slave's mailbox, and the message keeps the raw answer when it arrives.
 `Gateway::processPendingRequests` sends completed answers back to the tool.
 
-Address 0 is the master itself. If the application gave the bus a master
-mailbox with `setMasterMailbox`, the request is served at once from the
-master's own object dictionary, built by `MasterOD` (ETG.1510). That mailbox is
-a `mailbox::response::Mailbox` with no ESC: the same code that serves SDOs on a
-slave serves them on the master.
+Address 0 selects the master. If the application installed a mailbox with
+`setMasterMailbox`, it handles the request immediately using the master's object
+dictionary. `MasterOD` builds this dictionary according to ETG.1510. The mailbox
+uses `mailbox::response::Mailbox` without an ESC and uses the same SDO handlers as a
+slave.
 
 ## Adding a protocol
 
-Ethernet over EtherCAT (EoE) is the next protocol on the roadmap. Today
-KickCAT has its protocol definitions only, and no handler on either side. A new
-protocol follows the path of FoE:
+Ethernet over EtherCAT (EoE) is planned. KickCAT currently has EoE protocol
+definitions only. To add handlers for a new protocol, follow the FoE implementation.
 
 1. **Protocol definitions.** Put the headers, opcodes and error codes in a
    `<Protocol>/protocol.h` shared by both sides.
 2. **Master side.** Write a `mailbox::request::AbstractMessage` subclass. Its
-   `process` returns `NOOP` for any message that is not its answer, so it can
-   live next to the others. Add a factory call in `mailbox::request::Mailbox`,
-   and a blocking helper on `Bus` if the protocol needs one. If the slave can
-   send messages that no request caused, add a persistent handler in
-   `Bus::addMailboxHandlers`, as for emergencies.
+   `process` returns `NOOP` for any message that is not its answer, so the next
+   handler can check it. Add a factory call in `mailbox::request::Mailbox`, and a
+   blocking helper on `Bus` if the protocol needs one. If the slave can send
+   unsolicited messages, add a persistent handler in `Bus::addMailboxHandlers`, as
+   for emergencies.
 3. **Slave side.** Write a `mailbox::response::AbstractMessage` subclass and a
    factory function that returns a handler for a message of your type, or
    `nullptr`. Register the factory with an `enable<Protocol>` call on the
@@ -348,7 +330,8 @@ protocol follows the path of FoE:
 - `lib/include/kickcat/FoE/mailbox/request.h`, `response.h`, `FoE/Storage.h`: FoE.
 - `lib/master/include/kickcat/MailboxSequencer.h`: the round robin of the four steps.
 - `lib/master/src/CoE.cc`, `FoE.cc`: the blocking helpers and the bootstrap switch.
-- `lib/master/include/kickcat/Gateway.h`, `MasterOD.h`: the ETG.8200 gateway and the master dictionary.
+- `lib/master/include/kickcat/Gateway.h`, `MasterOD.h`: the ETG.8200 gateway and the
+  master dictionary.
 - Example: `examples/master/gateway/` for the gateway, and `tools/foe.cc` for FoE.
 
 ## Where to go next
