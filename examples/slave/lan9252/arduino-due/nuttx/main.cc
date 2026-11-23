@@ -55,6 +55,9 @@ int main(int argc, char *argv[])
 
     slave.start();
 
+    // Validate once per master session: re-validating stale outputs after a watchdog drop flaps OP/SAFE_OP.
+    bool outputs_validated = false;
+
     while (true)
     {
         slave.routine();
@@ -65,11 +68,18 @@ int main(int argc, char *argv[])
     //    }
     //    printf("\n");
 
-        if (slave.state() == State::SAFE_OP)
+        State const state = slave.state();
+        if (state == State::INIT or state == State::PRE_OP)
+        {
+            outputs_validated = false;
+        }
+
+        if (state == State::SAFE_OP and not outputs_validated)
         {
             if (buffer_out[1] != 0xFF)
             {
                 slave.validateOutputData();
+                outputs_validated = true;
             }
         }
         sleep(1ms);

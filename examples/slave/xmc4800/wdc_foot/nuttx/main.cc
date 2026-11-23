@@ -85,15 +85,25 @@ int main(int, char *[])
 
     slave.start();
 
+    // Validate once per master session: re-validating stale outputs after a watchdog drop flaps OP/SAFE_OP.
+    bool outputs_validated = false;
+
     while (true)
     {
         eeprom.process();
         slave.routine();
-        if (slave.state() == State::SAFE_OP)
+        State const state = slave.state();
+        if (state == State::INIT or state == State::PRE_OP)
+        {
+            outputs_validated = false;
+        }
+
+        if (state == State::SAFE_OP and not outputs_validated)
         {
             if (output_PDO.watchdog_counter != 0x00)
             {
                 slave.validateOutputData();
+                outputs_validated = true;
             }
         }
     }
