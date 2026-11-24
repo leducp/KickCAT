@@ -10,7 +10,7 @@ TEST(SoketNull, it_does_nothing)
     socket.open("");
     socket.close();
     ASSERT_EQ(0,  socket.read(nullptr, 0));
-    ASSERT_EQ(42, socket.write(nullptr, 42));
+    ASSERT_EQ(-ENODEV, socket.write(nullptr, 42));
 }
 
 

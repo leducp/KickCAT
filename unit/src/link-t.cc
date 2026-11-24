@@ -381,6 +381,42 @@ TEST_F(LinkTest, writeThenRead_error_write)
     ASSERT_THROW(link.writeThenRead(frame), Error);
 }
 
+TEST(LinkWithoutRedundancy, writeThenRead_reads_nominal_once)
+{
+    auto io_nominal = std::make_shared<MockSocket>();
+    Link link{io_nominal, std::make_shared<SocketNull>(), [](){}};
+    Frame frame;
+
+    EXPECT_CALL(*io_nominal, setTimeout(_))
+        .WillRepeatedly(Return());
+
+    EXPECT_CALL(*io_nominal, write(_,_))
+    .WillOnce(Return(ETH_MIN_SIZE));
+
+    EXPECT_CALL(*io_nominal, read(_,_))
+    .WillOnce(Return(ETH_MIN_SIZE));
+
+    link.writeThenRead(frame);
+}
+
+TEST(LinkWithoutRedundancy, writeThenRead_nominal_timeout_throws)
+{
+    auto io_nominal = std::make_shared<MockSocket>();
+    Link link{io_nominal, std::make_shared<SocketNull>(), [](){}};
+    Frame frame;
+
+    EXPECT_CALL(*io_nominal, setTimeout(_))
+        .WillRepeatedly(Return());
+
+    EXPECT_CALL(*io_nominal, write(_,_))
+    .WillOnce(Return(ETH_MIN_SIZE));
+
+    EXPECT_CALL(*io_nominal, read(_,_))
+    .WillOnce(Return(-ETIMEDOUT));
+
+    ASSERT_THROW(link.writeThenRead(frame), std::system_error);
+}
+
 TEST_F(LinkTest, isRedundancyNeeded_true)
 {
     InSequence s;
