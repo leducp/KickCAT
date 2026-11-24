@@ -90,7 +90,6 @@ namespace kickcat
         MailboxStatusFMMU mailboxStatusFMMUMode() const { return mailbox_status_fmmu_; }
 
         // create the mapping between slaves PI and client buffer
-        // if OK, set the bus to SAFE_OP state
         [[deprecated("pass the iomap size so it can be bounds-checked: createMapping(uint8_t*, std::size_t)")]]
         void createMapping(uint8_t* iomap);
         /// \brief Like createMapping(iomap), but throws if iomap_size cannot hold the process image.
@@ -133,9 +132,9 @@ namespace kickcat
         void processMessages(std::function<void(DatagramState const&)> const& error);
 
         /// \brief  Send drift compensation datagrams to maintain DC synchronization
-        /// \details Writes the current master time to the DC reference clock slave's system time register (0x0910)
-        ///          using FPWR, then reads it back with FRMW so that each slave on the segment updates its
-        ///          local clock offset accordingly.
+        /// \details Sends one FRMW on the DC reference clock slave's system time register (0x0910): the reference
+        ///          clock time it reads is written to every other DC slave, which corrects its drift against it.
+        ///          The payload is pre-filled with the master time.
         ///          Called cyclically during process data exchange, and repeatedly (15 000 times) during
         ///          static drift compensation at DC initialization.
         /// \param  error  Callback invoked when a datagram error occurs

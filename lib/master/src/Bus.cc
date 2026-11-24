@@ -1255,9 +1255,18 @@ namespace kickcat
         };
 
         // Get SII
+        // The EEPROM is addressed by 16 bits words: a slave without an end category
+        // (blank or damaged EEPROM) shall not make the address wrap and the read last forever.
+        constexpr int32_t EEPROM_WORD_ADDRESS_END = 0x10000;
+
         int32_t pos = 0;
         while (not pending.empty())
         {
+            if (pos >= EEPROM_WORD_ADDRESS_END)
+            {
+                THROW_ERROR("EEPROM end category not found");
+            }
+
             readEeprom(static_cast<uint16_t>(pos), pending,
             [&](Slave& s, uint32_t word)
             {

@@ -56,8 +56,9 @@ significantly compared to the default `AF_PACKET` raw socket.
 sudo apt install libxdp-dev libbpf-dev clang
 
 # Build with AF_XDP support
-cmake .. -DENABLE_AF_XDP=ON
-make -j
+./scripts/configure.sh build --with=af_xdp
+./scripts/setup_build.sh build
+cd build && make -j
 ```
 
 **Usage:** prefix the interface name with `xdp:` to select the AF_XDP backend:

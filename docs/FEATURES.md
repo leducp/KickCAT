@@ -33,7 +33,7 @@ authoritative source for "what works today"; the README only summarizes it.
 |----------|------------|------------|-------|
 | CoE (CANopen over EtherCAT) | Supported | Supported | See CoE breakdown below. |
 | FoE (File over EtherCAT)    | Experimental | Experimental | See FoE breakdown below. |
-| EoE (Ethernet over EtherCAT)| Planned    | Planned    | Protocol header only; no mailbox handlers yet. |
+| EoE (Ethernet over EtherCAT)| Planned    | Planned    | Protocol definitions only; no mailbox handlers yet. |
 | SoE (Servo over EtherCAT)   | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
 | AoE (ADS over EtherCAT)     | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
 | VoE (Vendor over EtherCAT)  | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
@@ -47,7 +47,7 @@ authoritative source for "what works today"; the README only summarizes it.
 | SDO segmented transfer              | Supported | Supported |
 | SDO Information service             | Supported | Supported |
 | Emergency messages                  | Supported | Not applicable |
-| Object Dictionary                   | Not applicable | Supported |
+| Object Dictionary                   | Supported (ETG.1510 master OD, through the mailbox gateway) | Supported |
 | PDO mapping / assignment            | Supported | Supported |
 
 ### FoE breakdown
@@ -122,18 +122,24 @@ Controller (ESC).
 | PikeOS 5.1 | ARMv8        | Supported                                    |
 | Windows    | x86-64       | Tools and testing only (not real-time)       |
 
-### Slave (RTOS + ESC hardware)
+### Slave (OS + ESC hardware)
 
-The slave stack runs on the NuttX RTOS. Supported EtherCAT Slave Controllers:
+The slave stack runs on NuttX, Linux and KickOS:
+
+| OS     | Status       | Reference board                                    |
+|--------|--------------|----------------------------------------------------|
+| NuttX  | Supported    | Freedom K64F (LAN9252), Arduino Due (EasyCAT, LAN9252), XMC4800 Relax Kit |
+| Linux  | Supported    | Raspberry Pi (LAN9252 over SPI)                     |
+| KickOS | Experimental | Freedom K64F                                       |
+
+Supported EtherCAT Slave Controllers:
 
 | ESC      | Interface  | Status                   |
 |----------|------------|--------------------------|
 | LAN9252  | SPI        | Supported                |
 | XMC4800  | Integrated | Supported; CTT-validated |
 
-Reference boards: NXP Freedom K64F (LAN9252), Arduino Due with EasyCAT shield
-(LAN9252), and the Infineon XMC4800 Relax Kit (XMC4800). Build and flashing
-details are in [HARDWARE.md](HARDWARE.md).
+Build and flashing details are in [HARDWARE.md](HARDWARE.md).
 
 ## Known limitations
 

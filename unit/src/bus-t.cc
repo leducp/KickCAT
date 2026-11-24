@@ -96,7 +96,8 @@ public:
         }
     }
 
-    void initBus(milliseconds watchdog = 100ms)
+    // Answers of Bus::init() up to the read of the EEPROM
+    void initUntilFetchEeprom()
     {
         detectAndReset();
 
@@ -131,6 +132,11 @@ public:
         {
             mock_link->handleProcess(Command::FPRD, uint8_t(State::INIT), 1);
         }
+    }
+
+    void initBus(milliseconds watchdog = 100ms)
+    {
+        initUntilFetchEeprom();
 
         // fetchEeprom
         addFetchEepromWord(0);
@@ -918,6 +924,20 @@ TEST_F(BusTest, pdio_watchdogs)
 TEST_F(BusTest, init_no_slave_detected)
 {
     mock_link->handleWriteThenRead(Command::BRD, 0);
+    ASSERT_THROW(bus.init(), Error);
+}
+
+
+TEST_F(BusTest, init_eeprom_without_end_category)
+{
+    initUntilFetchEeprom();
+
+    // The whole 16 bits word address space (two words per read) without an end category
+    for (int32_t i = 0; i < 0x8000; ++i)
+    {
+        addFetchEepromWord(0);
+    }
+
     ASSERT_THROW(bus.init(), Error);
 }
 

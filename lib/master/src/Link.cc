@@ -219,11 +219,16 @@ namespace kickcat
         int32_t to_write = frame.finalize();
         auto write_read = [&](std::shared_ptr<AbstractSocket> from,
                               std::shared_ptr<AbstractSocket> to,
-                              MAC const& src)
+                              MAC const& src) -> int32_t
         {
             int32_t is_faulty = 0;
             frame.setSourceMAC(src);
             int32_t written = from->write(frame.data(), to_write);
+            if (written == -ENODEV)
+            {
+                // Nothing was sent: no answer can come back.
+                return 1;
+            }
             if (written < to_write)
             {
                 THROW_ERROR("Can't write to interface");

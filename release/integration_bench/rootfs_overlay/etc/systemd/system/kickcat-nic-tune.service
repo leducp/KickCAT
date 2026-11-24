@@ -1,0 +1,12 @@
+[Unit]
+Description=Disable eth0 RX interrupt coalescing (RT latency)
+After=sys-subsystem-net-devices-eth0.device
+Wants=sys-subsystem-net-devices-eth0.device
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'ethtool -C eth0 rx-usecs 0'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,7 @@
 #include "kickcat/Gateway.h"
 #include "kickcat/helpers.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/MasterOD.h"
 #include "kickcat/OS/Timer.h"
 
 #ifdef __linux__
@@ -115,6 +116,16 @@ int main(int argc, char* argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
+
+    // Gateway requests addressed to station 0 are served by the master object dictionary (ETG.1510)
+    MasterIdentity identity;
+    identity.device_name = "KickCAT gateway example";
+    MasterOD master_od(identity);
+    CoE::Dictionary master_dictionary = master_od.createDictionary();
+    master_od.populate(master_dictionary, bus.slaves());
+    mailbox::response::Mailbox master_mailbox(1024);
+    master_mailbox.enableCoE(master_dictionary);
+    bus.setMasterMailbox(&master_mailbox);
 
     auto socket = std::make_shared<UdpDiagSocket>();
     socket->open();

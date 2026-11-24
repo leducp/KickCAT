@@ -22,8 +22,8 @@ There are two layers:
 EtherCAT Slave Controller and is driven by the real slave stack
 (`Slave` + `PDO` + optional CoE mailbox). It implements:
 
-- 16 SyncManagers, including mailbox SyncManagers (RxSM/TxSM).
-- 16 FMMUs (logical-to-physical process-data mapping).
+- 8 SyncManagers, including mailbox SyncManagers (RxSM/TxSM).
+- 8 FMMUs (logical-to-physical process-data mapping).
 - AL (Application Layer) state machine registers and event masks.
 - DL (Data Link) port descriptors, per-port link status, and error counters.
 - EEPROM loaded from a raw `.bin` or compiled from an ESI XML device.
@@ -148,6 +148,8 @@ image -- `esi` or `eeprom`:
 | `foe_password` | uint32 | With `foe_dir`: password required by every transfer; `0` (default) accepts any. |
 | `foe_read_only`| bool   | With `foe_dir`: reject FoE writes (default `false`).               |
 | `foe_max_size` | uint32 | With `foe_dir`: largest file accepted on write (default 64 MiB).   |
+| `ds402_motor`  | bool   | Emulate a CiA 402 drive: state machine plus a small motor model (default `false`). |
+| `motor_*`      | number | With `ds402_motor`: motor model tuning (`motor_cycle_ms`, `motor_bandwidth`, `motor_damping`, `motor_vel_tau`, `motor_inertia`, `motor_friction`, `motor_torque_scale`, `motor_max_velocity`). |
 
 When several `esi` device filters match, the first match is used. With `esi`,
 the CoE mailbox (if the device declares CoE) is built from the same device, so
@@ -158,8 +160,8 @@ the CoE mailbox (if the device declares CoE) is built from the same device, so
 With `foe_dir`, the slave serves FoE reads and writes from a flat host directory:
 the requested file name must be a plain file name (no `/`, `\`, `:`, `.` or `..`),
 so a transfer cannot reach anything outside the directory. A write is staged in
-memory and reaches the disk only once the last packet is acknowledged, so an
-aborted write never leaves a truncated file. `ecat402-drive-foe.json` serves
+memory and reaches the disk only when the last packet is received (before it is
+acknowledged), so an aborted write never leaves a truncated file. `ecat402-drive-foe.json` serves
 `simulation/slave_configs/foe_files/`.
 
 When the SII also declares a bootstrap mailbox (ESI `Eeprom/BootStrap`), the
