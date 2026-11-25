@@ -277,6 +277,15 @@ namespace kickcat::mailbox::request
     }
 
 
+    void AbstractMessage::restartTimeout(nanoseconds current_time)
+    {
+        if ((status_ == MessageStatus::RUNNING) and (timeout_duration_ != 0ns))
+        {
+            timeout_ = current_time + timeout_duration_;
+        }
+    }
+
+
     uint32_t AbstractMessage::status(nanoseconds current_time)
     {
         if (status_ == MessageStatus::RUNNING)

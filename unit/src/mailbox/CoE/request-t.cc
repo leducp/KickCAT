@@ -467,6 +467,43 @@ TEST_F(CoE_Request, SDO_timedout)
     ASSERT_EQ(0, mailbox.to_process.size());
 }
 
+TEST_F(CoE_Request, SDO_restart_timeout)
+{
+    nanoseconds const TIMEOUT = 10ms;
+    int32_t data = 0xCAFEDECA;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::DOWNLOAD, &data, &data_size, TIMEOUT);
+
+    auto message = mailbox.send();
+    header->type = mailbox::Type::VoE; // unrelated reply to process the message
+    nanoseconds start = now();
+
+    // The client could not poll for 50ms: the whole message gets a new timeout
+    message->restartTimeout(start + 50ms);
+    ASSERT_FALSE(mailbox.receive(raw_message, start + 50ms + TIMEOUT));
+    ASSERT_EQ(MessageStatus::RUNNING, message->status(start + 50ms + TIMEOUT));
+    ASSERT_EQ(1, mailbox.to_process.size());
+
+    ASSERT_FALSE(mailbox.receive(raw_message, start + 51ms + TIMEOUT));
+    ASSERT_EQ(MessageStatus::TIMEDOUT, message->status());
+    ASSERT_EQ(0, mailbox.to_process.size());
+
+    // A final status is kept
+    message->restartTimeout(start + 100ms);
+    ASSERT_EQ(MessageStatus::TIMEDOUT, message->status(start + 100ms));
+}
+
+TEST_F(CoE_Request, SDO_restart_timeout_without_timeout)
+{
+    int32_t data = 0xCAFEDECA;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::DOWNLOAD, &data, &data_size, 0ns);
+
+    auto message = mailbox.send();
+    message->restartTimeout(now());
+    ASSERT_EQ(MessageStatus::RUNNING, message->status(now() + 1h));
+}
+
 
 TEST_F(CoE_Request, SDO_wrong_service)
 {

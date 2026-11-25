@@ -390,6 +390,54 @@ TEST_F(FoE_Request, timeout_applies_to_each_exchange)
     ASSERT_EQ(MessageStatus::TIMEDOUT, foe->status(start + 200ms));
 }
 
+TEST_F(FoE_Request, restart_timeout_after_a_pause)
+{
+    nanoseconds start = now();
+    auto foe = mailbox.createFoERead("fw.bin", 0, 100ms);
+    mailbox.send();
+    exchange(FoE::opcode::DATA, 1, pattern(CAPACITY));
+
+    // The client could not poll for 500ms: the exchange would be over its timeout
+    foe->restartTimeout(start + 500ms);
+
+    // The reply re-arms the timeout from the (test) clock again: check the end without injected times
+    ASSERT_TRUE(mailbox.receive(reply(FoE::opcode::DATA, 2, pattern(3)), start + 590ms));
+    ASSERT_NE(nullptr, mailbox.send());
+    ASSERT_EQ(MessageStatus::SUCCESS, foe->status());
+    ASSERT_EQ(CAPACITY + 3, foe->file().size());
+}
+
+TEST_F(FoE_Request, restart_timeout_expires_one_timeout_later)
+{
+    nanoseconds start = now();
+    auto foe = mailbox.createFoEWrite("fw.bin", 0, pattern(3), 100ms);
+    mailbox.send();
+
+    foe->restartTimeout(start + 500ms);
+    ASSERT_EQ(MessageStatus::RUNNING, foe->status(start + 600ms));
+    ASSERT_FALSE(mailbox.receive(reply(FoE::opcode::ACK, 0), start + 601ms));
+    ASSERT_EQ(MessageStatus::TIMEDOUT, foe->status());
+}
+
+TEST_F(FoE_Request, restart_timeout_keeps_a_final_status)
+{
+    nanoseconds start = now();
+    auto foe = mailbox.createFoERead("fw.bin", 0, 100ms);
+    mailbox.send();
+    exchange(FoE::opcode::DATA, 1, pattern(3));
+    ASSERT_EQ(MessageStatus::SUCCESS, foe->status());
+
+    foe->restartTimeout(start + 500ms);
+    ASSERT_EQ(MessageStatus::SUCCESS, foe->status(start + 550ms));
+
+    auto expired = mailbox.createFoERead("fw.bin", 0, 100ms);
+    mailbox.send();
+    ASSERT_EQ(MessageStatus::TIMEDOUT, expired->status(start + 500ms));
+
+    expired->restartTimeout(start + 500ms);
+    ASSERT_EQ(MessageStatus::TIMEDOUT, expired->status(start + 550ms));
+}
+
 TEST_F(FoE_Request, reply_reaches_transfer_not_check_message)
 {
     // Bus::init seeds a CheckMessage ahead of any user message: it shall not swallow FoE replies.
