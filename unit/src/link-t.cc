@@ -525,6 +525,31 @@ TEST_F(LinkTest, sendFrame_error_wrong_number_write)
     checkSendFrameError();
 }
 
+TEST_F(LinkTest, sendFrame_write_throws_next_frame_has_its_own_length)
+{
+    // A socket that throws on write must not leave the length of the frame behind: the next
+    // frame would be sent with both lengths, beyond its buffer.
+    constexpr uint16_t DATA_SIZE = 1000;
+    constexpr int32_t FRAME_SIZE = sizeof(EthernetHeader) + sizeof(EthercatHeader) + sizeof(DatagramHeader) + DATA_SIZE + 2;
+
+    auto process = [](DatagramHeader const*, uint8_t const*, uint16_t) { return DatagramState::OK; };
+    auto error = [](DatagramState const&) {};
+
+    link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, DATA_SIZE, process, error);
+    EXPECT_CALL(*io_nominal, write(_,_))
+        .WillOnce(::testing::Throw(std::runtime_error("write failed")));
+    ASSERT_THROW(sendFrame(), std::runtime_error);
+    checkSendFrameError();
+
+    link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, DATA_SIZE, process, error);
+    EXPECT_CALL(*io_nominal, write(_, FRAME_SIZE))
+        .WillOnce(Return(FRAME_SIZE));
+    EXPECT_CALL(*io_redundancy, write(_, FRAME_SIZE))
+        .WillOnce(Return(FRAME_SIZE));
+    sendFrame();
+    ASSERT_EQ(sentFrames(), 1);
+}
+
 TEST_F(LinkTest, sendFrame_error_write)
 {
     link.addDatagram(Command::BRD, createAddress(0, 0x0000), nullptr, nullptr, nullptr);

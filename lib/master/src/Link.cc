@@ -294,12 +294,39 @@ namespace kickcat
         int32_t const datagrams = frame_nominal_.datagramCounter();
         int32_t to_Write = frame_nominal_.finalize();
 
-        bool is_frame_sent_nominal = write(socket_nominal_, frame_nominal_, PRIMARY_IF_MAC, to_Write);
-        bool is_frame_sent_redundancy = write(socket_redundancy_, frame_nominal_, SECONDARY_IF_MAC, to_Write);
+        auto clearFrames = [&]()
+        {
+            frame_nominal_.clear();
+            frame_redundancy_.clear();
+            frame_redundancy_.resetContext();
+        };
 
-        frame_nominal_.clear();
-        frame_redundancy_.clear();
-        frame_redundancy_.resetContext();
+        auto markSendError = [&]()
+        {
+            for (int32_t i = 0; i < datagrams; ++i)
+            {
+                uint8_t index = static_cast<uint8_t>(index_head_ - i - 1);
+                callbacks_[index].status = DatagramState::SEND_ERROR;
+            }
+        };
+
+        bool is_frame_sent_nominal = false;
+        bool is_frame_sent_redundancy = false;
+        try
+        {
+            is_frame_sent_nominal = write(socket_nominal_, frame_nominal_, PRIMARY_IF_MAC, to_Write);
+            is_frame_sent_redundancy = write(socket_redundancy_, frame_nominal_, SECONDARY_IF_MAC, to_Write);
+        }
+        catch (...)
+        {
+            // finalize() has reset the datagram position but not the frame length: without the
+            // clear the next frame would be sent with the length of this one added to its own.
+            clearFrames();
+            markSendError();
+            throw;
+        }
+
+        clearFrames();
 
         if (is_frame_sent_nominal or is_frame_sent_redundancy)
         {
@@ -307,11 +334,7 @@ namespace kickcat
         }
         else
         {
-            for (int32_t i = 0; i < datagrams; ++i)
-            {
-                uint8_t index = static_cast<uint8_t>(index_head_ - i - 1);
-                callbacks_[index].status = DatagramState::SEND_ERROR;
-            }
+            markSendError();
         }
     }
 
