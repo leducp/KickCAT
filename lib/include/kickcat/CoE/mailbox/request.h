@@ -30,6 +30,8 @@ namespace kickcat::mailbox::request
         uint8_t* payload_;
         uint8_t* client_data_;
         uint32_t* client_data_size_;
+        uint16_t index_;                   // object of the transfer: the download segments overwrite it in the request
+        uint8_t  subindex_;
         uint32_t client_buffer_size_{0};   // original client buffer capacity, fixed at construction
         uint32_t download_remaining_{0};   // bytes still to send for a segmented download
         uint32_t pending_status_{MessageStatus::RUNNING}; // status to apply once the abort request is sent
