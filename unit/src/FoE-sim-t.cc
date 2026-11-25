@@ -180,6 +180,42 @@ TEST_F(FoESimTest, firmware_update_in_bootstrap)
     ASSERT_EQ(slave().sii.info.vendor_id, vendor_id);
 }
 
+TEST_F(FoESimTest, sdo_upload_client_buffer_too_small_then_next_request)
+{
+    // A 24-byte send mailbox makes the upload of a 10-byte object a segmented one
+    std::vector<uint8_t> raw = filesystem::readFile(ESI);
+    std::string esi{raw.begin(), raw.end()};
+    std::string const from = "DefaultSize=\"128\" StartAddress=\"#x1400\"";
+    std::size_t pos = esi.find(from);
+    ASSERT_NE(std::string::npos, pos);
+    esi.replace(pos, from.size(), "DefaultSize=\"24\" StartAddress=\"#x1400\"");
+    filesystem::writeFile(ASYMMETRIC_ESI, esi);
+
+    start("", ASYMMETRIC_ESI);
+    ASSERT_EQ(24, slave().mailbox.send_size);
+
+    // The client gives up each transfer, more often than the slave has room for pending messages
+    for (int i = 0; i < 3; ++i)
+    {
+        uint8_t too_small[6] = {0};
+        uint32_t size = sizeof(too_small);
+        auto sdo = slave().mailbox.createSDO(0x5ee4, 0, false, CoE::SDO::request::UPLOAD, too_small, &size, 1s);
+        bus_->waitForMessage(sdo);
+        ASSERT_EQ(mailbox::request::MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL, sdo->status());
+    }
+
+    // The slave is not left in the middle of a transfer: it serves the next requests
+    uint8_t version[10] = {0};
+    uint32_t size = sizeof(version);
+    bus_->readSDO(slave(), 0x5ee4, 0, Bus::Access::PARTIAL, version, &size);
+    ASSERT_EQ(10u, size);
+
+    uint32_t vendor_id = 0;
+    size = sizeof(vendor_id);
+    bus_->readSDO(slave(), 0x1018, 1, Bus::Access::PARTIAL, &vendor_id, &size);
+    ASSERT_EQ(slave().sii.info.vendor_id, vendor_id);
+}
+
 TEST_F(FoESimTest, missing_directory)
 {
     filesystem::writeFile(CONFIG, "{\"esi\": \"ecat402-drive.xml\", \"foe_dir\": \"no_such_dir\"}");
