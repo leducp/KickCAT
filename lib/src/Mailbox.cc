@@ -268,16 +268,7 @@ namespace kickcat::mailbox::request
     }
 
 
-    void AbstractMessage::rearmTimeout()
-    {
-        if (timeout_duration_ != 0ns)
-        {
-            timeout_ = now() + timeout_duration_;
-        }
-    }
-
-
-    void AbstractMessage::restartTimeout(nanoseconds current_time)
+    void AbstractMessage::rearmTimeout(nanoseconds current_time)
     {
         if ((status_ == MessageStatus::RUNNING) and (timeout_duration_ != 0ns))
         {

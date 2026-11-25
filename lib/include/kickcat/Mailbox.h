@@ -90,23 +90,21 @@ namespace kickcat::mailbox::request
         uint32_t status(nanoseconds current_time = now());
 
         /// \brief Restart the timeout of a running message: it expires one full timeout after current_time.
-        /// \details For a client that could not process the mailbox for a while (e.g. its thread was blocked):
-        ///          call it before processing the mailbox again, so that the pause does not count against the
-        ///          message. For a service whose timeout applies to each exchange (FoE), this restarts the
-        ///          timeout of the current exchange; otherwise (SDO), the timeout of the whole message.
+        /// \details Services whose timeout applies to each exchange (FoE) call it for every new exchange.
+        ///          A client that could not process the mailbox for a while (e.g. its thread was blocked)
+        ///          calls it before processing the mailbox again, so that the pause does not count against
+        ///          the message: for FoE this restarts the timeout of the current exchange, otherwise (SDO)
+        ///          the timeout of the whole message.
         ///          It does nothing if the message has no timeout or its status is no longer RUNNING (finished,
         ///          or already TIMEDOUT because status(), Mailbox::send() or Mailbox::receive() saw the deadline
         ///          passed).
         /// \param current_time     Considered time to restart the timeout from (enable injection for tests)
-        void restartTimeout(nanoseconds current_time = now());
+        void rearmTimeout(nanoseconds current_time = now());
 
         uint8_t const* data() const { return data_.data(); }
         size_t size() const         { return data_.size(); }
 
     protected:
-        /// \brief Restart the timeout from now, for services whose timeout applies to each exchange
-        void rearmTimeout();
-
         std::vector<uint8_t> data_;     // data of the message (send and gateway rec)
         mailbox::Header* header_;       // pointer on the mailbox header in data
         uint32_t status_;               // message current status
