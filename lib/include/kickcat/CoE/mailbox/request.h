@@ -22,7 +22,7 @@ namespace kickcat::mailbox::request
         ProcessingResult processDownloadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
         void prepareDownloadSegment();
 
-        /// rief Give up a segmented transfer: send an Abort SDO Transfer request, then end with this status
+        /// \brief Give up a segmented transfer: send an Abort SDO Transfer request, then end with this status
         ProcessingResult abort(uint32_t code, uint32_t status);
 
         CoE::Header* coe_;
