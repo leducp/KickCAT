@@ -90,14 +90,9 @@ namespace kickcat::mailbox::request
         uint32_t status(nanoseconds current_time = now());
 
         /// \brief Restart the timeout of a running message: it expires one full timeout after current_time.
-        /// \details Services whose timeout applies to each exchange (FoE) call it for every new exchange.
-        ///          A client that could not process the mailbox for a while (e.g. its thread was blocked)
-        ///          calls it before processing the mailbox again, so that the pause does not count against
-        ///          the message: for FoE this restarts the timeout of the current exchange, otherwise (SDO)
-        ///          the timeout of the whole message.
-        ///          It does nothing if the message has no timeout or its status is no longer RUNNING (finished,
-        ///          or already TIMEDOUT because status(), Mailbox::send() or Mailbox::receive() saw the deadline
-        ///          passed).
+        /// \details Lets a client that could not process the mailbox for a while resume without a TIMEDOUT.
+        ///          FoE: timeout of the current exchange; SDO: timeout of the whole message.
+        ///          No effect if the message has no timeout or is no longer RUNNING.
         /// \param current_time     Considered time to restart the timeout from (enable injection for tests)
         void rearmTimeout(nanoseconds current_time = now());
 
