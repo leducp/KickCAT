@@ -13,6 +13,7 @@ namespace kickcat::mailbox::request
         virtual ~SDOMessage() = default;
 
         ProcessingResult process(uint8_t const* received) override;
+        void sent() override;
 
     protected:
         ProcessingResult processUpload           (mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
@@ -21,13 +22,19 @@ namespace kickcat::mailbox::request
         ProcessingResult processDownloadSegmented(mailbox::Header const* header, CoE::ServiceData const* sdo, uint8_t const* payload);
         void prepareDownloadSegment();
 
+        /// \brief Give up a segmented transfer: send an Abort SDO Transfer request, then end with this status
+        ProcessingResult abort(uint32_t code, uint32_t status);
+
         CoE::Header* coe_;
         CoE::ServiceData* sdo_;
         uint8_t* payload_;
         uint8_t* client_data_;
         uint32_t* client_data_size_;
+        uint16_t index_;                   // object of the transfer: the download segments overwrite it in the request
+        uint8_t  subindex_;
         uint32_t client_buffer_size_{0};   // original client buffer capacity, fixed at construction
         uint32_t download_remaining_{0};   // bytes still to send for a segmented download
+        uint32_t pending_status_{MessageStatus::RUNNING}; // status to apply once the abort request is sent
     };
 
     class SDOInformationMessage final : public AbstractMessage

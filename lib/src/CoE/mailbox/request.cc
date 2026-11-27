@@ -11,6 +11,8 @@ namespace kickcat::mailbox::request
         : AbstractMessage(mbx_recv_size, mbx_send_size, timeout)
         , client_data_(reinterpret_cast<uint8_t*>(data))
         , client_data_size_(data_size)
+        , index_(index)
+        , subindex_(subindex)
         , client_buffer_size_(*data_size)
     {
         // What this message writes below: headers, service data and the four expedited/size bytes.
@@ -64,6 +66,36 @@ namespace kickcat::mailbox::request
                 std::memcpy(payload_, &size, sizeof(uint32_t));
                 download_remaining_ = size; // client_data_ already points at the source buffer
             }
+        }
+    }
+
+
+    ProcessingResult SDOMessage::abort(uint32_t code, uint32_t status)
+    {
+        // ETG.1000.6 Abort SDO Transfer Request
+        header_->len          = 10;
+        coe_->service         = CoE::Service::SDO_REQUEST;
+        sdo_->command         = CoE::SDO::request::ABORT;
+        sdo_->complete_access = 0;
+        sdo_->block_size      = 0;
+        sdo_->transfer_type   = 0;
+        sdo_->size_indicator  = 0;
+        sdo_->index           = index_;
+        sdo_->subindex        = subindex_;
+        std::memcpy(payload_, &code, sizeof(uint32_t));
+
+        // The slave does not answer an abort: the message ends once it is sent
+        pending_status_ = status;
+        rearmTimeout();
+        return ProcessingResult::CONTINUE;
+    }
+
+
+    void SDOMessage::sent()
+    {
+        if (pending_status_ != MessageStatus::RUNNING)
+        {
+            status_ = pending_status_;
         }
     }
 
@@ -173,13 +205,18 @@ namespace kickcat::mailbox::request
         std::memcpy(&complete_size, payload, sizeof(uint32_t));
         payload += 4;
 
+        uint32_t const data_len = header->len - 10;
         if (*client_data_size_ < complete_size)
         {
+            if (data_len < complete_size)
+            {
+                // segmented: the slave waits for the segment requests
+                return abort(CoE::SDO::abort::OUT_OF_MEMORY, MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL);
+            }
             status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
             return ProcessingResult::FINALIZE;
         }
 
-        uint32_t const data_len = header->len - 10;
         if (data_len >= complete_size)
         {
             // standard
@@ -213,6 +250,11 @@ namespace kickcat::mailbox::request
 
         if (sdo->complete_access != sdo_->complete_access)
         {
+            if (not sdo->size_indicator)
+            {
+                // more segments follow: the slave waits for the next segment request
+                return abort(CoE::SDO::abort::TOGGLE_BIT_NOT_ALTERNATED, MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT);
+            }
             status_ = MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT;
             return ProcessingResult::FINALIZE;
         }
@@ -230,6 +272,11 @@ namespace kickcat::mailbox::request
         // *client_data_size_ tracks bytes written so far; never write past the original buffer.
         if (size > (client_buffer_size_ - *client_data_size_))
         {
+            if (not sdo->size_indicator)
+            {
+                // more segments follow: the slave waits for the next segment request
+                return abort(CoE::SDO::abort::OUT_OF_MEMORY, MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL);
+            }
             status_ = MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL;
             return ProcessingResult::FINALIZE;
         }
@@ -313,6 +360,11 @@ namespace kickcat::mailbox::request
         // toggle echoed by the slave must match the one we sent
         if (sdo->complete_access != sdo_->complete_access)
         {
+            if (download_remaining_ != 0)
+            {
+                // the slave waits for the next segments
+                return abort(CoE::SDO::abort::TOGGLE_BIT_NOT_ALTERNATED, MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT);
+            }
             status_ = MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT;
             return ProcessingResult::FINALIZE;
         }

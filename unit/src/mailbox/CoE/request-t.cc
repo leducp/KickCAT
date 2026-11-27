@@ -30,6 +30,74 @@ public:
         header->address = 0;
     }
 
+    // Reply to an upload request with a segmented Initiate Upload Response: complete size only, no data
+    void receiveSegmentedUploadInitiate(uint32_t complete_size)
+    {
+        header->type        = mailbox::Type::CoE;
+        header->len         = 10;
+        coe->service        = CoE::Service::SDO_RESPONSE;
+        sdo->command        = CoE::SDO::response::UPLOAD;
+        sdo->transfer_type  = 0;
+        sdo->size_indicator = 1;
+        sdo->index          = 0x1018;
+        sdo->subindex       = 1;
+        std::memcpy(payload, &complete_size, sizeof(uint32_t));
+        ASSERT_TRUE(mailbox.receive(raw_message));
+    }
+
+    // Reply to an upload segment request with 8 data octets (Length 0x0B)
+    void receiveUploadSegment(bool toggle, bool last)
+    {
+        header->len          = 11;
+        sdo->command         = CoE::SDO::response::UPLOAD_SEGMENTED;
+        sdo->complete_access = toggle;
+        sdo->size_indicator  = last;    // More Follows: 1 marks the last segment
+        sdo->transfer_type   = 0;
+        sdo->block_size      = 0;
+        std::memset(reinterpret_cast<uint8_t*>(sdo) + 1, 0xA5, 8);
+        ASSERT_TRUE(mailbox.receive(raw_message));
+    }
+
+    // The message gave up a segmented transfer: its PDU is now an Abort SDO Transfer request
+    // (ETG.1000.6) and the message ends with the expected status once this request is sent.
+    void checkAbortRequest(std::shared_ptr<AbstractMessage> const& message, uint8_t counter, uint32_t code, uint32_t status)
+    {
+        // nothing answers an abort: the message waits to be sent, it is still running until then
+        ASSERT_EQ(MessageStatus::RUNNING, message->status());
+        ASSERT_EQ(0, mailbox.to_process.size());
+        ASSERT_EQ(1, mailbox.to_send.size());
+
+        auto const* mbx_section = pointData<mailbox::Header>(message->data());
+        auto const* coe_section = pointData<CoE::Header>(mbx_section);
+        auto const* sdo_section = pointData<CoE::ServiceData>(coe_section);
+
+        ASSERT_EQ(10,                        mbx_section->len);
+        ASSERT_EQ(0,                         mbx_section->address);
+        ASSERT_EQ(0,                         mbx_section->channel);
+        ASSERT_EQ(0,                         mbx_section->priority);
+        ASSERT_EQ(mailbox::Type::CoE,        mbx_section->type);
+        ASSERT_EQ(counter,                   mbx_section->count);   // a new session handle
+        ASSERT_EQ(0,                         mbx_section->reserved);
+        ASSERT_EQ(0,                         coe_section->number);
+        ASSERT_EQ(0,                         coe_section->reserved);
+        ASSERT_EQ(CoE::Service::SDO_REQUEST, coe_section->service);
+        ASSERT_EQ(CoE::SDO::request::ABORT,  sdo_section->command);
+        ASSERT_EQ(0,                         sdo_section->complete_access);
+        ASSERT_EQ(0,                         sdo_section->block_size);
+        ASSERT_EQ(0,                         sdo_section->transfer_type);
+        ASSERT_EQ(0,                         sdo_section->size_indicator);
+        ASSERT_EQ(0x1018,                    sdo_section->index);
+        ASSERT_EQ(1,                         sdo_section->subindex);
+        uint32_t abort_code = 0;
+        std::memcpy(&abort_code, pointData<uint8_t>(sdo_section), sizeof(uint32_t));
+        ASSERT_EQ(code, abort_code);
+
+        ASSERT_EQ(message, mailbox.send());
+        ASSERT_EQ(status, message->status());
+        ASSERT_EQ(0, mailbox.to_process.size());
+        ASSERT_EQ(0, mailbox.to_send.size());
+    }
+
 protected:
     Mailbox mailbox;
     uint8_t raw_message[256];
@@ -269,6 +337,141 @@ TEST_F(CoE_Request, SDO_upload_segmented_OK)
 }
 
 
+TEST_F(CoE_Request, SDO_upload_segmented_initiate_buffer_too_small)
+{
+    // The slave announces a segmented upload that does not fit the client buffer: it waits for the
+    // segment requests, so the client has to abort the transfer.
+    uint8_t data[8] = {0};
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, data, &data_size);
+    auto message = mailbox.send();
+
+    receiveSegmentedUploadInitiate(13);
+    checkAbortRequest(message, 2, CoE::SDO::abort::OUT_OF_MEMORY, MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL);
+}
+
+
+TEST_F(CoE_Request, SDO_upload_standard_buffer_too_small)
+{
+    // All the data are in the response: the transfer is over for the slave, there is nothing to abort
+    int32_t data = 0;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size);
+    auto message = mailbox.send();
+
+    header->type = mailbox::Type::CoE;
+    header->len  = 10 + 8;
+    coe->service = CoE::Service::SDO_RESPONSE;
+    sdo->command = CoE::SDO::response::UPLOAD;
+    sdo->index    = 0x1018;
+    sdo->subindex = 1;
+    int32_t* reply = static_cast<int32_t*>(payload);
+    reply[0] = 8; // payload size
+    ASSERT_TRUE(mailbox.receive(raw_message));
+
+    ASSERT_EQ(MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL, message->status());
+    ASSERT_EQ(0, mailbox.to_process.size());
+    ASSERT_EQ(0, mailbox.to_send.size());
+}
+
+
+TEST_F(CoE_Request, SDO_upload_expedited_buffer_too_small)
+{
+    int16_t data = 0;
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, &data, &data_size);
+    auto message = mailbox.send();
+
+    header->type = mailbox::Type::CoE;
+    coe->service = CoE::Service::SDO_RESPONSE;
+    sdo->command = CoE::SDO::response::UPLOAD;
+    sdo->transfer_type = 1;
+    sdo->block_size    = 0; // 4 bytes
+    sdo->index    = 0x1018;
+    sdo->subindex = 1;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+
+    ASSERT_EQ(MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL, message->status());
+    ASSERT_EQ(0, mailbox.to_process.size());
+    ASSERT_EQ(0, mailbox.to_send.size());
+}
+
+
+TEST_F(CoE_Request, SDO_upload_segment_buffer_too_small)
+{
+    // The slave sends more than the complete size it announced and more segments follow: abort
+    uint8_t data[13] = {0};
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, data, &data_size);
+    auto message = mailbox.send();
+
+    receiveSegmentedUploadInitiate(13);
+    ASSERT_EQ(message, mailbox.send());
+    receiveUploadSegment(false, false);     // 8 octets
+    ASSERT_EQ(message, mailbox.send());
+    ASSERT_EQ(MessageStatus::RUNNING, message->status());
+
+    receiveUploadSegment(true, false);      // 8 more octets, only 5 left in the buffer
+    checkAbortRequest(message, 4, CoE::SDO::abort::OUT_OF_MEMORY, MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL);
+    ASSERT_EQ(8, data_size);
+}
+
+
+TEST_F(CoE_Request, SDO_upload_last_segment_buffer_too_small)
+{
+    // Same with the last segment: the transfer is over for the slave, there is nothing to abort
+    uint8_t data[13] = {0};
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, data, &data_size);
+    auto message = mailbox.send();
+
+    receiveSegmentedUploadInitiate(13);
+    ASSERT_EQ(message, mailbox.send());
+    receiveUploadSegment(false, false);
+    ASSERT_EQ(message, mailbox.send());
+
+    receiveUploadSegment(true, true);
+    ASSERT_EQ(MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL, message->status());
+    ASSERT_EQ(0, mailbox.to_process.size());
+    ASSERT_EQ(0, mailbox.to_send.size());
+}
+
+
+TEST_F(CoE_Request, SDO_upload_segment_bad_toggle_bit)
+{
+    // The client gives up on a segment that is not the last one: the slave waits for the next request
+    uint8_t data[32] = {0};
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, data, &data_size);
+    auto message = mailbox.send();
+
+    receiveSegmentedUploadInitiate(32);
+    ASSERT_EQ(message, mailbox.send());
+
+    receiveUploadSegment(true, false);      // toggle shall be 0
+    checkAbortRequest(message, 3, CoE::SDO::abort::TOGGLE_BIT_NOT_ALTERNATED, MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT);
+    ASSERT_EQ(0, data_size);
+}
+
+
+TEST_F(CoE_Request, SDO_upload_last_segment_bad_toggle_bit)
+{
+    // Same with the last segment: the transfer is over for the slave, there is nothing to abort
+    uint8_t data[32] = {0};
+    uint32_t data_size = sizeof(data);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::UPLOAD, data, &data_size);
+    auto message = mailbox.send();
+
+    receiveSegmentedUploadInitiate(8);
+    ASSERT_EQ(message, mailbox.send());
+
+    receiveUploadSegment(true, true);
+    ASSERT_EQ(MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT, message->status());
+    ASSERT_EQ(0, mailbox.to_process.size());
+    ASSERT_EQ(0, mailbox.to_send.size());
+}
+
+
 TEST_F(CoE_Request, SDO_download_expedited_OK)
 {
     int32_t data = 0xCAFEDECA;
@@ -407,6 +610,65 @@ TEST_F(CoE_Request, SDO_download_segmented_OK)
     sdo->complete_access = 1;
     ASSERT_TRUE(mailbox.receive(raw_message));
     ASSERT_EQ(MessageStatus::SUCCESS, message->status());
+}
+
+
+TEST_F(CoE_Request, SDO_download_segment_bad_toggle_bit)
+{
+    // 13 bytes through a 16-byte mailbox: two segments
+    mailbox.recv_size = 16;
+    mailbox.send_size = 16;
+
+    uint8_t source[13] = {0};
+    uint32_t data_size = sizeof(source);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::DOWNLOAD, source, &data_size);
+    auto message = mailbox.send();
+
+    header->type  = mailbox::Type::CoE;
+    coe->service  = CoE::Service::SDO_RESPONSE;
+    sdo->command  = CoE::SDO::response::DOWNLOAD;
+    sdo->index    = 0x1018;
+    sdo->subindex = 1;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(message, mailbox.send());     // segment 1, toggle 0: its data overwrite index and subindex
+
+    // The slave waits for the second segment: the client gives up with an abort for the object
+    sdo->command         = CoE::SDO::response::DOWNLOAD_SEGMENTED;
+    sdo->complete_access = 1;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    checkAbortRequest(message, 3, CoE::SDO::abort::TOGGLE_BIT_NOT_ALTERNATED, MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT);
+}
+
+
+TEST_F(CoE_Request, SDO_download_last_segment_bad_toggle_bit)
+{
+    mailbox.recv_size = 16;
+    mailbox.send_size = 16;
+
+    uint8_t source[13] = {0};
+    uint32_t data_size = sizeof(source);
+    mailbox.createSDO(0x1018, 1, false, CoE::SDO::request::DOWNLOAD, source, &data_size);
+    auto message = mailbox.send();
+
+    header->type  = mailbox::Type::CoE;
+    coe->service  = CoE::Service::SDO_RESPONSE;
+    sdo->command  = CoE::SDO::response::DOWNLOAD;
+    sdo->index    = 0x1018;
+    sdo->subindex = 1;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(message, mailbox.send());     // segment 1, toggle 0
+
+    sdo->command         = CoE::SDO::response::DOWNLOAD_SEGMENTED;
+    sdo->complete_access = 0;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(message, mailbox.send());     // segment 2, toggle 1: the last one
+
+    // The slave has all the data: the transfer is over for it, there is nothing to abort
+    sdo->complete_access = 0;
+    ASSERT_TRUE(mailbox.receive(raw_message));
+    ASSERT_EQ(MessageStatus::COE_SEGMENT_BAD_TOGGLE_BIT, message->status());
+    ASSERT_EQ(0, mailbox.to_process.size());
+    ASSERT_EQ(0, mailbox.to_send.size());
 }
 
 

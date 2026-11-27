@@ -183,6 +183,13 @@ namespace kickcat::mailbox::response
             return ProcessingResult::NOOP;
         }
 
+        if (sdo->command == CoE::SDO::request::ABORT)
+        {
+            // Abort SDO Transfer from the client: the transfer is over and nothing is answered
+            segmented_entry_ = nullptr;
+            return ProcessingResult::FINALIZE;
+        }
+
         if (sdo->command == CoE::SDO::request::DOWNLOAD_SEGMENTED)
         {
             return downloadSegment(header, sdo);

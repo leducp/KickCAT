@@ -1225,3 +1225,64 @@ TEST(CoE_Roundtrip, sdo_segmented_download_master_slave)
     ASSERT_NE(entry, nullptr);
     ASSERT_EQ(0, std::memcmp(entry->data, blob, sizeof(blob)));
 }
+
+// The client gives up a segmented upload that does not fit its buffer: the Abort SDO Transfer request
+// it sends ends the transfer on the slave, which serves the next request.
+TEST(CoE_Roundtrip, sdo_segmented_upload_client_buffer_too_small_then_next_request)
+{
+    constexpr uint16_t MBX = 32;
+
+    std::mt19937 rng{0xAB0471EDu};
+    uint8_t blob[50];
+    for (auto& byte : blob) { byte = static_cast<uint8_t>(rng()); }
+
+    CoE::Dictionary dict;
+    {
+        CoE::Object object{0x2000, CoE::ObjectCode::VAR, "Big blob", {}};
+        object.entries.emplace_back(0, static_cast<uint16_t>(sizeof(blob) * 8), 0,
+                                    CoE::Access::READ, CoE::DataType::OCTET_STRING, "blob");
+        object.entries.back().data = std::malloc(sizeof(blob));
+        std::memcpy(object.entries.back().data, blob, sizeof(blob));
+        dict.push_back(std::move(object));
+    }
+
+    Mailbox slave{MBX, 1};
+    slave.enableCoE(dict);
+
+    mailbox::request::Mailbox master;
+    master.recv_size = MBX;
+    master.send_size = MBX;
+
+    auto exchange = [&](std::shared_ptr<mailbox::request::AbstractMessage> const& msg)
+    {
+        int guard = 0;
+        while ((msg->status() == mailbox::request::MessageStatus::RUNNING) and (guard++ < 32))
+        {
+            auto to_write = master.send();
+            if (to_write == nullptr)
+            {
+                break;
+            }
+            std::vector<uint8_t> request(to_write->data(), to_write->data() + to_write->size());
+            std::vector<uint8_t> reply = slave.processRequest(std::move(request));
+            if (not reply.empty())
+            {
+                master.receive(reply.data());
+            }
+        }
+    };
+
+    uint8_t too_small[20] = {0};
+    uint32_t too_small_size = sizeof(too_small);
+    auto msg = master.createSDO(0x2000, 0, false, CoE::SDO::request::UPLOAD, too_small, &too_small_size);
+    exchange(msg);
+    ASSERT_EQ(mailbox::request::MessageStatus::COE_CLIENT_BUFFER_TOO_SMALL, msg->status());
+
+    uint8_t received[sizeof(blob)] = {0};
+    uint32_t received_size = sizeof(received);
+    msg = master.createSDO(0x2000, 0, false, CoE::SDO::request::UPLOAD, received, &received_size);
+    exchange(msg);
+    ASSERT_EQ(mailbox::request::MessageStatus::SUCCESS, msg->status());
+    ASSERT_EQ(sizeof(blob), received_size);
+    ASSERT_EQ(0, std::memcmp(received, blob, sizeof(blob)));
+}
