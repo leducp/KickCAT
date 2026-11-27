@@ -89,13 +89,17 @@ namespace kickcat::mailbox::request
         /// \return current message status. Value may depend on underlying service.
         uint32_t status(nanoseconds current_time = now());
 
+        /// \brief Restart the timeout of a running message: it expires one full timeout after current_time.
+        /// \details Lets a client that could not process the mailbox for a while resume without a TIMEDOUT.
+        ///          FoE: timeout of the current exchange; SDO: timeout of the whole message.
+        ///          No effect if the message has no timeout or is no longer RUNNING.
+        /// \param current_time     Considered time to restart the timeout from (enable injection for tests)
+        void rearmTimeout(nanoseconds current_time = now());
+
         uint8_t const* data() const { return data_.data(); }
         size_t size() const         { return data_.size(); }
 
     protected:
-        /// \brief Restart the timeout from now, for services whose timeout applies to each exchange
-        void rearmTimeout();
-
         std::vector<uint8_t> data_;     // data of the message (send and gateway rec)
         mailbox::Header* header_;       // pointer on the mailbox header in data
         uint32_t status_;               // message current status
