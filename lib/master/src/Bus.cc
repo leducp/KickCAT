@@ -1613,4 +1613,16 @@ namespace kickcat
         link_->addDatagram(Command::FPRD, createAddress(slave.address, reg::ESC_DL_STATUS), nullptr, 2, process, error);
     }
 
+
+    int32_t waitForSlaves(Bus& bus, int32_t expected, nanoseconds timeout, nanoseconds period)
+    {
+        nanoseconds const start = now();
+        int32_t detected = bus.detectSlaves();
+        while (detected != expected and elapsed_time(start) <= timeout)
+        {
+            sleep(period);
+            detected = bus.detectSlaves();
+        }
+        return detected;
+    }
 }

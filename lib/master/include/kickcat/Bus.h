@@ -328,6 +328,14 @@ namespace kickcat
      * @param sm_map        Sync Manager mapping index (e.g. 0x1C12 for Outputs, 0x1C13 for Inputs)
      */
     void mapPDO(Bus& bus, Slave& slave, uint16_t pdo_map, uint32_t const* mapping, uint8_t mapping_count, uint16_t sm_map);
+
+    /// \brief Scan the bus until it shows the expected number of slaves, for slaves that boot later than the master
+    /// \param bus      The bus to scan, before its init()
+    /// \param expected Number of slaves to wait for
+    /// \param timeout  Maximum time to wait
+    /// \param period   Time between two scans
+    /// \return The number of slaves of the last scan: expected on success, what the bus showed on timeout
+    int32_t waitForSlaves(Bus& bus, int32_t expected, nanoseconds timeout, nanoseconds period = 100ms);
 }
 
 #endif
