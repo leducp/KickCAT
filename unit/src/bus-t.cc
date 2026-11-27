@@ -5,7 +5,6 @@
 #include "kickcat/Bus.h"
 #include "kickcat/FoE/protocol.h"
 #include "kickcat/MailboxSequencer.h"
-#include "kickcat/helpers.h"
 
 using namespace kickcat;
 
