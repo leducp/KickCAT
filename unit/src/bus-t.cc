@@ -5,6 +5,7 @@
 #include "kickcat/Bus.h"
 #include "kickcat/FoE/protocol.h"
 #include "kickcat/MailboxSequencer.h"
+#include "kickcat/helpers.h"
 
 using namespace kickcat;
 
@@ -925,6 +926,26 @@ TEST_F(BusTest, init_no_slave_detected)
 {
     mock_link->handleWriteThenRead(Command::BRD, 0);
     ASSERT_THROW(bus.init(), Error);
+}
+
+
+TEST_F(BusTest, waitForSlaves_late_boot)
+{
+    mock_link->handleWriteThenRead(Command::BRD, 0);
+    mock_link->handleWriteThenRead(Command::BRD, 1);
+    mock_link->handleWriteThenRead(Command::BRD, 2);
+    ASSERT_EQ(2, waitForSlaves(bus, 2, 1s));
+}
+
+
+TEST_F(BusTest, waitForSlaves_timeout)
+{
+    // The mock clock moves 1ms per now() call: the 4th scan exceeds a 3ms timeout.
+    for (int i = 0; i < 4; ++i)
+    {
+        mock_link->handleWriteThenRead(Command::BRD, 1);
+    }
+    ASSERT_EQ(1, waitForSlaves(bus, 2, 3ms));
 }
 
 

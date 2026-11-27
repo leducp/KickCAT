@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "helpers.h"
+#include "kickcat/Bus.h"
 
 #include "kickcat/TapSocket.h"
 #include "kickcat/SocketNull.h"
@@ -124,4 +125,16 @@ namespace kickcat
         return {nominal, redundant};
     }
 // LCOV_EXCL_STOP
+
+    int32_t waitForSlaves(Bus& bus, int32_t expected, nanoseconds timeout, nanoseconds period)
+    {
+        nanoseconds const start = now();
+        int32_t detected = bus.detectSlaves();
+        while (detected != expected and elapsed_time(start) <= timeout)
+        {
+            sleep(period);
+            detected = bus.detectSlaves();
+        }
+        return detected;
+    }
 }
