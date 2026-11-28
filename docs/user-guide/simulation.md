@@ -51,7 +51,7 @@ between emulated ESCs as a physical network would:
 ### Current limitations
 
 - No interrupt emulation.
-- See the matrix in [FEATURES.md](FEATURES.md) for DC and redundancy status.
+- See the matrix in [Features](features.md) for DC and redundancy status.
 
 ---
 

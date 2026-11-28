@@ -12,44 +12,55 @@ exclude_docs = "includes/"
 
 nav = [
   { "Home" = "index.md" },
-  { "Features" = "FEATURES.md" },
-  { "Building" = "BUILDING.md" },
-  { "Hardware" = "HARDWARE.md" },
-  { "Simulation" = "SIMULATION.md" },
-  { "Tools" = "TOOLS.md" },
-  { "Performance" = "PERFORMANCE.md" },
-  { "Developer guide" = [
-    { "Introduction" = "guide/README.md" },
-    { "0.0 How to read this guide" = "guide/how-to-read.md" },
-    { "0.1 What is EtherCAT?" = "guide/what-is-ethercat.md" },
-    { "0.2 Frames and datagrams" = "guide/frames-and-datagrams.md" },
-    { "0.3 Inside a slave: the ESC" = "guide/inside-a-slave.md" },
-    { "0.4 The EtherCAT state machine" = "guide/state-machine.md" },
-    { "0.5 Process data" = "guide/process-data.md" },
-    { "0.6 Mailboxes: CoE and FoE" = "guide/mailboxes.md" },
-    { "0.7 Topology, redundancy and clocks" = "guide/topology-and-clocks.md" },
-    { "0.8 Describing a device" = "guide/device-descriptions.md" },
-    { "1 Overview and principles" = "guide/principles.md" },
-    { "2 A map of the code" = "architecture.md" },
-    { "3 The master" = "guide/master.md" },
-    { "4 Transport" = "guide/transport.md" },
-    { "5 Mailboxes in KickCAT" = "guide/mailbox-implementation.md" },
-    { "6 The slave stack" = "guide/slave.md" },
-    { "7 Distributed clocks" = "guide/distributed-clocks.md" },
-    { "8 Simulation internals" = "guide/simulation.md" },
-    { "9 From XML to bytes" = "guide/from-xml-to-bytes.md" },
-    { "10 Operating systems and porting" = "guide/os-and-porting.md" },
-    { "11 Testing a change" = "guide/testing.md" },
+  { "User guide" = [
+    { "Features" = "user-guide/features.md" },
+    { "Building" = "user-guide/building.md" },
+    { "Hardware" = "user-guide/hardware.md" },
+    { "Simulation" = "user-guide/simulation.md" },
+    { "Tools" = "user-guide/tools.md" },
+    { "Performance" = "user-guide/realtime.md" },
   ] },
-  { "Contributing" = "CONTRIBUTING.md" },
-  { "Release procedure" = "RELEASE.md" },
+  { "Developer guide" = [
+    "developer-guide/index.md",
+    { "How to read this guide" = "developer-guide/how-to-read.md" },
+    { "EtherCAT background" = [
+      { "What is EtherCAT?" = "developer-guide/ethercat/what-is-ethercat.md" },
+      { "Frames and datagrams" = "developer-guide/ethercat/frames-and-datagrams.md" },
+      { "Inside a slave: the ESC" = "developer-guide/ethercat/inside-a-slave.md" },
+      { "The EtherCAT state machine" = "developer-guide/ethercat/state-machine.md" },
+      { "Process data" = "developer-guide/ethercat/process-data.md" },
+      { "Mailboxes: CoE and FoE" = "developer-guide/ethercat/mailboxes.md" },
+      { "Topology, redundancy and clocks" = "developer-guide/ethercat/topology-and-clocks.md" },
+      { "Describing a device" = "developer-guide/ethercat/device-descriptions.md" },
+    ] },
+    { "Architecture" = [
+      { "Overview and principles" = "developer-guide/architecture/principles.md" },
+      { "A map of the code" = "developer-guide/architecture/code-map.md" },
+      { "The master" = "developer-guide/architecture/master.md" },
+      { "Transport" = "developer-guide/architecture/transport.md" },
+      { "Mailboxes in KickCAT" = "developer-guide/architecture/mailboxes.md" },
+      { "The slave stack" = "developer-guide/architecture/slave.md" },
+      { "Distributed clocks" = "developer-guide/architecture/distributed-clocks.md" },
+      { "Simulation internals" = "developer-guide/architecture/emulation.md" },
+      { "From XML to bytes" = "developer-guide/architecture/device-descriptions.md" },
+      { "Operating systems and porting" = "developer-guide/architecture/platform.md" },
+    ] },
+    { "Contributing" = [
+      "developer-guide/contributing/index.md",
+      { "Testing a change" = "developer-guide/contributing/testing.md" },
+      { "Release procedure" = "developer-guide/contributing/release.md" },
+    ] },
+  ] },
 ]
 
 [project.theme]
 name = "material"
-logo = "kickCAT_logo_dark_mode.png"
-favicon = "kickCAT_logo_light_mode.png"
+logo = "assets/kickCAT_logo_dark_mode.png"
+favicon = "assets/kickCAT_logo_light_mode.png"
 features = [
+  "navigation.tabs",
+  "navigation.sections",
+  "navigation.indexes",
   "navigation.top",
   "navigation.footer",
   "search.suggest",

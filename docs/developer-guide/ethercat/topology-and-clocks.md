@@ -133,16 +133,15 @@ reference clock or adjust its cycle to follow the reference clock.
 ## In KickCAT
 
 KickCAT supports cable redundancy. Its experimental master DC support adjusts the
-master's cycle to follow the reference clock. See [Chapter 4](transport.md) for
-redundancy and [Chapter 7](distributed-clocks.md) for clock setup. The emulator
-models ports, network layouts, broken cables, and DC. See [Chapter
-8](simulation.md).
+master's cycle to follow the reference clock. See [Transport](../architecture/transport.md) for
+redundancy and [Distributed clocks](../architecture/distributed-clocks.md) for clock setup. The emulator
+models ports, network layouts, broken cables, and DC. See [Simulation internals](../architecture/emulation.md).
 
 ## Where to go next
 
 - How frames and redundancy are handled in the master:
-  [Chapter 4](transport.md).
+  [Transport](../architecture/transport.md).
 - How the master sets up DC and follows the reference clock:
-  [Chapter 7](distributed-clocks.md).
+  [Distributed clocks](../architecture/distributed-clocks.md).
 - How the emulator wires a network of software slaves:
-  [Chapter 8](simulation.md).
+  [Simulation internals](../architecture/emulation.md).

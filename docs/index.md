@@ -1,6 +1,6 @@
 <p align="center">
-  <img src="kickCAT_logo_light_mode.png#only-light" alt="KickCAT" width="300">
-  <img src="kickCAT_logo_dark_mode.png#only-dark" alt="KickCAT" width="300">
+  <img src="assets/kickCAT_logo_light_mode.png#only-light" alt="KickCAT" width="300">
+  <img src="assets/kickCAT_logo_dark_mode.png#only-dark" alt="KickCAT" width="300">
 </p>
 
 <p align="center">
@@ -46,7 +46,7 @@ CoE is fully supported on master and slave. FoE is experimental on master and
 slave (file transfer, including firmware update in the Bootstrap state). EoE is planned. SoE, AoE,
 and VoE are not currently on the roadmap (no maintainer hardware to test
 against) -- contributions are welcome. See the
-[feature support matrix](FEATURES.md) for the full breakdown.
+[feature support matrix](user-guide/features.md) for the full breakdown.
 
 ### Tooling and GUIs
 
@@ -59,7 +59,7 @@ against) -- contributions are welcome. See the
 - **od_generator** -- generate CoE Object Dictionary code from ESI files
 - **ethercat_gui** -- PySide6 bus monitoring application
 
-See [docs/TOOLS.md](TOOLS.md) for usage.
+See [Tools](user-guide/tools.md) for usage.
 
 ### Simulation and emulation
 
@@ -69,7 +69,7 @@ topology routing, redundancy, runtime wire break/heal). Run a master against it
 either in-process (the `simulated_bus` example) or as a separate process
 (`network_simulator` over a shared-memory TAP socket).
 
-See [docs/SIMULATION.md](SIMULATION.md).
+See [Simulation](user-guide/simulation.md).
 
 ## Platform support
 
@@ -97,7 +97,7 @@ ESC.
 | LAN9252  | SPI        | Production               |
 | XMC4800  | Integrated | Production; CTT validated |
 
-See the [hardware guide](HARDWARE.md).
+See the [hardware guide](user-guide/hardware.md).
 
 ## Getting started
 
@@ -120,10 +120,10 @@ hardware, single process:
 
 ## Where to go next
 
-- [Feature support matrix](FEATURES.md) -- exactly what is and isn't supported
-- [Building and installing](BUILDING.md) -- build, install, Python bindings, Windows/PikeOS
-- [Hardware guide](HARDWARE.md) -- slave firmware, flashing, end-to-end walkthrough
-- [Simulation and emulation](SIMULATION.md) -- software ESC and network emulator
-- [Tools and GUIs](TOOLS.md) -- KickUI, EEPROM editor, CLI utilities
-- [Real-time performance tuning](PERFORMANCE.md) -- Linux RT setup
-- [Developer guide](guide/README.md) -- how EtherCAT works and how KickCAT implements it
+- [Feature support matrix](user-guide/features.md) -- exactly what is and isn't supported
+- [Building and installing](user-guide/building.md) -- build, install, Python bindings, Windows/PikeOS
+- [Hardware guide](user-guide/hardware.md) -- slave firmware, flashing, end-to-end walkthrough
+- [Simulation and emulation](user-guide/simulation.md) -- software ESC and network emulator
+- [Tools and GUIs](user-guide/tools.md) -- KickUI, EEPROM editor, CLI utilities
+- [Real-time performance tuning](user-guide/realtime.md) -- Linux RT setup
+- [Developer guide](developer-guide/index.md) -- how EtherCAT works and how KickCAT implements it

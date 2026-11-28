@@ -78,7 +78,7 @@ refused with AL status code 0x0013.
 | DC modeling in the emulator     | Supported (local clock, drift-ppm injection, SYNC0) | -- |
 
 The ESC emulator models a DC clock with configurable drift; see
-[SIMULATION.md](SIMULATION.md). Slave-side DC is not implemented on real ESCs yet.
+[Simulation](simulation.md). Slave-side DC is not implemented on real ESCs yet.
 
 `Bus::enableDC` lets the reference (first DC) slave clock free-run: the cyclic drift
 datagram only relays it to the other slaves (ETG-standard FRMW/ARMW relay). The master
@@ -106,7 +106,7 @@ RT-loop jitter into the DC domain and can unlock the slaves' SYNC PLL.
 | EEPROM read/dump tooling         | Supported | Not applicable |
 | EEPROM write (slave provisioning)| Supported | Not applicable |
 
-See [TOOLS.md](TOOLS.md) for the `eeprom` CLI and the EEPROM editor GUI.
+See [Tools](tools.md) for the `eeprom` CLI and the EEPROM editor GUI.
 
 ## Platforms
 
@@ -138,7 +138,7 @@ Supported EtherCAT Slave Controllers:
 | LAN9252  | SPI        | Supported                |
 | XMC4800  | Integrated | Supported; CTT-validated |
 
-Build and flashing details are in [HARDWARE.md](HARDWARE.md).
+Build and flashing details are in [Hardware](hardware.md).
 
 ## Known limitations
 
@@ -149,4 +149,4 @@ Build and flashing details are in [HARDWARE.md](HARDWARE.md).
   supported.
 - Slave-side Distributed Clocks are not implemented.
 - The simulator/emulator does not emulate interrupts; see
-  [SIMULATION.md](SIMULATION.md).
+  [Simulation](simulation.md).

@@ -3,9 +3,9 @@
 This guide covers running KickCAT against real hardware: building and flashing
 NuttX slave firmware, provisioning EEPROM, and running a master against the
 slaves. For a no-hardware path, use the simulator instead -- see
-[SIMULATION.md](SIMULATION.md).
+[Simulation](simulation.md).
 
-Build the host-side binaries first; see [BUILDING.md](BUILDING.md).
+Build the host-side binaries first; see [Building](building.md).
 
 ---
 
@@ -66,7 +66,7 @@ python py_bindings/examples/freedom-k64f.py -i enp8s0
 
 ### Expected output
 
-![Freedom K64F master-slave communication](freedom-demo.gif)
+![Freedom K64F master-slave communication](../assets/freedom-demo.gif)
 
 The master will:
 
@@ -85,7 +85,7 @@ The master will:
 
 **Permission denied**
 
-- Run the master with `sudo` or grant capabilities (see [BUILDING.md](BUILDING.md)).
+- Run the master with `sudo` or grant capabilities (see [Building](building.md)).
 - For Python: run `./py_bindings/enable_raw_access.sh`.
 
 **Interface not found**
@@ -109,7 +109,7 @@ Located in `examples/master/`:
 - **load_esi**: ESI file loading utility
 - **wdc_foot**: CTT conformance example
 - **simulated_bus**: in-process master + emulated slave (no hardware) -- see
-  [SIMULATION.md](SIMULATION.md)
+  [Simulation](simulation.md)
 
 Run a C++ example:
 
@@ -216,7 +216,7 @@ Make sure both slaves are running before continuing.
 
 ### 2. Connect the hardware
 
-![Multi-slave example setup](multi-slave-example.png)
+![Multi-slave example setup](../assets/multi-slave-example.png)
 
 Ensure that:
 
@@ -236,4 +236,4 @@ Replace `eth0` with the interface connected to your bus.
 The master enumerates all slaves and continuously prints their input/output
 data.
 
-![Multi-slave EasyCAT example output](multi-slave-easycat-output.gif)
+![Multi-slave EasyCAT example output](../assets/multi-slave-easycat-output.gif)

@@ -104,20 +104,19 @@ After building, run this command from the repository root.
 The program has five steps.
 
 1. **Read the device description.** The ESI parser loads `Board` from the XML file
-   and builds the EEPROM image and CoE object dictionary. See [Chapter
-   9](guide/from-xml-to-bytes.md).
+   and builds the EEPROM image and CoE object dictionary. See [From XML to bytes](device-descriptions.md).
 2. **Build the slave.** An `EmulatedESC` uses the EEPROM image. A `PDO` object
    manages process data, and `slave::Slave` runs the same stack as the firmware.
    The mailbox serves CoE requests from the dictionary. The application provides input and
-   output buffers. See [Chapter 6](guide/slave.md).
+   output buffers. See [The slave stack](slave.md).
 3. **Connect the master.** A `LoopbackSocket` passes each frame to the emulated
    slave, which runs `routine()` once per frame. A `Link` uses the socket, and a
-   `Bus` uses the link. See [Chapter 4](guide/transport.md) for transport and
-   [Chapter 8](guide/simulation.md) for the emulator.
+   `Bus` uses the link. See [Transport](transport.md) for transport and
+   [Simulation internals](emulation.md) for the emulator.
 4. **Start the bus.** `bus.init()` finds the slave and brings it to PRE-OP.
    `bus.createMapping()` sets up the process image. The application requests
    SAFE-OP, writes its first outputs, and requests OP. It keeps exchanging process
-   data while it waits. See [Chapter 3](guide/master.md).
+   data while it waits. See [The master](master.md).
 5. **Exchange process data.** The master reads inputs and writes outputs each cycle.
 
 ```mermaid
@@ -151,7 +150,7 @@ Both use the same stack code as the example.
 
 ## Where to go next
 
-- The principles behind this layout: [Chapter 1](guide/principles.md).
-- The master, from discovery to OP: [Chapter 3](guide/master.md).
-- The slave stack: [Chapter 6](guide/slave.md).
-- The list of all chapters: [the guide's index](guide/README.md).
+- The principles behind this layout: [Overview and principles](principles.md).
+- The master, from discovery to OP: [The master](master.md).
+- The slave stack: [The slave stack](slave.md).
+- The list of all chapters: [the guide's index](../index.md).

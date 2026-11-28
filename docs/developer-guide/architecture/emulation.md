@@ -34,7 +34,7 @@ KickCAT uses hardware emulation.
 
 The slave uses `AbstractESC`, so an emulated ESC can replace a LAN9252 or XMC4800.
 The master uses `AbstractSocket`, so a software network can replace a network card.
-The protocol code between them runs unchanged. See [Chapter 1](principles.md).
+The protocol code between them runs unchanged. See [Overview and principles](principles.md).
 
 The emulator must model the registers used by the slave stack and the network
 behavior seen by the master. The same emulator can then test both stacks, including
@@ -179,7 +179,7 @@ If the SII declares FoE and the configuration specifies a directory,
 in memory and writes the file only after the last packet. If the SII declares a
 bootstrap mailbox, the slave uses a second mailbox in BOOT.
 
-The configuration keys are listed in the [simulation user guide](../SIMULATION.md).
+The configuration keys are listed in the [simulation user guide](../../user-guide/simulation.md).
 
 ## Device behaviour
 
@@ -236,11 +236,8 @@ cable breaks.
 ## Where to go next
 
 - How to run the simulator, and the JSON configuration keys:
-  [Simulation and emulation](../SIMULATION.md).
-- What the slave stack does on top of the ESC: Chapter 6,
-  [The slave stack](slave.md).
-- How the master sends the frames the emulator receives: Chapter 4,
-  [Transport: links, frames and sockets](transport.md).
-- How ESI files become EEPROM images and dictionaries: Chapter 9,
-  [From XML to bytes](from-xml-to-bytes.md).
-- How tests use the emulator: Chapter 11, [Testing a change](testing.md).
+  [Simulation and emulation](../../user-guide/simulation.md).
+- What the slave stack does on top of the ESC: [The slave stack](slave.md).
+- How the master sends the frames the emulator receives: [Transport: links, frames and sockets](transport.md).
+- How ESI files become EEPROM images and dictionaries: [From XML to bytes](device-descriptions.md).
+- How tests use the emulator: [Testing a change](../contributing/testing.md).

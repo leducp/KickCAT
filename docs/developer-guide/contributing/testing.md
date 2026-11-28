@@ -33,7 +33,7 @@ The scope of a test affects what a failure tells you.
 Test a behavior at the lowest layer where you can observe it. Use both stacks with
 the emulator when a test needs both master and slave behavior.
 
-The hardware interfaces described in [Chapter 1](principles.md) support both
+The hardware interfaces described in [Overview and principles](../architecture/principles.md) support both
 approaches. A unit test can replace one interface with a mock. An integration test
 can run the stacks with a software ESC and network.
 
@@ -45,7 +45,7 @@ The GoogleTest program `kickcat_unit` contains all unit tests. Test files in
 group related tests. Small XML parser fixtures are in `unit/`.
 
 The commands to build it, run it and filter tests are in
-[Building KickCAT](../BUILDING.md).
+[Building KickCAT](../../user-guide/building.md).
 
 ### A deterministic clock
 
@@ -70,7 +70,7 @@ The mocks in `unit/mocks/` each replace one boundary.
 
 Use both stacks to test distributed clocks, FoE transfers, redundancy, or a
 simulated drive. Connect a `Bus` to emulated slaves with a `LoopbackSocket` (see
-[Chapter 8](simulation.md)). The `simulated_bus` example uses the same setup.
+[Simulation internals](../architecture/emulation.md)). The `simulated_bus` example uses the same setup.
 
 Each frame passes through the emulated network before the slave stack runs once. The
 test uses one thread in one process, so the order is repeatable. You can follow a
@@ -98,16 +98,15 @@ Beyond `kickcat_unit` on each platform, CI runs:
 
 - **Sanitizers.** A debug build runs all unit tests with AddressSanitizer (ASan),
   LeakSanitizer (LSan), and Undefined Behavior Sanitizer (UBSan). It disables the
-  UBSan alignment check because the code reads packed frames in place (see [Chapter
-  10](os-and-porting.md)).
+  UBSan alignment check because the code reads packed frames in place (see [Operating systems and porting](../architecture/platform.md)).
 - **Coverage.** Changes must maintain or increase code coverage (see
-  [Contributing](../CONTRIBUTING.md)).
+  [Contributing](index.md)).
 - **Simulation.** C++ and Python master examples use `network_simulator` through a
   shared memory socket. A separate test checks a FoE round trip.
 - **Builds and installation.** CI checks the installed package and builds the NuttX
   board firmware and documentation.
 
-Hardware tests run before a release (see the [release procedure](../RELEASE.md)).
+Hardware tests run before a release (see the [release procedure](release.md)).
 
 ## Choosing a test
 
@@ -150,8 +149,7 @@ Hardware tests run before a release (see the [release procedure](../RELEASE.md))
 ## Where to go next
 
 - How to build and run the tests, and how to measure coverage:
-  [Building KickCAT](../BUILDING.md).
-- How the emulator works: Chapter 8, [Simulation internals](simulation.md).
-- Why unaligned accesses are allowed: Chapter 10,
-  [Operating systems and porting](os-and-porting.md).
-- Code conventions and pull request rules: [Contributing](../CONTRIBUTING.md).
+  [Building KickCAT](../../user-guide/building.md).
+- How the emulator works: [Simulation internals](../architecture/emulation.md).
+- Why unaligned accesses are allowed: [Operating systems and porting](../architecture/platform.md).
+- Code conventions and pull request rules: [Contributing](index.md).

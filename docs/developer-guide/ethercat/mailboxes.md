@@ -13,8 +13,7 @@
 
 ## The problem: data that is not cyclic
 
-Process data has a fixed layout and travels every cycle (see [Chapter
-0.5](process-data.md)). Other data varies in size and is needed only at certain
+Process data has a fixed layout and travels every cycle (see [Process data](process-data.md)). Other data varies in size and is needed only at certain
 times.
 
 - **Configuration.** Before the machine starts, the master can set a gear ratio, a
@@ -28,7 +27,7 @@ lets the master send a message to one slave and read its reply when it is ready.
 ## The mailbox: two SyncManagers and a handshake
 
 A slave reserves two memory areas for its mailbox. A SyncManager controls access to
-each area (see [Chapter 0.3](inside-a-slave.md)).
+each area (see [Inside a slave: the ESC](inside-a-slave.md)).
 
 - the **mailbox out** area, written by the master and read by the slave (on the
   board: SyncManager 0 at `0x1000`, 128 bytes)
@@ -130,7 +129,7 @@ writes to flash memory. Either side can stop the transfer with an **ERROR**
 packet that holds an error code.
 
 FoE is commonly used for firmware updates. The master requests the **BOOT** state
-(see [Chapter 0.4](state-machine.md)). In BOOT, the slave often runs a bootloader
+(see [The EtherCAT state machine](state-machine.md)). In BOOT, the slave often runs a bootloader
 that supports only FoE. The slave's EEPROM describes the bootloader's mailbox
 areas.
 
@@ -163,14 +162,14 @@ the UDP.
 
 KickCAT supports CoE on the master and the slave, including segmented transfers,
 SDO Information and emergencies on the master. FoE is experimental on both sides,
-and EoE is planned. See [docs/FEATURES.md](../FEATURES.md) for the details.
-[Chapter 5](mailbox-implementation.md) shows how the mailboxes are built in the
+and EoE is planned. See [Features](../../user-guide/features.md) for the details.
+[Mailboxes in KickCAT](../architecture/mailboxes.md) shows how the mailboxes are built in the
 code.
 
 ## Where to go next
 
-- The state machine and the BOOT state: [Chapter 0.4](state-machine.md).
+- The state machine and the BOOT state: [The EtherCAT state machine](state-machine.md).
 - How the master and the slave stacks implement mailboxes:
-  [Chapter 5](mailbox-implementation.md).
+  [Mailboxes in KickCAT](../architecture/mailboxes.md).
 - Where the object dictionary of a device comes from:
-  [Chapter 0.8](device-descriptions.md).
+  [Describing a device](device-descriptions.md).

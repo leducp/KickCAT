@@ -19,7 +19,7 @@ parameters as needed and checks for errors.
 At startup, the master finds the slaves and assigns station addresses. It reads
 each slave's EEPROM and configures its mailbox. It reads the PDO mapping, then
 configures the FMMUs and SyncManagers. It requests state changes as described in
-[Chapter 0.4](state-machine.md). During operation, it must exchange process data
+[The EtherCAT state machine](../ethercat/state-machine.md). During operation, it must exchange process data
 at a fixed rate without waiting for mailbox replies.
 
 The library design determines who schedules the cycle.
@@ -31,7 +31,7 @@ The library design determines who schedules the cycle.
   the loop and controls the timing.
 
 KickCAT uses the second design. Your `main` runs the loop and decides when to send
-frames. See [Chapter 1](principles.md).
+frames. See [Overview and principles](principles.md).
 
 ## The objects of a master
 
@@ -42,10 +42,9 @@ Three types provide the main master functions.
 - **`Slave`** (`kickcat::Slave`) stores one remote slave's station address, parsed
   SII data, ESC description, and last AL status. It also stores error counters,
   the request mailbox, and the process data mapping. `Bus` fills in this record.
-  The separate `kickcat::slave::Slave` class runs on the slave (see [Chapter
-  6](slave.md)).
+  The separate `kickcat::slave::Slave` class runs on the slave (see [The slave stack](slave.md)).
 - **`AbstractLink`** provides the datagram interface. `Link` implements it, and
-  `Bus` uses it for all network access. See [Chapter 4](transport.md).
+  `Bus` uses it for all network access. See [Transport](transport.md).
 
 ```mermaid
 classDiagram
@@ -79,7 +78,7 @@ classDiagram
 ```
 
 `Bus` owns the slave records. Each record owns a request mailbox
-(`mailbox::request::Mailbox`, see [Chapter 5](mailbox-implementation.md)).
+(`mailbox::request::Mailbox`, see [Mailboxes in KickCAT](mailboxes.md)).
 
 The application creates the link and passes it to `Bus`. It keeps a reference for
 link settings such as the read timeout.
@@ -130,7 +129,7 @@ sequenceDiagram
 
 `requestState()` and `waitForState()` can address the whole bus or one slave. For
 example, a tool can put one slave into the bootstrap state for a firmware update.
-See [Chapter 5](mailbox-implementation.md).
+See [Mailboxes in KickCAT](mailboxes.md).
 
 Configure individual slaves between `init()` and `createMapping()`. In PRE-OP, the
 application can use SDOs to set drive parameters or change a
@@ -157,7 +156,7 @@ one PDO per direction: it writes the PDO mapping object, then assigns it to the
 SyncManager.
 
 KickCAT supports one input and one output block per slave (see the
-[feature matrix](../FEATURES.md)).
+[feature matrix](../../user-guide/features.md)).
 
 ## The process image
 
@@ -171,7 +170,7 @@ The buffer and the frames use different layouts.
   all their outputs. After mapping, each `Slave` holds pointers to its blocks:
   `slave.input.data` and `slave.output.data`, with their sizes in `bsize`.
 - **On the wire**, each slave gets a range of the logical address space (see
-  [Chapter 0.5](process-data.md)). A slave's inputs and outputs share that range.
+  [Process data](../ethercat/process-data.md)). A slave's inputs and outputs share that range.
   Its FMMUs route reads to its input SyncManager and writes to its output
   SyncManager. This overlap keeps LRW frames as short as possible. Each frame
   holds at most 1486 bytes of data, so a slave that does not fit starts the next
@@ -305,7 +304,7 @@ These features use the public API of `Bus`.
   `update()` in the cycle.
 - **The mailbox gateway** (`Gateway`) forwards mailbox requests from outside tools
   to the slaves. The **master object dictionary** (`MasterOD`) answers requests
-  addressed to the master itself. [Chapter 5](mailbox-implementation.md) covers
+  addressed to the master itself. [Mailboxes in KickCAT](mailboxes.md) covers
   both.
 - **Diagnostics** helpers rebuild the topology from each slave's port status. The
   bus refreshes error counters with `sendRefreshErrorCounters()`.
@@ -335,7 +334,7 @@ These features use the public API of `Bus`.
 
 ## Where to go next
 
-- How datagrams reach the wire and come back: [Chapter 4](transport.md).
-- How mailbox messages work on both sides: [Chapter 5](mailbox-implementation.md).
-- How to lock the cycle to the slaves' clocks: [Chapter 7](distributed-clocks.md).
-- The protocol behind the process image: [Chapter 0.5](process-data.md).
+- How datagrams reach the wire and come back: [Transport](transport.md).
+- How mailbox messages work on both sides: [Mailboxes in KickCAT](mailboxes.md).
+- How to lock the cycle to the slaves' clocks: [Distributed clocks](distributed-clocks.md).
+- The protocol behind the process image: [Process data](../ethercat/process-data.md).

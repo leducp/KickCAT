@@ -6,7 +6,7 @@
 - Commit messages start with a short summary line. Changes that are not
   trivial add a paragraph on what changed and its impact.
 - Unit tests must pass and new behaviour comes with tests; code coverage must
-  not decrease. See [BUILDING.md](BUILDING.md) for the test and coverage builds.
+  not decrease. See [Building](../../user-guide/building.md) for the test and coverage builds.
 
 ## Code conventions
 

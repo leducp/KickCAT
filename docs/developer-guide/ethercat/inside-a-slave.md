@@ -14,7 +14,7 @@
 ## The problem: a fast wire and a slow program
 
 The ESC processes a datagram in less than a microsecond as the frame passes. See
-[Chapter 0.2](frames-and-datagrams.md). A program on a microcontroller cannot
+[Frames and datagrams](frames-and-datagrams.md). A program on a microcontroller cannot
 answer in that time. The application controls the light and reads the sensors on its own
 schedule. It may be busy when a frame arrives.
 
@@ -52,8 +52,7 @@ The ESC has its own address space with two areas.
 - The **process data RAM**, from address 0x1000. It is a few kilobytes of memory that
   hold the mailbox messages and the process data.
 
-The master reaches both areas with the physical addressing modes of [Chapter
-0.2](frames-and-datagrams.md): auto-increment, configured station address and
+The master reaches both areas with the physical addressing modes of [Frames and datagrams](frames-and-datagrams.md): auto-increment, configured station address and
 broadcast. The application reaches them through the PDI.
 
 ## SyncManagers: who may touch the memory, and when
@@ -90,7 +89,7 @@ usual layout.
 
 ## FMMUs: from the logical space to the ESC's memory
 
-In the logical address space described in [Chapter 0.2](frames-and-datagrams.md),
+In the logical address space described in [Frames and datagrams](frames-and-datagrams.md),
 one logical read-write (`LRW`) datagram can carry data for all slaves. Each slave
 needs a mapping from its logical addresses to its ESC memory.
 
@@ -124,8 +123,7 @@ Some ESCs, such as the XMC4800, emulate it in flash memory. It stores data in th
   names
 
 At startup, the master reads the EEPROM through ESC registers to identify and
-configure each slave. It does not need a local device description file. [Chapter
-0.8](device-descriptions.md) explains how to generate the EEPROM contents.
+configure each slave. It does not need a local device description file. [Describing a device](device-descriptions.md) explains how to generate the EEPROM contents.
 
 ## Ports and link status
 
@@ -133,7 +131,7 @@ An ESC has two to four **ports**, each with a cable connector. Port 0 faces the
 master. The other ports connect to more slaves. The ESC reports the link status and
 whether each port is open or closed. When a port has no cable, it closes and the ESC
 uses the next open port. At the end of a line, only port 0 is open, so the frame
-returns toward the master. See [Chapter 0.7](topology-and-clocks.md).
+returns toward the master. See [Topology, redundancy and clocks](topology-and-clocks.md).
 
 ## Watchdogs
 
@@ -143,8 +141,7 @@ The ESC has two watchdogs, timers that detect when one side stops working:
   can see it and knows that the application no longer serves the ESC.
 - The **process data watchdog** expires when the master stops writing the outputs.
   The ESC reports it to the application, which must then put its outputs in a safe
-  state instead of keeping them frozen at their last value. [Chapter
-  0.4](state-machine.md) shows how the slave then leaves the operational state.
+  state instead of keeping them frozen at their last value. [The EtherCAT state machine](state-machine.md) shows how the slave then leaves the operational state.
 
 ## Summary
 
@@ -160,12 +157,12 @@ The ESC has two watchdogs, timers that detect when one side stops working:
 ## In KickCAT
 
 The slave stack uses one ESC interface for the LAN9252, the XMC4800, and the
-software ESC used in simulation. [Chapter 6](slave.md) describes that interface, and
-[Chapter 8](simulation.md) the software ESC.
+software ESC used in simulation. [The slave stack](../architecture/slave.md) describes that interface, and
+[Simulation internals](../architecture/emulation.md) the software ESC.
 
 ## Where to go next
 
-- When the ESC allows mailboxes and process data: Chapter 0.4, [The EtherCAT state
+- When the ESC allows mailboxes and process data: [The EtherCAT state
   machine](state-machine.md).
-- How the master chooses the logical addresses and the mapping: Chapter 0.5, [Process
+- How the master chooses the logical addresses and the mapping: [Process
   data](process-data.md).
