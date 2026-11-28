@@ -16,7 +16,7 @@ matrix](../../user-guide/features.md).
 
 ## The problem: two kinds of clock error
 
-Each DC slave has a local clock (see [Topology, redundancy and clocks](../ethercat/topology-and-clocks.md)). One
+Each DC slave has a local clock (see [Topology, redundancy and clocks](../../get-started/ethercat-primer.md#topology-redundancy-and-clocks)). One
 supplies the **reference clock** and the others follow it. Synchronized slaves can
 generate a SYNC0 signal at the same time to sample inputs and apply outputs.
 
@@ -202,7 +202,7 @@ check sends a separate frame. Use it during startup or monitoring.
 
 ## Where to go next
 
-- How DC works on the protocol side: [Topology, redundancy and clocks](../ethercat/topology-and-clocks.md).
+- How DC works on the protocol side: [Topology, redundancy and clocks](../../get-started/ethercat-primer.md#topology-redundancy-and-clocks).
 - The cyclic loop around `sync()`: [The master](master.md).
 - How the emulator models a drifting clock: [Simulation internals](emulation.md).
 - How to tune Linux for a stable cycle: [the performance guide](../../user-guide/realtime.md).

@@ -1,11 +1,11 @@
 # The KickCAT developer guide
 
-This guide explains how EtherCAT works
-and how KickCAT implements it. Each chapter describes a problem, the options, and
-the reason for the design. The headers give the full API.
+This guide explains how KickCAT works. Each chapter describes a problem, the options, and
+the reason for the design. The headers provide the full API.
 
-The guide assumes you can read C++ and have built a CMake project. The EtherCAT background
-chapters introduce EtherCAT for beginners. The architecture chapters explain the KickCAT code.
+The guide assumes you can read C++ and have built a CMake project. The
+[EtherCAT primer](../get-started/ethercat-primer.md) introduces EtherCAT for beginners. The architecture chapters explain
+the KickCAT code.
 
 Start with [How to read this guide](how-to-read.md).
 
@@ -14,14 +14,7 @@ Start with [How to read this guide](how-to-read.md).
 | Chapter | What you learn |
 |---|---|
 | [How to read this guide](how-to-read.md) | The audience, example board, and suggested reading order. |
-| [What is EtherCAT?](ethercat/what-is-ethercat.md) | What a fieldbus does, what a master and a slave are, and why EtherCAT is fast. |
-| [Frames and datagrams](ethercat/frames-and-datagrams.md) | Frame contents, slave addressing, and the working counter. |
-| [Inside a slave controller](ethercat/inside-a-slave.md) | The ESC, registers, memory, SyncManagers, and address mapping. |
-| [The EtherCAT state machine](ethercat/state-machine.md) | The five slave states and what each allows. |
-| [Process data](ethercat/process-data.md) | How inputs and outputs are exchanged every cycle, and how PDO mappings define their layout. |
-| [Mailbox protocols](ethercat/mailboxes.md) | CoE for configuration and emergency messages, and FoE for files. |
-| [Topology, redundancy and clocks](ethercat/topology-and-clocks.md) | How a frame travels through ports, how a ring works with a broken cable, and how clocks stay synchronized. |
-| [Device and network descriptions](ethercat/device-descriptions.md) | Who uses ESI, the SII, and ENI. |
+| [EtherCAT primer](../get-started/ethercat-primer.md) | The EtherCAT concepts the guide relies on, and where KickCAT handles each one. |
 | [Overview and principles](architecture/principles.md) | What KickCAT is for, and the principles every later chapter applies. |
 | [A map of the code](architecture/code-map.md) | Source directories and namespaces. |
 | [Master discovery and startup](architecture/master.md) | Startup through OP, the process image, and the cyclic loop. |

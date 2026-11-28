@@ -10,8 +10,8 @@
 > - how the application accesses mapped PDOs
 > - how to support a new ESC or board
 
-The ESC processes frames as described in [Inside a slave: the ESC](../ethercat/inside-a-slave.md). The
-microcontroller software implements the ESM from [The EtherCAT state machine](../ethercat/state-machine.md)
+The ESC processes frames as described in [Inside a slave: the ESC](../../get-started/ethercat-primer.md#inside-a-slave-the-esc). The
+microcontroller software implements the ESM from [The EtherCAT state machine](../../get-started/ethercat-primer.md#the-state-machine)
 and accesses the ESC through the PDI.
 
 ## Two classes named Slave
@@ -289,8 +289,8 @@ Each port also needs the following components.
 
 ## Where to go next
 
-- The ESC and its registers: [Inside a slave: the ESC](../ethercat/inside-a-slave.md).
-- The state machine as the protocol defines it: [The EtherCAT state machine](../ethercat/state-machine.md).
+- The ESC and its registers: [Inside a slave: the ESC](../../get-started/ethercat-primer.md#inside-a-slave-the-esc).
+- The state machine as the protocol defines it: [The EtherCAT state machine](../../get-started/ethercat-primer.md#the-state-machine).
 - How the mailbox serves SDOs and files: [Mailboxes in KickCAT](mailboxes.md).
 - How the emulator runs this stack: [Simulation internals](emulation.md).
 - How the dictionary and the EEPROM image are built: [From XML to bytes](device-descriptions.md).

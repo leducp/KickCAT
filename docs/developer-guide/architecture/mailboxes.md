@@ -12,7 +12,7 @@
 
 A mailbox uses two SyncManagers to exchange messages outside the regular process
 data cycle. Examples include SDO transfers, emergency
-messages, and files. See [Mailboxes: CoE and FoE](../ethercat/mailboxes.md).
+messages, and files. See [Mailboxes: CoE and FoE](../../get-started/ethercat-primer.md#mailboxes).
 
 ## The problem: one exchange, many cycles
 
@@ -331,7 +331,7 @@ definitions only. To add handlers for a new protocol, follow the FoE implementat
 
 ## Where to go next
 
-- What a mailbox is on the wire: [Mailboxes: CoE and FoE](../ethercat/mailboxes.md).
+- What a mailbox is on the wire: [Mailboxes: CoE and FoE](../../get-started/ethercat-primer.md#mailboxes).
 - How datagrams are queued and sent: [Transport](transport.md).
 - How the slave state machine activates the mailbox: [The slave stack](slave.md).
 - How the object dictionary is built and validated: [From XML to bytes](device-descriptions.md).

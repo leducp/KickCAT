@@ -16,6 +16,7 @@ nav = [
     { "Installation" = "get-started/installation.md" },
     { "Your first bus" = "get-started/first-bus.md" },
     { "The ecosystem" = "get-started/ecosystem.md" },
+    { "EtherCAT primer" = "get-started/ethercat-primer.md" },
   ] },
   { "User guide" = [
     { "Features" = "user-guide/features.md" },
@@ -28,16 +29,6 @@ nav = [
   { "Developer guide" = [
     { "Overview" = "developer-guide/index.md" },
     { "How to read this guide" = "developer-guide/how-to-read.md" },
-    { "EtherCAT background" = [
-      { "What is EtherCAT?" = "developer-guide/ethercat/what-is-ethercat.md" },
-      { "Frames and datagrams" = "developer-guide/ethercat/frames-and-datagrams.md" },
-      { "Inside a slave: the ESC" = "developer-guide/ethercat/inside-a-slave.md" },
-      { "The EtherCAT state machine" = "developer-guide/ethercat/state-machine.md" },
-      { "Process data" = "developer-guide/ethercat/process-data.md" },
-      { "Mailboxes: CoE and FoE" = "developer-guide/ethercat/mailboxes.md" },
-      { "Topology, redundancy and clocks" = "developer-guide/ethercat/topology-and-clocks.md" },
-      { "Describing a device" = "developer-guide/ethercat/device-descriptions.md" },
-    ] },
     { "Architecture" = [
       { "Overview and principles" = "developer-guide/architecture/principles.md" },
       { "A map of the code" = "developer-guide/architecture/code-map.md" },

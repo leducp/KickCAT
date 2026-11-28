@@ -11,23 +11,13 @@
 
 ## Who the guide is for
 
-This guide assumes you can read C++ and have built a CMake project. The EtherCAT
-background chapters introduce EtherCAT. You can start
-here without experience with industrial networks.
-
-- [What is EtherCAT?](ethercat/what-is-ethercat.md) introduces the protocol and explains its speed.
-- [Frames and datagrams](ethercat/frames-and-datagrams.md) shows what travels on the wire.
-- [Inside a slave: the ESC](ethercat/inside-a-slave.md) describes the slave controller chip.
-- [The EtherCAT state machine](ethercat/state-machine.md) explains slave states.
-- [Process data](ethercat/process-data.md) shows how inputs and outputs move every cycle.
-- [Mailboxes: CoE and FoE](ethercat/mailboxes.md) covers messages sent outside the regular exchange.
-- [Topology, redundancy and clocks](ethercat/topology-and-clocks.md) covers cables, redundancy and clocks.
-- [Describing a device](ethercat/device-descriptions.md) explains device description files.
+This guide assumes you can read C++ and have built a CMake project. If you are new to
+industrial networks, read the [EtherCAT primer](../get-started/ethercat-primer.md) first.
 
 [Overview and principles](architecture/principles.md) explains KickCAT's design principles. [A map of the code](architecture/code-map.md) describes the source directories. Later chapters cover
 individual parts of the stack.
 
-If you already know EtherCAT, skip the EtherCAT background and start at
+If you already know EtherCAT, start at
 [Overview and principles](architecture/principles.md).
 
 ## One example through the guide
@@ -67,7 +57,7 @@ The guide explains the main classes and the order of calls in the API. Use the h
 
 ## A reading path for a newcomer
 
-1. Read the EtherCAT background, from [What is EtherCAT?](ethercat/what-is-ethercat.md) through [Describing a device](ethercat/device-descriptions.md).
+1. Read the [EtherCAT primer](../get-started/ethercat-primer.md).
 2. Read [Overview and principles](architecture/principles.md) for the design principles.
 3. Follow [Building](../user-guide/building.md), then run `simulated_bus` as shown in [Your first bus](../get-started/first-bus.md). Watch the slave reach OP.
 4. For master development, read [The master](architecture/master.md), [Transport](architecture/transport.md), and
@@ -78,5 +68,5 @@ The guide explains the main classes and the order of calls in the API. Use the h
 
 ## Where to go next
 
-- [What is EtherCAT?](ethercat/what-is-ethercat.md), the first page of the EtherCAT background.
+- The [EtherCAT primer](../get-started/ethercat-primer.md), if EtherCAT is new to you.
 - The full list of chapters: [the guide's index](index.md).

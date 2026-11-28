@@ -12,7 +12,7 @@
 
 EtherCAT uses three descriptions: the ESI file describes a device in XML, the SII
 is its binary description in the slave's EEPROM, and the ENI file describes a
-network in XML. See [Describing a device](../ethercat/device-descriptions.md).
+network in XML. See [Describing a device](../../get-started/ethercat-primer.md#device-descriptions).
 
 ## The problem: one device, three forms
 
@@ -174,7 +174,7 @@ covers parsing.
 
 ## Where to go next
 
-- What ESI, SII and ENI are: [Describing a device](../ethercat/device-descriptions.md).
+- What ESI, SII and ENI are: [Describing a device](../../get-started/ethercat-primer.md#device-descriptions).
 - How the slave serves and maps its dictionary: [The slave stack](slave.md).
 - How the simulator assembles a slave: [Simulation internals](emulation.md).
 - How the master uses the SII during initialization: [The master](master.md).

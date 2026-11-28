@@ -19,7 +19,7 @@ parameters as needed and checks for errors.
 At startup, the master finds the slaves and assigns station addresses. It reads
 each slave's EEPROM and configures its mailbox. It reads the PDO mapping, then
 configures the FMMUs and SyncManagers. It requests state changes as described in
-[The EtherCAT state machine](../ethercat/state-machine.md). During operation, it must exchange process data
+[The EtherCAT state machine](../../get-started/ethercat-primer.md#the-state-machine). During operation, it must exchange process data
 at a fixed rate without waiting for mailbox replies.
 
 The library design determines who schedules the cycle.
@@ -170,7 +170,7 @@ The buffer and the frames use different layouts.
   all their outputs. After mapping, each `Slave` holds pointers to its blocks:
   `slave.input.data` and `slave.output.data`, with their sizes in `bsize`.
 - **On the wire**, each slave gets a range of the logical address space (see
-  [Process data](../ethercat/process-data.md)). A slave's inputs and outputs share that range.
+  [Process data](../../get-started/ethercat-primer.md#process-data)). A slave's inputs and outputs share that range.
   Its FMMUs route reads to its input SyncManager and writes to its output
   SyncManager. This overlap keeps LRW frames as short as possible. Each frame
   holds at most 1486 bytes of data, so a slave that does not fit starts the next
@@ -337,4 +337,4 @@ These features use the public API of `Bus`.
 - How datagrams reach the wire and come back: [Transport](transport.md).
 - How mailbox messages work on both sides: [Mailboxes in KickCAT](mailboxes.md).
 - How to lock the cycle to the slaves' clocks: [Distributed clocks](distributed-clocks.md).
-- The protocol behind the process image: [Process data](../ethercat/process-data.md).
+- The protocol behind the process image: [Process data](../../get-started/ethercat-primer.md#process-data).
