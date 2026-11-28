@@ -1,7 +1,7 @@
 <p align="center">
     <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/kickCAT_logo_dark_mode.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/kickCAT_logo_light_mode.png">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kickCAT_logo_dark_mode.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/kickCAT_logo_light_mode.png">
     <img alt="KickCAT" width="300">
     </picture><br>
 </p>
@@ -24,7 +24,7 @@ CLI tooling, so a bus can be developed, configured, and tested without physical
 hardware.
 
 For exactly what is and isn't supported, see the
-[feature support matrix](docs/FEATURES.md).
+[feature support matrix](docs/user-guide/features.md).
 
 ## Getting started
 
@@ -59,15 +59,15 @@ repository root:
 uvx zensical serve
 ```
 
-- [Feature support matrix](docs/FEATURES.md)
-- [Building and installing](docs/BUILDING.md)
-- [Hardware guide](docs/HARDWARE.md)
-- [Simulation and emulation](docs/SIMULATION.md)
-- [Tools and GUIs](docs/TOOLS.md)
-- [Real-time performance tuning](docs/PERFORMANCE.md)
-- [Developer guide](docs/guide/README.md)
-- [Release procedure](docs/RELEASE.md)
-- [Contributing](docs/CONTRIBUTING.md)
+- [Feature support matrix](docs/user-guide/features.md)
+- [Building and installing](docs/user-guide/building.md)
+- [Hardware guide](docs/user-guide/hardware.md)
+- [Simulation and emulation](docs/user-guide/simulation.md)
+- [Tools and GUIs](docs/user-guide/tools.md)
+- [Real-time performance tuning](docs/user-guide/realtime.md)
+- [Developer guide](docs/developer-guide/index.md)
+- [Release procedure](docs/developer-guide/contributing/release.md)
+- [Contributing](docs/developer-guide/contributing/index.md)
 
 ### EtherCAT references
 
@@ -80,12 +80,12 @@ uvx zensical serve
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for code-style
-and PR conventions, and [docs/BUILDING.md](docs/BUILDING.md) for the development
+Contributions are welcome. See [Contributing](docs/developer-guide/contributing/index.md) for code-style
+and PR conventions, and [Building](docs/user-guide/building.md) for the development
 build (unit tests and coverage).
 
 KickCAT follows [Semantic Versioning](https://semver.org/). The release workflow
-is documented in [docs/RELEASE.md](docs/RELEASE.md).
+is documented in [Release procedure](docs/developer-guide/contributing/release.md).
 
 ## License
 

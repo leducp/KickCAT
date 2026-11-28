@@ -13,7 +13,7 @@
 ## The problem: many small requests, one wire, no waiting
 
 Each frame can carry several datagrams. Each datagram returns its data and a WKC,
-as described in [Chapter 0.2](frames-and-datagrams.md). A cycle can include
+as described in [Frames and datagrams](../ethercat/frames-and-datagrams.md). A cycle can include
 logical reads and writes, mailbox checks, and error counter reads. Each request
 needs its own result.
 
@@ -26,8 +26,7 @@ The transport layer has three tasks.
 
 Sending each request separately would add a round trip of tens of microseconds per
 request. KickCAT queues requests, sends them together, and passes replies to
-callbacks. Its blocking calls use the same operations (see [Chapter
-1](principles.md)).
+callbacks. Its blocking calls use the same operations (see [Overview and principles](principles.md)).
 
 ## Three layers
 
@@ -159,7 +158,7 @@ example when assigning station addresses with auto-increment addressing during
 ## Cable redundancy
 
 To form a ring, connect the last slave to a second network card on the master (see
-[Chapter 0.7](topology-and-clocks.md)). A `Link` always has a **nominal** socket and
+[Topology, redundancy and clocks](../ethercat/topology-and-clocks.md)). A `Link` always has a **nominal** socket and
 a **redundancy** socket. Without redundancy, it uses `SocketNull` for the second
 socket. This socket accepts writes and never receives a frame.
 
@@ -203,7 +202,7 @@ operation determines how the link combines the data.
 The application receives one reply with the combined WKC. At startup,
 `checkRedundancyNeeded()` sends a probe. If the ring is open, it calls the callback
 passed to the `Link` constructor. The slaves' error counters and port status
-indicate the location of the break (see [Chapter 3](master.md)).
+indicate the location of the break (see [The master](master.md)).
 
 ## Events from the slaves
 
@@ -232,7 +231,7 @@ PikeOS and NuttX. The build selects the implementation for the target.
 Create `LoopbackSocket` directly to connect a master to emulated slaves in the same
 process. A write passes the frame through the emulated network and advances each
 slave once. The next read returns the reply. The `simulated_bus` example uses this
-socket to run the bus in one thread (see [Chapter 8](simulation.md)).
+socket to run the bus in one thread (see [Simulation internals](emulation.md)).
 
 To add a transport, implement `AbstractSocket` operations to open and close the
 socket, set its timeout, and read and write a frame.
@@ -267,10 +266,10 @@ socket, set its timeout, and read and write a frame.
 
 ## Where to go next
 
-- What the bus puts in the datagrams: [Chapter 3](master.md).
+- What the bus puts in the datagrams: [The master](master.md).
 - The emulated network behind `LoopbackSocket` and `TapSocket`:
-  [Chapter 8](simulation.md).
+  [Simulation internals](emulation.md).
 - How to tune Linux and the network card for low latency:
-  [the performance guide](../PERFORMANCE.md).
+  [the performance guide](../../user-guide/realtime.md).
 - Ports, rings and loop-back on the protocol side:
-  [Chapter 0.7](topology-and-clocks.md).
+  [Topology, redundancy and clocks](../ethercat/topology-and-clocks.md).

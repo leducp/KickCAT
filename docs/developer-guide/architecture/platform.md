@@ -51,7 +51,7 @@ The OS headers are in `kickcat/OS/`.
 | `Filesystem.h` | A few file operations, used by the simulator and the tools. |
 
 Applications, tools, and the simulator can use `Thread`, `Mutex`, and
-`ConditionVariable`. The stack starts no threads (see [Chapter 1](principles.md)). A
+`ConditionVariable`. The stack starts no threads (see [Overview and principles](principles.md)). A
 slave-only target can omit these services.
 
 `types.h` selects types such as `os_mutex`, `os_socket`, and `os_shm` from the
@@ -90,7 +90,7 @@ On Linux, the master selects the backend from the interface name:
 - `xdp:eth0` opens an `AF_XDP` socket, which skips most of the kernel network
   stack. It is built only when the AF_XDP option is on.
 - `tap:client` opens a `TapSocket` to the simulator (see
-  [Chapter 8](simulation.md)).
+  [Simulation internals](emulation.md)).
 
 ## Endianness and packed frames
 
@@ -140,7 +140,7 @@ A slave with an SPI ESC, such as the LAN9252, reaches the chip through
 `AbstractSPI`. A driver implements `open()`, `close()`, `transfer()`, the chip
 select, the baud rate and the SPI mode. The drivers for NuttX, the Raspberry Pi
 (through the bcm2835 library) and KickOS are short examples. An ESC with another
-interface implements `AbstractESC` directly (see [Chapter 6](slave.md)).
+interface implements `AbstractESC` directly (see [The slave stack](slave.md)).
 
 ## Summary
 
@@ -174,12 +174,10 @@ interface implements `AbstractESC` directly (see [Chapter 6](slave.md)).
 
 ## Where to go next
 
-- How to build for each platform: [Building KickCAT](../BUILDING.md).
+- How to build for each platform: [Building KickCAT](../../user-guide/building.md).
 - How to tune Linux for real time, and how to enable AF_XDP:
-  [Real-time performance tuning](../PERFORMANCE.md).
-- How to build and flash slave firmware: [Hardware guide](../HARDWARE.md).
-- What `Link` does above the socket: Chapter 4,
-  [Transport: links, frames and sockets](transport.md).
-- How the timer follows the distributed clock: Chapter 7,
-  [Distributed clocks](distributed-clocks.md).
-- How the slave stack uses its ESC: Chapter 6, [The slave stack](slave.md).
+  [Real-time performance tuning](../../user-guide/realtime.md).
+- How to build and flash slave firmware: [Hardware guide](../../user-guide/hardware.md).
+- What `Link` does above the socket: [Transport: links, frames and sockets](transport.md).
+- How the timer follows the distributed clock: [Distributed clocks](distributed-clocks.md).
+- How the slave stack uses its ESC: [The slave stack](slave.md).

@@ -29,7 +29,7 @@ configuration.
 | **PRE-OP** | Yes | No | No | Configures the process data: the mapping, the process data SyncManagers and the FMMUs. |
 | **SAFE-OP** | Yes | Yes | No, held in a safe state | Starts the cycle, so that valid outputs reach the slave. |
 | **OP** | Yes | Yes | Yes | Runs the machine. |
-| **BOOT** | Bootstrap mailbox only | No | No | Updates the firmware, see [Chapter 0.6](mailboxes.md). |
+| **BOOT** | Bootstrap mailbox only | No | No | Updates the firmware, see [Mailboxes: CoE and FoE](mailboxes.md). |
 
 A slave advances one state at a time. It can skip states when returning to a lower state.
 
@@ -111,7 +111,7 @@ AL Control again with the **error acknowledge** bit set. The slave then clears t
 error indication bit.
 
 The most common reason for a return to a lower state is a timeout on the process
-data watchdog described in [Chapter 0.3](inside-a-slave.md). When the master stops
+data watchdog described in [Inside a slave: the ESC](inside-a-slave.md). When the master stops
 sending outputs while the slave is in OP, the watchdog expires. The slave goes back
 to SAFE-OP with the code 0x001B (sync manager watchdog), and its outputs return to
 their safe state. With the watchdog enabled, a lost cable or a crashed master does
@@ -131,11 +131,11 @@ not leave a motor running on old commands.
 ## In KickCAT
 
 The master requests states and waits for them, and the slave stack implements one
-class per state. [Chapter 3](master.md) shows the master side, and [Chapter 6](slave.md)
+class per state. [The master](../architecture/master.md) shows the master side, and [The slave stack](../architecture/slave.md)
 the slave side.
 
 ## Where to go next
 
-- What the master configures between PRE-OP and SAFE-OP: Chapter 0.5, [Process
+- What the master configures between PRE-OP and SAFE-OP: [Process
   data](process-data.md).
-- Mailbox services available in PRE-OP: Chapter 0.6, [Mailbox protocols](mailboxes.md).
+- Mailbox services available in PRE-OP: [Mailbox protocols](mailboxes.md).

@@ -12,7 +12,7 @@
 
 EtherCAT uses three descriptions: the ESI file describes a device in XML, the SII
 is its binary description in the slave's EEPROM, and the ENI file describes a
-network in XML. See [Chapter 0.8](device-descriptions.md).
+network in XML. See [Describing a device](../ethercat/device-descriptions.md).
 
 ## The problem: one device, three forms
 
@@ -97,7 +97,7 @@ uses that image directly.
 The image reaches the slave in one of two ways:
 
 - **A real slave.** The `eeprom` tool writes the image through the master into
-  the slave's EEPROM (see [TOOLS](../TOOLS.md)). The EEPROM editor can also
+  the slave's EEPROM (see [Tools](../../user-guide/tools.md)). The EEPROM editor can also
   build or change an image.
 - **A simulated slave.** The simulator loads the image into the emulated ESC.
 
@@ -109,7 +109,7 @@ It can run the bus without an ESI file.
 ## The dictionary path
 
 A slave with a CoE mailbox serves its dictionary over SDO, and maps its process
-data from it (see [Chapter 6](slave.md)). The dictionary comes from the same
+data from it (see [The slave stack](slave.md)). The dictionary comes from the same
 `ESI::Device` in one of two ways.
 
 **For firmware**, `od_generator` parses the ESI file on the host, allocates
@@ -124,7 +124,7 @@ validation.
 runtime. The `simulated_bus` example starts with this step.
 
 Checking the configuration on the host lets the tool report errors before the slave
-enters its cycle (see [Chapter 1](principles.md)).
+enters its cycle (see [Overview and principles](principles.md)).
 
 ## Why the XML stays on the host
 
@@ -174,7 +174,7 @@ covers parsing.
 
 ## Where to go next
 
-- What ESI, SII and ENI are: [Chapter 0.8](device-descriptions.md).
-- How the slave serves and maps its dictionary: [Chapter 6](slave.md).
-- How the simulator assembles a slave: [Chapter 8](simulation.md).
-- How the master uses the SII during initialization: [Chapter 3](master.md).
+- What ESI, SII and ENI are: [Describing a device](../ethercat/device-descriptions.md).
+- How the slave serves and maps its dictionary: [The slave stack](slave.md).
+- How the simulator assembles a slave: [Simulation internals](emulation.md).
+- How the master uses the SII during initialization: [The master](master.md).

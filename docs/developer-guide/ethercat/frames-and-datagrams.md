@@ -11,8 +11,7 @@
 
 ## The problem: one frame, many readers
 
-An EtherCAT frame passes through every slave, as described in [Chapter
-0.1](what-is-ethercat.md). One frame can contain several requests for different
+An EtherCAT frame passes through every slave, as described in [What is EtherCAT?](what-is-ethercat.md). One frame can contain several requests for different
 slaves.
 
 Each request is a **datagram**. Its address selects the data to access. Its WKC
@@ -84,14 +83,12 @@ can count the slaves with a broadcast read.
 
 **Logical.** The master defines a logical address space of 4 gibibytes (GiB). It
 assigns each slave a range. Each slave reads or writes its part as the frame passes.
-One logical datagram can carry process data for all the slaves. [Chapter
-0.3](inside-a-slave.md) describes the hardware.
+One logical datagram can carry process data for all the slaves. [Inside a slave: the ESC](inside-a-slave.md) describes the hardware.
 
 Two more commands read one slave's register and write its value to the same register
 on each following slave. Auto-increment read multiple write (`ARMW`) selects the
 source by position. Configured address read multiple write (`FRMW`) selects it by
-station address. These commands distribute the reference time (see [Chapter
-0.7](topology-and-clocks.md)).
+station address. These commands distribute the reference time (see [Topology, redundancy and clocks](topology-and-clocks.md)).
 
 ## The working counter
 
@@ -109,7 +106,7 @@ the WKC first on every datagram.
 ## The example: two datagrams for one board
 
 In this example, the master assigns station address 1001 to the Freedom K64F board
-from [Chapter 0.1](what-is-ethercat.md).
+from [What is EtherCAT?](what-is-ethercat.md).
 
 To read the board's state, the master sends an `FPRD` for 2 bytes at station address
 1001 and the state register address. The board writes its state into the datagram
@@ -136,11 +133,10 @@ Both datagrams can travel in the same frame.
 ## In KickCAT
 
 On the master, every request becomes a datagram with a callback that receives the
-data and the working counter. [Chapter 4](transport.md) shows how datagrams are packed
+data and the working counter. [Transport](../architecture/transport.md) shows how datagrams are packed
 into frames and matched when they return.
 
 ## Where to go next
 
-- What the slave does with a datagram: Chapter 0.3, [Inside a slave](inside-a-slave.md).
-- How the logical address space is built for the process data: Chapter 0.5,
-  [Process data](process-data.md).
+- What the slave does with a datagram: [Inside a slave](inside-a-slave.md).
+- How the logical address space is built for the process data: [Process data](process-data.md).

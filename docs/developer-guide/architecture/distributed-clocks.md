@@ -12,11 +12,11 @@
 
 Master DC support is experimental. The maintainers have tested it in the emulator
 and on hardware. It still needs longer tests on physical buses. See the [feature
-matrix](../FEATURES.md).
+matrix](../../user-guide/features.md).
 
 ## The problem: two kinds of clock error
 
-Each DC slave has a local clock (see [Chapter 0.7](topology-and-clocks.md)). One
+Each DC slave has a local clock (see [Topology, redundancy and clocks](../ethercat/topology-and-clocks.md)). One
 supplies the **reference clock** and the others follow it. Synchronized slaves can
 generate a SYNC0 signal at the same time to sample inputs and apply outputs.
 
@@ -164,7 +164,7 @@ Use the following call order.
 
 1. `init()`, then `enableDC()`, which returns a sync point.
 2. Map the process data and bring the bus to SAFE-OP, then OP, as in
-   [Chapter 3](master.md).
+   [The master](master.md).
 3. Create a `Timer` with the DC cycle time and start it at the sync point.
 4. In each cycle: exchange process data, call `bus.sync(timer)`, then
    `timer.wait_next_tick()`.
@@ -202,7 +202,7 @@ check sends a separate frame. Use it during startup or monitoring.
 
 ## Where to go next
 
-- How DC works on the protocol side: [Chapter 0.7](topology-and-clocks.md).
-- The cyclic loop around `sync()`: [Chapter 3](master.md).
-- How the emulator models a drifting clock: [Chapter 8](simulation.md).
-- How to tune Linux for a stable cycle: [the performance guide](../PERFORMANCE.md).
+- How DC works on the protocol side: [Topology, redundancy and clocks](../ethercat/topology-and-clocks.md).
+- The cyclic loop around `sync()`: [The master](master.md).
+- How the emulator models a drifting clock: [Simulation internals](emulation.md).
+- How to tune Linux for a stable cycle: [the performance guide](../../user-guide/realtime.md).

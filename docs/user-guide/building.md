@@ -52,7 +52,7 @@ then rebuild and run `make coverage` from the build directory.
 
 KickUI and the EEPROM editor are off by default. They require ImGui and GLFW.
 Enable them with `--with=kickui` and/or `--with=eeprom_editor`, then rerun
-`setup_build.sh` and build. See [TOOLS.md](TOOLS.md) for their commands.
+`setup_build.sh` and build. See [Tools](tools.md) for their commands.
 
 ## Python bindings
 
@@ -67,7 +67,7 @@ uv pip install --config-setting=cmake.define.BUILD_EEPROM_EDITOR=OFF .
 The package is also published as `kickcat` on PyPI. To use a physical bus on
 Linux, grant raw-socket capabilities to the executable or run
 `./py_bindings/enable_raw_access.sh` for the active Python interpreter. See
-the [hardware guide](HARDWARE.md) for bus setup and
+the [hardware guide](hardware.md) for bus setup and
 `py_bindings/examples/` for Python examples.
 
 ## Other platforms
@@ -83,4 +83,4 @@ PikeOS 5.1 native personality builds require a cross-toolchain file defining
 `lib/src/OS/PikeOS/p4ext_config.c`.
 
 NuttX slave firmware build and flashing instructions are in
-[HARDWARE.md](HARDWARE.md).
+[Hardware](hardware.md).

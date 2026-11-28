@@ -12,7 +12,7 @@
 
 A mailbox uses two SyncManagers to exchange messages outside the regular process
 data cycle. Examples include SDO transfers, emergency
-messages, and files. See [Chapter 0.6](mailboxes.md).
+messages, and files. See [Mailboxes: CoE and FoE](../ethercat/mailboxes.md).
 
 ## The problem: one exchange, many cycles
 
@@ -33,8 +33,7 @@ There are two common ways to handle a pending request.
   for completion.
 
 KickCAT uses state objects for both interfaces. A blocking helper waits for the
-object to finish. The application controls the loop (see [Chapter
-1](principles.md)).
+object to finish. The application controls the loop (see [Overview and principles](principles.md)).
 
 ## Two sides, one protocol codebase
 
@@ -147,7 +146,7 @@ The `Bus` handles network access. Each step queues datagrams for slaves with mai
 
 These calls only queue datagrams. The frames leave and the callbacks run when
 the application calls `finalizeDatagrams` and `processAwaitingFrames`, as for
-process data (see [Chapter 4](transport.md)).
+process data (see [Transport](transport.md)).
 
 `configureMailboxStatusCheck` uses extra FMMUs to
 map the mailbox status bits into the cyclic frame. The master can then read them
@@ -248,7 +247,7 @@ protocol's factory. If no factory accepts it, the mailbox returns
 after a loss.
 
 The object dictionary is validated when it is built. The slave uses it without
-repeating that validation at runtime (see [Chapter 9](from-xml-to-bytes.md)).
+repeating that validation at runtime (see [From XML to bytes](device-descriptions.md)).
 
 ### Files: the storage interface
 
@@ -260,7 +259,7 @@ incomplete data.
 
 Firmware can store files in flash. The simulator uses a host directory. Both use the
 same FoE handlers. FoE is experimental on the master and slave (see
-[FEATURES](../FEATURES.md)).
+[Features](../../user-guide/features.md)).
 
 ### The bootstrap mailbox
 
@@ -307,7 +306,7 @@ definitions only. To add handlers for a new protocol, follow the FoE implementat
    `nullptr`. Register the factory with an `enable<Protocol>` call on the
    response mailbox, which also takes the application object the protocol needs.
 4. **Simulation.** Enable the protocol in the simulated slave, so that a master
-   test can run against the real slave code (see [Chapter 8](simulation.md)).
+   test can run against the real slave code (see [Simulation internals](emulation.md)).
 
 ## Summary
 
@@ -332,7 +331,7 @@ definitions only. To add handlers for a new protocol, follow the FoE implementat
 
 ## Where to go next
 
-- What a mailbox is on the wire: [Chapter 0.6](mailboxes.md).
-- How datagrams are queued and sent: [Chapter 4](transport.md).
-- How the slave state machine activates the mailbox: [Chapter 6](slave.md).
-- How the object dictionary is built and validated: [Chapter 9](from-xml-to-bytes.md).
+- What a mailbox is on the wire: [Mailboxes: CoE and FoE](../ethercat/mailboxes.md).
+- How datagrams are queued and sent: [Transport](transport.md).
+- How the slave state machine activates the mailbox: [The slave stack](slave.md).
+- How the object dictionary is built and validated: [From XML to bytes](device-descriptions.md).

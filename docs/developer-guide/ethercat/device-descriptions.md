@@ -62,7 +62,7 @@ vendor writes the SII once during production, or a developer writes it with an
 EEPROM tool. Both usually use the ESI as the source.
 
 The SII does not hold the object dictionary. When the master needs it, it asks
-the slave over CoE (see [Chapter 0.6](mailboxes.md)).
+the slave over CoE (see [Mailboxes: CoE and FoE](mailboxes.md)).
 
 ## ENI: the description of a whole network
 
@@ -110,12 +110,12 @@ can also read an ENI.
 KickCAT reads each slave's SII at startup and can run without an ENI. Its ESI parser
 can build an EEPROM image, generate slave object dictionary code, or create an
 emulated slave. Its ENI parser loads a network configuration into a structure. See
-[Chapter 9](from-xml-to-bytes.md).
+[From XML to bytes](../architecture/device-descriptions.md).
 
 ## Where to go next
 
-- How the master reads the SII during startup: [Chapter 3](master.md).
+- How the master reads the SII during startup: [The master](../architecture/master.md).
 - How KickCAT turns ESI, SII and ENI files into data:
-  [Chapter 9](from-xml-to-bytes.md).
+  [From XML to bytes](../architecture/device-descriptions.md).
 - The tools that program an EEPROM and generate an object dictionary:
-  [docs/TOOLS.md](../TOOLS.md).
+  [Tools](../../user-guide/tools.md).

@@ -40,7 +40,7 @@ the six sensor values.
 ## Mapping and assignment: what goes where
 
 A slave's **object dictionary** lists the values it exposes. Two types of objects
-describe its PDOs. See [Chapter 0.6](mailboxes.md).
+describe its PDOs. See [Mailboxes: CoE and FoE](mailboxes.md).
 
 - A **PDO mapping** object lists the values that make up one PDO, in order, with
   their size in bits. RxPDO mappings use the indexes `0x1600` to `0x17FF`, and TxPDO
@@ -50,8 +50,7 @@ describe its PDOs. See [Chapter 0.6](mailboxes.md).
   `0x1C12` assigns RxPDOs to the output SyncManager, and `0x1C13` assigns TxPDOs
   to the input SyncManager.
 
-A **SyncManager** controls access to an area of slave memory (see [Chapter
-0.3](inside-a-slave.md)). On the board, SyncManager 2 holds the 3 output bytes at
+A **SyncManager** controls access to an area of slave memory (see [Inside a slave: the ESC](inside-a-slave.md)). On the board, SyncManager 2 holds the 3 output bytes at
 `0x1800`. SyncManager 3 holds the 12 input bytes at `0x1C00`. Process data uses
 **buffered mode**. The controller keeps three buffers so the reader always gets the
 latest complete value.
@@ -99,7 +98,7 @@ inputs and writes outputs at each slave's assigned offsets.
 ## The working counter: did everyone take part?
 
 Each slave increments the datagram's WKC for the operations it completes (see
-[Chapter 0.2](frames-and-datagrams.md)). The table gives the WKC increments for a
+[Frames and datagrams](frames-and-datagrams.md)). The table gives the WKC increments for a
 LRW datagram. A plain logical read or logical write adds 1.
 
 | What the slave did | Added to the WKC |
@@ -110,8 +109,7 @@ LRW datagram. A plain logical read or logical write adds 1.
 
 On a bus with only this board, the master expects an LRW to return a WKC of 3
 because the board has both inputs and outputs. A lower WKC means an expected
-transfer failed. A slave may be disconnected or in the wrong state (see [Chapter
-0.4](state-machine.md)). A cable may also be broken. The master must treat that
+transfer failed. A slave may be disconnected or in the wrong state (see [The EtherCAT state machine](state-machine.md)). A cable may also be broken. The master must treat that
 cycle's data as unreliable.
 
 ## Summary
@@ -129,14 +127,14 @@ cycle's data as unreliable.
 
 KickCAT reads each slave's mapping at startup, gives each slave one logical
 range for both inputs and outputs, and builds the frames of the cycle once.
-The application owns the process image buffer. [Chapter 3](master.md) shows this
+The application owns the process image buffer. [The master](../architecture/master.md) shows this
 in the master's code.
 
 ## Where to go next
 
 - The SyncManagers and FMMUs inside the slave controller:
-  [Chapter 0.3](inside-a-slave.md).
+  [Inside a slave: the ESC](inside-a-slave.md).
 - The traffic that is not cyclic, and the object dictionary behind the PDO
-  mappings: [Chapter 0.6](mailboxes.md).
+  mappings: [Mailboxes: CoE and FoE](mailboxes.md).
 - How the master builds the process image and runs the cycle:
-  [Chapter 3](master.md).
+  [The master](../architecture/master.md).

@@ -73,7 +73,7 @@ flowchart LR
   special hardware.
 
 Each slave uses an **ESC** to process frames. See
-[Chapter 0.3](inside-a-slave.md).
+[Inside a slave: the ESC](inside-a-slave.md).
 
 ## The example this guide follows
 
@@ -83,13 +83,13 @@ ESC. The examples use these parts of the board.
 - A light uses **3 output bytes**, one each for red, green, and blue.
 - An accelerometer and a magnetometer provide **12 input bytes**. Each sensor
   returns three signed 16-bit values for the x, y, and z axes.
-- A mailbox carries messages outside the cyclic exchange. See [Chapter 0.6](mailboxes.md).
+- A mailbox carries messages outside the cyclic exchange. See [Mailboxes: CoE and FoE](mailboxes.md).
 
 Each cycle, the master writes the 3 color bytes and reads the 12 sensor bytes. The
 next chapters explain the frame layout, where the board stores the data, and when it
 accepts outputs.
 
-You can run the example with an emulated board. See [Chapter 2](../architecture.md).
+You can run the example with an emulated board. See [A map of the code](../architecture/code-map.md).
 
 ## Summary
 
@@ -104,10 +104,9 @@ You can run the example with an emulated board. See [Chapter 2](../architecture.
 ## In KickCAT
 
 The KickCAT master runs on a host operating system. The slave stack runs on a
-microcontroller connected to an ESC. See [Chapter 1](principles.md).
+microcontroller connected to an ESC. See [Overview and principles](../architecture/principles.md).
 
 ## Where to go next
 
-- What is inside the frame, and how a slave finds its part: Chapter 0.2,
-  [Frames and datagrams](frames-and-datagrams.md).
-- What the ESC does with the frame: Chapter 0.3, [Inside a slave](inside-a-slave.md).
+- What is inside the frame, and how a slave finds its part: [Frames and datagrams](frames-and-datagrams.md).
+- What the ESC does with the frame: [Inside a slave](inside-a-slave.md).
