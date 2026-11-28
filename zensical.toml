@@ -92,6 +92,7 @@ md_in_html = {}
 tables = {}
 toc.permalink = true
 pymdownx.details = {}
+pymdownx.emoji = { emoji_index = "zensical.extensions.emoji.twemoji", emoji_generator = "zensical.extensions.emoji.to_svg" }
 pymdownx.highlight = {}
 pymdownx.inlinehilite = {}
 pymdownx.snippets = { base_path = ["."], check_paths = true, auto_append = [

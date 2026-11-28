@@ -10,93 +10,74 @@
   <strong>A lightweight, efficient EtherCAT master/slave stack for embedded and real-time systems</strong>
 </p>
 
----
+<p align="center">
+  <a href="https://github.com/leducp/KickCAT/actions/workflows/ci.yml"><img src="https://github.com/leducp/KickCAT/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://leducp.github.io/KickCAT/"><img src="https://github.com/leducp/KickCAT/actions/workflows/docs.yml/badge.svg" alt="Docs"></a>
+  <a href="https://pypi.org/project/kickcat/"><img src="https://img.shields.io/pypi/v/kickcat" alt="PyPI"></a>
+</p>
 
-## Overview
-
-KickCAT is a thin EtherCAT stack designed to be embedded in larger software with
-efficiency in mind. It provides **both master and slave** implementations in one
-codebase and runs on Linux (including RT-PREEMPT), Windows, PikeOS, and NuttX.
-
-CoE (CANopen over EtherCAT) is fully supported on both sides. Beyond the stack
-itself, KickCAT ships a complete **software ESC and network emulator**, GUIs, and
-CLI tooling, so a bus can be developed, configured, and tested without physical
+KickCAT is an EtherCAT stack that you can embed in your own software. One codebase provides
+both the master and the slave, plus an emulator for developing and testing a bus without
 hardware.
 
-For exactly what is and isn't supported, see the
-[feature support matrix](docs/user-guide/features.md).
+**Documentation: <https://leducp.github.io/KickCAT/>**
 
-## Getting started
+## Quick start
 
-Build the stack and tools (Linux):
+Build, then run a master against an emulated slave in one process. No hardware is needed.
 
 ```bash
-source .venv/bin/activate   # provides Conan, see the building guide
-./scripts/configure.sh build --with=unit_tests
+python3 -m venv .venv && source .venv/bin/activate && pip install 'conan>=2.10'
 ./scripts/setup_build.sh build
 make -C build -j
-```
-
-Then, from the repository root, run a master against an emulated slave -- no
-hardware, single process:
-
-```bash
 ./build/examples/master/simulated_bus/simulated_bus \
     -f examples/slave/lan9252/freedom-k64f/nuttx/freedom-k64f.xml -t Board
 ```
 
-Point `-f` at any vendor ESI XML and `-t` at the device `<Type>` to emulate a
-different slave. Beckhoff publish ESI files for their devices at
-<https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description>.
+## Cheat sheet
+
+Run from the repository root, with `.venv` active.
+
+| Task | Command |
+|---|---|
+| Choose build options | `./scripts/configure.sh build --with=unit_tests` (`--show` lists them) |
+| Fetch dependencies and configure | `./scripts/setup_build.sh build` (again after changing options) |
+| Build | `make -C build -j` |
+| Run the unit tests | `./build/kickcat_unit --gtest_filter='Bus*'` |
+| Measure coverage | options `--with=unit_tests --with=code_coverage`, then `make -C build coverage` |
+| Build with sanitizers | options `--with=asan --with=ubsan` |
+| Build the GUIs | options `--with=kickui --with=eeprom_editor` |
+| Run KickUI | `./build/tools/kickui/kickui` |
+| Simulate a bus in a second process | `./build/simulation/network_simulator -i tap:server -s simulation/slave_configs/freedom-k64f.json` |
+| Connect a master to it | `sudo ./build/examples/master/easycat/easycat_example -i tap:client` |
+| Run a master on a network card | `sudo ./build/examples/master/easycat/easycat_example -i eth0` |
+| Write a slave EEPROM | `sudo ./build/tools/eeprom -s 0 -c write -f eeprom.bin -i eth0` |
+| Build NuttX slave firmware | `./scripts/build_slave_bin.sh freedom-k64f ~/nuttxspace/nuttx` |
+| Install the Python package | `pip install kickcat`, then `./py_bindings/enable_raw_access.sh` |
+| Check Python formatting | `./scripts/format_py.sh check` |
+| Preview the docs | `uvx zensical@0.1.1 serve` |
+| Build the docs as CI does | `uvx zensical@0.1.1 build --strict` |
 
 ## Documentation
 
-The documentation is published at <https://leducp.github.io/KickCAT/>. It is
-built with [Zensical](https://zensical.org/); preview it locally from the
-repository root:
+- [Home](https://leducp.github.io/KickCAT/): what KickCAT is, and where to start
+- [User guide](https://leducp.github.io/KickCAT/user-guide/features/): features, building,
+  hardware, simulation, tools
+- [Developer guide](https://leducp.github.io/KickCAT/developer-guide/): architecture and
+  contributing
+- [Reference](https://leducp.github.io/KickCAT/reference/glossary/): glossary and ETG
+  specifications
+- EtherCAT quick reference: the ETG
+  [Device Protocol Poster](https://www.ethercat.org/download/documents/ethercat_device_protocol_poster.pdf)
 
-```bash
-uvx zensical serve
-```
+## Project
 
-- [Feature support matrix](docs/user-guide/features.md)
-- [Building and installing](docs/user-guide/building.md)
-- [Hardware guide](docs/user-guide/hardware.md)
-- [Simulation and emulation](docs/user-guide/simulation.md)
-- [Tools and GUIs](docs/user-guide/tools.md)
-- [Real-time performance tuning](docs/user-guide/realtime.md)
-- [Developer guide](docs/developer-guide/index.md)
-- [Release procedure](docs/developer-guide/contributing/release.md)
-- [Contributing](docs/developer-guide/contributing/index.md)
+Contributions are welcome: see
+[Contributing](https://leducp.github.io/KickCAT/developer-guide/contributing/). KickCAT
+follows [Semantic Versioning](https://semver.org/) and is used in production systems.
 
-### EtherCAT references
-
-- [ETG official documentation](https://www.ethercat.org/en/downloads.html)
-- [Beckhoff EtherCAT documentation](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html)
-- [Beckhoff ESI (XML device description) files](https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description)
-- [ESC datasheets](https://download.beckhoff.com/download/document/io/ethercat-development-products/)
-- [EtherCAT Device Protocol Poster](https://www.ethercat.org/download/documents/EtherCAT_Device_Protocol_Poster.pdf)
-- [ESC comparison](https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf)
-
-## Contributing
-
-Contributions are welcome. See [Contributing](docs/developer-guide/contributing/index.md) for code-style
-and PR conventions, and [Building](docs/user-guide/building.md) for the development
-build (unit tests and coverage).
-
-KickCAT follows [Semantic Versioning](https://semver.org/). The release workflow
-is documented in [Release procedure](docs/developer-guide/contributing/release.md).
-
-## License
-
-[CeCILL-C](LICENSE)
-
-## Support
-
-- Issues: [GitHub Issues](https://github.com/leducp/KickCAT/issues)
-- Discussions: [GitHub Discussions](https://github.com/leducp/KickCAT/discussions)
-- Conan package: [conan-center-index](https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat)
-
-Status: actively maintained and used in production systems. See
-[Releases](https://github.com/leducp/KickCAT/releases) for the latest stable
-version.
+[Issues](https://github.com/leducp/KickCAT/issues) ·
+[Discussions](https://github.com/leducp/KickCAT/discussions) ·
+[Releases](https://github.com/leducp/KickCAT/releases) ·
+[Conan package](https://github.com/conan-io/conan-center-index/tree/master/recipes/kickcat) ·
+License: [CeCILL-C](LICENSE)
