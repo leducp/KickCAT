@@ -126,4 +126,4 @@ hardware, single process:
 - [Simulation and emulation](SIMULATION.md) -- software ESC and network emulator
 - [Tools and GUIs](TOOLS.md) -- KickUI, EEPROM editor, CLI utilities
 - [Real-time performance tuning](PERFORMANCE.md) -- Linux RT setup
-- [Architecture overview](architecture.md)
+- [Developer guide](guide/README.md) -- how EtherCAT works and how KickCAT implements it
