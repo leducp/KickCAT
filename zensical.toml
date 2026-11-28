@@ -48,8 +48,12 @@ nav = [
     { "Contributing" = [
       { "Guidelines" = "developer-guide/contributing/index.md" },
       { "Testing a change" = "developer-guide/contributing/testing.md" },
+      { "Writing docs" = "developer-guide/contributing/writing-docs.md" },
       { "Release procedure" = "developer-guide/contributing/release.md" },
     ] },
+  ] },
+  { "Reference" = [
+    { "Glossary" = "reference/glossary.md" },
   ] },
 ]
 
