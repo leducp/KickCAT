@@ -76,7 +76,7 @@ flowchart LR
 
     These pages explain KickCAT. Keep the ETG poster at hand for the protocol.
 
-    [What is EtherCAT?](developer-guide/ethercat/what-is-ethercat.md) · [Poster][etg-poster] ·
+    [EtherCAT primer](get-started/ethercat-primer.md) · [Poster][etg-poster] ·
     [Glossary](reference/glossary.md)
 
 -   :lucide-git-pull-request: **Contribute**

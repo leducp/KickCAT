@@ -13,7 +13,7 @@
 ## The problem: many small requests, one wire, no waiting
 
 Each frame can carry several datagrams. Each datagram returns its data and a WKC,
-as described in [Frames and datagrams](../ethercat/frames-and-datagrams.md). A cycle can include
+as described in [Frames and datagrams](../../get-started/ethercat-primer.md#one-frame-for-the-whole-bus). A cycle can include
 logical reads and writes, mailbox checks, and error counter reads. Each request
 needs its own result.
 
@@ -158,7 +158,7 @@ example when assigning station addresses with auto-increment addressing during
 ## Cable redundancy
 
 To form a ring, connect the last slave to a second network card on the master (see
-[Topology, redundancy and clocks](../ethercat/topology-and-clocks.md)). A `Link` always has a **nominal** socket and
+[Topology, redundancy and clocks](../../get-started/ethercat-primer.md#topology-redundancy-and-clocks)). A `Link` always has a **nominal** socket and
 a **redundancy** socket. Without redundancy, it uses `SocketNull` for the second
 socket. This socket accepts writes and never receives a frame.
 
@@ -272,4 +272,4 @@ socket, set its timeout, and read and write a frame.
 - How to tune Linux and the network card for low latency:
   [the performance guide](../../user-guide/realtime.md).
 - Ports, rings and loop-back on the protocol side:
-  [Topology, redundancy and clocks](../ethercat/topology-and-clocks.md).
+  [Topology, redundancy and clocks](../../get-started/ethercat-primer.md#topology-redundancy-and-clocks).
