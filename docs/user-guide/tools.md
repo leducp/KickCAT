@@ -10,6 +10,11 @@ ls tools/   # built CLI tools land here
 
 ## KickUI (GUI)
 
+<figure markdown="span">
+  ![KickUI bus topology view: a master and three simulated slaves, all in OP](../assets/screenshots/kickui-topology.png){ loading=lazy }
+  <figcaption>Bus topology view of three simulated slaves in OP, started from KickUI's built-in simulator.</figcaption>
+</figure>
+
 ImGui + GLFW dashboard for inspecting, configuring, and operating an EtherCAT
 bus from the master side (`tools/kickui/`). It provides:
 
@@ -31,6 +36,11 @@ cd build && make -j
 ```
 
 ## EEPROM editor (GUI)
+
+<figure markdown="span">
+  ![EEPROM editor showing the Freedom K64F EEPROM header, identity, mailbox settings, and raw bytes](../assets/screenshots/eeprom-editor.png){ loading=lazy }
+  <figcaption>The Freedom K64F EEPROM, with structured header fields above the raw bytes.</figcaption>
+</figure>
 
 ImGui + GLFW structured editor for slave SII/EEPROM images
 (`tools/eeprom_editor/`), with tabs for device info, strings, SyncManagers,
