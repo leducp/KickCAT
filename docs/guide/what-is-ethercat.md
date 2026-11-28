@@ -1,6 +1,6 @@
 # What is EtherCAT?
 
-> How does Ethernet for Control Automation Technology (EtherCAT) exchange machine data?
+> How does EtherCAT exchange machine data?
 >
 > You will learn:
 >
@@ -72,7 +72,7 @@ flowchart LR
 - **Hardware.** The master uses a standard Ethernet port. Only the slaves need
   special hardware.
 
-Each slave uses an **EtherCAT Slave Controller (ESC)** to process frames. See
+Each slave uses an **ESC** to process frames. See
 [Chapter 0.3](inside-a-slave.md).
 
 ## The example this guide follows

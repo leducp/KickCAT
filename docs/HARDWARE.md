@@ -72,7 +72,7 @@ The master will:
 
 1. Discover the slave on the network.
 2. Transition through INIT -> PRE-OP -> SAFE-OP -> OP.
-3. Begin exchanging process data (PDOs).
+3. Begin exchanging process data.
 4. Display diagnostic information.
 
 ### Troubleshooting

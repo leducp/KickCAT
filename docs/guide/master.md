@@ -1,12 +1,11 @@
 # The master: from discovery to OP
 
-> How does the KickCAT master start and run a bus using Ethernet for Control
-> Automation Technology (EtherCAT)?
+> How does the KickCAT master start and run a bus using EtherCAT?
 >
 > You will learn:
 >
 > - which objects the application and bus own
-> - which calls bring a slave to the operational state (OP)
+> - which calls bring a slave to OP
 > - how the process image and frame layouts differ
 > - how to exchange process data and mailbox messages in the cyclic loop
 > - how the application receives errors
@@ -14,15 +13,14 @@
 ## The problem: one program drives a whole bus
 
 Every millisecond, the example master reads 12 sensor bytes from the Freedom K64F
-board and writes 3 bytes to its light-emitting diodes (LEDs). It also reads
+board and writes 3 bytes to its LEDs. It also reads
 parameters as needed and checks for errors.
 
-At startup, the master finds the slaves and assigns station addresses. It reads each
-slave's electrically erasable programmable read-only memory (EEPROM) and configures
-its mailbox. It reads the process data object (PDO) mapping and configures the
-fieldbus memory management units (FMMUs) and SyncManagers. It requests state changes as described in
-[Chapter 0.4](state-machine.md). During operation, it must exchange process data at
-a fixed rate without waiting for mailbox replies.
+At startup, the master finds the slaves and assigns station addresses. It reads
+each slave's EEPROM and configures its mailbox. It reads the PDO mapping, then
+configures the FMMUs and SyncManagers. It requests state changes as described in
+[Chapter 0.4](state-machine.md). During operation, it must exchange process data
+at a fixed rate without waiting for mailbox replies.
 
 The library design determines who schedules the cycle.
 
@@ -42,13 +40,12 @@ Three types provide the main master functions.
 - **`Bus`** owns the slave list, runs startup, builds process data frames, and
   provides the cyclic calls.
 - **`Slave`** (`kickcat::Slave`) stores one remote slave's station address, parsed
-  Slave Information Interface (SII) data, EtherCAT Slave Controller (ESC)
-  description, and last Application Layer (AL) status. It also stores error
-  counters, the request mailbox, and the process data mapping. `Bus` fills in this
-  record. The separate `kickcat::slave::Slave` class runs on the slave (see [Chapter
+  SII data, ESC description, and last AL status. It also stores error counters,
+  the request mailbox, and the process data mapping. `Bus` fills in this record.
+  The separate `kickcat::slave::Slave` class runs on the slave (see [Chapter
   6](slave.md)).
-- **`AbstractLink`** provides the datagram interface. `Link` implements it. `Bus`
-  uses this interface for all network access. See [Chapter 4](transport.md).
+- **`AbstractLink`** provides the datagram interface. `Link` implements it, and
+  `Bus` uses it for all network access. See [Chapter 4](transport.md).
 
 ```mermaid
 classDiagram
@@ -91,23 +88,21 @@ link settings such as the read timeout.
 
 The application starts the bus in three steps.
 
-**`Bus::init()` brings the bus to the pre-operational state (PRE-OP).** It counts
-the slaves using the working counter (WKC) of a broadcast read. It resets their
-registers, assigns station addresses, and reads their ESC and data link
-descriptions. It requests the initialization state (INIT), reads each EEPROM,
+**`Bus::init()` brings the bus to PRE-OP.** It counts the slaves using the WKC
+of a broadcast read. It resets their registers, assigns station addresses, and
+reads their ESC and data link descriptions. It requests INIT, reads each EEPROM,
 configures the mailbox SyncManagers, and requests PRE-OP. It then empties the
-mailboxes and installs handlers for unsolicited messages such as CANopen over
-EtherCAT (CoE) emergencies. After `init()`, `bus.slaves()` lists each slave and its
-parsed SII.
+mailboxes and installs handlers for unsolicited messages such as CoE emergencies.
+After `init()`, `bus.slaves()` lists each slave and its parsed SII.
 
 **`Bus::createMapping()` sets up process data.** It gets the input and output sizes
 for each slave, assigns logical addresses and buffer offsets, builds the cyclic
 frames, and programs the FMMUs. Each slave stays in its current state.
 
-**The application requests safe-operational (SAFE-OP), then OP.** For each state it
-calls `requestState()` and `waitForState()`. A slave with outputs must receive valid outputs
-before entering OP. The application writes outputs before requesting OP and
-continues exchanging process data while it waits.
+**The application requests SAFE-OP, then OP.** For each state, it calls
+`requestState()` and `waitForState()`. A slave with outputs must receive valid
+outputs before entering OP. The application writes outputs before requesting OP
+and keeps exchanging process data while it waits.
 
 ```mermaid
 sequenceDiagram
@@ -138,7 +133,7 @@ example, a tool can put one slave into the bootstrap state for a firmware update
 See [Chapter 5](mailbox-implementation.md).
 
 Configure individual slaves between `init()` and `createMapping()`. In PRE-OP, the
-application can use service data objects (SDOs) to set drive parameters or change a
+application can use SDOs to set drive parameters or change a
 PDO mapping. Mailbox calls such as `readSDO()` are available
 from PRE-OP onward.
 
@@ -172,16 +167,15 @@ throws an exception if the buffer is too small.
 
 The buffer and the frames use different layouts.
 
-- **In your buffer**, the bus places the inputs of all slaves first, in bus
-  order, then the outputs of all slaves. After mapping, each `Slave` holds a
-  pointer to its blocks: `slave.input.data` and `slave.output.data`, with their
-  sizes in `bsize`.
+- **In your buffer**, the bus places all slaves' inputs first, in bus order, then
+  all their outputs. After mapping, each `Slave` holds pointers to its blocks:
+  `slave.input.data` and `slave.output.data`, with their sizes in `bsize`.
 - **On the wire**, each slave gets a range of the logical address space (see
-  [Chapter 0.5](process-data.md)). The inputs and the outputs of one slave share
-  the same logical range. The FMMUs of the slave route reads to its input
-  SyncManager and writes to its output SyncManager. This overlap makes a
-  logical read-write (LRW) frame as short as possible. A frame holds at most
-  1486 bytes of data, so a slave that does not fit starts the next frame.
+  [Chapter 0.5](process-data.md)). A slave's inputs and outputs share that range.
+  Its FMMUs route reads to its input SyncManager and writes to its output
+  SyncManager. This overlap keeps LRW frames as short as possible. Each frame
+  holds at most 1486 bytes of data, so a slave that does not fit starts the next
+  frame.
 
 ```mermaid
 flowchart LR
@@ -209,9 +203,9 @@ With only the Freedom K64F board, the process image contains 12 input bytes foll
 by 3 output bytes. In an LRW frame, logical bytes 0 to 11 cover both the 3 LED bytes
 and the 12 sensor bytes.
 
-The datagram callbacks copy inputs into the process image. For a logical read (LRD),
-the bus copies the inputs even if the WKC is wrong, then reports the error. For LRW,
-it copies inputs only if the WKC matches. For a write, it copies outputs into the
+The datagram callbacks copy inputs into the process image. For an LRD, the bus
+copies the inputs even if the WKC is wrong, then reports the error. For LRW, it
+copies inputs only if the WKC matches. For a write, it copies outputs into the
 frame just before sending.
 
 Keep the buffer at the same address while the bus runs. To use another buffer with
@@ -260,7 +254,7 @@ The application sets the cycle rate. A typical loop waits on a `Timer` at the st
 of each cycle. The application chooses the thread, its priority, and its processor
 core.
 
-The application can use separate LRD and logical write (LWR) datagrams or a single
+The application can use separate LRD and LWR datagrams or a single
 LRW. LRW uses fewer bytes on the network. Separate datagrams still return inputs
 when the WKC indicates a missing operation.
 
@@ -303,19 +297,18 @@ application decides whether to continue after a lost frame.
 
 ## Higher layers
 
-These features use the public application programming interface (API) of `Bus`.
+These features use the public API of `Bus`.
 
-- **`CoE::CiA::DS402::Drive`** controls one CAN in Automation (CiA) 402 servo drive.
-  It configures the drive's PDO mapping over SDO before `createMapping()`, attaches
-  to the drive's process data after mapping, and runs the CiA 402 state machine on
-  each call to `update()` in the cycle.
-- **The mailbox gateway** (`Gateway`) forwards mailbox requests from outside
-  tools to the slaves, and the **master object dictionary** (`MasterOD`) answers
-  the requests addressed to the master itself. [Chapter 5](mailbox-implementation.md)
-  covers both.
-- **Diagnostics** helpers rebuild the topology from the port status of each
-  slave, and the bus refreshes the error counters with
-  `sendRefreshErrorCounters()`.
+- **`CoE::CiA::DS402::Drive`** controls one CiA 402 servo drive. It configures the
+  drive's PDO mapping over SDO before `createMapping()`, attaches to the drive's
+  process data after mapping, and runs the CiA 402 state machine on each call to
+  `update()` in the cycle.
+- **The mailbox gateway** (`Gateway`) forwards mailbox requests from outside tools
+  to the slaves. The **master object dictionary** (`MasterOD`) answers requests
+  addressed to the master itself. [Chapter 5](mailbox-implementation.md) covers
+  both.
+- **Diagnostics** helpers rebuild the topology from each slave's port status. The
+  bus refreshes error counters with `sendRefreshErrorCounters()`.
 
 ## Summary
 

@@ -7,7 +7,7 @@
 > - how EtherCAT uses Ethernet frames
 > - what a datagram header contains
 > - the four ways to address a slave
-> - what the working counter (WKC) tells the master
+> - what the WKC tells the master
 
 ## The problem: one frame, many readers
 

@@ -1,12 +1,11 @@
 # Describing a device: ESI, SII and ENI
 
-> How does a master identify and configure a slave in Ethernet for Control
-> Automation Technology (EtherCAT)?
+> How does a master identify and configure a slave in EtherCAT?
 >
 > You will learn:
 >
-> - what EtherCAT Slave Information (ESI), Slave Information Interface (SII), and
->   EtherCAT Network Information (ENI) describe
+> - what ESI, SII, and
+>   ENI describe
 > - which tools write and read each format
 > - how the example board uses these descriptions
 
@@ -14,35 +13,32 @@
 
 A master can use slaves from different vendors. Before exchanging process data, it
 needs each slave's identity, mailbox layout, and process data SyncManagers. It also
-needs to know which process data objects (PDOs) and object dictionary entries the
-slave provides.
+needs to know which PDOs and object dictionary entries each slave provides.
 
 Device and network descriptions let the master use new devices without a code
 change. Each description serves a different purpose.
 
 ## ESI: the vendor's description of a device
 
-The vendor writes the **ESI** file in Extensible Markup Language (XML) according to
+The vendor writes the **ESI** file in XML according to
 EtherCAT Technology Group specification ETG.2000. One file can describe several
 devices or several revisions. The description includes the following information.
 
 - the **identity**: vendor identifier (ID), product code and revision number
-- the **SyncManagers** and **fieldbus memory management units (FMMUs)**, with their
+- the **SyncManagers** and **FMMUs**, with their
   addresses and sizes
 - the **PDOs** and their entries
 - the **object dictionary**, with the name, type and access of every entry
-- the **mailbox protocols** the device supports, such as CANopen over EtherCAT (CoE)
-  or File over EtherCAT (FoE)
+- the **mailbox protocols** the device supports, such as CoE
+  or FoE
 - the distributed clock modes, if any
-- the content to program into the device's electrically erasable programmable
-  read-only memory (EEPROM)
+- the content to program into the device's EEPROM
 
-The board's ESI describes one device of type `Board` with vendor ID `0x000006A5` and
+The board's ESI describes one `Board` device with vendor ID `0x000006A5` and
 product code `0x00DEFEDE`. Its mailbox SyncManagers are at `0x1000` and `0x1400`.
-The output SyncManager is at `0x1800` and the input SyncManager is at `0x1C00`. A
-fixed receive PDO (RxPDO) holds three light-emitting diode (LED) values. A fixed
-transmit PDO (TxPDO) holds six sensor values. The mailbox supports CoE with Service
-Data Object (SDO) Information.
+The output SyncManager is at `0x1800`, and the input SyncManager is at `0x1C00`.
+A fixed RxPDO holds three LED values; a fixed TxPDO holds six sensor values. The
+mailbox supports CoE with SDO Information.
 
 Configuration tools read the ESI to plan a network. EEPROM tools read it to build an
 image for the slave.
@@ -55,10 +51,10 @@ ESI. The board has 1024 bytes of EEPROM. The SII has two parts.
 - The controller reads the first words of the **fixed area** at power-on, for
   example to set up its microcontroller interface. The rest holds the device
   identity and supported mailbox protocols. It also gives the addresses and sizes of
-  the normal and bootstrap (BOOT) mailbox areas.
+  the normal and BOOT mailbox areas.
 - A list of **categories** after it. Each category has a type and a size. The
   common ones are Strings, General (names and flags of the device), FMMU,
-  SyncManager, TxPDO, RxPDO and distributed clocks (DC).
+  SyncManager, TxPDO, RxPDO and DC.
 
 At startup, the master reads each slave's SII to identify the device, configure its
 mailbox, and set up simple process data. It needs no local file for these steps. The

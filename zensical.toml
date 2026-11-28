@@ -7,6 +7,8 @@ repo_name = "leducp/KickCAT"
 edit_uri = "edit/master/docs/"
 docs_dir = "docs"
 site_dir = "build/docs-site"
+# Abbreviations and shared links, appended to every page by pymdownx.snippets
+exclude_docs = "includes/"
 
 nav = [
   { "Home" = "index.md" },
@@ -53,6 +55,8 @@ features = [
   "search.suggest",
   "search.highlight",
   "content.code.copy",
+  "content.code.annotate",
+  "content.tabs.link",
   "content.action.edit",
 ]
 
@@ -67,6 +71,7 @@ toggle.icon = "lucide/moon"
 toggle.name = "Switch to light mode"
 
 [project.markdown_extensions]
+abbr = {}
 admonition = {}
 attr_list = {}
 md_in_html = {}
@@ -75,6 +80,11 @@ toc.permalink = true
 pymdownx.details = {}
 pymdownx.highlight = {}
 pymdownx.inlinehilite = {}
+pymdownx.snippets = { base_path = ["."], check_paths = true, auto_append = [
+  "docs/includes/abbreviations.md",
+  "docs/includes/links.md",
+] }
 pymdownx.superfences.custom_fences = [
   { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
 ]
+pymdownx.tabbed = { alternate_style = true }

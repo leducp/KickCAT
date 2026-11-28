@@ -6,22 +6,20 @@
 >
 > - how the master's `Slave` and the slave stack's `Slave` differ
 > - how the application calls the stack
-> - how the state machine checks requests to enter the operational state (OP)
-> - how the application accesses mapped process data objects (PDOs)
-> - how to support a new EtherCAT Slave Controller (ESC) or board
+> - how the state machine checks requests to enter OP
+> - how the application accesses mapped PDOs
+> - how to support a new ESC or board
 
 The ESC processes frames as described in [Chapter 0.3](inside-a-slave.md). The
-software on the microcontroller implements the EtherCAT state machine (ESM) from
-[Chapter 0.4](state-machine.md). It accesses the ESC through the Process Data
-Interface (PDI).
+microcontroller software implements the ESM from [Chapter 0.4](state-machine.md)
+and accesses the ESC through the PDI.
 
 ## Two classes named Slave
 
-- On the master, `kickcat::Slave` stores one slave's station address, electrically
-  erasable programmable read-only memory (EEPROM) contents, request mailbox, and
-  process image offsets.
+- On the master, `kickcat::Slave` stores one slave's station address, EEPROM
+  contents, request mailbox, and process image offsets.
 - On the device, `kickcat::slave::Slave` handles the mailbox, runs the state
-  machine, and copies process data between the ESC and the application.
+  machine, and copies process data between the ESC and application.
 
 See [Chapter 3](master.md) for the master-side record.
 
@@ -29,15 +27,13 @@ See [Chapter 3](master.md) for the master-side record.
 
 The slave stack has three design constraints.
 
-- **Memory and operating system (OS).** A microcontroller often has only a few
-  hundred kilobytes of random-access memory (RAM). The stack runs on NuttX, Linux,
-  and KickOS (experimental).
+- **Memory and OS.** A microcontroller often has only a few hundred kilobytes of
+  RAM. The stack runs on NuttX, Linux, and KickOS (experimental).
 - **State requests.** The master requests a state. The slave checks the
-  configuration and accepts or refuses the request. The master can read the reason
-  for a refusal.
-- **ESC access.** A LAN9252 uses a Serial Peripheral Interface (SPI) transaction for
-  each register access. The XMC4800 has an internal ESC with memory-mapped
-  registers.
+  configuration and accepts or refuses the request. The master can read the
+  reason for a refusal.
+- **ESC access.** A LAN9252 uses an SPI transaction for each register access.
+  The XMC4800 has an internal ESC with memory-mapped registers.
 
 The stack must fit in the available memory, report EtherCAT errors to the master,
 and support both types of register access through one interface.
@@ -100,7 +96,7 @@ The Freedom K64F firmware builds the stack in this order:
 
 1. A `Lan9252` ESC on an `AbstractSPI`, then `init()`.
 2. A `PDO` on the ESC, and a `slave::Slave` on the ESC and the PDO.
-3. A `mailbox::response::Mailbox` on the ESC, with CANopen over EtherCAT (CoE)
+3. A `mailbox::response::Mailbox` on the ESC, with CoE
    enabled on the object dictionary returned by `CoE::createOD()`.
 4. `setMailbox` and `setDictionary` on the slave, then `setInput` and
    `setOutput` on the PDO with two application buffers.
@@ -110,11 +106,10 @@ The `simulated_bus` example uses the same slave stack with an `EmulatedESC`.
 
 ## The application loop
 
-The application calls `routine()` often enough to meet the master's cycle time. It
-does its own work between calls. The stack has no timer or thread. Each `routine()`
-call handles the mailbox and runs the state machine. The state machine reads the
-Application Layer (AL) registers. In the safe-operational state (SAFE-OP) and in OP,
-it also copies process data.
+The application calls `routine()` often enough to meet the master's cycle time
+and does its own work between calls. The stack has no timer or thread. Each
+`routine()` call handles the mailbox and runs the state machine, which reads the
+AL registers. In SAFE-OP and OP, it also copies process data.
 
 ```mermaid
 sequenceDiagram
@@ -135,12 +130,12 @@ sequenceDiagram
     SM->>ESC: write AL status code, then AL status
 ```
 
-In the bootstrap state (BOOT), `routine()` serves the bootstrap mailbox.
+In BOOT, `routine()` serves the bootstrap mailbox.
 
-In SAFE-OP, `bind(index, pointer)` associates a typed
-pointer with a mapped object. For example, `bind(0x7000, led_r)` binds a pointer to
-the red light-emitting diode (LED) value on the Freedom K64F board. The application
-can then read the output byte written in the last cycle.
+In SAFE-OP, `bind(index, pointer)` associates a typed pointer with a mapped
+object. For example, `bind(0x7000, led_r)` binds a pointer to the red LED value on
+the Freedom K64F board. The application can then read the output byte written in
+the last cycle.
 
 A slave with outputs can enter OP only after the application
 calls `validateOutputData()`. The application decides what values are valid for its
@@ -223,10 +218,10 @@ dictionary, the stack copies the SyncManager bytes directly to the buffers.
 **In SAFE-OP and OP**, each `routine()` writes the input buffer to the input
 SyncManager and reads the output SyncManager into the output buffer.
 
-The application, the Service Data Object (SDO) server, and the process data use the
-same bytes. A master can change the mapping over SDO in PRE-OP to select the data
-the slave sends. The application buffers must fit the largest mapping the master may
-request. The Freedom K64F firmware reserves 16 bytes in each direction.
+The application, SDO server, and process data use the same bytes. In PRE-OP, a
+master can change the mapping over SDO to select the data the slave sends. The
+application buffers must fit the largest mapping the master may request. The
+Freedom K64F firmware reserves 16 bytes in each direction.
 
 KickCAT supports one input and one output process data SyncManager per slave
 (see [FEATURES](../FEATURES.md)).
@@ -236,12 +231,12 @@ KickCAT supports one input and one output process data SyncManager per slave
 The application owns the `CoE::Dictionary`, a list of objects and their entries. The
 mailbox uses it to serve SDOs. The slave uses it to map process data.
 
-On the host, `od_generator` reads the EtherCAT Slave Information (ESI) file in
-Extensible Markup Language (XML). It generates `od_populator.cc`, which defines
-`CoE::createOD()`. The firmware therefore needs no XML parser at boot. The generator
-calls `CoE::validateDictionary` and rejects entries the SDO server cannot handle
-safely. The SDO server relies on this check and does not repeat it during the cycle.
-See [Chapter 1](principles.md) and [Chapter 9](from-xml-to-bytes.md).
+On the host, `od_generator` reads the ESI file in XML and generates
+`od_populator.cc`, which defines `CoE::createOD()`. The firmware therefore needs
+no XML parser at boot. The generator calls `CoE::validateDictionary` and rejects
+entries the SDO server cannot handle safely. The SDO server relies on this check
+and does not repeat it during the cycle. See [Chapter 1](principles.md) and
+[Chapter 9](from-xml-to-bytes.md).
 
 ## Porting to a new ESC or board
 

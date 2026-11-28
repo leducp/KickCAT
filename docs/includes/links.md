@@ -1,0 +1,8 @@
+[etg-poster]: https://www.ethercat.org/download/documents/ethercat_device_protocol_poster.pdf "EtherCAT Device Protocol Poster (ETG, 2023-10 edition)"
+[etg-downloads]: https://www.ethercat.org/en/downloads.html "ETG specifications and downloads"
+[etg-kb]: https://www.ethercat.org/kb "ETG Knowledge Base"
+[etg-forum]: https://www.ethercat.org/forum "ETG Developers Forum"
+[beckhoff-infosys]: https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_io_intro/1257993099.html "Beckhoff EtherCAT documentation"
+[beckhoff-esi]: https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description "Beckhoff ESI files"
+[esc-datasheets]: https://download.beckhoff.com/download/document/io/ethercat-development-products/ "ESC datasheets"
+[esc-comparison]: https://download.beckhoff.com/download/document/io/ethercat-development-products/an_esc_comparison_v2i7.pdf "ESC comparison"

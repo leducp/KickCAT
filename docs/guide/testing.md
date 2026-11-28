@@ -7,13 +7,13 @@
 > - how the tests are organized
 > - which mock to use for each interface
 > - how to test both stacks with the emulator
-> - what continuous integration (CI) checks
+> - what CI checks
 
 ## The problem: a stack between two kinds of hardware
 
-Master tests need control over network frames. Slave tests need access to an
-EtherCAT Slave Controller (ESC). Developers and CI must be able to run both types of
-tests quickly and repeatably without EtherCAT hardware.
+Master tests need control over network frames, while slave tests need access to
+an ESC. Developers and CI must be able to run both types of tests quickly and
+repeatably without EtherCAT hardware.
 
 Some operations involve several layers. For a lost frame, the socket reports the
 loss, the link handles it, and the bus receives an error callback. For a state
@@ -40,10 +40,9 @@ can run the stacks with a software ESC and network.
 ## The unit test binary
 
 The GoogleTest program `kickcat_unit` contains all unit tests. Test files in
-`unit/src/` take the name of the subject and the suffix `-t.cc`. The directories
-`slave/`, `mailbox/CoE/`, `mailbox/FoE/`, `CoE/`, `ESI/`, `ENI/`, and `utils/` group
-related tests. Small Extensible Markup Language (XML) parser fixtures are in
-`unit/`.
+`unit/src/` use the subject name with the suffix `-t.cc`. The directories
+`slave/`, `mailbox/CoE/`, `mailbox/FoE/`, `CoE/`, `ESI/`, `ENI/`, and `utils/`
+group related tests. Small XML parser fixtures are in `unit/`.
 
 The commands to build it, run it and filter tests are in
 [Building KickCAT](../BUILDING.md).
@@ -62,17 +61,16 @@ The mocks in `unit/mocks/` each replace one boundary.
 |---|---|---|
 | `MockLink` | `AbstractLink` | The `Bus`: it queues the datagrams the bus sends and returns the answers the test prepared. |
 | `MockSocket` | `AbstractSocket` | The `Link`: it checks outgoing frames and simulates replies, loss, and corruption. |
-| `MockESC` | `AbstractESC` | The slave stack: the state machine, process data object (PDO) handling and the mailbox, register by register. |
-| `MockSPI` | `AbstractSPI` | A Serial Peripheral Interface (SPI) driver for an ESC such as the LAN9252. |
+| `MockESC` | `AbstractESC` | The slave stack: the state machine, PDO handling and the mailbox, register by register. |
+| `MockSPI` | `AbstractSPI` | An SPI driver for an ESC such as the LAN9252. |
 | `ESMStateTest` | (a fixture) | One state of the slave state machine, with a mock ESC and its SyncManagers ready. |
 | `PhysicalSocket` | a master cable | Redundancy: it routes a frame through an emulated network and returns it on the right master port, or not at all when the cable is cut. |
 
 ## Tests with the real stacks
 
-Use both stacks to test distributed clocks, File over EtherCAT (FoE) transfers,
-redundancy, or a simulated drive. Connect a `Bus` to emulated slaves with a
-`LoopbackSocket` (see [Chapter 8](simulation.md)). The `simulated_bus` example uses
-the same setup.
+Use both stacks to test distributed clocks, FoE transfers, redundancy, or a
+simulated drive. Connect a `Bus` to emulated slaves with a `LoopbackSocket` (see
+[Chapter 8](simulation.md)). The `simulated_bus` example uses the same setup.
 
 Each frame passes through the emulated network before the slave stack runs once. The
 test uses one thread in one process, so the order is repeatable. You can follow a
@@ -82,15 +80,14 @@ frame through both stacks in a debugger.
 
 The integration programs are in `test/integration/bench/`.
 
-- `esi_boot` reads an EtherCAT Slave Information (ESI) catalog. It builds an
-  emulated slave for each device and requests the operational state (OP) through a
-  loopback socket. Reaching OP checks that the ESI parser, electrically erasable
-  programmable read-only memory (EEPROM) image builder, dictionary, and both stacks
-  agree on the device.
-- `esi_validate` checks each device's process data mapping without requesting state changes.
-- `hw_test_bench` runs long tests on hardware. It counts working counter (WKC)
-  errors and lost frames. It fails if the counts exceed a calibrated baseline. It is
-  part of release qualification.
+- `esi_boot` reads an ESI catalog, builds an emulated slave for each device, and
+  requests OP through a loopback socket. Reaching OP checks that the ESI parser,
+  EEPROM image builder, dictionary, and both stacks agree on the device.
+- `esi_validate` checks each device's process data mapping without requesting
+  state changes.
+- `hw_test_bench` runs long tests on hardware. It counts WKC errors and lost
+  frames, and fails if the counts exceed a calibrated baseline. It is part of
+  release qualification.
 
 `scripts/test_install.sh` checks the installed package by building a small
 application with CMake `find_package` and with pkg-config.
@@ -121,11 +118,11 @@ Hardware tests run before a release (see the [release procedure](../RELEASE.md))
 | Redundancy or a split ring | a test with `PhysicalSocket` on an emulated ring | `unit/src/redundancy-t.cc` |
 | A slave state transition | an `ESMStateTest` case | `unit/src/ESMStateSafeOP-t.cc` and the other states |
 | Slave process data mapping | a unit test with `MockESC` | `unit/src/slave/PDO-t.cc` |
-| A CANopen over EtherCAT (CoE) or FoE message | a request or response unit test | `unit/src/mailbox/` |
+| A CoE or FoE message | a request or response unit test | `unit/src/mailbox/` |
 | Behavior across master and slave | a loopback test with emulated slaves | `unit/src/FoE-sim-t.cc`, `unit/src/dc-t.cc` |
 | The emulated ESC or network | a unit test on the emulator | `unit/src/EmulatedESC-t.cc`, `unit/src/EmulatedNetwork-t.cc` |
 | A simulated device behavior | a unit test on the device | `unit/src/Ds402Motor-t.cc` |
-| The ESI, Slave Information Interface (SII), or EtherCAT Network Information (ENI) parser | a parser test with an XML fixture | `unit/src/ESI/`, `unit/src/ENI/` |
+| The ESI, SII, or ENI parser | a parser test with an XML fixture | `unit/src/ESI/`, `unit/src/ENI/` |
 | A time-dependent algorithm | a unit test on the deterministic clock | `unit/src/SoftPll-t.cc`, `unit/src/Timer-t.cc` |
 
 ## Summary

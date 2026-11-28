@@ -6,13 +6,13 @@
 > You will learn:
 >
 > - why KickCAT emulates the hardware
-> - how the emulated EtherCAT Slave Controller (ESC) and network process frames
+> - how the emulated ESC and network process frames
 > - how to run a simulation in one or two processes
-> - how to configure slaves with JavaScript Object Notation (JSON) files and add a device
+> - how to configure slaves with JSON files and add a device
 
 ## The problem: EtherCAT without hardware
 
-Master development needs repeatable tests. A continuous integration (CI) job may run
+Master development needs repeatable tests. A CI job may run
 on a computer without an EtherCAT port. Redundancy tests need to break a connection
 at a known point. Physical cards, cables, and slaves take time to set up for these
 tests.
@@ -21,14 +21,14 @@ tests.
 
 A test can replace different parts of a slave.
 
-1. **Return fixed replies.** A script returns the bytes the master expects. It tests
-   the master against the script. It cannot check whether a real slave would give
-   the same reply.
-2. **Model the protocol.** A model handles Service Data Object (SDO) requests, state
-   changes, and process data. This requires a second protocol implementation that
-   must be kept consistent with the slave stack.
-3. **Emulate the hardware.** A software ESC and network run the same slave stack as
-   the microcontroller.
+1. **Return fixed replies.** A script returns the bytes the master expects. This
+   tests the master against the script, but cannot check whether a real slave would
+   give the same reply.
+2. **Model the protocol.** A model handles SDO requests, state changes, and process
+   data. This requires a second protocol implementation that must stay consistent
+   with the slave stack.
+3. **Emulate the hardware.** A software ESC and network run the same slave stack
+   as the microcontroller.
 
 KickCAT uses hardware emulation.
 
@@ -47,18 +47,17 @@ new slave protocol features.
 The emulator provides two interfaces.
 
 - **EtherCAT.** `processDatagram()` applies a physical read or write, a broadcast,
-  or a logical read or write through the fieldbus memory management units (FMMUs).
-  It updates the working counter (WKC).
-- **Process Data Interface (PDI).** The slave stack calls `read()` and `write()`.
-  The SyncManagers provide the same mailbox and buffered modes as a physical ESC.
+  or a logical read or write through the FMMUs. It updates the WKC.
+- **PDI.** The slave stack calls `read()` and `write()`. The SyncManagers provide
+  the same mailbox and buffered modes as a physical ESC.
 
 The emulator models the following parts of the controller.
 
 - eight SyncManagers and eight FMMUs
-- the Application Layer (AL) control and status registers used by the state machine
-- electrically erasable programmable read-only memory (EEPROM) loaded from a raw
-  image or built from an EtherCAT Slave Information (ESI) file
-- a distributed clock with configurable drift and jitter, receive times, and SYNC0 pulses
+- the AL control and status registers used by the state machine
+- EEPROM loaded from a raw image or built from an ESI file
+- a distributed clock with configurable drift and jitter, receive times, and SYNC0
+  pulses
 - the PDI and process data watchdogs
 
 It does not emulate interrupts. The slave stack polls the ESC, so it does not
@@ -82,9 +81,9 @@ port 0. A test or a topology file can replace it with any tree, through
 running. A test can break the ring and check that the master's two ports still reach
 all slaves.
 
-The network calculates the processing order, data link (DL) status of each port, and
-distributed clocks (DC) receive time offsets. It repeats this calculation only when
-a link changes. Each frame then follows the stored order.
+The network calculates the processing order, each port's DL status, and DC
+receive time offsets. It repeats the calculation only when a link changes. Each
+frame then follows the stored order.
 
 ## Two ways to plug a master in
 
@@ -150,14 +149,12 @@ prepares what the master will read on the next frame.
 
 For each slave, the `network_simulator` loop performs the work of the in-process tick.
 
-1. Read a frame from the master socket, and from the redundant socket if there is
-   one.
+1. Read a frame from the master socket and, if present, the redundant socket.
 2. Route it through the network. Send it back on the opposite master port when
    the ring is intact, or on the same port when the ring is broken.
 3. Apply pending control commands (see below).
-4. Run each slave: `routine()`, output validation in the safe-operational state
-   (SAFE-OP), then the device behavior, or a rolling test pattern on the inputs if
-   the slave has none.
+4. Run each slave: `routine()`, output validation in SAFE-OP, then its device
+   behavior. A slave without one gets a rolling test pattern on its inputs.
 
 The loop waits for a socket read with a timeout so it can check for a stop signal.
 It does not sleep between iterations.
@@ -165,24 +162,22 @@ It does not sleep between iterations.
 ## Building a slave from a file
 
 The `kickcat_simulation` library in `lib/simulation` builds slaves from
-configuration files. `sim::buildSlave()` reads one JSON file and returns a
-`SimulatedSlave`. This object owns the ESC, process data object (PDO) handler, slave
-stack, dictionary, mailboxes, File over EtherCAT (FoE) storage, device behavior, and
-process data buffers.
+configuration files. `sim::buildSlave()` reads a JSON file and returns a
+`SimulatedSlave`. The object owns the ESC, PDO handler, slave stack, dictionary,
+mailboxes, FoE storage, device behavior, and process data buffers.
 
 The slave image comes from one of two sources:
 
-- With an ESI file and device filter, the parser builds the EEPROM image and CANopen
-  over EtherCAT (CoE) dictionary from the same device description.
-- With a raw EEPROM image, the configuration can also supply a CoE dictionary in
-  Extensible Markup Language (XML).
+- With an ESI file and device filter, the parser builds the EEPROM image and CoE
+  dictionary from the same device description.
+- With a raw EEPROM image, the configuration can also provide a CoE dictionary in
+  XML.
 
-If the Slave Information Interface (SII) declares FoE and the configuration
-specifies a directory, `DirectoryStorage` serves files from that directory. It
-implements the same `FoE::AbstractStorage` interface as a device using flash. It
-buffers received data in memory and writes the file only after the last packet. If
-the SII declares a bootstrap mailbox, the slave uses a second mailbox in the
-bootstrap state (BOOT).
+If the SII declares FoE and the configuration specifies a directory,
+`DirectoryStorage` serves files from it. It implements the same
+`FoE::AbstractStorage` interface as a device using flash. It buffers received data
+in memory and writes the file only after the last packet. If the SII declares a
+bootstrap mailbox, the slave uses a second mailbox in BOOT.
 
 The configuration keys are listed in the [simulation user guide](../SIMULATION.md).
 
@@ -193,8 +188,8 @@ input values stay fixed. A simulated motor drive also needs to process its contr
 word and update its position.
 
 `sim::DeviceApp` defines a `step()` method that runs once per cyclic frame. The
-existing device, `Ds402Motor`, implements the CAN in Automation (CiA) 402 drive
-state machine and a motor model with following error and limited bandwidth.
+existing `Ds402Motor` device implements the CiA 402 drive state machine and models
+a motor with following error and limited bandwidth.
 
 `sim::makeDeviceApp()` selects the device from the JSON configuration. To add a
 device, implement a `DeviceApp` subclass and add a case to `makeDeviceApp()`. The
@@ -236,8 +231,7 @@ cable breaks.
 - `lib/include/kickcat/SimulatorControl.h`: the control channel messages.
 - `simulation/network_simulator.cc`: the two-process runner.
 - Example to read: `examples/master/simulated_bus/simulated_bus.cc` builds one slave
-  by hand, with the same steps as `sim::buildSlave()`, and requests the operational
-  state (OP).
+  by hand, with the same steps as `sim::buildSlave()`, and requests OP.
 
 ## Where to go next
 

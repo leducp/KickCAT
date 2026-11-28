@@ -10,10 +10,10 @@
 
 ## What KickCAT is
 
-KickCAT implements the master and slave sides of EtherCAT. The master runs as a
-process on a host operating system (OS), such as Linux or PikeOS. The slave stack
-runs on a microcontroller with an EtherCAT Slave Controller (ESC). A software ESC
-and network let the master communicate with emulated slaves.
+KickCAT implements both the master and slave sides of EtherCAT. The master runs
+as a process on a host OS, such as Linux or PikeOS. The slave stack runs on a
+microcontroller with an ESC. A software ESC and network let the master communicate
+with emulated slaves.
 
 Applications such as robot controllers, test benches, and device firmware use
 KickCAT as a library. Each application controls its main loop, threads, and memory.
@@ -38,7 +38,7 @@ describes the slave's main loop.
 ## The caller owns the memory
 
 Some real-time applications forbid memory allocation after the cycle starts. Others
-need buffers in a specific area of random-access memory (RAM).
+need buffers in a specific area of RAM.
 
 The application provides the memory for cyclic data. On the master, it passes its
 process image buffer to `createMapping()`. On the slave, it provides the input and
@@ -59,7 +59,7 @@ sends them, then processes the replies later. It can also queue a mailbox messag
 and check its status later.
 
 Blocking helpers use the same asynchronous operations. For example, a setup tool can
-read one CANopen over EtherCAT (CoE) value and wait for the reply. Use asynchronous
+read one CoE value and wait for the reply. Use asynchronous
 calls in a real-time cycle.
 
 [Chapter 4](transport.md) describes datagram callbacks. [Chapter
@@ -70,10 +70,10 @@ calls in a real-time cycle.
 KickCAT supports different network cards, slave controllers, and operating systems.
 Tests and simulations must also run without EtherCAT hardware.
 
-The master sends frames through an `AbstractSocket`. The slave uses `AbstractESC` to
-access its controller. A controller on a Serial Peripheral Interface (SPI) bus uses
-`AbstractSPI`. File over EtherCAT (FoE) uses `FoE::AbstractStorage` for file access.
-Higher-level code uses the same interfaces on all targets.
+The master sends frames through an `AbstractSocket`. The slave uses
+`AbstractESC` to access its controller. A controller on an SPI bus uses
+`AbstractSPI`, and FoE uses `FoE::AbstractStorage` for file access. Higher-level
+code uses the same interfaces on all targets.
 
 The emulator replaces the controller and network. The master communicates with the
 same slave stack that runs in firmware.
@@ -88,10 +88,9 @@ The master and slave must use the same byte layout. Separate frame and mailbox
 definitions can become inconsistent. Matching errors in the two definitions can also
 hide a bug.
 
-Both stacks use the same frame and datagram headers, electrically erasable
-programmable read-only memory (EEPROM) layout, mailbox messages for CoE and FoE, and
-object dictionary types. The master builds requests and the slave builds responses
-from these types.
+Both stacks use the same frame and datagram headers, EEPROM layout, mailbox
+messages for CoE and FoE, and object dictionary types. The master builds requests
+and the slave builds responses from these types.
 
 [Chapter 5](mailbox-implementation.md) describes requests and responses. [Chapter
 9](from-xml-to-bytes.md) explains how both stacks use the same device description.
@@ -111,9 +110,9 @@ dictionary and [Chapter 3](master.md) for the process image.
 
 ## Errors: exceptions on the master, status codes on the slave
 
-The master runs on a host OS where it can use exceptions. The slave runs on a
+The master runs on a host OS where it can use exceptions; the slave runs on a
 microcontroller. EtherCAT defines how a slave can refuse a state change and report
-the reason with an Application Layer (AL) status code.
+the reason with an AL status code.
 
 The master reports errors with exceptions. It uses error callbacks for cyclic
 datagrams. The slave reports errors to the master with AL status codes.
@@ -142,4 +141,4 @@ similar amount of code. The `simulated_bus` example runs both without hardware. 
 ## Where to go next
 
 - Source directories and an example program: [Chapter 2](../architecture.md).
-- Master startup through the operational state (OP): [Chapter 3](master.md).
+- Master startup through OP: [Chapter 3](master.md).

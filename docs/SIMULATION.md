@@ -24,8 +24,8 @@ EtherCAT Slave Controller and is driven by the real slave stack
 
 - 8 SyncManagers, including mailbox SyncManagers (RxSM/TxSM).
 - 8 FMMUs (logical-to-physical process-data mapping).
-- AL (Application Layer) state machine registers and event masks.
-- DL (Data Link) port descriptors, per-port link status, and error counters.
+- AL state machine registers and event masks.
+- DL port descriptors, per-port link status, and error counters.
 - EEPROM loaded from a raw `.bin` or compiled from an ESI XML device.
 - A DC local clock with configurable drift (ppm), receive-time latching,
   system-time offset, and SYNC0.
@@ -77,8 +77,7 @@ Canonical example -- `examples/master/simulated_bus`:
 drives INIT -> PRE_OP -> SAFE_OP -> OPERATIONAL, and exchanges process data --
 all in a short example you can read top to bottom.
 
-Beckhoff publish ESI files for their devices at
-<https://download.beckhoff.com/download/configuration-files/io/ethercat/xml-device-description>;
+Beckhoff publish [ESI files][beckhoff-esi] for their devices;
 most vendors ship the matching ESI XML with their hardware.
 
 `test/integration/bench/esi_boot` uses the same loopback to boot an entire ESI
