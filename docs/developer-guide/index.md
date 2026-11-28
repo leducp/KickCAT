@@ -23,7 +23,7 @@ Start with [How to read this guide](how-to-read.md).
 | [Topology, redundancy and clocks](ethercat/topology-and-clocks.md) | How a frame travels through ports, how a ring works with a broken cable, and how clocks stay synchronized. |
 | [Device and network descriptions](ethercat/device-descriptions.md) | Who uses ESI, the SII, and ENI. |
 | [Overview and principles](architecture/principles.md) | What KickCAT is for, and the principles every later chapter applies. |
-| [A map of the code](architecture/code-map.md) | Source directories and an example program. |
+| [A map of the code](architecture/code-map.md) | Source directories and namespaces. |
 | [Master discovery and startup](architecture/master.md) | Startup through OP, the process image, and the cyclic loop. |
 | [Transport: links, frames and sockets](architecture/transport.md) | How a datagram leaves the master and comes back, and how redundancy works. |
 | [Mailboxes in KickCAT](architecture/mailboxes.md) | Requests on the master, responses on the slave, and how to add a protocol. |

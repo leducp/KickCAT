@@ -56,6 +56,7 @@ def main():
     nom_interface = args.interface
     red_interface = args.redundancy
 
+    # --8<-- [start:bring-up]
     # Create link
     link = kickcat.create_link(nom_interface, red_interface)
 
@@ -88,6 +89,7 @@ def main():
 
     bus.request_state(State.OPERATIONAL)
     bus.wait_for_state(State.OPERATIONAL, 1.0, cyclic_callback)
+    # --8<-- [end:bring-up]
 
     # Thresholds
     threashold_accel = 1000

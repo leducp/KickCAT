@@ -41,7 +41,7 @@ flowchart LR
 
     Bring a bus to OP and exchange process data from C++ or Python.
 
-    [Building](user-guide/building.md) · [Simulation](user-guide/simulation.md) ·
+    [Installation](get-started/installation.md) · [Your first bus](get-started/first-bus.md) ·
     [The master](developer-guide/architecture/master.md)
 
 -   :lucide-circuit-board: **Build a slave device**
@@ -111,7 +111,8 @@ OPERATIONAL reached
 Process data: 12 input byte(s), 3 output byte(s)
 ```
 
-To set up `.venv` or change the build options, see [Building](user-guide/building.md).
+To set up `.venv`, see [Installation](get-started/installation.md). For a step-by-step walkthrough of
+what this program does, see [Your first bus](get-started/first-bus.md).
 
 ## At a glance
 

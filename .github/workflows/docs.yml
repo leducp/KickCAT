@@ -4,10 +4,10 @@ name: Docs
 on:
   pull_request:
     branches: [master]
-    paths: ['docs/**', 'zensical.toml', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'zensical.toml', '.github/workflows/docs.yml', 'examples/**', 'py_bindings/examples/**']
   push:
     branches: [master]
-    paths: ['docs/**', 'zensical.toml', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'zensical.toml', '.github/workflows/docs.yml', 'examples/**', 'py_bindings/examples/**']
   workflow_dispatch:
 
 permissions:

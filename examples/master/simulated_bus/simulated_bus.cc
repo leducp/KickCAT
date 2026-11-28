@@ -61,6 +61,7 @@ int main(int argc, char** argv)
 
     // 1. Parse the ESI and compile the selected device into an emulated slave's
     //    EEPROM image plus its CoE object dictionary.
+    // --8<-- [start:parse]
     ESI::Parser parser;
     ESI::DeviceFilter filter;
     if (not device_type.empty())
@@ -80,10 +81,12 @@ int main(int argc, char** argv)
     }
     CoE::materializeStorage(dev.dictionary);
     printf("Device: %s  (product 0x%08x, revision 0x%x)\n", dev.type.c_str(), dev.product_code, dev.revision_no);
+    // --8<-- [end:parse]
 
     // 2. Assemble the emulated slave: hardware (EmulatedESC) + process data (PDO)
     //    + state machine (Slave) + optional CoE mailbox. Same recipe as the
     //    network simulator, just kept in local variables here.
+    // --8<-- [start:slave]
     EmulatedESC esc;
     esc.loadEeprom(ESI::buildEepromImage(dev));
 
@@ -106,10 +109,12 @@ int main(int argc, char** argv)
     pdo.setOutput(outputs.data(), PDO_SIZE);
 
     sl.start();   // DL_STATUS is derived from the topology by the LoopbackSocket's network
+    // --8<-- [end:slave]
 
     // 3. Wire a master Bus to the slave through the in-process loopback. The tick
     //    advances the slave once per frame; once the master is driving process
     //    data we declare outputs valid so the slave may leave SAFE_OP.
+    // --8<-- [start:wire]
     bool op_phase = false;
     auto tick = [&]()
     {
@@ -123,21 +128,28 @@ int main(int argc, char** argv)
     auto loopback = std::make_shared<LoopbackSocket>(std::vector<EmulatedESC*>{&esc}, tick);
     auto link = std::make_shared<Link>(loopback, std::make_shared<SocketNull>(), [](){});
     Bus bus(link);
+    // --8<-- [end:wire]
 
+    // --8<-- [start:cyclic]
     auto noop   = [](DatagramState const&) {};
     auto cyclic = [&]()
     {
         bus.processDataRead(noop);
         bus.processDataWrite(noop);
     };
+    // --8<-- [end:cyclic]
 
     // 4. Drive the EtherCAT state machine to OPERATIONAL.
+    // --8<-- [start:iomap]
     std::vector<uint8_t> iomap(4096);  // master-side process image
+    // --8<-- [end:iomap]
     try
     {
+        // --8<-- [start:init]
         bus.init(100ms);
         printf("Detected %zu slave(s)\n", bus.slaves().size());
         bus.createMapping(iomap.data(), iomap.size());
+        // --8<-- [end:init]
 
         if (use_dc)
         {
@@ -150,6 +162,7 @@ int main(int argc, char** argv)
             printf("DC initialized, synchronized: %s\n", synced);
         }
 
+        // --8<-- [start:op]
         bus.requestState(State::SAFE_OP);
         bus.waitForState(State::SAFE_OP, 500ms);
         printf("SAFE_OP reached\n");
@@ -167,6 +180,7 @@ int main(int argc, char** argv)
         bus.requestState(State::OPERATIONAL);
         bus.waitForState(State::OPERATIONAL, 500ms, cyclic);
         printf("OPERATIONAL reached\n");
+        // --8<-- [end:op]
     }
     catch (std::exception const& e)
     {
@@ -176,12 +190,14 @@ int main(int argc, char** argv)
     }
 
     // 5. Exchange a few process-data cycles and report the mapped sizes.
+    // --8<-- [start:exchange]
     for (int cycle = 0; cycle < 3; ++cycle)
     {
         cyclic();
     }
     auto const& s0 = bus.slaves().at(0);
     printf("Process data: %d input byte(s), %d output byte(s)\n", s0.input.bsize, s0.output.bsize);
+    // --8<-- [end:exchange]
 
     return 0;
 }
