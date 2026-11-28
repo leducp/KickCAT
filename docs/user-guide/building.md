@@ -56,19 +56,8 @@ Enable them with `--with=kickui` and/or `--with=eeprom_editor`, then rerun
 
 ## Python bindings
 
-Install the Python package from the repository root with `uv pip install .`
-or `pip install .`. The wheel build enables the EEPROM editor GUI by default;
-if its GUI dependencies are unavailable, use:
-
-```bash
-uv pip install --config-setting=cmake.define.BUILD_EEPROM_EDITOR=OFF .
-```
-
-The package is also published as `kickcat` on PyPI. To use a physical bus on
-Linux, grant raw-socket capabilities to the executable or run
-`./py_bindings/enable_raw_access.sh` for the active Python interpreter. See
-the [hardware guide](hardware.md) for bus setup and
-`py_bindings/examples/` for Python examples.
+For instructions on installing the Python package from PyPI or a checkout, see
+[Installation](../get-started/installation.md#use-python).
 
 ## Other platforms
 

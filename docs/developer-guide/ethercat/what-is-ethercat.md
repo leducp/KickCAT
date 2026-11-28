@@ -89,7 +89,7 @@ Each cycle, the master writes the 3 color bytes and reads the 12 sensor bytes. T
 next chapters explain the frame layout, where the board stores the data, and when it
 accepts outputs.
 
-You can run the example with an emulated board. See [A map of the code](../architecture/code-map.md).
+You can run the example with an emulated board. See [Your first bus](../../get-started/first-bus.md).
 
 ## Summary
 

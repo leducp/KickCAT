@@ -61,6 +61,8 @@ Run from the repository root, with `.venv` active.
 ## Documentation
 
 - [Home](https://leducp.github.io/KickCAT/): what KickCAT is, and where to start
+- [Get started](https://leducp.github.io/KickCAT/get-started/installation/): installation, a first bus,
+  the ecosystem
 - [User guide](https://leducp.github.io/KickCAT/user-guide/features/): features, building,
   hardware, simulation, tools
 - [Developer guide](https://leducp.github.io/KickCAT/developer-guide/): architecture and

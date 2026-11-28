@@ -89,64 +89,8 @@ All installed headers are part of the public API. This includes protected member
 
 ## One example, top to bottom
 
-The `simulated_bus` example runs the master and slave stacks in one process in about
-100 lines of code. It uses the Freedom K64F device description. Three output bytes
-set red, green, and blue levels on an LED. An accelerometer
-and a magnetometer supply 12 input bytes.
-
-After building, run this command from the repository root.
-
-```bash
-./build/examples/master/simulated_bus/simulated_bus \
-    -f examples/slave/lan9252/freedom-k64f/nuttx/freedom-k64f.xml -t Board
-```
-
-The program has five steps.
-
-1. **Read the device description.** The ESI parser loads `Board` from the XML file
-   and builds the EEPROM image and CoE object dictionary. See [From XML to bytes](device-descriptions.md).
-2. **Build the slave.** An `EmulatedESC` uses the EEPROM image. A `PDO` object
-   manages process data, and `slave::Slave` runs the same stack as the firmware.
-   The mailbox serves CoE requests from the dictionary. The application provides input and
-   output buffers. See [The slave stack](slave.md).
-3. **Connect the master.** A `LoopbackSocket` passes each frame to the emulated
-   slave, which runs `routine()` once per frame. A `Link` uses the socket, and a
-   `Bus` uses the link. See [Transport](transport.md) for transport and
-   [Simulation internals](emulation.md) for the emulator.
-4. **Start the bus.** `bus.init()` finds the slave and brings it to PRE-OP.
-   `bus.createMapping()` sets up the process image. The application requests
-   SAFE-OP, writes its first outputs, and requests OP. It keeps exchanging process
-   data while it waits. See [The master](master.md).
-5. **Exchange process data.** The master reads inputs and writes outputs each cycle.
-
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant Bus
-    participant Link
-    participant Sock as LoopbackSocket
-    participant ESC as EmulatedESC
-    participant Sl as slave::Slave
-    App->>Bus: init(), createMapping(iomap)
-    App->>Bus: requestState(SAFE_OP), waitForState(SAFE_OP)
-    loop each cycle
-        App->>Bus: processDataRead(), processDataWrite()
-        Bus->>Link: datagrams
-        Link->>Sock: write(frame)
-        Sock->>ESC: process each datagram
-        Sock->>Sl: routine()
-        Sock-->>Link: read(frame)
-        Link-->>Bus: callbacks
-    end
-    App->>Bus: requestState(OPERATIONAL), waitForState(OPERATIONAL, cyclic)
-```
-
-The application calls the `Bus`. The link sends the frame through the socket to the
-emulated controller. Callbacks process the returning data.
-
-On hardware, the master uses a raw Ethernet socket on a network card. The slave runs
-on a separate board with a `Lan9252` or `XMC4800` driver in place of `EmulatedESC`.
-Both use the same stack code as the example.
+[Your first bus](../../get-started/first-bus.md) follows the `simulated_bus` example through
+both stacks: the ESI parser, emulated slave, loopback transport, and master.
 
 ## Where to go next
 

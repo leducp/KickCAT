@@ -42,8 +42,8 @@ The master exchanges the following data with the board.
   readings. Each is a signed 16-bit integer.
 - **A mailbox** lets the master read and write configuration objects using CoE.
 
-You can use the `simulated_bus` example without the board. It uses the device
-description to emulate the board and runs the master in the same process. [A map of the code](architecture/code-map.md) explains the example.
+You can run the `simulated_bus` example without a board. It uses the device
+description to emulate the board and runs the master in the same process. [Your first bus](../get-started/first-bus.md) walks through the example.
 
 ## How a chapter is shaped
 
@@ -69,7 +69,7 @@ The guide explains the main classes and the order of calls in the API. Use the h
 
 1. Read the EtherCAT background, from [What is EtherCAT?](ethercat/what-is-ethercat.md) through [Describing a device](ethercat/device-descriptions.md).
 2. Read [Overview and principles](architecture/principles.md) for the design principles.
-3. Follow [Building](../user-guide/building.md), then run `simulated_bus` as shown in [A map of the code](architecture/code-map.md). Watch the slave reach OP.
+3. Follow [Building](../user-guide/building.md), then run `simulated_bus` as shown in [Your first bus](../get-started/first-bus.md). Watch the slave reach OP.
 4. For master development, read [The master](architecture/master.md), [Transport](architecture/transport.md), and
    [Mailboxes in KickCAT](architecture/mailboxes.md). For firmware, read [The slave stack](architecture/slave.md),
    [Mailboxes in KickCAT](architecture/mailboxes.md), and [From XML to bytes](architecture/device-descriptions.md).

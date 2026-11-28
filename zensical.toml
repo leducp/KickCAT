@@ -12,6 +12,11 @@ exclude_docs = "includes/"
 
 nav = [
   { "Home" = "index.md" },
+  { "Get started" = [
+    { "Installation" = "get-started/installation.md" },
+    { "Your first bus" = "get-started/first-bus.md" },
+    { "The ecosystem" = "get-started/ecosystem.md" },
+  ] },
   { "User guide" = [
     { "Features" = "user-guide/features.md" },
     { "Building" = "user-guide/building.md" },
@@ -95,7 +100,7 @@ pymdownx.details = {}
 pymdownx.emoji = { emoji_index = "zensical.extensions.emoji.twemoji", emoji_generator = "zensical.extensions.emoji.to_svg" }
 pymdownx.highlight = {}
 pymdownx.inlinehilite = {}
-pymdownx.snippets = { base_path = ["."], check_paths = true, auto_append = [
+pymdownx.snippets = { base_path = ["."], check_paths = true, dedent_subsections = true, auto_append = [
   "docs/includes/abbreviations.md",
   "docs/includes/links.md",
 ] }
