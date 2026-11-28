@@ -7,6 +7,7 @@
   trivial add a paragraph on what changed and its impact.
 - Unit tests must pass and new behaviour comes with tests; code coverage must
   not decrease. See [Building](../../user-guide/building.md) for the test and coverage builds.
+- Documentation changes follow [Writing docs](writing-docs.md).
 
 ## Code conventions
 
