@@ -1,26 +1,24 @@
 # From XML to bytes
 
-> How does KickCAT use a device description written in Extensible Markup Language (XML)?
+> How does KickCAT use a device description written in XML?
 >
 > You will learn:
 >
 > - what the XML parsers read and produce
 > - why the parsers run on the host
 > - how firmware and the simulator build an object dictionary
-> - how the master reads electrically erasable programmable read-only memory (EEPROM)
+> - how the master reads EEPROM
 > - which network settings the parser can read
 
-EtherCAT uses three descriptions. The
-EtherCAT Slave Information (ESI) file describes a device in XML. The Slave
-Information Interface (SII) is its binary description in the slave's EEPROM. The
-EtherCAT Network Information (ENI) file describes a network in XML. See [Chapter
-0.8](device-descriptions.md).
+EtherCAT uses three descriptions: the ESI file describes a device in XML, the SII
+is its binary description in the slave's EEPROM, and the ENI file describes a
+network in XML. See [Chapter 0.8](device-descriptions.md).
 
 ## The problem: one device, three forms
 
 The vendor describes a device in the ESI file. The slave stores some of that
 information in EEPROM so the master can identify it and configure its SyncManagers
-without a local file. A slave with a CANopen over EtherCAT (CoE) mailbox also needs
+without a local file. A slave with a CoE mailbox also needs
 a matching object dictionary.
 
 Separate descriptions can disagree. For example, the EEPROM could list 12 input
@@ -57,9 +55,8 @@ position in the file. `listDevices` summarizes the devices without building them
 `loadAllDevices` builds them all in one pass.
 
 The resulting `ESI::Device` structure holds the vendor, product code, revision,
-SyncManagers, fieldbus memory management units (FMMUs), and process data objects
-(PDOs) with their entries. It also holds mailbox settings and protocols, distributed
-clock modes, EEPROM data, and the object dictionary.
+SyncManagers, FMMUs, and PDOs with their entries. It also holds mailbox settings
+and protocols, distributed clock modes, EEPROM data, and the object dictionary.
 
 For the Freedom K64F board, the device has four SyncManagers: two for the
 mailbox at 0x1000 and 0x1400, one for 3 output bytes at 0x1800, and one for 12
@@ -85,10 +82,10 @@ The parser adds only values it can derive from the file.
 
 ### Storage for the dictionary
 
-Some ESI entries specify a default value. For entries accessible by Service Data
-Object (SDO) transfers that have no storage, `CoE::materializeStorage` allocates
-zero-filled storage. It preserves existing entries and values. Both `od_generator`
-and the simulator call it before using the dictionary.
+Some ESI entries specify a default value. For entries accessible by SDO transfers
+that have no storage, `CoE::materializeStorage` allocates zero-filled storage. It
+preserves existing entries and values. Both `od_generator` and the simulator call
+it before using the dictionary.
 
 ## The EEPROM path
 
@@ -102,8 +99,7 @@ The image reaches the slave in one of two ways:
 - **A real slave.** The `eeprom` tool writes the image through the master into
   the slave's EEPROM (see [TOOLS](../TOOLS.md)). The EEPROM editor can also
   build or change an image.
-- **A simulated slave.** The simulator loads the image into the emulated EtherCAT
-  Slave Controller (ESC).
+- **A simulated slave.** The simulator loads the image into the emulated ESC.
 
 **On the master**, `Bus::init` reads each EEPROM through ESC registers. It parses
 the bytes into an `eeprom::SII` in the slave record. The master uses this

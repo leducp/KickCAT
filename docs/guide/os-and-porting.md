@@ -1,14 +1,13 @@
 # Operating systems and porting
 
-> What does KickCAT need from a new operating system (OS) or driver?
+> What does KickCAT need from a new OS or driver?
 >
 > You will learn:
 >
 > - which OS services KickCAT uses
 > - what each supported platform provides
 > - how targets and unit tests measure time
-> - which interfaces to implement for a new OS, network backend, or Serial
->   Peripheral Interface (SPI) driver
+> - which interfaces to implement for a new OS, network backend, or SPI driver
 
 ## The problem: one stack, many systems
 
@@ -17,9 +16,9 @@ The slave runs on NuttX or KickOS on a microcontroller, or on Linux on a Raspber
 Pi. Each system provides different calls for clocks, raw Ethernet frames, and SPI
 devices.
 
-The EtherCAT state machine and Service
-Data Object (SDO) transfers work the same way on each system. Direct OS calls in
-this code would require `#ifdef` blocks and introduce platform-specific behavior.
+The EtherCAT state machine and SDO transfers work the same way on each system.
+Direct OS calls in this code would require `#ifdef` blocks and introduce
+platform-specific behavior.
 
 ## The ways to support several systems
 
@@ -33,9 +32,9 @@ stack never uses.
 KickCAT provides only the OS services the stack and its tools need.
 
 Protocol code calls `now()` and uses `AbstractSocket` and `AbstractESC` to access
-the network and the EtherCAT Slave Controller (ESC). Each OS interface has a header
-and platform-specific source files. CMake selects the implementation at configure
-time. Protocol code needs no runtime platform check or `#ifdef`.
+the network and ESC. Each OS interface has a header and platform-specific source
+files. CMake selects the implementation at configure time, so protocol code needs
+no runtime platform check or `#ifdef`.
 
 ## What the layer contains
 
@@ -44,7 +43,7 @@ The OS headers are in `kickcat/OS/`.
 | Header | What it gives |
 |---|---|
 | `Time.h` | `now()`, a monotonic clock in nanoseconds, `since_unix_epoch()`, `sleep()`, and helpers built on them. |
-| `Timer.h` | A periodic deadline for a cyclic loop, with overrun detection. It also owns the software phase-locked loop (PLL) that follows a distributed clock. |
+| `Timer.h` | A periodic deadline for a cyclic loop, with overrun detection. It also owns the software PLL that follows a distributed clock. |
 | `SoftPll.h` | The PLL used by `Timer` to stay in phase with the reference clock. |
 | `Thread.h` | A thread wrapper with a name and a scheduling priority. |
 | `Mutex.h`, `ConditionVariable.h` | Locking and waiting between threads. |
@@ -100,10 +99,10 @@ reads packed C++ structures for frames, datagram headers, and registers directly
 without byte-order conversion.
 
 Packed structures have no padding, so some fields can be unaligned. Supported
-targets can read them in place. The packed attribute tells the compiler how to
-access them. The continuous integration (CI) build disables the alignment check in
-the Undefined Behavior Sanitizer (UBSan) for this reason. Keep these in-place
-accesses when changing the code.
+targets can read them in place, and the packed attribute tells the compiler how
+to access them. For this reason, the CI build disables the alignment check in the
+Undefined Behavior Sanitizer (UBSan). Keep these in-place accesses when changing
+the code.
 
 `packed.h` selects the compiler syntax. The GNU Compiler Collection (GCC) and Clang
 use an attribute. Microsoft Visual C++ (MSVC) uses `#pragma pack`.

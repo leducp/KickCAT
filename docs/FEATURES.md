@@ -31,12 +31,12 @@ authoritative source for "what works today"; the README only summarizes it.
 
 | Protocol | Master     | Slave      | Notes |
 |----------|------------|------------|-------|
-| CoE (CANopen over EtherCAT) | Supported | Supported | See CoE breakdown below. |
-| FoE (File over EtherCAT)    | Experimental | Experimental | See FoE breakdown below. |
-| EoE (Ethernet over EtherCAT)| Planned    | Planned    | Protocol definitions only; no mailbox handlers yet. |
-| SoE (Servo over EtherCAT)   | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
-| AoE (ADS over EtherCAT)     | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
-| VoE (Vendor over EtherCAT)  | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
+| CoE      | Supported | Supported | See CoE breakdown below. |
+| FoE      | Experimental | Experimental | See FoE breakdown below. |
+| EoE      | Planned    | Planned    | Protocol definitions only; no mailbox handlers yet. |
+| SoE      | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
+| AoE      | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
+| VoE      | Not planned | Not planned | ESI parsing only. No maintainer hardware; contributions welcome. |
 
 ### CoE breakdown
 
@@ -70,7 +70,7 @@ On the slave, `slave::Slave::setBootstrapMailbox` gives the mailbox served in
 BOOT (typically FoE only, with its own SyncManager layout); without one, BOOT is
 refused with AL status code 0x0013.
 
-## Distributed Clocks (DC)
+## Distributed Clocks
 
 | Feature                         | Master       | Slave       |
 |---------------------------------|--------------|-------------|
@@ -111,8 +111,7 @@ See [TOOLS.md](TOOLS.md) for the `eeprom` CLI and the EEPROM editor GUI.
 ## Platforms
 
 The master and slave run on different layers: the master is a host OS process,
-while the slave is the stack running on an RTOS against an EtherCAT Slave
-Controller (ESC).
+while the slave is the stack running on an RTOS against an ESC.
 
 ### Master (host operating system)
 

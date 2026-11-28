@@ -7,9 +7,9 @@
 >
 > - when to use a mailbox
 > - how the master checks for a reply
-> - how CANopen over EtherCAT (CoE) uses service data objects (SDOs) to access the
+> - how CoE uses SDOs to access the
 >   object dictionary
-> - how File over EtherCAT (FoE) transfers files
+> - how FoE transfers files
 
 ## The problem: data that is not cyclic
 
@@ -18,7 +18,7 @@ Process data has a fixed layout and travels every cycle (see [Chapter
 times.
 
 - **Configuration.** Before the machine starts, the master can set a gear ratio, a
-  filter, or the process data object (PDO) mapping of a drive.
+  filter, or the PDO mapping of a drive.
 - **Diagnostics.** A slave reports an error when it occurs.
 - **Files.** A firmware image can be several hundred kilobytes.
 
@@ -47,7 +47,7 @@ Every message starts with a **mailbox header** of 6 bytes:
 | Length | The size of the data after the header. |
 | Address | A station address, used to route a message through a mailbox gateway. |
 | Channel and priority | Rarely used. Usually 0. |
-| Type | The protocol, such as CoE, FoE, or Ethernet over EtherCAT (EoE), or a mailbox error. |
+| Type | The protocol, such as CoE, FoE, or EoE, or a mailbox error. |
 | Counter | A number from 1 to 7 that changes with each new message, so that a slave can detect a repeated one. |
 
 ## The polling problem
@@ -55,13 +55,11 @@ Every message starts with a **mailbox header** of 6 bytes:
 Only the master starts frame exchanges. It can check for a reply in the mailbox in
 area in two ways.
 
-- **Read the status of each slave.** The master reads the status register of the
-  mailbox in SyncManager of each slave. The cost is one datagram per slave and
-  per check.
-- **Map the status into the logical space.** The master configures an additional
-  fieldbus memory management unit (FMMU) in each slave, which maps the "mailbox
-  full" bit into the logical address space. One logical read then checks every slave
-  at once.
+- **Read each slave's status.** The master reads the mailbox SyncManager status
+  register on each slave. This costs one datagram per slave per check.
+- **Map the status into logical space.** The master configures an additional FMMU
+  on each slave to map the "mailbox full" bit into the logical address space. One
+  logical read then checks every slave at once.
 
 The master also checks that a mailbox out area is empty before it writes a new
 message into it.
@@ -131,25 +129,25 @@ A slave can answer **BUSY** to ask the master to wait, for example while it
 writes to flash memory. Either side can stop the transfer with an **ERROR**
 packet that holds an error code.
 
-FoE is commonly used for firmware updates. The master requests the **bootstrap
-(BOOT)** state (see [Chapter 0.4](state-machine.md)). In BOOT, the slave often runs
-a bootloader that supports only FoE. The slave's electrically erasable programmable
-read-only memory (EEPROM) describes the bootloader's mailbox areas.
+FoE is commonly used for firmware updates. The master requests the **BOOT** state
+(see [Chapter 0.4](state-machine.md)). In BOOT, the slave often runs a bootloader
+that supports only FoE. The slave's EEPROM describes the bootloader's mailbox
+areas.
 
 ## The other protocols
 
 - **EoE** carries standard Ethernet frames, for example
   to reach a web server inside a slave.
-- **Servo drive profile over EtherCAT (SoE)** carries the servo drive profile of
+- **SoE** carries the servo drive profile of
   International Electrotechnical Commission (IEC) 61800-7, used by the Serial
   Real-time Communication System (SERCOS).
-- **Automation Device Specification (ADS) over EtherCAT (AoE)** carries Beckhoff ADS
+- **AoE** carries Beckhoff ADS
   messages.
-- **Vendor specific over EtherCAT (VoE)** lets each vendor define its messages.
+- **VoE** lets each vendor define its messages.
 
 The **mailbox gateway** specification (EtherCAT Technology Group, ETG.8200) lets a
 tool on another computer send mailbox messages through the master, for example over
-the User Datagram Protocol (UDP).
+the UDP.
 
 ## Summary
 

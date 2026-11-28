@@ -1,7 +1,6 @@
 # Mailboxes in KickCAT
 
-> How do the master and slave handle mailbox requests in Ethernet for Control
-> Automation Technology (EtherCAT)?
+> How do the master and slave handle mailbox requests in EtherCAT?
 >
 > You will learn:
 >
@@ -12,7 +11,7 @@
 > - how to add a mailbox protocol
 
 A mailbox uses two SyncManagers to exchange messages outside the regular process
-data cycle. Examples include Service Data Object (SDO) transfers, emergency
+data cycle. Examples include SDO transfers, emergency
 messages, and files. See [Chapter 0.6](mailboxes.md).
 
 ## The problem: one exchange, many cycles
@@ -45,11 +44,10 @@ builds replies. One header defines both interfaces in separate namespaces.
 - `mailbox::request` is the master side. Its `Mailbox` belongs to one remote
   slave, and its messages are requests waiting for an answer.
 - `mailbox::response` is the slave side. Its `Mailbox` is bound to an
-  EtherCAT Slave Controller (ESC), and its messages are handlers that build
+  ESC, and its messages are handlers that build
   answers.
 
-The two sides share mailbox headers, CANopen over EtherCAT (CoE) and File over
-EtherCAT (FoE) headers, SDO command codes, and abort codes.
+The two sides share mailbox headers, CoE and FoE headers, SDO command codes, and abort codes.
 
 ```mermaid
 classDiagram
@@ -151,7 +149,7 @@ These calls only queue datagrams. The frames leave and the callbacks run when
 the application calls `finalizeDatagrams` and `processAwaitingFrames`, as for
 process data (see [Chapter 4](transport.md)).
 
-`configureMailboxStatusCheck` uses extra fieldbus memory management units (FMMUs) to
+`configureMailboxStatusCheck` uses extra FMMUs to
 map the mailbox status bits into the cyclic frame. The master can then read them
 without separate datagrams for steps 1 and 3.
 
@@ -181,9 +179,8 @@ while (true)
 
 **With a blocking helper.** `Bus::readSDO`, `writeSDO`, `readFoE`, and `writeFoE`
 create a message and repeat the four steps until its status changes from `RUNNING`.
-They throw on failure. Use these helpers during configuration in the pre-operational
-state (PRE-OP). Use the sequencer in the operational state (OP) so the cyclic thread
-can keep sending process data.
+They throw on failure. Use these helpers during configuration in PRE-OP. In OP, use
+the sequencer so the cyclic thread can keep sending process data.
 
 ### A segmented SDO upload
 
@@ -267,19 +264,18 @@ same FoE handlers. FoE is experimental on the master and slave (see
 
 ### The bootstrap mailbox
 
-In the bootstrap state (BOOT), the slave uses a second mailbox layout from its
-electrically erasable programmable read-only memory (EEPROM), usually for FoE
-firmware updates. The slave application provides a second mailbox with
-`setBootstrapMailbox`. Without it, the slave refuses BOOT. `Bus::enterBootstrap`
-requests the initialization state (INIT), clears pending messages, switches to the
-bootstrap mailbox layout, and requests BOOT. `exitBootstrap` reverses the change and
-returns the slave to PRE-OP.
+In BOOT, the slave uses a second mailbox layout from its EEPROM, usually for FoE
+firmware updates. The application provides a second mailbox with
+`setBootstrapMailbox`; without it, the slave refuses BOOT. `Bus::enterBootstrap`
+requests INIT, clears pending messages, switches to the bootstrap mailbox layout,
+and requests BOOT. `exitBootstrap` reverses the change and returns the slave to
+PRE-OP.
 
 ## The mailbox gateway
 
 EtherCAT Technology Group specification ETG.8200 defines a mailbox gateway. An
-external tool sends raw mailbox messages to the master over the User Datagram
-Protocol (UDP). The master forwards them to the addressed slave.
+external tool sends raw mailbox messages to the master over UDP. The master forwards
+them to the addressed slave.
 
 `Gateway` reads requests from an `AbstractDiagSocket` (`UdpDiagSocket` on
 Linux) and passes them to `Bus::addGatewayMessage`. The bus reads the address
@@ -295,7 +291,7 @@ slave.
 
 ## Adding a protocol
 
-Ethernet over EtherCAT (EoE) is planned. KickCAT currently has EoE protocol
+EoE is planned. KickCAT currently has EoE protocol
 definitions only. To add handlers for a new protocol, follow the FoE implementation.
 
 1. **Protocol definitions.** Put the headers, opcodes and error codes in a

@@ -8,7 +8,7 @@
 > - in what order a frame passes through the slave ports
 > - how slaves connect in a line or a tree
 > - how a ring maintains communication after a cable break
-> - how distributed clocks (DC) keep a common time
+> - how DC keep a common time
 
 ## Ports: how a frame travels
 
@@ -87,10 +87,10 @@ Clock setup and synchronization account for three timing differences.
    clock to each slave.
 2. **Offset.** The clocks start at different times. The master calculates each
    clock's difference from the reference and writes the offset to the slave.
-3. **Drift.** Quartz crystals run at slightly different frequencies. Each cycle, the
-   master sends an auto-increment read multiple write (ARMW) or configured address
-   read multiple write (FRMW) datagram. The reference clock writes its time into the
-   datagram. Each following slave receives that value and adjusts its clock rate.
+3. **Drift.** Quartz crystals run at slightly different frequencies. Each cycle,
+   the master sends an ARMW or FRMW datagram. The reference clock writes its time
+   into the datagram. Each following slave receives that value and adjusts its
+   clock rate.
 
 Once synchronized, each slave controller can generate **SYNC0** pulses. The pulses
 start at a configured system time and repeat at a configured interval. An

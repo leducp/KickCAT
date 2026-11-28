@@ -12,10 +12,10 @@
 
 ## The problem: many small requests, one wire, no waiting
 
-Each frame can carry several datagrams. Each datagram returns its data and a working
-counter (WKC), as described in [Chapter 0.2](frames-and-datagrams.md). A cycle can
-include logical reads and writes, mailbox checks, and error counter reads. Each
-request needs its own result.
+Each frame can carry several datagrams. Each datagram returns its data and a WKC,
+as described in [Chapter 0.2](frames-and-datagrams.md). A cycle can include
+logical reads and writes, mailbox checks, and error counter reads. Each request
+needs its own result.
 
 The transport layer has three tasks.
 
@@ -74,11 +74,11 @@ classDiagram
 
 - **`AbstractLink`** is the datagram and callback interface for `Bus`. `Link`
   implements it. Unit tests can use a mock to test `Bus` in isolation.
-- **`Frame`** holds an Ethernet frame with a header for Ethernet for Control
-  Automation Technology (EtherCAT). It appends datagrams, tracks available space,
-  and reads datagrams from a reply. It performs no network operations.
-- **`AbstractSocket`** sends and receives raw Ethernet frames. The transport can use
-  any network that carries these frames.
+- **`Frame`** holds an Ethernet frame with an EtherCAT header. It appends
+  datagrams, tracks available space, and reads datagrams from a reply. It performs
+  no network operations.
+- **`AbstractSocket`** sends and receives raw Ethernet frames. The transport can
+  use any network that carries them.
 
 ## The life of a datagram
 
@@ -192,12 +192,12 @@ operation determines how the link combines the data.
 
 - For a **read**, the master sends zeros. Each slave writes only its own data. The
   link combines the two copies with a bitwise OR.
-- For a **logical read-write** (LRW), inputs and outputs share addresses, so an
-  OR would mix them. The bus gives the link a description of each mapped frame
-  (`LogicalFrameDescription`, set with `setLogicalMapping()`): for each slave,
-  in bus order, its expected working counter and its input offsets. The
-  link uses the working counter of each copy to find where the ring is broken,
-  then takes each slave's inputs from the copy that crossed it.
+- For an **LRW**, inputs and outputs share addresses, so an OR would mix them. The
+  bus gives the link a description of each mapped frame
+  (`LogicalFrameDescription`, set with `setLogicalMapping()`): for each slave in
+  bus order, it records the expected working counter and input offsets. The link
+  uses each copy's working counter to find where the ring is broken, then takes
+  each slave's inputs from the copy that crossed it.
 - For a **write**, both copies echo the same payload, and the link keeps one.
 
 The application receives one reply with the combined WKC. At startup,

@@ -5,9 +5,9 @@
 > You will learn:
 >
 > - how the master and slave name process data
-> - what a process data object (PDO), mapping, and assignment are
+> - what a PDO, mapping, and assignment are
 > - how a logical datagram reaches several slaves
-> - how the master checks the working counter (WKC)
+> - how the master checks the WKC
 
 ## The problem: the same small exchange, again and again
 
@@ -16,10 +16,9 @@ actuators. The cycle often repeats every millisecond. The small set of values
 exchanged each cycle is called **process data**. Its layout stays fixed while the
 machine runs. The data must arrive on time.
 
-Each cycle, the master sends 3 output bytes to the Freedom K64F board. They set the
-red, green, and blue levels of its light-emitting diode (LED). The board returns 12
-input bytes. Its accelerometer and magnetometer each return three signed 16-bit
-values.
+Each cycle, the master sends 3 output bytes to the Freedom K64F board. They set
+its LED's red, green, and blue levels. The board returns 12 input bytes, with
+three signed 16-bit values from each of its accelerometer and magnetometer.
 
 Separate register reads and writes would take two datagrams per slave, or 100 per
 cycle for 50 slaves. EtherCAT can use
@@ -32,8 +31,8 @@ The direction depends on the device.
 - The **master** sends outputs and reads inputs.
 - The **slave** receives the master's outputs and transmits the master's inputs.
 
-A **PDO** groups values for transfer. A receive PDO (**RxPDO**) carries outputs to
-the slave. A transmit PDO (**TxPDO**) carries inputs to the master.
+A **PDO** groups values for transfer. An **RxPDO** carries outputs to
+the slave. A **TxPDO** carries inputs to the master.
 
 On the board, RxPDO `0x1600` holds the three LED values and TxPDO `0x1A00` holds
 the six sensor values.
@@ -58,7 +57,7 @@ A **SyncManager** controls access to an area of slave memory (see [Chapter
 latest complete value.
 
 A **fixed** mapping stays the same. With a **configurable** mapping, the master
-writes the mapping and assignment objects in the pre-operational state (PRE-OP). The
+writes the mapping and assignment objects in PRE-OP. The
 board has a fixed mapping. A drive can have a configurable mapping for position,
 velocity, or torque, depending on its control mode.
 
@@ -67,16 +66,16 @@ velocity, or torque, depending on its control mode.
 For cyclic data, the master uses one **logical address space** of 4 gibibytes (GiB).
 It assigns each slave a range of logical addresses.
 
-A slave's **fieldbus memory management units (FMMUs)** map logical address ranges to
+A slave's **FMMUs** map logical address ranges to
 slave memory. Each FMMU maps data in one direction. The board uses two FMMUs.
 
 - one maps the logical output range to SyncManager 2, for writing
 - one maps the logical input range to SyncManager 3, for reading
 
-The master sends a **logical read-write (LRW)** datagram that covers the configured
-range. For each matching address, a write FMMU copies data from the frame to slave
-memory. A read FMMU copies data from slave memory into the frame. The master
-receives the slaves' inputs in the returning frame.
+The master sends an **LRW** datagram that covers the configured range. For each
+matching address, a write FMMU copies data from the frame to slave memory, and a
+read FMMU copies data from slave memory into the frame. The returning frame carries
+the slaves' inputs back to the master.
 
 ```mermaid
 flowchart LR
@@ -101,7 +100,7 @@ inputs and writes outputs at each slave's assigned offsets.
 
 Each slave increments the datagram's WKC for the operations it completes (see
 [Chapter 0.2](frames-and-datagrams.md)). The table gives the WKC increments for a
-logical read-write datagram (LRW). A plain logical read or logical write adds 1.
+LRW datagram. A plain logical read or logical write adds 1.
 
 | What the slave did | Added to the WKC |
 |---|---|
@@ -122,7 +121,7 @@ cycle's data as unreliable.
 | Who calls the LED values outputs? | The master. The slave receives them in an RxPDO. |
 | What lists the values in a PDO? | A PDO mapping object, `0x16xx` or `0x1Axx`. |
 | What ties PDOs to a SyncManager? | The PDO assignment objects `0x1C12` and `0x1C13`. |
-| How many datagrams does a cycle need? | One logical datagram (LRW) for the whole bus, if it fits in a frame. |
+| How many datagrams does a cycle need? | One LRW datagram for the whole bus, if it fits in a frame. |
 | What translates logical addresses to slave memory? | The FMMUs of each slave. |
 | How does the master detect a missing slave? | The working counter is lower than expected. |
 

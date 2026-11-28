@@ -1,14 +1,13 @@
 # Distributed clocks
 
-> How does KickCAT synchronize the slaves and master cycle in Ethernet for Control
-> Automation Technology (EtherCAT)?
+> How does KickCAT synchronize the slaves and master cycle in EtherCAT?
 >
 > You will learn:
 >
-> - how `Bus::enableDC()` configures distributed clocks (DC)
-> - how a configured address read multiple write (FRMW) datagram distributes time
+> - how `Bus::enableDC()` configures DC
+> - how an FRMW datagram distributes time
 > - why the master adjusts its own cycle
-> - how a software phase-locked loop (PLL) adjusts the master's timing
+> - how a software PLL adjusts the master's timing
 > - how to check synchronization
 
 Master DC support is experimental. The maintainers have tested it in the emulator
@@ -37,8 +36,7 @@ eventually arrive while a slave is sampling its data.
 ## Setting up the clocks: enableDC
 
 `Bus::enableDC(cycle_time, shift, start_delay)` configures DC for the bus. The
-application calls it after `init()` and before requesting the safe-operational state
-(SAFE-OP).
+application calls it after `init()` and before requesting SAFE-OP.
 
 ```mermaid
 sequenceDiagram
@@ -61,7 +59,7 @@ sequenceDiagram
 ```
 
 **1. Select the reference.** The bus uses the first slave in bus order whose
-EtherCAT Slave Controller (ESC) supports DC. If none supports DC, `enableDC()`
+ESC supports DC. If none supports DC, `enableDC()`
 throws.
 
 **2. Measure port times.** The master reads its clock and broadcasts a write to the
@@ -117,11 +115,11 @@ either of two ways.
 KickCAT adjusts the master cycle. Host timing jitter therefore affects only the master.
 
 The master uses a `Timer` for its cycle. Each `Timer` has a software PLL
-(`SoftPll`). Once per cycle, the application calls `Bus::sync(timer)`. If the drift
-datagram returned, `sync()` passes its reference time to the timer. The PLL compares
-the phase of the master's wake-up with the target phase and adjusts the next
-deadline. The configured timer period stays the same. The following cycle uses a
-logical read-write (LRW) datagram for process data.
+(`SoftPll`). Once per cycle, the application calls `Bus::sync(timer)`. If the
+drift datagram came back, `sync()` passes its reference time to the timer. The PLL
+compares the master's wake-up phase with the target phase and adjusts the next
+deadline. The configured timer period stays the same. The cycle below uses an LRW
+datagram for process data.
 
 ```mermaid
 sequenceDiagram
@@ -165,7 +163,7 @@ validated on hardware.
 Use the following call order.
 
 1. `init()`, then `enableDC()`, which returns a sync point.
-2. Map the process data and bring the bus to SAFE-OP, then the operational state (OP), as in
+2. Map the process data and bring the bus to SAFE-OP, then OP, as in
    [Chapter 3](master.md).
 3. Create a `Timer` with the DC cycle time and start it at the sync point.
 4. In each cycle: exchange process data, call `bus.sync(timer)`, then
@@ -183,7 +181,7 @@ check sends a separate frame. Use it during startup or monitoring.
 |---|---|
 | Which slave is the reference? | The first slave in bus order with DC. |
 | When is `enableDC()` called? | After `init()`, before SAFE-OP. |
-| How do the slaves follow the reference? | A FRMW datagram added to each cyclic write. |
+| How do the slaves follow the reference? | An FRMW datagram added to each cyclic write. |
 | Does the master write its time into the reference? | No. The reference runs free. |
 | How does the master stay in step? | `Bus::sync()` feeds the reference time to the `Timer`'s soft PLL. |
 | What happens when a drift frame is lost? | The timer repeats its last correction. |

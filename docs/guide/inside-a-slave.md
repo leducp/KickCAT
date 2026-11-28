@@ -1,15 +1,14 @@
 # Inside a slave: the ESC
 
-> How does a slave share data with its application in Ethernet for Control
-> Automation Technology (EtherCAT)?
+> How does a slave share data with its application in EtherCAT?
 >
 > You will learn:
 >
-> - what the EtherCAT Slave Controller (ESC) and the application do
-> - how the ESC uses registers and random-access memory (RAM)
+> - what the ESC and the application do
+> - how the ESC uses registers and RAM
 > - how the two SyncManager modes protect shared data
-> - how fieldbus memory management units (FMMUs) map logical addresses
-> - what the electrically erasable programmable read-only memory (EEPROM) stores and
+> - how FMMUs map logical addresses
+> - what the EEPROM stores and
 >   what the watchdogs detect
 
 ## The problem: a fast wire and a slow program
@@ -26,9 +25,7 @@ The ESC and the application share memory.
 - The **application** runs on the slave's microcontroller. It reads and writes the
   shared memory when it is ready.
 
-The ESC communicates with the application through the **Process Data Interface
-(PDI)**. On the Freedom K64F board, the ESC is a LAN9252 and the PDI is a Serial
-Peripheral Interface (SPI) bus between the LAN9252 and the K64F microcontroller. On
+The ESC communicates with the application through the **PDI**. On the Freedom K64F board, the ESC is a LAN9252 and the PDI is an SPI bus between the LAN9252 and the K64F microcontroller. On
 other slaves, the ESC is part of the microcontroller, and the PDI is a bus inside
 the chip.
 
@@ -116,7 +113,7 @@ logical byte.
 
 Every ESC reads its configuration from a small nonvolatile memory, the **EEPROM**.
 Some ESCs, such as the XMC4800, emulate it in flash memory. It stores data in the
-**Slave Information Interface (SII)** format.
+**SII** format.
 
 - settings that the ESC itself reads at power-up, such as the kind of PDI to use
 - the identity of the slave: vendor identifier, product code, revision and serial

@@ -11,7 +11,7 @@ KickCAT is a thin EtherCAT stack designed to be embedded in larger software with
 efficiency in mind. It provides **both master and slave** implementations in one
 codebase and runs on Linux (including RT-PREEMPT), Windows, PikeOS, and NuttX.
 
-CoE (CANopen over EtherCAT) is fully supported on both sides. Beyond the stack
+CoE is fully supported on both sides. Beyond the stack
 itself, KickCAT ships a complete **software ESC and network emulator**, GUIs, and
 CLI tooling, so a bus can be developed, configured, and tested without physical
 hardware.
@@ -21,7 +21,7 @@ hardware.
 ### Master stack
 
 - Full EtherCAT State Machine (INIT, PRE-OP, SAFE-OP, OP)
-- Process data (PDO) read/write
+- PDO read/write
 - CoE: SDO read/write (expedited, normal, segmented), SDO Information, Emergency
 - Bus diagnostics with error counters
 - Cable redundancy
@@ -38,7 +38,7 @@ hardware.
 - CoE: Object Dictionary, SDO (including segmented and SDO Information)
 - ESC support: LAN9252 (SPI), XMC4800
 - EEPROM provisioning tooling
-- Conformance Test Tool (CTT) validated (WDC_FOOT)
+- CTT validated (WDC_FOOT)
 
 ### Mailbox protocols
 
@@ -74,7 +74,7 @@ See [docs/SIMULATION.md](SIMULATION.md).
 ## Platform support
 
 The master runs as a host OS process; the slave runs the stack against an
-EtherCAT Slave Controller (ESC).
+ESC.
 
 **Master (host OS):**
 

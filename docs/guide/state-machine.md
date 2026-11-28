@@ -1,22 +1,21 @@
 # The EtherCAT state machine
 
-> How does a slave start, change state, and report errors in Ethernet for Control
-> Automation Technology (EtherCAT)?
+> How does a slave start, change state, and report errors in EtherCAT?
 >
 > You will learn:
 >
-> - the initialization (INIT), pre-operational (PRE-OP), safe-operational (SAFE-OP),
->   operational (OP), and bootstrap (BOOT) states
+> - INIT, PRE-OP, SAFE-OP,
+>   OP, and BOOT states
 > - what the master configures and what the slave allows in each state
 > - how the master requests a state change and checks the result
 > - how a slave reports an error and returns to a lower state
 
 ## The problem: start a machine safely
 
-A motor must stay in a safe state until its outputs have been checked. Before the
-first cycle, the master sets the station address, configures the mailbox, and
-selects the process data. It also configures the SyncManagers and fieldbus memory
-management units (FMMUs). Each step depends on the previous one.
+A motor must stay in a safe state until its outputs have been checked. Before
+the first cycle, the master sets the station address, configures the mailbox,
+selects the process data, and configures the SyncManagers and FMMUs. Each step
+depends on the previous one.
 
 The EtherCAT **state machine** controls when the slave can use each function. To
 advance, the master must request the next state and the slave must accept the
@@ -26,7 +25,7 @@ configuration.
 
 | State | Mailbox | Inputs | Outputs | What the master does here |
 |---|---|---|---|---|
-| **INIT** | No | No | No | Sets the station address, reads the electrically erasable programmable read-only memory (EEPROM), configures the mailbox SyncManagers. |
+| **INIT** | No | No | No | Sets the station address, reads the EEPROM, configures the mailbox SyncManagers. |
 | **PRE-OP** | Yes | No | No | Configures the process data: the mapping, the process data SyncManagers and the FMMUs. |
 | **SAFE-OP** | Yes | Yes | No, held in a safe state | Starts the cycle, so that valid outputs reach the slave. |
 | **OP** | Yes | Yes | Yes | Runs the machine. |
@@ -72,8 +71,7 @@ The Freedom K64F board starts in this order.
 
 ## Request and answer
 
-The master and slave use three Application Layer (AL) registers in the EtherCAT
-Slave Controller (ESC).
+The master and slave use three AL registers in the ESC.
 
 - **AL Control** (at 0x0120): the master writes the state it
   wants.

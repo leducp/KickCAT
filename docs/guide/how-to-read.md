@@ -33,16 +33,14 @@ If you already know EtherCAT, skip Part 0 and start at Chapter 1.
 ## One example through the guide
 
 The examples use the **Freedom K64F board**, an NXP development board with a LAN9252
-EtherCAT Slave Controller. KickCAT includes the firmware and an Extensible Markup
-Language (XML) file that describes the board.
+EtherCAT Slave Controller. KickCAT includes the firmware and an XML file that describes the board.
 
 The master exchanges the following data with the board.
 
-- **3 output bytes** set the red, green, and blue levels of a light-emitting diode (LED).
+- **3 output bytes** set the red, green, and blue levels of an LED.
 - **12 input bytes** contain three accelerometer readings and three magnetometer
   readings. Each is a signed 16-bit integer.
-- **A mailbox** lets the master read and write configuration objects using CANopen
-  over EtherCAT (CoE).
+- **A mailbox** lets the master read and write configuration objects using CoE.
 
 You can use the `simulated_bus` example without the board. It uses the device
 description to emulate the board and runs the master in the same process. [Chapter
@@ -53,8 +51,7 @@ description to emulate the board and runs the master in the same process. [Chapt
 Each chapter describes the problem, the options, and the reason for the design. The
 "In the code" section lists the relevant source files.
 
-The guide explains the main classes and the order of calls in the application
-programming interface (API). Use the headers for current function signatures.
+The guide explains the main classes and the order of calls in the API. Use the headers for current function signatures.
 
 ## The other documents
 
@@ -75,7 +72,7 @@ programming interface (API). Use the headers for current function signatures.
    0.8](device-descriptions.md).
 2. Read [Chapter 1](principles.md) for the design principles.
 3. Follow [Building](../BUILDING.md), then run `simulated_bus` as shown in [Chapter
-   2](../architecture.md). Watch the slave reach the operational state (OP).
+   2](../architecture.md). Watch the slave reach OP.
 4. For master development, read Chapters [3](master.md), [4](transport.md), and
    [5](mailbox-implementation.md). For firmware, read Chapters [6](slave.md),
    [5](mailbox-implementation.md), and [9](from-xml-to-bytes.md).
