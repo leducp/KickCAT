@@ -21,7 +21,7 @@ nav = [
     { "Performance" = "user-guide/realtime.md" },
   ] },
   { "Developer guide" = [
-    "developer-guide/index.md",
+    { "Overview" = "developer-guide/index.md" },
     { "How to read this guide" = "developer-guide/how-to-read.md" },
     { "EtherCAT background" = [
       { "What is EtherCAT?" = "developer-guide/ethercat/what-is-ethercat.md" },
@@ -46,7 +46,7 @@ nav = [
       { "Operating systems and porting" = "developer-guide/architecture/platform.md" },
     ] },
     { "Contributing" = [
-      "developer-guide/contributing/index.md",
+      { "Guidelines" = "developer-guide/contributing/index.md" },
       { "Testing a change" = "developer-guide/contributing/testing.md" },
       { "Release procedure" = "developer-guide/contributing/release.md" },
     ] },
@@ -60,7 +60,6 @@ favicon = "assets/kickCAT_logo_light_mode.png"
 features = [
   "navigation.tabs",
   "navigation.sections",
-  "navigation.indexes",
   "navigation.top",
   "navigation.footer",
   "search.suggest",
